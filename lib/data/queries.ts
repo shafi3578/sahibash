@@ -11,7 +11,7 @@ import type {
   Offer,
   ListingVehicleFeature,
 } from "@/types/database";
-import { ACTIVE_HOME_CATEGORY_SLUGS } from "@/lib/categories/categoryTree";
+import { ACTIVE_HOME_CATEGORY_SLUGS, LAUNCH_ACTIVE_CATEGORY_SLUGS } from "@/lib/categories/categoryTree";
 
 type ListingFilters = {
   categoryId?: number;
@@ -107,6 +107,33 @@ export async function getApprovedListings(
 ): Promise<ListingWithRelations[]> {
     try {
       const supabase = await createSupabaseServerClient();
+
+      const lifecycleCategoryIds = await (async () => {
+        const lifecycle = await supabase
+          .from("categories")
+          .select("id")
+          .eq("is_active", true)
+          .eq("is_coming_soon", false);
+
+        if (!lifecycle.error && lifecycle.data) {
+          return (lifecycle.data as Array<{ id: number }>).map((row) => row.id);
+        }
+
+        const fallback = await supabase
+          .from("categories")
+          .select("id")
+          .in("slug", [...LAUNCH_ACTIVE_CATEGORY_SLUGS]);
+
+        if (fallback.error || !fallback.data) {
+          return [] as number[];
+        }
+
+        return (fallback.data as Array<{ id: number }>).map((row) => row.id);
+      })();
+
+      if (lifecycleCategoryIds.length === 0) {
+        return [];
+      }
 
       const intersectIds = (base: string[] | null, next: string[]): string[] => {
         if (base === null) {
@@ -288,6 +315,7 @@ export async function getApprovedListings(
                 `
                 )
                 .eq("status", "approved")
+                .in("category_id", lifecycleCategoryIds)
                 .in("id", ids)
                 .order("created_at", { ascending: false })
                 .limit(40);
@@ -340,6 +368,7 @@ export async function getApprovedListings(
         `
         )
         .eq("status", "approved")
+        .in("category_id", lifecycleCategoryIds)
         .limit(120);
 
       if (filters?.city) {

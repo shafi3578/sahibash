@@ -16,6 +16,8 @@ export default async function HomePage() {
 
   const featured = listings.filter((l) => l.featured).slice(0, 4);
   const latest = listings.slice(0, 8);
+  const launchCategories = categories.filter((category) => ["vehicles", "real-estate", "mobile-phones-tablets", "second-hand-items"].includes(category.slug));
+  const comingSoonCategories = categories.filter((category) => !["vehicles", "real-estate", "mobile-phones-tablets", "second-hand-items"].includes(category.slug));
 
   return (
     <main className="relative">
@@ -27,8 +29,8 @@ export default async function HomePage() {
             Find Better Deals Across Afghanistan
           </p>
           <p className="mt-3 max-w-2xl text-[var(--ink-2)]">
-            Buy and sell in Vehicles, Real Estate, Mobile Phones & Tablets,
-            Electronics, Home Goods, Jobs, Services, and more.
+            Buy and sell first in Vehicles, Real Estate, Phones & Electronics,
+            and Second Hand. More categories are launching soon.
           </p>
 
           <form action="/search" className="mt-6 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
@@ -86,10 +88,27 @@ export default async function HomePage() {
           </Link>
         </div>
         <div className="hidden grid-cols-1 gap-4 sm:grid-cols-2 lg:grid lg:grid-cols-4">
-          {categories.map((category) => (
+          {launchCategories.map((category) => (
             <CategoryCard key={category.id} category={category} />
           ))}
         </div>
+        {comingSoonCategories.length > 0 ? (
+          <div className="mt-4 hidden lg:block">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">More Categories (Coming Soon)</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {comingSoonCategories.map((category) => (
+                <Link
+                  key={category.id}
+                  href={`/categories/${category.slug}`}
+                  className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left"
+                >
+                  <p className="font-display text-base font-semibold text-[var(--ink-1)]">{category.name}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Coming Soon</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">

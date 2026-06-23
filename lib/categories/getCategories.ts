@@ -1,6 +1,11 @@
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ACTIVE_HOME_CATEGORY_SLUGS, RELATED_CATEGORIES } from "@/lib/categories/categoryTree";
+import {
+  ACTIVE_HOME_CATEGORY_SLUGS,
+  COMING_SOON_HOME_CATEGORY_SLUGS,
+  LAUNCH_ACTIVE_CATEGORY_SLUGS,
+  RELATED_CATEGORIES,
+} from "@/lib/categories/categoryTree";
 import { getCategoryCounts, getCategoryListingCount } from "@/lib/categories/getCategoryCounts";
 import type { CategoryNode } from "@/types/database";
 
@@ -10,7 +15,65 @@ export type CategoryNodeWithCount = CategoryNode & {
   icon: string | null;
   is_leaf: boolean;
   has_children: boolean;
+  is_coming_soon?: boolean;
+  launch_date?: string | null;
 };
+
+type RootCategoryState = {
+  id: number;
+  slug: string;
+  name: string;
+  is_active: boolean;
+  is_coming_soon: boolean;
+  launch_date: string | null;
+  display_order: number;
+};
+
+function toRootState(row: Record<string, unknown>): RootCategoryState {
+  return {
+    id: Number(row.id),
+    slug: String(row.slug),
+    name: String(row.name),
+    is_active: Boolean(row.is_active),
+    is_coming_soon: Boolean(row.is_coming_soon),
+    launch_date: row.launch_date ? String(row.launch_date) : null,
+    display_order: Number(row.display_order ?? 0),
+  };
+}
+
+async function getRootCategoryStates(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
+): Promise<RootCategoryState[]> {
+  const lifecycle = await supabase
+    .from("categories")
+    .select("id, slug, name, is_active, is_coming_soon, launch_date, display_order")
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+
+  if (!lifecycle.error && lifecycle.data) {
+    return (lifecycle.data as Record<string, unknown>[]).map(toRootState);
+  }
+
+  const fallback = await supabase
+    .from("categories")
+    .select("id, slug, name, is_active, display_order")
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+
+  if (fallback.error || !fallback.data) {
+    return [];
+  }
+
+  return (fallback.data as Record<string, unknown>[]).map((row) => ({
+    id: Number(row.id),
+    slug: String(row.slug),
+    name: String(row.name),
+    is_active: Boolean(row.is_active),
+    is_coming_soon: !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(String(row.slug) as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
+    launch_date: null,
+    display_order: Number(row.display_order ?? 0),
+  }));
+}
 
 function castNode(row: Record<string, unknown>): CategoryNode {
   return {
@@ -41,6 +104,8 @@ function sortNodes(a: CategoryNode, b: CategoryNode) {
 export const getHomeCategoryNodes = cache(async (): Promise<CategoryNodeWithCount[]> => {
   const supabase = await createSupabaseServerClient();
   const counts = await getCategoryCounts(null);
+  const categoryStates = await getRootCategoryStates(supabase);
+  const categoryStateById = new Map(categoryStates.map((item) => [item.id, item]));
 
   const { data, error } = await supabase
     .from("category_nodes")
@@ -54,17 +119,116 @@ export const getHomeCategoryNodes = cache(async (): Promise<CategoryNodeWithCoun
   const allNodes = (data as Record<string, unknown>[])
     .map(castNode)
     .sort(sortNodes)
-    .map((node) => ({
-      ...node,
-      count: counts.get(node.id) ?? 0,
-      subtitle: node.description ?? null,
-      icon: ((node as CategoryNode & { icon?: string | null }).icon ?? null),
-      is_leaf: ((node as CategoryNode & { is_leaf?: boolean }).is_leaf ?? false),
-      has_children: false,
-    }));
+    .map((node) => {
+      const state = categoryStateById.get(node.category_id);
 
-  const preferred = allNodes.filter((node) => ACTIVE_HOME_CATEGORY_SLUGS.includes(node.slug as (typeof ACTIVE_HOME_CATEGORY_SLUGS)[number]));
-  return preferred.length > 0 ? preferred : allNodes;
+      return {
+        ...node,
+        count: counts.get(node.id) ?? 0,
+        subtitle: node.description ?? null,
+        icon: ((node as CategoryNode & { icon?: string | null }).icon ?? null),
+        is_leaf: ((node as CategoryNode & { is_leaf?: boolean }).is_leaf ?? false),
+        has_children: false,
+        is_coming_soon: state?.is_coming_soon ?? false,
+        launch_date: state?.launch_date ?? null,
+      };
+    });
+
+  const preferred = allNodes.filter((node) =>
+    ACTIVE_HOME_CATEGORY_SLUGS.includes(node.slug as (typeof ACTIVE_HOME_CATEGORY_SLUGS)[number])
+      || COMING_SOON_HOME_CATEGORY_SLUGS.includes(node.slug as (typeof COMING_SOON_HOME_CATEGORY_SLUGS)[number])
+  );
+
+  if (preferred.length === 0) {
+    return allNodes;
+  }
+
+  return preferred.sort((a, b) => {
+    const aState = categoryStateById.get(a.category_id);
+    const bState = categoryStateById.get(b.category_id);
+    const aOrder = aState?.display_order ?? a.display_order;
+    const bOrder = bState?.display_order ?? b.display_order;
+    return aOrder - bOrder;
+  });
+});
+
+export const getRootCategoryLaunchState = cache(async (slug: string): Promise<{
+  categoryId: number;
+  categorySlug: string;
+  categoryName: string;
+  isComingSoon: boolean;
+  launchDate: string | null;
+  rootNode: CategoryNode | null;
+} | null> => {
+  const supabase = await createSupabaseServerClient();
+
+  const lifecycle = await supabase
+    .from("categories")
+    .select("id, slug, name, is_active, is_coming_soon, launch_date")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  let categoryRow: {
+    id: number;
+    slug: string;
+    name: string;
+    is_active: boolean;
+    is_coming_soon: boolean;
+    launch_date: string | null;
+  } | null = null;
+
+  if (!lifecycle.error && lifecycle.data) {
+    categoryRow = {
+      id: Number((lifecycle.data as Record<string, unknown>).id),
+      slug: String((lifecycle.data as Record<string, unknown>).slug),
+      name: String((lifecycle.data as Record<string, unknown>).name),
+      is_active: Boolean((lifecycle.data as Record<string, unknown>).is_active),
+      is_coming_soon: Boolean((lifecycle.data as Record<string, unknown>).is_coming_soon),
+      launch_date: (lifecycle.data as Record<string, unknown>).launch_date
+        ? String((lifecycle.data as Record<string, unknown>).launch_date)
+        : null,
+    };
+  } else {
+    const fallback = await supabase
+      .from("categories")
+      .select("id, slug, name, is_active")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (fallback.error || !fallback.data) {
+      return null;
+    }
+
+    categoryRow = {
+      id: Number((fallback.data as Record<string, unknown>).id),
+      slug: String((fallback.data as Record<string, unknown>).slug),
+      name: String((fallback.data as Record<string, unknown>).name),
+      is_active: Boolean((fallback.data as Record<string, unknown>).is_active),
+      is_coming_soon: !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(slug as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
+      launch_date: null,
+    };
+  }
+
+  if (!categoryRow.is_active) {
+    return null;
+  }
+
+  const { data: rootNodeData } = await supabase
+    .from("category_nodes")
+    .select("*")
+    .eq("category_id", categoryRow.id)
+    .is("parent_id", null)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  return {
+    categoryId: categoryRow.id,
+    categorySlug: categoryRow.slug,
+    categoryName: categoryRow.name,
+    isComingSoon: categoryRow.is_coming_soon,
+    launchDate: categoryRow.launch_date,
+    rootNode: rootNodeData ? castNode(rootNodeData as Record<string, unknown>) : null,
+  };
 });
 
 export const getCategoryNodeBySlugOrId = cache(async ({

@@ -410,6 +410,59 @@ async function resolveCategoryContext(
   };
 }
 
+async function ensureCategoryPostingAllowed(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  input: { category_id?: number | null; category_node_id?: number | null; subcategory_id?: number | null }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const categoryNodeId = getSelectedCategoryNodeId(input);
+  if (!categoryNodeId) {
+    return { ok: false, message: "Must select a category" };
+  }
+
+  const { data: node } = await supabase
+    .from("category_nodes")
+    .select("category_id, is_active")
+    .eq("id", categoryNodeId)
+    .maybeSingle();
+
+  if (!node || !node.is_active) {
+    return { ok: false, message: "Must select a category" };
+  }
+
+  const lifecycle = await supabase
+    .from("categories")
+    .select("is_active, is_coming_soon")
+    .eq("id", node.category_id)
+    .maybeSingle();
+
+  if (!lifecycle.error && lifecycle.data) {
+    const category = lifecycle.data as { is_active: boolean; is_coming_soon: boolean };
+    if (!category.is_active) {
+      return { ok: false, message: "Must select a category" };
+    }
+    if (category.is_coming_soon) {
+      return { ok: false, message: "Posting in this category is not available yet." };
+    }
+    return { ok: true };
+  }
+
+  const fallback = await supabase
+    .from("categories")
+    .select("slug, is_active")
+    .eq("id", node.category_id)
+    .maybeSingle();
+
+  if (fallback.error || !fallback.data || !fallback.data.is_active) {
+    return { ok: false, message: "Must select a category" };
+  }
+
+  if (!["vehicles", "real-estate", "mobile-phones-tablets", "second-hand-items"].includes(String(fallback.data.slug))) {
+    return { ok: false, message: "Posting in this category is not available yet." };
+  }
+
+  return { ok: true };
+}
+
 async function resolveLegacySubcategoryId(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   categoryId: number,
@@ -532,6 +585,11 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   }
 
   const input = parsed.data;
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
+  if (!postingGuard.ok) {
+    return;
+  }
+
   const listing = await buildListingPayload(supabase, user.id, input, formData);
   if (!listing) {
     return;
@@ -575,6 +633,11 @@ export async function createListingAction(formData: FormData): Promise<{
   }
 
   const input = parsed.data;
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
+  if (!postingGuard.ok) {
+    return { ok: false, message: postingGuard.message };
+  }
+
   const createdListing = await buildListingPayload(supabase, user.id, input, formData);
   if (!createdListing) {
     return { ok: false, message: "Must select a category" };
@@ -639,6 +702,11 @@ export async function updateListingAction(
   }
 
   const input = parsed.data;
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
+  if (!postingGuard.ok) {
+    return { ok: false, message: postingGuard.message };
+  }
+
   const createdListing = await buildListingPayload(supabase, user.id, input, formData);
   if (!createdListing) {
     return { ok: false, message: "Must select a category" };

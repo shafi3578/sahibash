@@ -59,8 +59,18 @@ export type Category = {
   description: string | null;
   display_order: number;
   is_active: boolean;
+  is_coming_soon: boolean;
+  launch_date: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type CategoryWaitlist = {
+  id: number;
+  category_id: CategoryId;
+  user_id: string | null;
+  email: string | null;
+  created_at: string;
 };
 
 export type CategoryNode = {

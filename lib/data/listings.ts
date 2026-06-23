@@ -1,6 +1,10 @@
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { ACTIVE_HOME_CATEGORY_SLUGS } from "@/lib/categories/categoryTree";
+import {
+  ACTIVE_HOME_CATEGORY_SLUGS,
+  COMING_SOON_HOME_CATEGORY_SLUGS,
+  LAUNCH_ACTIVE_CATEGORY_SLUGS,
+} from "@/lib/categories/categoryTree";
 import type { Category } from "@/types/database";
 
 export const getCategoriesWithStats = cache(
@@ -15,14 +19,24 @@ export const getCategoriesWithStats = cache(
       const { data: categories } = await supabase
         .from("categories")
         .select("*")
-        .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS])
+        .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS, ...COMING_SOON_HOME_CATEGORY_SLUGS])
         .order("display_order", { ascending: true });
 
       if (!categories) return [];
 
+      const normalized = (categories as Category[]).map((category) => ({
+        ...category,
+        is_coming_soon:
+          typeof (category as Category & { is_coming_soon?: boolean }).is_coming_soon === "boolean"
+            ? Boolean((category as Category & { is_coming_soon?: boolean }).is_coming_soon)
+            : !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
+        launch_date:
+          (category as Category & { launch_date?: string | null }).launch_date ?? null,
+      })) as Array<Category & { is_coming_soon: boolean; launch_date: string | null }>;
+
       // Get count for each category
       const withCounts = await Promise.all(
-        categories.map(async (cat) => {
+        normalized.map(async (cat) => {
           const { count } = await supabase
             .from("listings")
             .select("id", { count: "exact", head: true })
@@ -36,7 +50,7 @@ export const getCategoriesWithStats = cache(
         })
       );
 
-      return withCounts;
+      return withCounts.sort((a, b) => a.display_order - b.display_order);
     } catch {
       return [];
     }

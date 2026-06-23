@@ -87,7 +87,7 @@ export function CategoryRow({
     </div>
   );
 
-  if (href && !comingSoon) {
+  if (href) {
     return (
       <Link href={href} className="block border-b border-slate-100 last:border-b-0">
         {content}
