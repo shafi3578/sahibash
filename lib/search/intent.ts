@@ -316,6 +316,12 @@ const SPECIFIC_INTENTS: SpecificIntent[] = [
     matchedRule: "houses",
   },
   {
+    terms: ["shop", "shops"],
+    categoryPath: "real-estate/shops-commercial",
+    confidence: "high",
+    matchedRule: "shops-commercial",
+  },
+  {
     terms: ["apartment", "flat"],
     categoryPath: "real-estate/apartments",
     confidence: "high",
@@ -421,7 +427,7 @@ const RULES: Array<{
   {
     name: "real-estate",
     confidence: "high",
-    match: (input) => /\bapartment\b|\bhouse\b|\bhaweli\b|\bhaveli\b|\bflat\b|\bland\b|\bdormitory\b|\brent\b|\bgerawy\b|\bgarawi\b|\brahn\b|\bvilla\b|\bduplex\b/.test(input),
+    match: (input) => /\bapartment\b|\bhouse\b|\bhaweli\b|\bhaveli\b|\bflat\b|\bland\b|\bdormitory\b|\brent\b|\bgerawy\b|\bgarawi\b|\brahn\b|\bvilla\b|\bduplex\b|\bshop\b/.test(input),
     categoryPath: "real-estate",
   },
   {
