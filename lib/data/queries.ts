@@ -60,6 +60,11 @@ type ListingFilters = {
   accidentStatus?: string;
   oldVehicle?: boolean;
   importedVehicle?: boolean;
+  rebuiltVehicle?: boolean;
+  customVehicle?: boolean;
+  documentsAvailable?: boolean;
+  engineSwapped?: boolean;
+  olderThan1980?: boolean;
   honda70?: boolean;
   engineCc?: string;
   rickshawType?: string;
@@ -310,6 +315,9 @@ export async function getApprovedListings(
       await applyAttributeTextFilter("imported_from", filters?.importedFrom);
       await applyAttributeTextFilter("condition", filters?.condition);
       await applyAttributeTextFilter("accident_status", filters?.accidentStatus);
+      await applyAttributeBooleanFilter("rebuilt_vehicle", filters?.rebuiltVehicle);
+      await applyAttributeBooleanFilter("documents_available", filters?.documentsAvailable);
+      await applyAttributeBooleanFilter("engine_swapped", filters?.engineSwapped);
       await applyAttributeNumberFilter("mileage", filters?.kmMin, filters?.kmMax);
 
       await applyAttributeNumberFilter("bathrooms", filters?.bathroomsMin, undefined);
@@ -384,8 +392,16 @@ export async function getApprovedListings(
         query = query.eq("vehicle_is_classic", filters.oldVehicle);
       }
 
+      if (typeof filters?.olderThan1980 === "boolean" && filters.olderThan1980) {
+        query = query.lt("vehicle_year", 1980);
+      }
+
       if (typeof filters?.importedVehicle === "boolean") {
         query = query.contains("vehicle_manual_specs", { imported: filters.importedVehicle });
+      }
+
+      if (typeof filters?.customVehicle === "boolean") {
+        query = query.eq("vehicle_is_custom", filters.customVehicle);
       }
 
       if (typeof filters?.honda70 === "boolean" && filters.honda70) {
