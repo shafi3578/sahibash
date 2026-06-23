@@ -1,6 +1,5 @@
 import { CategoryRow } from "@/components/categories/CategoryRow";
 import type { CategoryNodeWithCount } from "@/lib/categories/getCategories";
-import { COMING_SOON_CATEGORY_LABELS } from "@/lib/categories/categoryTree";
 
 type Props = {
   categories: CategoryNodeWithCount[];
@@ -52,24 +51,6 @@ export function CategoryHomeList({ categories }: Props) {
           showIcon
         />
       ))}
-
-      {COMING_SOON_CATEGORY_LABELS.length > 0 ? (
-        <>
-          <div className="border-y border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            More Categories
-          </div>
-
-          {COMING_SOON_CATEGORY_LABELS.slice(0, 4).map((label) => (
-            <CategoryRow key={label} title={label} subtitle="More categories coming soon" comingSoon compact />
-          ))}
-        </>
-      ) : null}
-
-      <div className="border-y border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Quick Lists
-      </div>
-      <CategoryRow title="Urgent Listings" compact showCount={false} />
-      <CategoryRow title="Last 48 Hours" compact showCount={false} />
     </section>
   );
 }
