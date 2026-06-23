@@ -26,6 +26,21 @@ const VEHICLE_BRANDS = [
 
 const PHONE_BRANDS = ["iphone", "samsung", "xiaomi", "oppo", "vivo", "infinix", "tecno", "realme"];
 
+const VEHICLE_MODEL_ALIASES: Array<{ token: string; brand: string; model: string }> = [
+  { token: "corolla", brand: "Toyota", model: "Corolla" },
+  { token: "fielder", brand: "Toyota", model: "Fielder" },
+  { token: "prado", brand: "Toyota", model: "Land Cruiser Prado" },
+  { token: "land cruiser", brand: "Toyota", model: "Land Cruiser" },
+  { token: "saracha", brand: "Toyota", model: "TownAce / Saracha" },
+  { token: "seraacha", brand: "Toyota", model: "TownAce / Saracha" },
+  { token: "camry", brand: "Toyota", model: "Camry" },
+  { token: "civic", brand: "Honda", model: "Civic" },
+  { token: "sonata", brand: "Hyundai", model: "Sonata" },
+  { token: "elantra", brand: "Hyundai", model: "Elantra" },
+  { token: "sportage", brand: "Kia", model: "Sportage" },
+  { token: "sunny", brand: "Nissan", model: "Sunny" },
+];
+
 const RULES: Array<{
   name: string;
   confidence: "high" | "medium" | "low";
@@ -35,25 +50,25 @@ const RULES: Array<{
   {
     name: "rickshaw",
     confidence: "high",
-    match: (input) => /\brickshaw\b|\bthree[\s-]?wheeler\b|\bauto[\s-]?rickshaw\b/.test(input),
-    categoryPath: "vehicles/rickshaw-three-wheelers",
+    match: (input) => /\brickshaw\b|\btuk\s*tuk\b|\bthree[\s-]?wheeler\b|\bauto[\s-]?rickshaw\b/.test(input),
+    categoryPath: "vehicles/rickshaws-three-wheelers",
   },
   {
     name: "motorcycle",
     confidence: "high",
-    match: (input) => /\bmotorcycle\b|\bbike\b|\bhonda\s*70\b|\b125\s*cc\b/.test(input),
+    match: (input) => /\bmotorcycle\b|\bbike\b|\bhonda\s*70\b|\bcd\s*70\b|\bcg\s*125\b|\b125\s*cc\b/.test(input),
     categoryPath: "vehicles/motorcycles",
   },
   {
     name: "vehicle",
     confidence: "medium",
-    match: (input) => /\bcar\b|\bvehicle\b|\btoyota\b|\bcorolla\b|\bsonata\b|\bcivic\b|\belantra\b/.test(input),
-    categoryPath: "vehicles",
+    match: (input) => /\bcar\b|\bvehicle\b|\btoyota\b|\bcorolla\b|\bfielder\b|\bprado\b|\bsaracha\b|\bsonata\b|\bcivic\b|\belantra\b/.test(input),
+    categoryPath: "vehicles/cars",
   },
   {
     name: "real-estate",
     confidence: "high",
-    match: (input) => /\bapartment\b|\bhouse\b|\bflat\b|\bland\b|\bdormitory\b|\brent\b|\bgerawy\b|\brahn\b/.test(input),
+    match: (input) => /\bapartment\b|\bhouse\b|\bhaweli\b|\bflat\b|\bland\b|\bdormitory\b|\brent\b|\bgerawy\b|\brahn\b/.test(input),
     categoryPath: "real-estate",
   },
   {
@@ -65,6 +80,12 @@ const RULES: Array<{
 ];
 
 function extractBrandModel(input: string): { brand?: string; model?: string } {
+  for (const alias of VEHICLE_MODEL_ALIASES) {
+    if (input.includes(alias.token)) {
+      return { brand: alias.brand, model: alias.model };
+    }
+  }
+
   for (const brand of VEHICLE_BRANDS) {
     if (input.includes(brand)) {
       const after = input.split(brand)[1]?.trim();

@@ -47,11 +47,15 @@ type ListingFilters = {
   kmMax?: number;
   fuelType?: string;
   transmission?: string;
+  bodyType?: string;
+  engineCapacity?: string;
   color?: string;
   sellerType?: string;
   warranty?: string;
   exchange?: boolean;
   plateStatus?: string;
+  customsStatus?: string;
+  importedFrom?: string;
   condition?: string;
   accidentStatus?: string;
   oldVehicle?: boolean;
@@ -65,6 +69,9 @@ type ListingFilters = {
   storage?: string;
   ram?: string;
   batteryHealthMin?: number;
+  originalRefurbished?: string;
+  bathroomsMin?: number;
+  parking?: boolean;
 };
 
 export type SearchIntent = {
@@ -292,19 +299,27 @@ export async function getApprovedListings(
 
       await applyAttributeTextFilter("locked__fuel_type", filters?.fuelType);
       await applyAttributeTextFilter("locked__gear", filters?.transmission);
+      await applyAttributeTextFilter("body_type", filters?.bodyType);
+      await applyAttributeTextFilter("engine_capacity", filters?.engineCapacity);
       await applyAttributeTextFilter("color", filters?.color);
       await applyAttributeTextFilter("seller_type", filters?.sellerType);
       await applyAttributeTextFilter("warranty", filters?.warranty);
       await applyAttributeBooleanFilter("exchange_available", filters?.exchange);
       await applyAttributeTextFilter("plate_status", filters?.plateStatus);
+      await applyAttributeTextFilter("customs_status", filters?.customsStatus);
+      await applyAttributeTextFilter("imported_from", filters?.importedFrom);
       await applyAttributeTextFilter("condition", filters?.condition);
       await applyAttributeTextFilter("accident_status", filters?.accidentStatus);
       await applyAttributeNumberFilter("mileage", filters?.kmMin, filters?.kmMax);
+
+      await applyAttributeNumberFilter("bathrooms", filters?.bathroomsMin, undefined);
+      await applyAttributeBooleanFilter("parking", filters?.parking);
 
       await applyAttributeTextFilter("model", filters?.phoneModel);
       await applyAttributeTextFilter("storage", filters?.storage);
       await applyAttributeTextFilter("ram", filters?.ram);
       await applyAttributeNumberFilter("battery_health", filters?.batteryHealthMin, undefined);
+      await applyAttributeTextFilter("original_refurbished", filters?.originalRefurbished);
 
       let query = supabase
         .from("listings")

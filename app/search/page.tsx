@@ -260,11 +260,15 @@ export default async function SearchPage({
     kmMax: toNumber(params.kmMax ?? params.km_max),
     fuelType: params.fuelType ?? params.fuel_type,
     transmission: params.transmission,
+    bodyType: params.bodyType ?? params.body_type,
+    engineCapacity: params.engineCapacity ?? params.engine_capacity,
     color: params.color,
     sellerType: params.sellerType ?? params.seller_type,
     warranty: params.warranty,
     exchange: toBoolean(params.exchange),
     plateStatus: params.plateStatus ?? params.plate_status,
+    customsStatus: params.customsStatus ?? params.customs_status,
+    importedFrom: params.importedFrom ?? params.imported_from,
     condition: params.condition,
     accidentStatus: params.accidentStatus ?? params.accident_status,
     oldVehicle: toBoolean(params.oldVehicle ?? params.old_vehicle),
@@ -279,6 +283,9 @@ export default async function SearchPage({
     storage: params.storage,
     ram: params.ram,
     batteryHealthMin: toNumber(params.batteryHealthMin ?? params.battery_health_min),
+    originalRefurbished: params.originalRefurbished ?? params.original_refurbished,
+    bathroomsMin: toNumber(params.bathroomsMin ?? params.bathrooms_min),
+    parking: toBoolean(params.parking),
   });
 
   const activeEntries = Object.entries(params).filter(
