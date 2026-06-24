@@ -6,9 +6,6 @@ export const LAUNCH_ACTIVE_CATEGORY_SLUGS = [
 ] as const;
 
 export const COMING_SOON_HOME_CATEGORY_SLUGS = [
-  "electronics-computers",
-  "home-furniture-appliances",
-  "clothing-personal-items",
   "jobs",
   "services",
   "business-industry",
