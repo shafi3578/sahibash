@@ -22,6 +22,8 @@ export const metadata: Metadata = {
   description: "A modern Afghanistan marketplace for vehicles, real estate, electronics, and second-hand items.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
