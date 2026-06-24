@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Source_Sans_3 } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { getCurrentLocale } from "@/lib/i18n/server";
 import "./globals.css";
 
 const displayFont = Space_Grotesk({
@@ -21,14 +22,15 @@ export const metadata: Metadata = {
   description: "A modern Afghanistan marketplace for vehicles, real estate, electronics, and second-hand items.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getCurrentLocale();
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${displayFont.variable} ${bodyFont.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

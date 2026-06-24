@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
 import { CURRENCIES, AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import type { TRANSLATIONS } from "@/lib/i18n/translations";
 
 type ElectronicsCategory = {
   id: number;
@@ -58,6 +59,7 @@ type LocationMethod = "device" | "manual" | null;
 
 type Props = {
   subcategories: ElectronicsCategory[];
+  t: (typeof TRANSLATIONS)["en"];
 };
 
 type Step = "category" | "brandModel" | "details" | "photos" | "location" | "preview";
@@ -90,7 +92,7 @@ function optionsByType(options: ElectronicsOption[], type: string) {
     .map((option) => option.option_value);
 }
 
-export default function ElectronicsPostAdForm({ subcategories }: Props) {
+export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -143,7 +145,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
   const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
   const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
   const [locationMethod, setLocationMethod] = useState<LocationMethod>(null);
-  const [locationVisibility, setLocationVisibility] = useState<"exact" | "approximate" | "hidden">("hidden");
+  const [locationVisibility, setLocationVisibility] = useState<"exact" | "approximate" | "province_district">("province_district");
   const [deviceLatitude, setDeviceLatitude] = useState<number | null>(null);
   const [deviceLongitude, setDeviceLongitude] = useState<number | null>(null);
   const [deviceAccuracy, setDeviceAccuracy] = useState<number | null>(null);
@@ -155,11 +157,11 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
   const [contactName, setContactName] = useState("");
 
   const breadcrumb = useMemo(() => {
-    const categoryName = selectedCategory?.name ?? "Phones & Electronics";
+    const categoryName = selectedCategory?.name ?? t.postAdElectronics.phonesElectronics;
     const brandName = manualModel ? (manualBrandName || "Manual Brand") : (selectedBrand?.name ?? "Brand");
     const modelName = manualModel ? (manualModelName || "Manual Model") : (selectedModel?.name ?? "Model");
-    return `Phones & Electronics -> ${categoryName} -> ${brandName} -> ${modelName}`;
-  }, [selectedCategory?.name, selectedBrand?.name, selectedModel?.name, manualModel, manualBrandName, manualModelName]);
+    return `${t.postAdElectronics.phonesElectronics} -> ${categoryName} -> ${brandName} -> ${modelName}`;
+  }, [selectedCategory?.name, selectedBrand?.name, selectedModel?.name, manualModel, manualBrandName, manualModelName, t.postAdElectronics.phonesElectronics]);
 
   const storageOptions = useMemo(() => optionsByType(modelOptions, "storage"), [modelOptions]);
   const colorOptions = useMemo(() => optionsByType(modelOptions, "color"), [modelOptions]);
@@ -630,16 +632,16 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
   return (
     <div className="relative pb-28">
       <div className="sticky top-0 z-10 rounded-2xl bg-sky-700 px-4 py-3 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wide">Phones & Electronics</p>
-        <p className="text-sm">{STEP_LABELS[step]}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide">{t.postAdElectronics.phonesElectronics}</p>
+        <p className="text-sm">{step === "category" ? t.postAdElectronics.category : step === "brandModel" ? t.postAdElectronics.brandModel : step === "details" ? t.postAdElectronics.details : step === "photos" ? t.postAdElectronics.photos : step === "location" ? t.postAdElectronics.location : t.postAdElectronics.preview}</p>
         <p className="mt-1 text-xs text-sky-100 break-words">{breadcrumb}</p>
       </div>
 
       <div className="mt-4 space-y-4">
         {step === "category" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Category</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">Choose a Phones & Electronics subcategory.</p>
+            <h2 className="font-display text-lg font-bold">{t.postAdElectronics.category}</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAdElectronics.chooseSubcategory}</p>
             <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
               {subcategories.map((category) => (
                 <button key={category.id} type="button" onClick={() => void onSelectCategory(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
@@ -653,8 +655,8 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
 
         {step === "brandModel" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Brand & Model</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">Popular brands are prioritized for faster posting.</p>
+            <h2 className="font-display text-lg font-bold">{t.postAdElectronics.brandModel}</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAdElectronics.popularBrandsHint}</p>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold">Brand
@@ -664,7 +666,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
                     void onSelectBrand(next);
                   }
                 }} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select brand</option>
+                  <option value="">{t.postAdElectronics.selectBrand}</option>
                   {brands.map((brand) => (
                     <option key={brand.id} value={brand.id}>{brand.name}</option>
                   ))}
@@ -678,7 +680,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
                     void onSelectModel(next);
                   }
                 }} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select model</option>
+                  <option value="">{t.postAdElectronics.selectModel}</option>
                   {models.map((model) => (
                     <option key={model.id} value={model.id}>{model.name}</option>
                   ))}
@@ -689,7 +691,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
             <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
               <label className="flex items-center gap-2 text-sm font-semibold">
                 <input type="checkbox" checked={manualModel} onChange={(event) => setManualModel(event.target.checked)} className="h-4 w-4" />
-                Can\'t find your model? Add manually.
+                {t.postAdElectronics.cantFindModel}
               </label>
 
               {manualModel ? (
@@ -708,11 +710,11 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
 
         {step === "details" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Details</h2>
+            <h2 className="font-display text-lg font-bold">{t.postAdElectronics.details}</h2>
 
             {knownSpecs.length > 0 ? (
               <details className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                <summary className="cursor-pointer text-sm font-semibold">Known Specs</summary>
+                <summary className="cursor-pointer text-sm font-semibold">{t.postAdElectronics.knownSpecs}</summary>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2 text-sm">
                   {knownSpecs.map((spec) => (
                     <p key={spec.id}><span className="font-semibold">{spec.spec_label}:</span> {spec.spec_value}</p>
@@ -800,7 +802,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
 
         {step === "photos" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Photos</h2>
+            <h2 className="font-display text-lg font-bold">{t.postAdElectronics.photos}</h2>
             <p className="mt-1 text-sm text-[var(--ink-2)]">
               {postingConfig.requires_images ? `Photos required. Minimum ${postingConfig.min_images}.` : "Photos optional."}
               {postingConfig.recommended_images ? ` Recommended: ${postingConfig.recommended_images}` : ""}
@@ -809,7 +811,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={pickFiles} />
             {images.length === 0 ? (
               <button type="button" onClick={() => fileInputRef.current?.click()} className="mt-3 w-full rounded-2xl border-2 border-dashed border-[var(--line)] py-10 text-sm font-semibold">
-                Add photos
+                {t.postAd.addPhotos}
               </button>
             ) : (
               <div className="mt-3 space-y-3">
@@ -827,7 +829,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
                 </div>
                 {images.length < postingConfig.max_images ? (
                   <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">
-                    Add more
+                    {t.postAd.addMore}
                   </button>
                 ) : null}
               </div>
@@ -837,8 +839,8 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
 
         {step === "location" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Where is this item located?</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">Choose how you want to add your location.</p>
+            <h2 className="font-display text-lg font-bold">{t.postAd.whereLocated}</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.chooseLocationMethod}</p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <button
@@ -846,8 +848,8 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
                 onClick={handleUseMyLocation}
                 className={`rounded-xl border p-4 text-left ${locationMethod === "device" ? "border-emerald-600 bg-emerald-50" : "border-[var(--line)]"}`}
               >
-                <p className="text-sm font-bold">Use My Location</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">Detect automatically from your device.</p>
+                <p className="text-sm font-bold">{t.postAd.useMyLocation}</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.detectAutomatically}</p>
               </button>
               <button
                 type="button"
@@ -858,13 +860,13 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
                 }}
                 className={`rounded-xl border p-4 text-left ${locationMethod === "manual" ? "border-sky-600 bg-sky-50" : "border-[var(--line)]"}`}
               >
-                <p className="text-sm font-bold">Manual Location</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">Choose province and district yourself.</p>
+                <p className="text-sm font-bold">{t.postAd.manualLocation}</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.chooseProvinceDistrict}</p>
               </button>
             </div>
 
             {isDetectingLocation ? (
-              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">Detecting your device location...</p>
+              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">{t.postAd.detectingLocation}</p>
             ) : null}
 
             {locationHint ? (
@@ -917,10 +919,10 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
                 <input value={area} onChange={(event) => setArea(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
               <label className="text-sm font-semibold sm:col-span-2">Location Visibility
-                <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "hidden")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="hidden">Hide exact location, show only province/district</option>
-                  <option value="approximate">Show approximate location</option>
-                  <option value="exact">Show exact location</option>
+                <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "province_district")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="province_district">{t.postAd.hideExactShowProvinceDistrict}</option>
+                  <option value="approximate">{t.postAd.showApproximateLocation}</option>
+                  <option value="exact">{t.postAd.showExactLocation}</option>
                 </select>
               </label>
               {locationMethod === "device" && deviceLatitude !== null && deviceLongitude !== null ? (
@@ -930,7 +932,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
                   <p>District: {district || "Not matched"}</p>
                   <p>Accuracy: {deviceAccuracy !== null ? `${deviceAccuracy} m` : "Unknown"}</p>
                   <button type="button" onClick={handleConfirmDetectedLocation} className="mt-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
-                    Confirm Location
+                    {t.postAd.confirmLocation}
                   </button>
                 </div>
               ) : null}
@@ -946,14 +948,14 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
 
         {step === "preview" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Preview</h2>
+            <h2 className="font-display text-lg font-bold">{t.postAd.preview}</h2>
             <div className="mt-3 grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-              <p><span className="font-semibold">Path:</span> {breadcrumb}</p>
-              <p><span className="font-semibold">Price:</span> {price ? `${price} ${currency}` : "-"}</p>
-              <p><span className="font-semibold">Condition:</span> {condition || "-"}</p>
-              <p><span className="font-semibold">Storage:</span> {storage || "-"}</p>
-              <p><span className="font-semibold">Location:</span> {province || "-"}{district ? `, ${district}` : ""}</p>
-              <p><span className="font-semibold">Photos:</span> {images.length}</p>
+              <p><span className="font-semibold">{t.postAdElectronics.path}:</span> {breadcrumb}</p>
+              <p><span className="font-semibold">{t.postAd.price}:</span> {price ? `${price} ${currency}` : "-"}</p>
+              <p><span className="font-semibold">{t.postAd.condition}:</span> {condition || "-"}</p>
+              <p><span className="font-semibold">{t.postAd.storage}:</span> {storage || "-"}</p>
+              <p><span className="font-semibold">{t.postAdElectronics.locationLabel}:</span> {province || "-"}{district ? `, ${district}` : ""}</p>
+              <p><span className="font-semibold">{t.postAd.photosLabel}:</span> {images.length}</p>
             </div>
           </section>
         ) : null}
@@ -966,17 +968,17 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
         <div className="mx-auto flex w-full max-w-5xl gap-2">
           {step !== "category" ? (
             <button type="button" onClick={gotoPrev} className="rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-semibold">
-              Back
+              {t.postAd.back}
             </button>
           ) : null}
 
           {step !== "preview" ? (
             <button type="button" onClick={gotoNext} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white">
-              Continue
+              {t.postAd.continue}
             </button>
           ) : (
             <button type="button" onClick={() => void onPublish()} disabled={isPending} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-              {isPending ? status ?? "Publishing..." : "Publish"}
+              {isPending ? status ?? t.postAd.publishing : t.postAd.publish}
             </button>
           )}
         </div>

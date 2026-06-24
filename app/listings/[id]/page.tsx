@@ -11,6 +11,7 @@ import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
 import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
 import LocationCard from "@/components/location/LocationCard";
+import { getDictionary } from "@/lib/i18n/server";
 
 function readAttributeValue(value: unknown) {
   if (typeof value === "string") return value;
@@ -26,6 +27,7 @@ export default async function ListingDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ message?: string; offer?: string; compose?: string; offerbox?: string }>;
 }) {
+  const { t } = await getDictionary();
   const { id } = await params;
   const qp = await searchParams;
   const listing = await getListingById(id);
@@ -45,12 +47,26 @@ export default async function ListingDetailPage({
   );
   const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
   const locationParts = [listing.province, listing.district, listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean);
+  const listingTypeValue = String(
+    (listing as { listing_type?: string }).listing_type
+    ?? attributeMap.get("listing_type")
+    ?? attributeMap.get("listing_purpose")
+    ?? attributeMap.get("rental_type")
+    ?? ""
+  ).toLowerCase();
+  const isWanted = listingTypeValue.includes("wanted") || /\bwanted\b/i.test(listing.title);
   const videoUrl = listing.video_url || attributeMap.get("video_url") || "";
   const postedDate = new Date(listing.created_at).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
+  const sellerJoinedDate = listing.profile?.created_at
+    ? new Date(listing.profile.created_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+      })
+    : null;
   const sellerName = listing.contact_name || listing.profile?.full_name || "Seller";
   const sellerPhone = listing.contact_phone || listing.profile?.phone || "Not provided";
   const groupedSpecs = Object.entries(specView.grouped)
@@ -105,8 +121,8 @@ export default async function ListingDetailPage({
   }, {});
   const vehicleSummaryRows = isVehicleListing
     ? [
-        { label: "Listing No", value: listing.id },
-        { label: "Listing Date", value: postedDate },
+        { label: t.listing.listingNo, value: listing.id },
+        { label: t.listing.listingDate, value: postedDate },
         { label: "Make", value: attributeMap.get("locked__make") || attributeMap.get("locked__brand") || vehicleVariant?.generation?.model?.brand?.name || "-" },
         { label: "Series", value: attributeMap.get("locked__series") || vehicleVariant?.generation?.model?.series?.name || "-" },
         { label: "Model", value: attributeMap.get("locked__model") || vehicleVariant?.generation?.model?.name || "-" },
@@ -139,7 +155,7 @@ export default async function ListingDetailPage({
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       {qp.message === "sent" && (
         <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          Your message has been sent to the seller.
+          {t.listing.sendMessage}.
         </div>
       )}
       {qp.message === "invalid" && (
@@ -164,30 +180,35 @@ export default async function ListingDetailPage({
       )}
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link href="/listings" className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold">
-          Back to Listings
+          {t.listing.backToListings}
         </Link>
-        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-2)]">{categoryLabel || "Category"}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-2)]">{categoryLabel || t.listing.category}</p>
       </div>
       <div className="space-y-4 pb-20 sm:pb-0">
         <ListingGallery images={listing.listing_images ?? []} title={listing.title} />
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+          {isWanted ? (
+            <p className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              {t.listing.wantedAd}
+            </p>
+          ) : null}
           <h1 className="mt-1 font-display text-2xl font-bold leading-tight sm:text-3xl">{listing.title}</h1>
           {listing.suitable_for_students ? (
             <p className="mt-2 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-              This place is suitable for students.
+              {t.listing.suitableForStudents}
             </p>
           ) : null}
           <p className="mt-3 text-3xl font-bold text-[var(--accent)]">{new Intl.NumberFormat("en-US").format(listing.price)} {listing.currency}</p>
           <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-3 text-sm text-[var(--ink-2)] sm:grid-cols-2">
             {locationParts.length > 0 ? <p>{locationParts.join(" / ")}</p> : null}
-            <p className="sm:text-right">Posted: {postedDate}</p>
+            <p className="sm:text-right">{t.listing.posted}: {postedDate}</p>
           </div>
         </section>
 
         {isVehicleListing ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-            <h2 className="text-base font-bold">Vehicle Summary</h2>
+            <h2 className="text-base font-bold">{t.listing.vehicleSummary}</h2>
             <div className="mt-3 grid overflow-hidden rounded-xl border border-[var(--line)] md:grid-cols-2">
               {vehicleSummaryRows.map((row) => (
                 <div key={row.label} className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0 md:nth-[2n]:border-l">
@@ -200,23 +221,26 @@ export default async function ListingDetailPage({
         ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-          <h2 className="text-base font-bold">Seller Information</h2>
+          <h2 className="text-base font-bold">{t.listing.sellerInformation}</h2>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-            <p><span className="text-[var(--ink-2)]">Name:</span> <span className="font-semibold">{sellerName}</span></p>
-            <p><span className="text-[var(--ink-2)]">Phone:</span> <span className="font-semibold">{sellerPhone}</span></p>
+            <p><span className="text-[var(--ink-2)]">{t.listing.name}:</span> <span className="font-semibold">{sellerName}</span></p>
+            <p><span className="text-[var(--ink-2)]">{t.listing.phone}:</span> <span className="font-semibold">{sellerPhone}</span></p>
+            {sellerJoinedDate ? (
+              <p><span className="text-[var(--ink-2)]">{t.listing.joined}:</span> <span className="font-semibold">{sellerJoinedDate}</span></p>
+            ) : null}
           </div>
           {listing.minimum_offer ? (
-            <p className="mt-2 text-sm text-[var(--ink-2)]">Minimum offer: {new Intl.NumberFormat("en-US").format(listing.minimum_offer)} {listing.currency}</p>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">{t.listing.minimumOffer}: {new Intl.NumberFormat("en-US").format(listing.minimum_offer)} {listing.currency}</p>
           ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
             {listing.contact_phone ? (
-              <a href={callHref} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Call Seller</a>
+              <a href={callHref} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">{t.listing.callSeller}</a>
             ) : null}
             {!isOwner ? (
-              <Link href={`/listings/${listing.id}?compose=1`} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">Message</Link>
+              <Link href={`/listings/${listing.id}?compose=1`} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
             ) : null}
             {!isOwner ? (
-              <Link href={`/listings/${listing.id}?offerbox=1`} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">Offer</Link>
+              <Link href={`/listings/${listing.id}?offerbox=1`} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">{t.listing.offer}</Link>
             ) : null}
           </div>
         </section>
@@ -252,13 +276,13 @@ export default async function ListingDetailPage({
         ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-          <h2 className="text-base font-bold">Description</h2>
+          <h2 className="text-base font-bold">{t.listing.description}</h2>
           <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[var(--ink-1)]">{listing.description}</p>
           {videoUrl ? (
             <div className="mt-4 border-t border-[var(--line)] pt-3 text-sm">
-              <p className="font-semibold">Video</p>
+              <p className="font-semibold">{t.listing.video}</p>
               <a href={videoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[var(--accent)] underline underline-offset-2">
-                Open vehicle video
+                {t.listing.openVehicleVideo}
               </a>
             </div>
           ) : null}
@@ -266,7 +290,7 @@ export default async function ListingDetailPage({
 
         {selectedFeatures.length > 0 ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-            <h2 className="text-base font-bold">Feature Checklist</h2>
+            <h2 className="text-base font-bold">{t.listing.featureChecklist}</h2>
             <div className="mt-3 space-y-4">
               {Object.entries(featuresByGroup).map(([groupKey, group]) => (
                 <section key={groupKey} className="rounded-xl border border-[var(--line)] p-3">
@@ -285,16 +309,16 @@ export default async function ListingDetailPage({
         ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-          <h2 className="text-base font-bold">{isVehicleListing ? "Additional Details" : "Specifications"}</h2>
+          <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : t.listing.specifications}</h2>
 
           {groupedSpecs.length === 0 ? (
-            <p className="mt-3 text-sm text-[var(--ink-2)]">No additional details were provided.</p>
+            <p className="mt-3 text-sm text-[var(--ink-2)]">{t.listing.noAdditionalDetails}</p>
           ) : (
             <div className="mt-3 space-y-4">
               {groupedSpecs.map(([group, rows]) => (
                 <section key={group} className="overflow-hidden rounded-xl border border-[var(--line)]">
                   <header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2">
-                    <h3 className="text-sm font-semibold">{group === "locked_specs" ? "Auto-Filled Specifications" : group.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</h3>
+                    <h3 className="text-sm font-semibold">{group === "locked_specs" ? t.listing.autoFilledSpecifications : group.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</h3>
                   </header>
                   <div className="grid divide-y divide-[var(--line)] md:grid-cols-2 md:divide-x md:divide-y-0">
                     {rows.map((row) => (
@@ -311,24 +335,33 @@ export default async function ListingDetailPage({
         </section>
 
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
-          <h2 className="text-base font-bold text-amber-900">Buyer Safety Warning</h2>
+          <h2 className="text-base font-bold text-amber-900">{t.listing.buyerSafetyWarning}</h2>
           <ul className="mt-3 space-y-2 text-sm text-amber-900">
-            <li>Do not send advance payment before seeing the vehicle.</li>
-            <li>Check the vehicle documents.</li>
-            <li>Meet in a safe public place if possible.</li>
-            <li>Verify ownership before payment.</li>
+            <li>{t.listing.safety1}</li>
+            <li>{t.listing.safety2}</li>
+            <li>{t.listing.safety3}</li>
+            <li>{t.listing.safety4}</li>
           </ul>
         </section>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3">
         <form action={async () => { "use server"; await toggleFavoriteAction(listing.id); }}>
-          <button className="rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Add to Favorites</button>
+          <button className="rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{t.listing.addToFavorites}</button>
         </form>
         <form action={createReportAction} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="listingId" value={listing.id} />
-          <input name="reason" required placeholder="Report reason" className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm" />
-          <button className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">Report Listing</button>
+          <select name="reason" required defaultValue="" className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm">
+            <option value="" disabled>{t.listing.selectReportReason}</option>
+            <option value={t.listing.fraudOrScam}>{t.listing.fraudOrScam}</option>
+            <option value={t.listing.wrongCategory}>{t.listing.wrongCategory}</option>
+            <option value={t.listing.duplicateListing}>{t.listing.duplicateListing}</option>
+            <option value={t.listing.prohibitedOrUnsafeItem}>{t.listing.prohibitedOrUnsafeItem}</option>
+            <option value={t.listing.spamOrMisleading}>{t.listing.spamOrMisleading}</option>
+            <option value={t.listing.other}>{t.listing.other}</option>
+          </select>
+          <input name="details" placeholder={t.listing.optionalDetails} className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm" />
+          <button className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.reportListing}</button>
         </form>
       </div>
 
@@ -336,10 +369,10 @@ export default async function ListingDetailPage({
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
           <div className="mx-auto flex w-full max-w-5xl gap-2">
             {listing.contact_phone ? (
-              <a href={callHref} className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">Call</a>
+              <a href={callHref} className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">{t.listing.call}</a>
             ) : null}
-            <Link href={`/listings/${listing.id}?compose=1`} className="flex-1 rounded-lg bg-[var(--ink-1)] px-4 py-3 text-center text-sm font-semibold text-white">Message</Link>
-            <Link href={`/listings/${listing.id}?offerbox=1`} className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-white">Offer</Link>
+            <Link href={`/listings/${listing.id}?compose=1`} className="flex-1 rounded-lg bg-[var(--ink-1)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.message}</Link>
+            <Link href={`/listings/${listing.id}?offerbox=1`} className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.offer}</Link>
           </div>
         </div>
       ) : null}
@@ -348,9 +381,9 @@ export default async function ListingDetailPage({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg font-bold">Send a Message</h3>
+              <h3 className="font-display text-lg font-bold">{t.listing.sendMessage}</h3>
               <Link href={`/listings/${listing.id}`} className="rounded px-2 py-1 text-sm text-[var(--ink-2)] hover:bg-[var(--surface-2)]">
-                Close
+                {t.listing.close}
               </Link>
             </div>
             <form action={sendListingMessageAction} className="space-y-3">
@@ -359,11 +392,11 @@ export default async function ListingDetailPage({
                 name="body"
                 required
                 minLength={2}
-                placeholder="Hi, is this still available?"
+                placeholder={t.listing.hiAvailability}
                 className="min-h-28 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm"
               />
               <button className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">
-                Send Message
+                {t.listing.sendMessage}
               </button>
             </form>
           </div>
@@ -374,14 +407,14 @@ export default async function ListingDetailPage({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg font-bold">Send Your Offer</h3>
+              <h3 className="font-display text-lg font-bold">{t.listing.sendYourOffer}</h3>
               <Link href={`/listings/${listing.id}`} className="rounded px-2 py-1 text-sm text-[var(--ink-2)] hover:bg-[var(--surface-2)]">
-                Close
+                {t.listing.close}
               </Link>
             </div>
             {listing.minimum_offer ? (
               <p className="mb-3 text-sm text-[var(--ink-2)]">
-                Minimum offer: {new Intl.NumberFormat("en-US").format(listing.minimum_offer)} {listing.currency}
+                {t.listing.minimumOffer}: {new Intl.NumberFormat("en-US").format(listing.minimum_offer)} {listing.currency}
               </p>
             ) : null}
             <form action={createOfferAction} className="space-y-3">
@@ -391,16 +424,16 @@ export default async function ListingDetailPage({
                 type="number"
                 min={listing.minimum_offer ?? 1}
                 required
-                placeholder="Enter your offered price"
+                placeholder={t.listing.enterOfferedPrice}
                 className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm"
               />
               <textarea
                 name="buyerNote"
-                placeholder="Optional note to seller"
+                placeholder={t.listing.optionalNoteToSeller}
                 className="min-h-20 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm"
               />
               <button className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">
-                Send Offer
+                {t.listing.sendOffer}
               </button>
             </form>
           </div>

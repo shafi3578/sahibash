@@ -11,6 +11,7 @@ import {
 } from "@/lib/data/queries";
 import { detectSearchIntent } from "@/lib/search/intent";
 import { ListingCard } from "@/components/listing-card";
+import { getDictionary } from "@/lib/i18n/server";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -74,7 +75,8 @@ function buildParamsFromRecord(params: Record<string, string | undefined>): URLS
 function renderDynamicFilterInput(
   def: FilterDefinition,
   selected: string,
-  options: string[]
+  options: string[],
+  t: Awaited<ReturnType<typeof getDictionary>>["t"]
 ) {
   if (def.filter_type === "boolean") {
     return (
@@ -84,9 +86,9 @@ function renderDynamicFilterInput(
         defaultValue={selected}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
-        <option value="">{def.filter_label}: Any</option>
-        <option value="true">Yes</option>
-        <option value="false">No</option>
+        <option value="">{def.filter_label}: {t.search.any}</option>
+        <option value="true">{t.search.yes}</option>
+        <option value="false">{t.search.no}</option>
       </select>
     );
   }
@@ -99,7 +101,7 @@ function renderDynamicFilterInput(
         defaultValue={selected}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
-        <option value="">{def.filter_label}: Any</option>
+        <option value="">{def.filter_label}: {t.search.any}</option>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -126,17 +128,19 @@ function FilterFields({
   params,
   categories,
   filterDefinitions,
+  t,
 }: {
   params: Record<string, string | undefined>;
   categories: Array<{ id: number; name: string }>;
   filterDefinitions: FilterDefinition[];
+  t: Awaited<ReturnType<typeof getDictionary>>["t"];
 }) {
   return (
     <>
       <input
         name="q"
         defaultValue={params.q ?? ""}
-        placeholder="Search listings"
+        placeholder={t.search.searchListings}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       />
 
@@ -145,7 +149,7 @@ function FilterFields({
         defaultValue={params.province ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
-        <option value="">All Afghanistan</option>
+        <option value="">{t.home.allAfghanistan}</option>
         {AFGHAN_PROVINCES.map((province) => (
           <option key={province} value={province}>
             {province}
@@ -156,7 +160,7 @@ function FilterFields({
       <input
         name="district"
         defaultValue={params.district ?? ""}
-        placeholder="District"
+        placeholder={t.search.district}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       />
 
@@ -165,7 +169,7 @@ function FilterFields({
         defaultValue={params.categoryId ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
-        <option value="">All categories</option>
+        <option value="">{t.search.allCategories}</option>
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
@@ -178,16 +182,26 @@ function FilterFields({
         defaultValue={params.sort ?? "newest"}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
-        <option value="newest">Newest</option>
-        <option value="relevant">Relevant</option>
-        <option value="price_low">Price: low to high</option>
-        <option value="price_high">Price: high to low</option>
+        <option value="newest">{t.search.newest}</option>
+        <option value="relevant">{t.search.relevant}</option>
+        <option value="price_low">{t.search.priceLowHigh}</option>
+        <option value="price_high">{t.search.priceHighLow}</option>
+      </select>
+
+      <select
+        name="listingType"
+        defaultValue={params.listingType ?? ""}
+        className="rounded-xl border border-[var(--line)] px-3 py-2"
+      >
+        <option value="">{t.search.allAdTypes}</option>
+        <option value="for_sale">{t.search.forSale}</option>
+        <option value="wanted">{t.search.wanted}</option>
       </select>
 
       {filterDefinitions.map((def) => {
         const selected = params[def.filter_key] ?? "";
         const options = toOptionList(def);
-        return renderDynamicFilterInput(def, selected, options);
+        return renderDynamicFilterInput(def, selected, options, t);
       })}
     </>
   );
@@ -198,6 +212,7 @@ export default async function SearchPage({
 }: {
   searchParams: RawSearchParams;
 }) {
+  const { t } = await getDictionary();
   const raw = await searchParams;
   const params = Object.fromEntries(
     Object.entries(raw).map(([key, value]) => [key, pickFirst(value)])
@@ -224,6 +239,7 @@ export default async function SearchPage({
   const autoVehicleBrand = params.vehicleBrand ?? params.vehicle_brand ?? intent?.brand;
   const autoVehicleModel = params.vehicleModel ?? params.vehicle_model ?? intent?.model;
   const autoRentalType = params.rentalType ?? params.rental_type ?? intent?.rentalType;
+  const listingType = params.listingType ?? params.listing_type;
 
   const listings = await getApprovedListings({
     search: params.q,
@@ -301,6 +317,7 @@ export default async function SearchPage({
     originalRefurbished: params.originalRefurbished ?? params.original_refurbished,
     bathroomsMin: toNumber(params.bathroomsMin ?? params.bathrooms_min),
     parking: toBoolean(params.parking),
+    listingType: listingType === "wanted" ? "wanted" : listingType === "for_sale" ? "for_sale" : undefined,
   });
 
   const activeEntries = Object.entries(params).filter(
@@ -318,16 +335,16 @@ export default async function SearchPage({
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 pb-28 sm:px-6 lg:px-8 lg:pb-8">
-      <h1 className="font-display text-3xl font-bold">Smart Search</h1>
+      <h1 className="font-display text-3xl font-bold">{t.search.title}</h1>
       <p className="mt-2 text-sm text-[var(--ink-2)]">
-        Dynamic filters adjust to your category and keywords.
+        {t.search.subtitle}
       </p>
 
       {intent ? (
         <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--ink-2)]">
-          Intent detected: <strong>{intent.matchedRule}</strong> ({intent.confidence})
-          {intent.brand ? `, brand: ${intent.brand}` : ""}
-          {intent.model ? `, model: ${intent.model}` : ""}
+          {t.search.intentDetected}: <strong>{intent.matchedRule}</strong> ({intent.confidence})
+          {intent.brand ? `, ${t.search.brand}: ${intent.brand}` : ""}
+          {intent.model ? `, ${t.search.model}: ${intent.model}` : ""}
         </p>
       ) : null}
 
@@ -364,7 +381,7 @@ export default async function SearchPage({
                   href={buildUrlWithParams(next)}
                   className="rounded-full border border-[var(--line)] px-3 py-1 text-xs hover:border-[var(--ink-1)]"
                 >
-                  Related: {node.name}
+                    {t.search.related}: {node.name}
                 </a>
               );
             })}
@@ -383,7 +400,7 @@ export default async function SearchPage({
                 href={buildUrlWithParams(next)}
                 className="rounded-full border border-[var(--line)] px-3 py-1 text-sm hover:border-[var(--ink-1)]"
               >
-                Subcategory: {child.name}
+                {t.search.subcategory}: {child.name}
               </a>
             );
           })}
@@ -393,20 +410,20 @@ export default async function SearchPage({
       <div className="mt-5 grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="hidden rounded-2xl border border-[var(--line)] bg-white p-4 lg:block">
           <form className="grid gap-3">
-            <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} />
+            <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} t={t} />
 
             <button
               type="submit"
               className="rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white"
             >
-              Apply Filters
+              {t.search.applyFilters}
             </button>
 
             <a
               href="/search"
               className="rounded-xl border border-[var(--line)] px-4 py-2 text-center text-sm font-semibold"
             >
-              Clear All
+              {t.search.clearAll}
             </a>
 
             {effectiveCategoryNodeId ? (
@@ -439,7 +456,7 @@ export default async function SearchPage({
 
           {effectiveNode ? (
             <p className="mb-4 text-sm text-[var(--ink-2)]">
-              Showing: {effectiveNode.name} ({params.scope === "exact" ? "exact" : "subtree"})
+              {t.search.showing}: {effectiveNode.name} ({params.scope === "exact" ? "exact" : "subtree"})
             </p>
           ) : null}
 
@@ -451,7 +468,7 @@ export default async function SearchPage({
 
           {listings.length === 0 ? (
             <p className="mt-6 rounded-xl border border-[var(--line)] bg-white p-4 text-sm text-[var(--ink-2)]">
-              No listings matched these filters. Try removing one or two chips.
+              {t.search.noResults}
             </p>
           ) : null}
         </section>
@@ -462,7 +479,7 @@ export default async function SearchPage({
           href={buildUrlWithParams(openMobileFilterParams)}
           className="mx-auto flex w-full max-w-7xl items-center justify-between rounded-2xl bg-[var(--ink-1)] px-4 py-3 text-sm font-semibold text-white shadow-lg"
         >
-          Filters
+          {t.search.filters}
           <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs">{activeFilterCount}</span>
         </a>
       </div>
@@ -472,13 +489,13 @@ export default async function SearchPage({
           <a href={buildUrlWithParams(closeMobileFilterParams)} className="absolute inset-0 bg-black/35" />
           <div className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-hidden rounded-t-3xl border border-[var(--line)] bg-white">
             <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
-              <h2 className="text-sm font-semibold">Filter Listings</h2>
+              <h2 className="text-sm font-semibold">{t.search.filters}</h2>
               <a href={buildUrlWithParams(closeMobileFilterParams)} className="text-sm text-[var(--ink-2)]">
-                Close
+                {t.search.close}
               </a>
             </div>
             <form className="grid max-h-[80vh] gap-3 overflow-y-auto p-4 pb-24">
-              <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} />
+              <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} t={t} />
               {effectiveCategoryNodeId ? (
                 <input type="hidden" name="categoryNodeId" value={String(effectiveCategoryNodeId)} />
               ) : null}
@@ -488,13 +505,13 @@ export default async function SearchPage({
                   href="/search"
                   className="flex-1 rounded-xl border border-[var(--line)] px-4 py-3 text-center text-sm font-semibold"
                 >
-                  Reset
+                  {t.search.reset}
                 </a>
                 <button
                   type="submit"
                   className="flex-1 rounded-xl bg-[var(--ink-1)] px-4 py-3 text-sm font-semibold text-white"
                 >
-                  Apply
+                  {t.search.apply}
                 </button>
               </div>
             </form>

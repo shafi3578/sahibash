@@ -1,15 +1,17 @@
 import { getPostingRootCategories } from "@/lib/data/queries";
+import { getDictionary } from "@/lib/i18n/server";
 import PostAdForm from "./post-ad-form";
-import { requireUser } from "@/lib/auth";
 
 export default async function PostAdPage() {
-  await requireUser();
-  const categories = await getPostingRootCategories();
+  const [categories, { t }] = await Promise.all([
+    getPostingRootCategories(),
+    getDictionary(),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="font-display text-3xl font-bold">Post an Ad</h1>
-      <PostAdForm categories={categories} />
+      <PostAdForm categories={categories} t={t} />
     </main>
   );
 }

@@ -6,8 +6,10 @@ import { AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
 import { getHomeCategoryNodes } from "@/lib/categories/getCategories";
 import { getCategoriesWithStats } from "@/lib/data/listings";
 import { getApprovedListings } from "@/lib/data/queries";
+import { getDictionary } from "@/lib/i18n/server";
 
 export default async function HomePage() {
+  const { t } = await getDictionary();
   const [listings, categories, mobileCategories] = await Promise.all([
     getApprovedListings(),
     getCategoriesWithStats(),
@@ -26,17 +28,16 @@ export default async function HomePage() {
       <section className="relative mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 lg:px-8">
         <div className="rounded-3xl border border-[var(--line)] bg-white p-6 shadow-[0_20px_40px_-28px_rgba(0,0,0,0.6)] sm:p-8">
           <p className="font-display text-4xl font-bold leading-tight sm:text-5xl">
-            Find Better Deals Across Afghanistan
+            {t.home.heroTitle}
           </p>
           <p className="mt-3 max-w-2xl text-[var(--ink-2)]">
-            Buy and sell first in Vehicles, Real Estate, Phones & Electronics,
-            and Second Hand. More categories are launching soon.
+            {t.home.heroSubtitle}
           </p>
 
           <form action="/search" className="mt-6 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
             <input
               name="q"
-              placeholder="Search by title, brand, model..."
+              placeholder={t.home.searchPlaceholder}
               className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3"
             />
             <select
@@ -44,7 +45,7 @@ export default async function HomePage() {
               defaultValue=""
               className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3"
             >
-              <option value="">All Afghanistan</option>
+              <option value="">{t.home.allAfghanistan}</option>
               {AFGHAN_PROVINCES.map((province) => (
                 <option key={province} value={province}>
                   {province}
@@ -53,14 +54,14 @@ export default async function HomePage() {
             </select>
             <input
               name="district"
-              placeholder="District (optional)"
+              placeholder={t.home.districtPlaceholder}
               className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3"
             />
             <button
               type="submit"
               className="rounded-2xl bg-[var(--ink-1)] px-6 py-3 text-sm font-semibold text-white lg:col-span-3"
             >
-              Search
+              {t.home.searchButton}
             </button>
           </form>
 
@@ -69,27 +70,27 @@ export default async function HomePage() {
               href="/post-ad"
               className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
             >
-              Post an Ad
+              {t.home.postAd}
             </Link>
             <Link
               href="/listings"
               className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
             >
-              Browse Listings
+              {t.home.browseListings}
             </Link>
           </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-        <h2 className="mb-4 font-display text-2xl font-bold sm:text-3xl">Main Categories</h2>
+        <h2 className="mb-4 font-display text-2xl font-bold sm:text-3xl">{t.home.mainCategories}</h2>
         <div className="mb-5 block lg:hidden">
           <CategoryHomeList categories={mobileCategories} />
           <Link
             href="/categories"
             className="mt-3 inline-flex rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold"
           >
-            Open Full Category Browser
+            {t.home.openCategoryBrowser}
           </Link>
         </div>
         <div className="hidden grid-cols-1 gap-4 sm:grid-cols-2 lg:grid lg:grid-cols-4">
@@ -99,7 +100,7 @@ export default async function HomePage() {
         </div>
         {comingSoonCategories.length > 0 ? (
           <div className="mt-4 hidden lg:block">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">More Categories (Coming Soon)</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">{t.home.moreCategories} ({t.home.comingSoon})</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {comingSoonCategories.map((category) => (
                 <Link
@@ -108,7 +109,7 @@ export default async function HomePage() {
                   className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left"
                 >
                   <p className="font-display text-base font-semibold text-[var(--ink-1)]">{category.name}</p>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-700">Coming Soon</p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{t.home.comingSoon}</p>
                 </Link>
               ))}
             </div>
@@ -117,7 +118,7 @@ export default async function HomePage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-        <h2 className="mb-4 font-display text-2xl font-bold sm:text-3xl">Featured Listings</h2>
+        <h2 className="mb-4 font-display text-2xl font-bold sm:text-3xl">{t.home.featuredListings}</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {(featured.length ? featured : latest.slice(0, 4)).map((listing) => (
             <ListingCard key={listing.id} listing={listing} />
@@ -126,7 +127,7 @@ export default async function HomePage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-        <h2 className="mb-4 font-display text-2xl font-bold sm:text-3xl">Latest Listings</h2>
+        <h2 className="mb-4 font-display text-2xl font-bold sm:text-3xl">{t.home.latestListings}</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {latest.map((listing) => (
             <ListingCard key={listing.id} listing={listing} />

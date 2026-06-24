@@ -9,8 +9,10 @@ import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
 import type { Category, CategoryField, CategoryNode } from "@/types/database";
 import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
+import type { TRANSLATIONS } from "@/lib/i18n/translations";
 
 type Props = { categories: Category[] };
+type Dictionary = (typeof TRANSLATIONS)["en"];
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -94,7 +96,7 @@ function inferImageConfig(rootSlug: string, path: string | undefined): PostingCo
   return { requires_images: false, min_images: 0, max_images: 10, recommended_images: null, allow_video: false };
 }
 
-export default function PostAdForm({ categories }: Props) {
+export default function PostAdForm({ categories, t }: Props & { t: Dictionary }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -146,7 +148,7 @@ export default function PostAdForm({ categories }: Props) {
   const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
   const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
   const [areaText, setAreaText] = useState("");
-  const [locationVisibility, setLocationVisibility] = useState<"exact" | "approximate" | "hidden">("hidden");
+  const [locationVisibility, setLocationVisibility] = useState<"exact" | "approximate" | "province_district">("province_district");
   const [deviceLatitude, setDeviceLatitude] = useState<number | null>(null);
   const [deviceLongitude, setDeviceLongitude] = useState<number | null>(null);
   const [deviceAccuracy, setDeviceAccuracy] = useState<number | null>(null);
@@ -200,8 +202,8 @@ export default function PostAdForm({ categories }: Props) {
   const isPublishStep = step === publishStep;
 
   const visualSteps = showPhotoStep
-    ? ["Category", "Details", "Photos", "Location", "Preview", "Publish"]
-    : ["Category", "Details", "Location", "Preview", "Publish"];
+    ? [t.postAd.category, t.postAd.details, t.postAd.photos, t.postAd.location, t.postAd.preview, t.postAd.publish]
+    : [t.postAd.category, t.postAd.details, t.postAd.location, t.postAd.preview, t.postAd.publish];
 
   const currentVisualStep = (() => {
     if (showPhotoStep) {
@@ -963,21 +965,21 @@ export default function PostAdForm({ categories }: Props) {
   return (
     <div className="relative pb-28">
       <div className="sticky top-0 z-10 rounded-2xl bg-sky-700 px-4 py-3 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wide">Post Ad</p>
-        <p className="text-sm">Step {currentVisualStep} of {visualSteps.length}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide">{t.postAd.postAd}</p>
+        <p className="text-sm">{t.postAd.step} {currentVisualStep} {t.postAd.of} {visualSteps.length}</p>
         <p className="mt-1 text-xs text-sky-100">{visualSteps.join(" -> ")}</p>
       </div>
 
       <div className="mt-4 space-y-4">
         {step === 1 ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">1. Category</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">Select main category first, then go deeper until final category.</p>
+            <h2 className="font-display text-lg font-bold">{t.postAd.categoryStepTitle}</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.categoryStepSubtitle}</p>
 
             {breadcrumb ? <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb}</p> : null}
             {selectedRoot ? (
               <button type="button" onClick={goBackCategoryLevel} className="mt-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">
-                Back One Level
+                {t.postAd.backOneLevel}
               </button>
             ) : null}
 
@@ -994,13 +996,13 @@ export default function PostAdForm({ categories }: Props) {
 
                 {comingSoonCategories.length > 0 ? (
                   <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Coming Soon</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{t.postAd.comingSoon}</p>
                     <div className="mt-2 space-y-2">
                       {comingSoonCategories.map((category) => (
                         <div key={category.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
                           <p className="text-sm font-semibold text-slate-700">{category.name}</p>
                           <Link href={`/categories/${category.slug}`} className="rounded-lg border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-700">
-                            Notify Me
+                            {t.postAd.notifyMe}
                           </Link>
                         </div>
                       ))}
@@ -1010,9 +1012,9 @@ export default function PostAdForm({ categories }: Props) {
               </>
             ) : (
               <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-                {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">Loading...</div> : null}
+                {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">{t.postAd.loading}</div> : null}
                 {!loadingTree && currentOptions.length === 0 && finalNode ? (
-                  <div className="px-4 py-3 text-sm font-semibold text-green-700">Final category selected: {finalNode.name}</div>
+                  <div className="px-4 py-3 text-sm font-semibold text-green-700">{t.postAd.finalCategorySelected}: {finalNode.name}</div>
                 ) : null}
                 {!loadingTree
                   ? currentOptions.map((node) => (
@@ -1029,10 +1031,10 @@ export default function PostAdForm({ categories }: Props) {
 
         {step === 2 ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">2. Details</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">Form adapts to your selected category path.</p>
+            <h2 className="font-display text-lg font-bold">{t.postAd.detailsStepTitle}</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.detailsStepSubtitle}</p>
 
-            <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || "Category not selected"}</p>
+            <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold sm:col-span-2">Title
@@ -1056,10 +1058,10 @@ export default function PostAdForm({ categories }: Props) {
                 <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
               <label className="text-sm font-semibold sm:col-span-2">Contact Preferences
-                <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder="Call, WhatsApp, message, etc." className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
               <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)] sm:col-span-2">
-                Location has moved to a dedicated step near the end.
+                {t.postAd.locationMovedNote}
               </p>
             </div>
 
@@ -1428,10 +1430,10 @@ export default function PostAdForm({ categories }: Props) {
 
         {step === 3 && showPhotoStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">3. Photos</h2>
+            <h2 className="font-display text-lg font-bold">{t.postAd.photosStepTitle}</h2>
             <p className="mt-1 text-sm text-[var(--ink-2)]">
-              {resolvedImageConfig?.requires_images ? "Photos are required for this category." : "Photos are optional for this category."}
-              {resolvedImageConfig?.recommended_images ? ` Recommended: ${resolvedImageConfig.recommended_images}` : ""}
+              {resolvedImageConfig?.requires_images ? t.postAd.photosRequired : t.postAd.photosOptional}
+              {resolvedImageConfig?.recommended_images ? ` ${t.postAd.recommended}: ${resolvedImageConfig.recommended_images}` : ""}
             </p>
 
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
@@ -1441,7 +1443,7 @@ export default function PostAdForm({ categories }: Props) {
                 onClick={() => fileInputRef.current?.click()}
                 className="mt-3 w-full rounded-2xl border-2 border-dashed border-[var(--line)] py-10 text-sm font-semibold"
               >
-                Add photos
+                {t.postAd.addPhotos}
               </button>
             ) : (
               <div className="mt-3 space-y-3">
@@ -1451,14 +1453,14 @@ export default function PostAdForm({ categories }: Props) {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={img.previewUrl} alt={`Upload ${index + 1}`} className="h-full w-full object-cover" />
                       <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-1 text-[10px] font-semibold text-white">
-                        <button type="button" onClick={() => setPrimary(index)}>Primary</button>
-                        <button type="button" onClick={() => removeImage(index)}>Remove</button>
+                        <button type="button" onClick={() => setPrimary(index)}>{t.postAd.primary}</button>
+                        <button type="button" onClick={() => removeImage(index)}>{t.postAd.remove}</button>
                       </div>
                     </div>
                   ))}
                 </div>
                 <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">
-                  Add more
+                  {t.postAd.addMore}
                 </button>
               </div>
             )}
@@ -1467,8 +1469,8 @@ export default function PostAdForm({ categories }: Props) {
 
         {isLocationStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Where is this item located?</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">Choose how you want to add your location.</p>
+            <h2 className="font-display text-lg font-bold">{t.postAd.whereLocated}</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.chooseLocationMethod}</p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <button
@@ -1476,8 +1478,8 @@ export default function PostAdForm({ categories }: Props) {
                 onClick={handleUseMyLocation}
                 className={`rounded-xl border p-4 text-left ${locationMethod === "device" ? "border-emerald-600 bg-emerald-50" : "border-[var(--line)]"}`}
               >
-                <p className="text-sm font-bold">Use My Location</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">Detect automatically from your device.</p>
+                <p className="text-sm font-bold">{t.postAd.useMyLocation}</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.detectAutomatically}</p>
               </button>
               <button
                 type="button"
@@ -1488,13 +1490,13 @@ export default function PostAdForm({ categories }: Props) {
                 }}
                 className={`rounded-xl border p-4 text-left ${locationMethod === "manual" ? "border-sky-600 bg-sky-50" : "border-[var(--line)]"}`}
               >
-                <p className="text-sm font-bold">Manual Location</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">Choose province and district yourself.</p>
+                <p className="text-sm font-bold">{t.postAd.manualLocation}</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.chooseProvinceDistrict}</p>
               </button>
             </div>
 
             {isDetectingLocation ? (
-              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">Detecting your device location...</p>
+              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">{t.postAd.detectingLocation}</p>
             ) : null}
 
             {locationHint ? (
@@ -1541,21 +1543,21 @@ export default function PostAdForm({ categories }: Props) {
                 </label>
 
                 <label className="text-sm font-semibold sm:col-span-2">Location Visibility
-                  <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "hidden")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                    <option value="hidden">Hide exact location, show only province/district</option>
-                    <option value="approximate">Show approximate location</option>
-                    <option value="exact">Show exact location</option>
+                  <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "province_district")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                    <option value="province_district">{t.postAd.hideExactShowProvinceDistrict}</option>
+                    <option value="approximate">{t.postAd.showApproximateLocation}</option>
+                    <option value="exact">{t.postAd.showExactLocation}</option>
                   </select>
                 </label>
 
                 {locationMethod === "device" && deviceLatitude !== null && deviceLongitude !== null ? (
                   <div className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-                    <p className="font-semibold">Detected Location</p>
-                    <p className="mt-1">Latitude: {deviceLatitude.toFixed(6)}</p>
-                    <p>Longitude: {deviceLongitude.toFixed(6)}</p>
-                    <p>Accuracy: {deviceAccuracy !== null ? `${deviceAccuracy} m` : "Unknown"}</p>
+                    <p className="font-semibold">{t.postAd.detectedLocation}</p>
+                    <p className="mt-1">{t.postAd.latitude}: {deviceLatitude.toFixed(6)}</p>
+                    <p>{t.postAd.longitude}: {deviceLongitude.toFixed(6)}</p>
+                    <p>{t.postAd.accuracy}: {deviceAccuracy !== null ? `${deviceAccuracy} m` : t.postAd.unknown}</p>
                     <button type="button" onClick={handleConfirmDetectedLocation} className="mt-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
-                      Confirm Location
+                      {t.postAd.confirmLocation}
                     </button>
                   </div>
                 ) : null}
@@ -1566,27 +1568,27 @@ export default function PostAdForm({ categories }: Props) {
 
         {isPreviewStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Preview</h2>
+            <h2 className="font-display text-lg font-bold">{t.postAd.previewStepTitle}</h2>
             <div className="mt-3 grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-              <p><span className="font-semibold">Category:</span> {breadcrumb || "-"}</p>
-              <p><span className="font-semibold">Title:</span> {core.title || "-"}</p>
-              <p><span className="font-semibold">Description:</span> {core.description || "-"}</p>
-              <p><span className="font-semibold">Price:</span> {core.price ? `${core.price} ${core.currency}` : "-"}</p>
+              <p><span className="font-semibold">{t.postAd.categoryLabel}:</span> {breadcrumb || "-"}</p>
+              <p><span className="font-semibold">{t.postAd.title}:</span> {core.title || "-"}</p>
+              <p><span className="font-semibold">{t.postAd.description}:</span> {core.description || "-"}</p>
+              <p><span className="font-semibold">{t.postAd.price}:</span> {core.price ? `${core.price} ${core.currency}` : "-"}</p>
               <p>
-                <span className="font-semibold">Province / District:</span>{" "}
+                <span className="font-semibold">{t.postAd.provinceDistrict}:</span>{" "}
                 {provinceOptions.find((item) => item.id === selectedProvinceId)?.name ?? "-"}
                 {" / "}
                 {districtOptions.find((item) => item.id === selectedDistrictId)?.name ?? "-"}
               </p>
-              <p><span className="font-semibold">Photos:</span> {images.length}</p>
+              <p><span className="font-semibold">{t.postAd.photosLabel}:</span> {images.length}</p>
             </div>
           </section>
         ) : null}
 
         {isPublishStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Publish</h2>
-            <p className="mt-2 text-sm text-[var(--ink-2)]">Your ad is ready. Click publish to submit it for review.</p>
+            <h2 className="font-display text-lg font-bold">{t.postAd.publishStepTitle}</h2>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">{t.postAd.publishReady}</p>
           </section>
         ) : null}
 
@@ -1598,17 +1600,17 @@ export default function PostAdForm({ categories }: Props) {
         <div className="mx-auto flex w-full max-w-5xl gap-2">
           {step > 1 ? (
             <button type="button" onClick={goPrev} className="rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-semibold">
-              Back
+              {t.postAd.back}
             </button>
           ) : null}
 
           {!isPublishStep ? (
             <button type="button" onClick={goNext} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white">
-              Continue
+              {t.postAd.continue}
             </button>
           ) : (
             <button type="button" onClick={() => void onPublish()} disabled={isPending} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-              {isPending ? status ?? "Publishing..." : "Publish"}
+              {isPending ? status ?? t.postAd.publishing : t.postAd.publish}
             </button>
           )}
         </div>
