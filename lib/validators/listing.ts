@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { AFGHAN_PROVINCES, CITIES, CURRENCIES } from "@/lib/constants/marketplace";
+import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
 
-const cityEnum = z.enum(CITIES as unknown as [string, ...string[]]);
 const provinceEnum = z.enum(AFGHAN_PROVINCES as unknown as [string, ...string[]]);
 const currencyEnum = z.enum(CURRENCIES as unknown as ["AFN", "USD"]);
 
@@ -16,9 +15,18 @@ export const listingSchema = z.object({
   vehicle_variant_id: z.coerce.number().int().positive().optional(),
   price: z.coerce.number().positive("Price must be greater than 0"),
   currency: currencyEnum,
-  city: cityEnum.optional().or(z.literal("")),
+  city: optionalText,
   province: provinceEnum.optional().or(z.literal("")),
   district: optionalText,
+  province_id: z.coerce.number().int().positive().optional(),
+  district_id: z.coerce.number().int().positive().optional(),
+  area_text: optionalText,
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
+  location_source: z.enum(["manual", "device", "browser", "gps", "map_pin"]).optional(),
+  location_accuracy: z.coerce.number().int().nonnegative().optional(),
+  location_visibility: z.enum(["exact", "approximate", "hidden"]).optional(),
+  is_location_confirmed: z.coerce.boolean().optional(),
   neighborhood: optionalText,
   address_optional: optionalText,
   video_url: z.string().trim().url().optional().or(z.literal("")),

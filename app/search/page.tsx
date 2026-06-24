@@ -1,4 +1,4 @@
-import { CITIES } from "@/lib/constants/marketplace";
+import { AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
 import {
   getApprovedListings,
   getCategories,
@@ -141,17 +141,24 @@ function FilterFields({
       />
 
       <select
-        name="city"
-        defaultValue={params.city ?? ""}
+        name="province"
+        defaultValue={params.province ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
-        <option value="">All cities</option>
-        {CITIES.map((city) => (
-          <option key={city} value={city}>
-            {city}
+        <option value="">All Afghanistan</option>
+        {AFGHAN_PROVINCES.map((province) => (
+          <option key={province} value={province}>
+            {province}
           </option>
         ))}
       </select>
+
+      <input
+        name="district"
+        defaultValue={params.district ?? ""}
+        placeholder="District"
+        className="rounded-xl border border-[var(--line)] px-3 py-2"
+      />
 
       <select
         name="categoryId"
@@ -220,7 +227,6 @@ export default async function SearchPage({
 
   const listings = await getApprovedListings({
     search: params.q,
-    city: params.city,
     province: params.province,
     district: params.district,
     categoryId: toNumber(params.categoryId),

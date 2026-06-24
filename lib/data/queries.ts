@@ -23,7 +23,6 @@ type ListingFilters = {
   categoryNodeId?: number;
   categoryScope?: "subtree" | "exact";
   sort?: "newest" | "price_low" | "price_high" | "nearest" | "relevant";
-  city?: string;
   province?: string;
   district?: string;
   search?: string;
@@ -450,10 +449,6 @@ export async function getApprovedListings(
         .eq("status", "approved")
         .in("category_id", lifecycleCategoryIds)
         .limit(120);
-
-      if (filters?.city) {
-        query = query.eq("city", filters.city);
-      }
 
       if (filters?.province) {
         query = query.eq("province", filters.province);

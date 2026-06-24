@@ -30,7 +30,7 @@ export function ListingCard({ listing, showStatus = false }: { listing: ListingW
       <div className="space-y-2 p-4">
         <Link href={`/listings/${listing.id}`}><h3 className="line-clamp-2 text-base font-semibold text-[var(--ink-1)]">{listing.title}</h3></Link>
         <p className="text-lg font-bold text-[var(--accent)]">{new Intl.NumberFormat("en-US").format(listing.price)} {listing.currency}</p>
-        <p className="line-clamp-1 text-sm text-[var(--ink-2)]">{listing.city} - {listing.district}</p>
+        <p className="line-clamp-1 text-sm text-[var(--ink-2)]">{listing.province ?? "Afghanistan"}{listing.district ? ` - ${listing.district}` : ""}</p>
         {showStatus ? <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">Status: {listing.status}</p> : null}
       </div>
     </article>

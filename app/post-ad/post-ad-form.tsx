@@ -5,14 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
-import { AFGHAN_PROVINCES, CITIES, CURRENCIES } from "@/lib/constants/marketplace";
+import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
 import type { Category, CategoryField, CategoryNode } from "@/types/database";
 import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
 
 type Props = { categories: Category[] };
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 type StagedImage = { file: File; previewUrl: string; isPrimary: boolean };
 
@@ -27,10 +27,6 @@ type PostingConfig = {
 type CoreForm = {
   title: string;
   description: string;
-  province: string;
-  city: string;
-  district: string;
-  area: string;
   address_optional: string;
   contact_phone: string;
   contact_name: string;
@@ -41,6 +37,10 @@ type CoreForm = {
   minimum_offer: string;
   rulesAccepted: boolean;
 };
+
+type ProvinceOption = { id: number; name: string };
+type DistrictOption = { id: number; name: string; province_id: number };
+type LocationMethod = "device" | "manual" | null;
 
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const ACTIVE_POSTING_CATEGORY_SLUGS = [
@@ -118,10 +118,6 @@ export default function PostAdForm({ categories }: Props) {
   const [core, setCore] = useState<CoreForm>({
     title: "",
     description: "",
-    province: "",
-    city: "",
-    district: "",
-    area: "",
     address_optional: "",
     contact_phone: "",
     contact_name: "",
@@ -132,6 +128,20 @@ export default function PostAdForm({ categories }: Props) {
     minimum_offer: "",
     rulesAccepted: false,
   });
+
+  const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
+  const [districtOptions, setDistrictOptions] = useState<DistrictOption[]>([]);
+  const [locationMethod, setLocationMethod] = useState<LocationMethod>(null);
+  const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
+  const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
+  const [areaText, setAreaText] = useState("");
+  const [locationVisibility, setLocationVisibility] = useState<"exact" | "approximate" | "hidden">("hidden");
+  const [deviceLatitude, setDeviceLatitude] = useState<number | null>(null);
+  const [deviceLongitude, setDeviceLongitude] = useState<number | null>(null);
+  const [deviceAccuracy, setDeviceAccuracy] = useState<number | null>(null);
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationHint, setLocationHint] = useState<string | null>(null);
 
   const activeCategories = useMemo(
     () => categories.filter((category) =>
@@ -171,20 +181,25 @@ export default function PostAdForm({ categories }: Props) {
   }, [finalNode, finalPath, postingConfig, rootSlug]);
 
   const showPhotoStep = Boolean(resolvedImageConfig?.requires_images || images.length > 0);
-  const isPreviewStep = step === 4 || (step === 3 && !showPhotoStep);
+  const locationStep = showPhotoStep ? 4 : 3;
+  const previewStep = showPhotoStep ? 5 : 4;
+  const publishStep = showPhotoStep ? 6 : 5;
+  const isLocationStep = step === locationStep;
+  const isPreviewStep = step === previewStep;
+  const isPublishStep = step === publishStep;
 
   const visualSteps = showPhotoStep
-    ? ["Category", "Details", "Photos", "Preview"]
-    : ["Category", "Details", "Preview"];
+    ? ["Category", "Details", "Photos", "Location", "Preview", "Publish"]
+    : ["Category", "Details", "Location", "Preview", "Publish"];
 
   const currentVisualStep = (() => {
-    if (step === 1) return 1;
-    if (step === 2) return 2;
     if (showPhotoStep) {
-      if (step === 3) return 3;
-      return 4;
+      return step;
     }
-    return 3;
+    if (step <= 2) return step;
+    if (step === 3) return 3;
+    if (step === 4) return 4;
+    return 5;
   })();
 
   async function fetchChildren(parentId: number) {
@@ -358,6 +373,184 @@ export default function PostAdForm({ categories }: Props) {
     setDynamicValues((prev) => ({ ...prev, [key]: value }));
   }
 
+  const normalizeLocationName = useCallback((value: string) => {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace("daikundi", "daykundi")
+      .replace("jawzjan", "jowzjan")
+      .replace("sar e pol", "sar-e pol")
+      .replace("maidan wardak", "wardak");
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadProvinces = async () => {
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("provinces")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (!active) return;
+
+      const normalizedRows = ((data ?? []) as Array<{ id: number; name: string }>)
+        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(String(row.name)) }));
+
+      const whitelist = AFGHAN_PROVINCES.map((name) => ({
+        name,
+        norm: normalizeLocationName(name),
+      }));
+
+      const mapped = whitelist.reduce<ProvinceOption[]>((acc, item) => {
+        const match = normalizedRows.find((row) => row.norm === item.norm);
+        if (!match) return acc;
+        acc.push({ id: match.id, name: item.name });
+        return acc;
+      }, []);
+
+      setProvinceOptions(mapped);
+    };
+
+    void loadProvinces();
+    return () => {
+      active = false;
+    };
+  }, [normalizeLocationName]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadDistricts = async () => {
+      if (!selectedProvinceId) {
+        setDistrictOptions([]);
+        setSelectedDistrictId(null);
+        return;
+      }
+
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("districts")
+        .select("id, name, province_id")
+        .eq("province_id", selectedProvinceId)
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (!active) return;
+      setDistrictOptions((data ?? []) as DistrictOption[]);
+      setSelectedDistrictId((prev) => {
+        if (!prev) return null;
+        return (data ?? []).some((row) => Number((row as { id: number }).id) === prev) ? prev : null;
+      });
+    };
+
+    void loadDistricts();
+    return () => {
+      active = false;
+    };
+  }, [selectedProvinceId]);
+
+  async function attemptReverseGeocode(latitude: number, longitude: number) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}&accept-language=en`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        address?: {
+          state?: string;
+          province?: string;
+          county?: string;
+          city_district?: string;
+          municipality?: string;
+          town?: string;
+          city?: string;
+        };
+      };
+
+      const provinceHint = payload.address?.state || payload.address?.province || "";
+      const districtHint = payload.address?.county || payload.address?.city_district || payload.address?.municipality || payload.address?.town || payload.address?.city || "";
+
+      if (provinceHint) {
+        const matchedProvince = provinceOptions.find(
+          (option) => normalizeLocationName(option.name) === normalizeLocationName(provinceHint)
+        );
+        if (matchedProvince) {
+          setSelectedProvinceId(matchedProvince.id);
+        }
+      }
+
+      if (districtHint) {
+        setTimeout(() => {
+          setSelectedDistrictId((prev) => {
+            if (prev) return prev;
+            const matchedDistrict = districtOptions.find(
+              (option) => normalizeLocationName(option.name) === normalizeLocationName(districtHint)
+            );
+            return matchedDistrict?.id ?? null;
+          });
+        }, 250);
+      }
+    } catch {
+      // Best-effort only.
+    }
+  }
+
+  function handleUseMyLocation() {
+    setLocationMethod("device");
+    setLocationConfirmed(false);
+    setLocationHint(null);
+
+    if (!navigator.geolocation) {
+      setLocationHint("We could not detect your location. Please choose manually.");
+      setLocationMethod("manual");
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setIsDetectingLocation(false);
+        setDeviceLatitude(position.coords.latitude);
+        setDeviceLongitude(position.coords.longitude);
+        setDeviceAccuracy(Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null);
+        setLocationHint("We detected your location. Please confirm it before publishing.");
+        void attemptReverseGeocode(position.coords.latitude, position.coords.longitude);
+      },
+      () => {
+        setIsDetectingLocation(false);
+        setLocationMethod("manual");
+        setLocationHint("We could not detect your location. Please choose manually.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  }
+
+  function handleConfirmDetectedLocation() {
+    if (!selectedProvinceId || !selectedDistrictId || deviceLatitude === null || deviceLongitude === null) {
+      setStepError("Please confirm province and district for the detected location.");
+      return;
+    }
+    setLocationConfirmed(true);
+    setLocationHint("Location confirmed.");
+  }
+
   function onPickFiles(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
@@ -436,8 +629,6 @@ export default function PostAdForm({ categories }: Props) {
     if (!core.title || core.title.trim().length < 5) return "Title must be at least 5 characters.";
     if (!core.description || core.description.trim().length < 20) return "Description must be at least 20 characters.";
     if (!core.price || Number(core.price) <= 0) return "Please enter a valid price.";
-    if (!core.province) return "Province is required.";
-    if (!core.district) return "District is required.";
     if (!core.contact_phone) return "Contact phone is required.";
     if (!core.rulesAccepted) return "You must accept the posting rules to continue.";
 
@@ -459,6 +650,27 @@ export default function PostAdForm({ categories }: Props) {
       if (!String(dynamicValues.payment_period ?? "").trim()) return "Payment Period is required for dormitory.";
       if (!String(dynamicValues.gender_allowed ?? "").trim()) return "Gender Allowed is required for dormitory.";
       if (!String(dynamicValues.room_type ?? "").trim()) return "Room Type is required for dormitory.";
+    }
+
+    return null;
+  }
+
+  function validateLocationStep() {
+    if (!selectedProvinceId || !selectedDistrictId) {
+      return "Please add a location before publishing your ad.";
+    }
+
+    if (locationMethod === "device") {
+      if (deviceLatitude === null || deviceLongitude === null) {
+        return "Please detect your device location or choose manual location.";
+      }
+      if (!locationConfirmed) {
+        return "We detected your location. Please confirm it before publishing.";
+      }
+    }
+
+    if (!locationMethod) {
+      return "Please add a location before publishing your ad.";
     }
 
     return null;
@@ -492,17 +704,32 @@ export default function PostAdForm({ categories }: Props) {
         setStepError(err);
         return;
       }
-      setStep(showPhotoStep ? 3 : 4);
+      setStep(showPhotoStep ? 3 : 3);
       return;
     }
 
-    if (step === 3) {
+    if (step === 3 && showPhotoStep) {
       const err = validatePhotoStep();
       if (err) {
         setStepError(err);
         return;
       }
       setStep(4);
+      return;
+    }
+
+    if (step === locationStep) {
+      const err = validateLocationStep();
+      if (err) {
+        setStepError(err);
+        return;
+      }
+      setStep(previewStep);
+      return;
+    }
+
+    if (step === previewStep) {
+      setStep(publishStep);
     }
   }
 
@@ -510,12 +737,22 @@ export default function PostAdForm({ categories }: Props) {
     setError(null);
     setStepError(null);
 
-    if (step === 4) {
+    if (step === publishStep) {
+      setStep(previewStep);
+      return;
+    }
+
+    if (step === previewStep) {
+      setStep(locationStep);
+      return;
+    }
+
+    if (step === locationStep) {
       setStep(showPhotoStep ? 3 : 2);
       return;
     }
 
-    if (step === 3) {
+    if (step === 3 && showPhotoStep) {
       setStep(2);
       return;
     }
@@ -532,9 +769,10 @@ export default function PostAdForm({ categories }: Props) {
     const categoryErr = validateCategoryStep();
     const detailErr = validateDetailsStep();
     const photoErr = showPhotoStep ? validatePhotoStep() : null;
+    const locationErr = validateLocationStep();
 
-    if (categoryErr || detailErr || photoErr) {
-      setError(categoryErr || detailErr || photoErr || "Please complete required fields.");
+    if (categoryErr || detailErr || photoErr || locationErr) {
+      setError(categoryErr || detailErr || photoErr || locationErr || "Please complete required fields.");
       return;
     }
 
@@ -542,6 +780,9 @@ export default function PostAdForm({ categories }: Props) {
       setError("Category is required.");
       return;
     }
+
+    const selectedProvince = provinceOptions.find((item) => item.id === selectedProvinceId);
+    const selectedDistrict = districtOptions.find((item) => item.id === selectedDistrictId);
 
     const form = new FormData();
     form.set("title", core.title);
@@ -551,10 +792,19 @@ export default function PostAdForm({ categories }: Props) {
     form.set("subcategory_id", String(pathNodes[1]?.id ?? finalNode.id));
     form.set("price", core.price);
     form.set("currency", core.currency);
-    form.set("city", core.city);
-    form.set("province", core.province);
-    form.set("district", core.district);
-    form.set("address_optional", core.address_optional || core.area);
+    form.set("province", selectedProvince?.name ?? "");
+    form.set("district", selectedDistrict?.name ?? "");
+    form.set("province_id", String(selectedProvinceId ?? ""));
+    form.set("district_id", String(selectedDistrictId ?? ""));
+    form.set("area_text", areaText);
+    form.set("city", selectedProvince?.name ?? "");
+    form.set("address_optional", core.address_optional || areaText);
+    if (deviceLatitude !== null) form.set("latitude", String(deviceLatitude));
+    if (deviceLongitude !== null) form.set("longitude", String(deviceLongitude));
+    if (deviceAccuracy !== null) form.set("location_accuracy", String(deviceAccuracy));
+    form.set("location_source", locationMethod === "device" ? "device" : "manual");
+    form.set("location_visibility", locationVisibility);
+    form.set("is_location_confirmed", locationMethod === "device" ? (locationConfirmed ? "true" : "false") : "true");
     form.set("contact_phone", core.contact_phone);
     form.set("contact_name", core.contact_name);
     form.set("meeting_preference", core.contact_preferences);
@@ -777,24 +1027,6 @@ export default function PostAdForm({ categories }: Props) {
                   {CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
                 </select>
               </label>
-              <label className="text-sm font-semibold">Province
-                <select value={core.province} onChange={(event) => updateCore("province", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select province</option>
-                  {AFGHAN_PROVINCES.map((province) => <option key={province} value={province}>{province}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-semibold">Area / City
-                <select value={core.city} onChange={(event) => updateCore("city", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select area</option>
-                  {CITIES.map((city) => <option key={city} value={city}>{city}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-semibold">District
-                <input value={core.district} onChange={(event) => updateCore("district", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
-              <label className="text-sm font-semibold">Neighborhood / Area (optional)
-                <input value={core.area} onChange={(event) => updateCore("area", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
               <label className="text-sm font-semibold">Contact Phone
                 <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
@@ -804,6 +1036,9 @@ export default function PostAdForm({ categories }: Props) {
               <label className="text-sm font-semibold sm:col-span-2">Contact Preferences
                 <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder="Call, WhatsApp, message, etc." className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
+              <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)] sm:col-span-2">
+                Location has moved to a dedicated step near the end.
+              </p>
             </div>
 
             {rootSlug === "real-estate" ? (
@@ -1208,17 +1443,128 @@ export default function PostAdForm({ categories }: Props) {
           </section>
         ) : null}
 
+        {isLocationStep ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">Where is this item located?</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">Choose how you want to add your location.</p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={handleUseMyLocation}
+                className={`rounded-xl border p-4 text-left ${locationMethod === "device" ? "border-emerald-600 bg-emerald-50" : "border-[var(--line)]"}`}
+              >
+                <p className="text-sm font-bold">Use My Location</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">Detect automatically from your device.</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLocationMethod("manual");
+                  setLocationConfirmed(true);
+                  setLocationHint(null);
+                }}
+                className={`rounded-xl border p-4 text-left ${locationMethod === "manual" ? "border-sky-600 bg-sky-50" : "border-[var(--line)]"}`}
+              >
+                <p className="text-sm font-bold">Manual Location</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">Choose province and district yourself.</p>
+              </button>
+            </div>
+
+            {isDetectingLocation ? (
+              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">Detecting your device location...</p>
+            ) : null}
+
+            {locationHint ? (
+              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">{locationHint}</p>
+            ) : null}
+
+            {(locationMethod === "manual" || locationMethod === "device") ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-semibold">Province
+                  <select
+                    value={selectedProvinceId ? String(selectedProvinceId) : ""}
+                    onChange={(event) => {
+                      setSelectedProvinceId(event.target.value ? Number(event.target.value) : null);
+                      setLocationConfirmed(locationMethod === "manual");
+                    }}
+                    className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                  >
+                    <option value="">Select province</option>
+                    {provinceOptions.map((province) => (
+                      <option key={province.id} value={province.id}>{province.name}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-sm font-semibold">District
+                  <select
+                    value={selectedDistrictId ? String(selectedDistrictId) : ""}
+                    onChange={(event) => {
+                      setSelectedDistrictId(event.target.value ? Number(event.target.value) : null);
+                      setLocationConfirmed(locationMethod === "manual");
+                    }}
+                    className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                    disabled={!selectedProvinceId}
+                  >
+                    <option value="">Select district</option>
+                    {districtOptions.map((district) => (
+                      <option key={district.id} value={district.id}>{district.name}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-sm font-semibold sm:col-span-2">Area / Neighborhood (optional)
+                  <input value={areaText} onChange={(event) => setAreaText(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                </label>
+
+                <label className="text-sm font-semibold sm:col-span-2">Location Visibility
+                  <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "hidden")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                    <option value="hidden">Hide exact location, show only province/district</option>
+                    <option value="approximate">Show approximate location</option>
+                    <option value="exact">Show exact location</option>
+                  </select>
+                </label>
+
+                {locationMethod === "device" && deviceLatitude !== null && deviceLongitude !== null ? (
+                  <div className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+                    <p className="font-semibold">Detected Location</p>
+                    <p className="mt-1">Latitude: {deviceLatitude.toFixed(6)}</p>
+                    <p>Longitude: {deviceLongitude.toFixed(6)}</p>
+                    <p>Accuracy: {deviceAccuracy !== null ? `${deviceAccuracy} m` : "Unknown"}</p>
+                    <button type="button" onClick={handleConfirmDetectedLocation} className="mt-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
+                      Confirm Location
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         {isPreviewStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">{showPhotoStep ? "4. Preview" : "3. Preview"}</h2>
+            <h2 className="font-display text-lg font-bold">Preview</h2>
             <div className="mt-3 grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
               <p><span className="font-semibold">Category:</span> {breadcrumb || "-"}</p>
               <p><span className="font-semibold">Title:</span> {core.title || "-"}</p>
               <p><span className="font-semibold">Description:</span> {core.description || "-"}</p>
               <p><span className="font-semibold">Price:</span> {core.price ? `${core.price} ${core.currency}` : "-"}</p>
-              <p><span className="font-semibold">Province / District:</span> {core.province || "-"} / {core.district || "-"}</p>
+              <p>
+                <span className="font-semibold">Province / District:</span>{" "}
+                {provinceOptions.find((item) => item.id === selectedProvinceId)?.name ?? "-"}
+                {" / "}
+                {districtOptions.find((item) => item.id === selectedDistrictId)?.name ?? "-"}
+              </p>
               <p><span className="font-semibold">Photos:</span> {images.length}</p>
             </div>
+          </section>
+        ) : null}
+
+        {isPublishStep ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">Publish</h2>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">Your ad is ready. Click publish to submit it for review.</p>
           </section>
         ) : null}
 
@@ -1234,7 +1580,7 @@ export default function PostAdForm({ categories }: Props) {
             </button>
           ) : null}
 
-          {!isPreviewStep ? (
+          {!isPublishStep ? (
             <button type="button" onClick={goNext} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white">
               Continue
             </button>

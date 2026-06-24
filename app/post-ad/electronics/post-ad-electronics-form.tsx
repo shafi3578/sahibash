@@ -365,7 +365,6 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
     form.set("price", price);
     form.set("currency", currency);
     form.set("province", province);
-    form.set("city", province);
     form.set("district", district);
     form.set("address_optional", area);
     form.set("contact_phone", contactPhone.trim());

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CategoryCard } from "@/components/category-card";
 import { ListingCard } from "@/components/listing-card";
 import { CategoryHomeList } from "@/components/categories/CategoryHomeList";
-import { CITIES } from "@/lib/constants/marketplace";
+import { AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
 import { getHomeCategoryNodes } from "@/lib/categories/getCategories";
 import { getCategoriesWithStats } from "@/lib/data/listings";
 import { getApprovedListings } from "@/lib/data/queries";
@@ -40,20 +40,25 @@ export default async function HomePage() {
               className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3"
             />
             <select
-              name="city"
+              name="province"
               defaultValue=""
               className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3"
             >
-              <option value="">All Cities</option>
-              {CITIES.map((city) => (
-                <option key={city} value={city}>
-                  {city}
+              <option value="">All Afghanistan</option>
+              {AFGHAN_PROVINCES.map((province) => (
+                <option key={province} value={province}>
+                  {province}
                 </option>
               ))}
             </select>
+            <input
+              name="district"
+              placeholder="District (optional)"
+              className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3"
+            />
             <button
               type="submit"
-              className="rounded-2xl bg-[var(--ink-1)] px-6 py-3 text-sm font-semibold text-white"
+              className="rounded-2xl bg-[var(--ink-1)] px-6 py-3 text-sm font-semibold text-white lg:col-span-3"
             >
               Search
             </button>

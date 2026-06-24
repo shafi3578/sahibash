@@ -25,6 +25,15 @@ const RESERVED_FORM_KEYS = new Set([
   "city",
   "province",
   "district",
+  "province_id",
+  "district_id",
+  "area_text",
+  "latitude",
+  "longitude",
+  "location_source",
+  "location_accuracy",
+  "location_visibility",
+  "is_location_confirmed",
   "neighborhood",
   "address_optional",
   "video_url",
@@ -689,6 +698,49 @@ async function buildListingPayload(
 
   const province = input.province || input.city || null;
   const city = input.city || input.province || "";
+
+  const parseLocationId = (value: FormDataEntryValue | null): number | null => {
+    const raw = toFormValueText(value);
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const provinceId = parseLocationId(formData.get("province_id"));
+  const districtId = parseLocationId(formData.get("district_id"));
+  const areaText = toFormValueText(formData.get("area_text")) || null;
+  const latitudeRaw = toFormValueText(formData.get("latitude"));
+  const longitudeRaw = toFormValueText(formData.get("longitude"));
+  const latitude = latitudeRaw ? Number(latitudeRaw) : null;
+  const longitude = longitudeRaw ? Number(longitudeRaw) : null;
+  const locationSourceRaw = toFormValueText(formData.get("location_source")).toLowerCase();
+  const locationSource = ["manual", "device", "browser", "gps", "map_pin"].includes(locationSourceRaw)
+    ? locationSourceRaw
+    : null;
+  const locationAccuracyRaw = toFormValueText(formData.get("location_accuracy"));
+  const locationAccuracy = locationAccuracyRaw ? Number(locationAccuracyRaw) : null;
+  const locationVisibilityRaw = toFormValueText(formData.get("location_visibility")).toLowerCase();
+  const locationVisibility = ["exact", "approximate", "hidden"].includes(locationVisibilityRaw)
+    ? locationVisibilityRaw
+    : "hidden";
+  const isLocationConfirmed = toFormValueBoolean(formData.get("is_location_confirmed"));
+
+  if (!provinceId || !districtId) {
+    return null;
+  }
+
+  if (!isLocationConfirmed) {
+    return null;
+  }
+
+  const [{ data: provinceRow }, { data: districtRow }] = await Promise.all([
+    supabase.from("provinces").select("name").eq("id", provinceId).maybeSingle(),
+    supabase.from("districts").select("name").eq("id", districtId).maybeSingle(),
+  ]);
+
+  const resolvedProvince = toFormValueText(formData.get("province")) || (provinceRow?.name ? String(provinceRow.name) : null);
+  const resolvedDistrict = toFormValueText(formData.get("district")) || (districtRow?.name ? String(districtRow.name) : null);
+  const resolvedCity = resolvedProvince || city || "Afghanistan";
   const variantId = input.vehicle_variant_id ?? null;
   const manualSpecsRaw = toFormValueText(formData.get("vehicle_manual_specs_json"));
   let manualSpecs: Record<string, unknown> = {};
@@ -760,10 +812,19 @@ async function buildListingPayload(
       vehicle_variant_id: variantId,
       price: input.price,
       currency: input.currency,
-      city,
-      province,
-      district: input.district || null,
-      address_optional: input.address_optional || null,
+      city: resolvedCity,
+      province: resolvedProvince,
+      district: resolvedDistrict,
+      province_id: provinceId,
+      district_id: districtId,
+      address_text: areaText,
+      address_optional: input.address_optional || areaText,
+      latitude: Number.isFinite(latitude as number) ? latitude : null,
+      longitude: Number.isFinite(longitude as number) ? longitude : null,
+      location_source: locationSource,
+      location_accuracy: Number.isFinite(locationAccuracy as number) ? Math.round(locationAccuracy as number) : null,
+      location_visibility: locationVisibility,
+      is_location_confirmed: true,
       contact_phone: input.contact_phone,
       contact_name: input.contact_name || null,
       negotiable: input.negotiable ?? false,
@@ -789,6 +850,18 @@ async function buildListingPayload(
   };
 }
 
+function validatePostingLocationFormData(formData: FormData): { ok: true } | { ok: false; message: string } {
+  const provinceId = Number(toFormValueText(formData.get("province_id")));
+  const districtId = Number(toFormValueText(formData.get("district_id")));
+  const isConfirmed = toFormValueBoolean(formData.get("is_location_confirmed"));
+
+  if (!Number.isFinite(provinceId) || provinceId <= 0 || !Number.isFinite(districtId) || districtId <= 0 || !isConfirmed) {
+    return { ok: false, message: "Please add a location before publishing your ad." };
+  }
+
+  return { ok: true };
+}
+
 export async function createListingFormAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -801,6 +874,11 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   const input = parsed.data;
   const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
   if (!postingGuard.ok) {
+    return;
+  }
+
+  const locationGuard = validatePostingLocationFormData(formData);
+  if (!locationGuard.ok) {
     return;
   }
 
@@ -863,6 +941,11 @@ export async function createListingAction(formData: FormData): Promise<{
   const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
+  }
+
+  const locationGuard = validatePostingLocationFormData(formData);
+  if (!locationGuard.ok) {
+    return { ok: false, message: locationGuard.message };
   }
 
   const createdListing = await buildListingPayload(supabase, user.id, input, formData);

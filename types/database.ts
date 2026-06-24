@@ -15,7 +15,7 @@ export type NotificationType =
 export type LanguageCode = "en" | "fa" | "ps";
 
 // Location Types
-export type LocationSource = "manual" | "browser" | "gps" | "map_pin";
+export type LocationSource = "manual" | "device" | "browser" | "gps" | "map_pin";
 export type LocationVisibility = "exact" | "approximate" | "hidden";
 
 export type CategoryId = number;
@@ -148,6 +148,8 @@ export type Listing = {
   latitude: number | null;
   longitude: number | null;
   location_accuracy: number | null;
+  location_source: LocationSource | null;
+  is_location_confirmed: boolean;
   location_visibility: LocationVisibility;
   video_url: string | null;
   contact_phone: string;
