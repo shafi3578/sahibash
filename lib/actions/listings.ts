@@ -696,8 +696,7 @@ async function buildListingPayload(
     return null;
   }
 
-  const province = input.province || input.city || null;
-  const city = input.city || input.province || "";
+  const province = input.province || null;
 
   const parseLocationId = (value: FormDataEntryValue | null): number | null => {
     const raw = toFormValueText(value);
@@ -740,7 +739,7 @@ async function buildListingPayload(
 
   const resolvedProvince = toFormValueText(formData.get("province")) || (provinceRow?.name ? String(provinceRow.name) : null);
   const resolvedDistrict = toFormValueText(formData.get("district")) || (districtRow?.name ? String(districtRow.name) : null);
-  const resolvedCity = resolvedProvince || city || "Afghanistan";
+  const resolvedCity = null;
   const variantId = input.vehicle_variant_id ?? null;
   const manualSpecsRaw = toFormValueText(formData.get("vehicle_manual_specs_json"));
   let manualSpecs: Record<string, unknown> = {};

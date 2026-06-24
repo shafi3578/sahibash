@@ -44,7 +44,7 @@ export default async function ListingDetailPage({
     })
   );
   const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
-  const locationParts = [listing.province, listing.district, listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional || listing.city].filter(Boolean);
+  const locationParts = [listing.province, listing.district, listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean);
   const videoUrl = listing.video_url || attributeMap.get("video_url") || "";
   const postedDate = new Date(listing.created_at).toLocaleDateString("en-US", {
     year: "numeric",

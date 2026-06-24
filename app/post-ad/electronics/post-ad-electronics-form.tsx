@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
 import { CURRENCIES, AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type ElectronicsCategory = {
   id: number;
@@ -50,6 +51,10 @@ type PostingConfig = {
 };
 
 type StagedImage = { file: File; previewUrl: string; isPrimary: boolean };
+
+type ProvinceOption = { id: number; name: string };
+type DistrictOption = { id: number; name: string; province_id: number };
+type LocationMethod = "device" | "manual" | null;
 
 type Props = {
   subcategories: ElectronicsCategory[];
@@ -133,6 +138,18 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
 
   const [province, setProvince] = useState("");
   const [district, setDistrict] = useState("");
+  const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
+  const [districtOptions, setDistrictOptions] = useState<DistrictOption[]>([]);
+  const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
+  const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
+  const [locationMethod, setLocationMethod] = useState<LocationMethod>(null);
+  const [locationVisibility, setLocationVisibility] = useState<"exact" | "approximate" | "hidden">("hidden");
+  const [deviceLatitude, setDeviceLatitude] = useState<number | null>(null);
+  const [deviceLongitude, setDeviceLongitude] = useState<number | null>(null);
+  const [deviceAccuracy, setDeviceAccuracy] = useState<number | null>(null);
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationHint, setLocationHint] = useState<string | null>(null);
   const [area, setArea] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactName, setContactName] = useState("");
@@ -146,6 +163,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
 
   const storageOptions = useMemo(() => optionsByType(modelOptions, "storage"), [modelOptions]);
   const colorOptions = useMemo(() => optionsByType(modelOptions, "color"), [modelOptions]);
+  const showPhotoStep = postingConfig.requires_images || images.length > 0;
 
   async function loadBrands(categoryId: number) {
     const response = await fetch(`/api/electronics/brands?categoryId=${categoryId}`, { method: "GET" });
@@ -245,7 +263,169 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
     });
   }
 
-  const orderedSteps: Step[] = ["category", "brandModel", "details", "photos", "location", "preview"];
+  const orderedSteps: Step[] = showPhotoStep
+    ? ["category", "brandModel", "details", "photos", "location", "preview"]
+    : ["category", "brandModel", "details", "location", "preview"];
+
+  function normalizeLocationName(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace("daikundi", "daykundi")
+      .replace("jawzjan", "jowzjan")
+      .replace("sar e pol", "sar-e pol")
+      .replace("maidan wardak", "wardak");
+  }
+
+  async function loadProvinces() {
+    const supabase = createSupabaseBrowserClient();
+    const { data } = await supabase
+      .from("provinces")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name", { ascending: true });
+
+    const normalizedRows = ((data ?? []) as Array<{ id: number; name: string }>)
+      .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(String(row.name)) }));
+
+    const whitelist = AFGHAN_PROVINCES.map((name) => ({
+      name,
+      norm: normalizeLocationName(name),
+    }));
+
+    const mapped = whitelist.reduce<ProvinceOption[]>((acc, item) => {
+      const match = normalizedRows.find((row) => row.norm === item.norm);
+      if (!match) return acc;
+      acc.push({ id: match.id, name: item.name });
+      return acc;
+    }, []);
+
+    setProvinceOptions(mapped);
+  }
+
+  async function loadDistricts(provinceId: number) {
+    const supabase = createSupabaseBrowserClient();
+    const { data } = await supabase
+      .from("districts")
+      .select("id, name, province_id")
+      .eq("province_id", provinceId)
+      .eq("is_active", true)
+      .order("name", { ascending: true });
+
+    const rows = (data ?? []) as DistrictOption[];
+    setDistrictOptions(rows);
+    return rows;
+  }
+
+  async function attemptReverseGeocode(latitude: number, longitude: number) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}&accept-language=en`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as {
+        address?: {
+          state?: string;
+          province?: string;
+          county?: string;
+          city_district?: string;
+          municipality?: string;
+          town?: string;
+          city?: string;
+        };
+      };
+
+      const provinceHint = payload.address?.state || payload.address?.province || "";
+      const districtHint = payload.address?.county || payload.address?.city_district || payload.address?.municipality || payload.address?.town || payload.address?.city || "";
+
+      if (provinceHint) {
+        const matchedProvince = provinceOptions.find(
+          (option) => normalizeLocationName(option.name) === normalizeLocationName(provinceHint)
+        );
+        if (matchedProvince) {
+          setSelectedProvinceId(matchedProvince.id);
+          setProvince(matchedProvince.name);
+          const loadedDistricts = await loadDistricts(matchedProvince.id);
+
+          if (districtHint) {
+            const matchedDistrict = loadedDistricts.find(
+              (option) => normalizeLocationName(option.name) === normalizeLocationName(districtHint)
+            );
+            if (matchedDistrict) {
+              setSelectedDistrictId(matchedDistrict.id);
+              setDistrict(matchedDistrict.name);
+            }
+          }
+        }
+      }
+    } catch {
+      // Best-effort lookup only.
+    }
+  }
+
+  function handleUseMyLocation() {
+    setLocationMethod("device");
+    setLocationConfirmed(false);
+    setLocationHint(null);
+
+    if (!navigator.geolocation) {
+      setLocationHint("We could not detect your location. Please choose manually.");
+      setLocationMethod("manual");
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setIsDetectingLocation(false);
+        setDeviceLatitude(position.coords.latitude);
+        setDeviceLongitude(position.coords.longitude);
+        setDeviceAccuracy(Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null);
+        setLocationHint("We detected your location. Please confirm it before publishing.");
+        void attemptReverseGeocode(position.coords.latitude, position.coords.longitude);
+      },
+      () => {
+        setIsDetectingLocation(false);
+        setLocationMethod("manual");
+        setLocationHint("We could not detect your location. Please choose manually.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  }
+
+  function handleConfirmDetectedLocation() {
+    if (!selectedProvinceId || !selectedDistrictId || deviceLatitude === null || deviceLongitude === null) {
+      setStepError("Please confirm province and district for the detected location.");
+      return;
+    }
+    setLocationConfirmed(true);
+    setLocationHint("Location confirmed.");
+  }
+
+  useEffect(() => {
+    void loadProvinces();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProvinceId) {
+      setDistrictOptions([]);
+      setSelectedDistrictId(null);
+      setDistrict("");
+      return;
+    }
+
+    void loadDistricts(selectedProvinceId);
+  }, [selectedProvinceId]);
 
   function gotoNext() {
     setStepError(null);
@@ -303,7 +483,7 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
         setStepError("Storage is required for mobile phones.");
         return;
       }
-      setStep("photos");
+      setStep(showPhotoStep ? "photos" : "location");
       return;
     }
 
@@ -317,14 +497,27 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
     }
 
     if (step === "location") {
-      if (!province) {
-        setStepError("Province is required.");
+      if (!selectedProvinceId || !selectedDistrictId) {
+        setStepError("Please add a location before publishing your ad.");
         return;
       }
-      if (!district) {
-        setStepError("District is required.");
+
+      if (!locationMethod) {
+        setStepError("Please add a location before publishing your ad.");
         return;
       }
+
+      if (locationMethod === "device") {
+        if (deviceLatitude === null || deviceLongitude === null) {
+          setStepError("Please detect your device location or choose manual location.");
+          return;
+        }
+        if (!locationConfirmed) {
+          setStepError("We detected your location. Please confirm it before publishing.");
+          return;
+        }
+      }
+
       if (!contactPhone.trim() || contactPhone.trim().length < 7) {
         setStepError("Contact phone is required (minimum 7 digits).");
         return;
@@ -366,7 +559,16 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
     form.set("currency", currency);
     form.set("province", province);
     form.set("district", district);
+    form.set("province_id", String(selectedProvinceId ?? ""));
+    form.set("district_id", String(selectedDistrictId ?? ""));
+    form.set("area_text", area);
     form.set("address_optional", area);
+    if (deviceLatitude !== null) form.set("latitude", String(deviceLatitude));
+    if (deviceLongitude !== null) form.set("longitude", String(deviceLongitude));
+    if (deviceAccuracy !== null) form.set("location_accuracy", String(deviceAccuracy));
+    form.set("location_source", locationMethod === "device" ? "device" : "manual");
+    form.set("location_visibility", locationVisibility);
+    form.set("is_location_confirmed", locationMethod === "device" ? (locationConfirmed ? "true" : "false") : "true");
     form.set("contact_phone", contactPhone.trim());
     form.set("contact_name", contactName.trim());
 
@@ -635,20 +837,103 @@ export default function ElectronicsPostAdForm({ subcategories }: Props) {
 
         {step === "location" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Location</h2>
+            <h2 className="font-display text-lg font-bold">Where is this item located?</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">Choose how you want to add your location.</p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={handleUseMyLocation}
+                className={`rounded-xl border p-4 text-left ${locationMethod === "device" ? "border-emerald-600 bg-emerald-50" : "border-[var(--line)]"}`}
+              >
+                <p className="text-sm font-bold">Use My Location</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">Detect automatically from your device.</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLocationMethod("manual");
+                  setLocationConfirmed(true);
+                  setLocationHint(null);
+                }}
+                className={`rounded-xl border p-4 text-left ${locationMethod === "manual" ? "border-sky-600 bg-sky-50" : "border-[var(--line)]"}`}
+              >
+                <p className="text-sm font-bold">Manual Location</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">Choose province and district yourself.</p>
+              </button>
+            </div>
+
+            {isDetectingLocation ? (
+              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">Detecting your device location...</p>
+            ) : null}
+
+            {locationHint ? (
+              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">{locationHint}</p>
+            ) : null}
+
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold">Province
-                <select value={province} onChange={(event) => setProvince(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                <select
+                  value={selectedProvinceId ? String(selectedProvinceId) : ""}
+                  onChange={async (event) => {
+                    const next = event.target.value ? Number(event.target.value) : null;
+                    setSelectedProvinceId(next);
+                    setLocationConfirmed(locationMethod === "manual");
+                    setSelectedDistrictId(null);
+                    setDistrict("");
+                    if (next) {
+                      const selected = provinceOptions.find((item) => item.id === next);
+                      setProvince(selected?.name ?? "");
+                      await loadDistricts(next);
+                    } else {
+                      setProvince("");
+                      setDistrictOptions([]);
+                    }
+                  }}
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                >
                   <option value="">Select province</option>
-                  {AFGHAN_PROVINCES.map((value) => <option key={value} value={value}>{value}</option>)}
+                  {provinceOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
               <label className="text-sm font-semibold">District
-                <input value={district} onChange={(event) => setDistrict(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                <select
+                  value={selectedDistrictId ? String(selectedDistrictId) : ""}
+                  onChange={(event) => {
+                    const next = event.target.value ? Number(event.target.value) : null;
+                    setSelectedDistrictId(next);
+                    const selected = districtOptions.find((item) => item.id === next);
+                    setDistrict(selected?.name ?? "");
+                    setLocationConfirmed(locationMethod === "manual");
+                  }}
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                  disabled={!selectedProvinceId}
+                >
+                  <option value="">Select district</option>
+                  {districtOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
               </label>
               <label className="text-sm font-semibold sm:col-span-2">Area (optional)
                 <input value={area} onChange={(event) => setArea(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
+              <label className="text-sm font-semibold sm:col-span-2">Location Visibility
+                <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "hidden")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="hidden">Hide exact location, show only province/district</option>
+                  <option value="approximate">Show approximate location</option>
+                  <option value="exact">Show exact location</option>
+                </select>
+              </label>
+              {locationMethod === "device" && deviceLatitude !== null && deviceLongitude !== null ? (
+                <div className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+                  <p className="font-semibold">Detected Location</p>
+                  <p className="mt-1">Province: {province || "Not matched"}</p>
+                  <p>District: {district || "Not matched"}</p>
+                  <p>Accuracy: {deviceAccuracy !== null ? `${deviceAccuracy} m` : "Unknown"}</p>
+                  <button type="button" onClick={handleConfirmDetectedLocation} className="mt-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
+                    Confirm Location
+                  </button>
+                </div>
+              ) : null}
               <label className="text-sm font-semibold">Contact Phone
                 <input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
