@@ -16,8 +16,16 @@ import {
   COMING_SOON_HOME_CATEGORY_SLUGS,
   LAUNCH_ACTIVE_CATEGORY_SLUGS,
 } from "@/lib/categories/categoryTree";
+import {
+  appLocaleToListingLanguage,
+  getCompletedListingTranslations,
+  listingLanguageLabel,
+  type ListingLanguageCode,
+} from "@/lib/listings/translation-service";
+import type { AppLocale } from "@/lib/i18n/translations";
 
 type ListingFilters = {
+  locale?: AppLocale;
   categoryId?: number;
   categorySlug?: string;
   categoryNodeId?: number;
@@ -84,7 +92,58 @@ type ListingFilters = {
   originalRefurbished?: string;
   bathroomsMin?: number;
   parking?: boolean;
+  listingType?: "for_sale" | "wanted";
 };
+
+function attachPreferredTranslation(
+  rows: ListingWithRelations[],
+  translationsByListingId: Record<string, { title: string; description: string }>,
+  requestedLanguage: ListingLanguageCode
+) {
+  return rows.map((listing) => {
+    const translated = translationsByListingId[listing.id];
+    const originalLocale = (listing.original_locale as ListingLanguageCode | null) ?? "en";
+    if (translated) {
+      return {
+        ...listing,
+        translated_title: translated.title,
+        translated_description: translated.description,
+        display_language: requestedLanguage,
+        translation_note: `Translated from ${listingLanguageLabel(originalLocale)}`,
+      };
+    }
+
+    return {
+      ...listing,
+      translated_title: listing.title,
+      translated_description: listing.description,
+      display_language: originalLocale,
+      translation_note: `Original language: ${listingLanguageLabel(originalLocale)}`,
+    };
+  });
+}
+
+const PUBLIC_TEST_TEXT_PATTERNS = [
+  "%test listing%",
+  "%demo listing%",
+  "%dummy listing%",
+  "%this is a test%",
+  "%for testing%",
+  "%sample ad%",
+];
+
+function applyPublicListingQualityFilters<T>(query: T): T {
+  let next = query as T & {
+    not: (column: string, operator: string, value: string) => T;
+  };
+
+  for (const pattern of PUBLIC_TEST_TEXT_PATTERNS) {
+    next = next.not("title", "ilike", pattern) as typeof next;
+    next = next.not("description", "ilike", pattern) as typeof next;
+  }
+
+  return next as T;
+}
 
 export type SearchIntent = {
   categorySlug: string;
@@ -151,6 +210,25 @@ export async function getApprovedListings(
       };
 
       let attributeScopedListingIds: string[] | null = null;
+      let translatedSearchListingIds: string[] = [];
+
+      if (filters?.search?.trim()) {
+        const queryText = filters.search.trim();
+        const { data: translationRows } = await supabase
+          .from("listing_translations")
+          .select("listing_id")
+          .eq("translation_status", "completed")
+          .or(`title.ilike.%${queryText}%,description.ilike.%${queryText}%,normalized_keywords.ilike.%${queryText}%`)
+          .limit(5000);
+
+        translatedSearchListingIds = Array.from(
+          new Set(
+            (translationRows ?? [])
+              .map((row) => String((row as { listing_id?: string }).listing_id ?? ""))
+              .filter((id) => id.length > 0)
+          )
+        );
+      }
 
       const applyAttributeTextFilter = async (attributeKey: string, value?: string) => {
         if (!value) {
@@ -246,6 +324,34 @@ export async function getApprovedListings(
         attributeScopedListingIds = intersectIds(attributeScopedListingIds, ids);
       };
 
+      const applyWantedOnlyFilter = async (listingType?: "for_sale" | "wanted") => {
+        if (listingType !== "wanted") {
+          return;
+        }
+
+        let q = supabase
+          .from("listing_attributes")
+          .select("listing_id")
+          .in("attribute_key", ["listing_type", "listing_purpose", "rental_type"])
+          .ilike("attribute_value_text", "%wanted%")
+          .limit(5000);
+
+        if (attributeScopedListingIds && attributeScopedListingIds.length > 0) {
+          q = q.in("listing_id", attributeScopedListingIds);
+        }
+
+        const { data, error } = await q;
+        if (error) {
+          return;
+        }
+
+        const ids = (data ?? [])
+          .map((row) => String((row as { listing_id?: string }).listing_id ?? ""))
+          .filter((id) => id.length > 0);
+
+        attributeScopedListingIds = intersectIds(attributeScopedListingIds, ids);
+      };
+
       if (filters?.categoryNodeId) {
         const { data: scopedRoot } = await supabase
           .from("category_nodes")
@@ -302,8 +408,14 @@ export async function getApprovedListings(
               .in("id", ids)
               .limit(120);
 
+            studentQuery = applyPublicListingQualityFilters(studentQuery);
+
             if (filters.search) {
-              studentQuery = studentQuery.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+              if (translatedSearchListingIds.length > 0) {
+                studentQuery = studentQuery.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,id.in.(${translatedSearchListingIds.join(",")})`);
+              } else {
+                studentQuery = studentQuery.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+              }
             }
 
             if (filters.sort === "price_low") {
@@ -383,7 +495,7 @@ export async function getApprovedListings(
                 return [];
               }
 
-              const { data, error } = await supabase
+              let realEstateQuery = supabase
                 .from("listings")
                 .select(
                   `
@@ -398,6 +510,10 @@ export async function getApprovedListings(
                 .in("id", ids)
                 .order("created_at", { ascending: false })
                 .limit(40);
+
+              realEstateQuery = applyPublicListingQualityFilters(realEstateQuery);
+
+              const { data, error } = await realEstateQuery;
 
               if (error || !data) {
                 return [];
@@ -435,6 +551,7 @@ export async function getApprovedListings(
       await applyAttributeTextFilter("ram", filters?.ram);
       await applyAttributeNumberFilter("battery_health", filters?.batteryHealthMin, undefined);
       await applyAttributeTextFilter("original_refurbished", filters?.originalRefurbished);
+      await applyWantedOnlyFilter(filters?.listingType);
 
       let query = supabase
         .from("listings")
@@ -449,6 +566,8 @@ export async function getApprovedListings(
         .eq("status", "approved")
         .in("category_id", lifecycleCategoryIds)
         .limit(120);
+
+      query = applyPublicListingQualityFilters(query);
 
       if (filters?.province) {
         query = query.eq("province", filters.province);
@@ -471,9 +590,15 @@ export async function getApprovedListings(
       }
 
       if (filters?.search) {
-        query = query.or(
-          `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`
-        );
+        if (translatedSearchListingIds.length > 0) {
+          query = query.or(
+            `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,id.in.(${translatedSearchListingIds.join(",")})`
+          );
+        } else {
+          query = query.or(
+            `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`
+          );
+        }
       }
 
       if (typeof filters?.minPrice === "number") {
@@ -587,15 +712,22 @@ export async function getApprovedListings(
       }
 
       const rows = data as ListingWithRelations[];
+      const requestedLanguage = appLocaleToListingLanguage(filters?.locale ?? "en");
+      const translationsByListingId = await getCompletedListingTranslations(
+        supabase,
+        rows.map((row) => row.id),
+        requestedLanguage
+      );
+      const translatedRows = attachPreferredTranslation(rows, translationsByListingId, requestedLanguage);
 
       if (filters?.sort === "relevant" && filters.search?.trim()) {
         const queryText = filters.search.trim().toLowerCase();
         const terms = queryText.split(/\s+/).filter((term) => term.length > 1);
         const nowMs = Date.now();
 
-        const scored = rows.map((listing) => {
-          const title = String(listing.title ?? "").toLowerCase();
-          const description = String(listing.description ?? "").toLowerCase();
+        const scored = translatedRows.map((listing) => {
+          const title = String(listing.translated_title ?? listing.title ?? "").toLowerCase();
+          const description = String(listing.translated_description ?? listing.description ?? "").toLowerCase();
 
           let titleHits = 0;
           let descHits = 0;
@@ -624,14 +756,15 @@ export async function getApprovedListings(
         return scored.map((item) => item.listing).slice(0, 40);
       }
 
-      return rows.slice(0, 40);
+      return translatedRows.slice(0, 40);
     } catch {
       return [];
     }
 }
 
 export async function getListingById(
-  id: string
+  id: string,
+  locale: AppLocale = "en"
 ): Promise<ListingWithRelations | null> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -658,6 +791,21 @@ export async function getListingById(
     }
 
     const listing = data as ListingWithRelations;
+    const requestedLanguage = appLocaleToListingLanguage(locale);
+    const translationsByListingId = await getCompletedListingTranslations(
+      supabase,
+      [listing.id],
+      requestedLanguage
+    );
+    const translated = translationsByListingId[listing.id];
+    const originalLocale = (listing.original_locale as ListingLanguageCode | null) ?? "en";
+
+    listing.translated_title = translated?.title ?? listing.title;
+    listing.translated_description = translated?.description ?? listing.description;
+    listing.display_language = translated ? requestedLanguage : originalLocale;
+    listing.translation_note = translated
+      ? `Translated from ${listingLanguageLabel(originalLocale)}`
+      : `Original language: ${listingLanguageLabel(originalLocale)}`;
     const { data: profile } = await supabase
       .from("profiles")
       .select("*")

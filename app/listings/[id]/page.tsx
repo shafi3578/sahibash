@@ -6,12 +6,14 @@ import { createReportAction } from "@/lib/actions/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { sendListingMessageAction } from "@/lib/actions/messages";
 import { createOfferAction } from "@/lib/actions/offers";
+import { reportListingTranslationIssueAction } from "@/lib/actions/translations";
 import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
 import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
 import LocationCard from "@/components/location/LocationCard";
 import { getDictionary } from "@/lib/i18n/server";
+import { appLocaleToListingLanguage } from "@/lib/listings/translation-service";
 
 function readAttributeValue(value: unknown) {
   if (typeof value === "string") return value;
@@ -25,13 +27,22 @@ export default async function ListingDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ message?: string; offer?: string; compose?: string; offerbox?: string }>;
+  searchParams: Promise<{ message?: string; offer?: string; compose?: string; offerbox?: string; view?: string; translation?: string }>;
 }) {
-  const { t } = await getDictionary();
+  const { t, locale } = await getDictionary();
   const { id } = await params;
   const qp = await searchParams;
-  const listing = await getListingById(id);
+  const listing = await getListingById(id, locale);
   if (!listing) notFound();
+  const viewerLanguageCode = appLocaleToListingLanguage(locale);
+  const showOriginal = qp.view === "original";
+  const translationUnavailable = !showOriginal && viewerLanguageCode !== listing.display_language;
+  const displayTitle = showOriginal
+    ? (listing.original_title || listing.title)
+    : (listing.translated_title || listing.title);
+  const displayDescription = showOriginal
+    ? (listing.original_description || listing.description)
+    : (listing.translated_description || listing.description);
 
   const currentUser = await getCurrentUser();
   const isOwner = currentUser?.id === listing.user_id;
@@ -54,7 +65,7 @@ export default async function ListingDetailPage({
     ?? attributeMap.get("rental_type")
     ?? ""
   ).toLowerCase();
-  const isWanted = listingTypeValue.includes("wanted") || /\bwanted\b/i.test(listing.title);
+  const isWanted = listingTypeValue.includes("wanted") || /\bwanted\b/i.test(displayTitle);
   const videoUrl = listing.video_url || attributeMap.get("video_url") || "";
   const postedDate = new Date(listing.created_at).toLocaleDateString("en-US", {
     year: "numeric",
@@ -185,7 +196,7 @@ export default async function ListingDetailPage({
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-2)]">{categoryLabel || t.listing.category}</p>
       </div>
       <div className="space-y-4 pb-20 sm:pb-0">
-        <ListingGallery images={listing.listing_images ?? []} title={listing.title} />
+        <ListingGallery images={listing.listing_images ?? []} title={displayTitle} />
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           {isWanted ? (
@@ -193,7 +204,21 @@ export default async function ListingDetailPage({
               {t.listing.wantedAd}
             </p>
           ) : null}
-          <h1 className="mt-1 font-display text-2xl font-bold leading-tight sm:text-3xl">{listing.title}</h1>
+          <h1 className="mt-1 font-display text-2xl font-bold leading-tight sm:text-3xl">{displayTitle}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1 text-[var(--ink-2)]">
+              {listing.translation_note || "Original language"}
+            </span>
+            {showOriginal ? (
+              <Link href={`/listings/${listing.id}`} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
+                {t.listing.showTranslated}
+              </Link>
+            ) : (
+              <Link href={`/listings/${listing.id}?view=original`} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
+                {t.listing.viewOriginal}
+              </Link>
+            )}
+          </div>
           {listing.suitable_for_students ? (
             <p className="mt-2 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
               {t.listing.suitableForStudents}
@@ -277,7 +302,7 @@ export default async function ListingDetailPage({
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.description}</h2>
-          <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[var(--ink-1)]">{listing.description}</p>
+          <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[var(--ink-1)]">{displayDescription}</p>
           {videoUrl ? (
             <div className="mt-4 border-t border-[var(--line)] pt-3 text-sm">
               <p className="font-semibold">{t.listing.video}</p>
@@ -363,7 +388,25 @@ export default async function ListingDetailPage({
           <input name="details" placeholder={t.listing.optionalDetails} className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm" />
           <button className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.reportListing}</button>
         </form>
+        <form action={reportListingTranslationIssueAction} className="flex flex-wrap items-center gap-2">
+          <input type="hidden" name="listingId" value={listing.id} />
+          <input type="hidden" name="languageCode" value={viewerLanguageCode} />
+          <input
+            name="details"
+            placeholder={t.listing.reportTranslationIssue}
+            className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm"
+          />
+          <button className="rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">
+            {t.listing.reportTranslationIssue}
+          </button>
+        </form>
       </div>
+
+      {(qp.translation === "unavailable" || translationUnavailable) ? (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {t.listing.translationUnavailable}
+        </div>
+      ) : null}
 
       {!isOwner ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">

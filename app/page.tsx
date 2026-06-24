@@ -9,9 +9,9 @@ import { getApprovedListings } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
 
 export default async function HomePage() {
-  const { t } = await getDictionary();
+  const { t, locale } = await getDictionary();
   const [listings, categories, mobileCategories] = await Promise.all([
-    getApprovedListings(),
+    getApprovedListings({ locale }),
     getCategoriesWithStats(),
     getHomeCategoryNodes(),
   ]);

@@ -91,7 +91,8 @@ type TranslationTree = {
     safety3: string;
     safety4: string;
     addToFavorites: string;
-    reportListing: string;
+      reportListing: string;
+      reportTranslationIssue: string;
     selectReportReason: string;
     fraudOrScam: string;
     wrongCategory: string;
@@ -108,6 +109,9 @@ type TranslationTree = {
     sendOffer: string;
     call: string;
     close: string;
+    viewOriginal: string;
+    showTranslated: string;
+    translationUnavailable: string;
     listingNo: string;
     listingDate: string;
   };
@@ -365,6 +369,7 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       safety4: "Verify ownership before payment.",
       addToFavorites: "Add to Favorites",
       reportListing: "Report Listing",
+      reportTranslationIssue: "Report translation issue",
       selectReportReason: "Select report reason",
       fraudOrScam: "Fraud or scam",
       wrongCategory: "Wrong category",
@@ -381,6 +386,9 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       sendOffer: "Send Offer",
       call: "Call",
       close: "Close",
+      viewOriginal: "View original",
+      showTranslated: "Show translated",
+      translationUnavailable: "Translation is not available yet.",
       listingNo: "Listing No",
       listingDate: "Listing Date",
     },
@@ -636,6 +644,7 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       safety4: "قبل از پرداخت، مالکیت را تایید کنید.",
       addToFavorites: "افزودن به علاقه‌مندی‌ها",
       reportListing: "گزارش اعلان",
+      reportTranslationIssue: "گزارش مشکل ترجمه",
       selectReportReason: "دلیل گزارش را انتخاب کنید",
       fraudOrScam: "کلاه‌برداری",
       wrongCategory: "دسته‌بندی اشتباه",
@@ -652,6 +661,9 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       sendOffer: "ارسال پیشنهاد",
       call: "تماس",
       close: "بستن",
+      viewOriginal: "دیدن متن اصلی",
+      showTranslated: "نمایش ترجمه",
+      translationUnavailable: "ترجمه هنوز در دسترس نیست.",
       listingNo: "شماره اعلان",
       listingDate: "تاریخ اعلان",
     },
@@ -907,6 +919,7 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       safety4: "له پیسو مخکې د مالکیت تایید وکړئ.",
       addToFavorites: "خوښې ته اضافه کړئ",
       reportListing: "اعلان راپور کړئ",
+      reportTranslationIssue: "د ژباړې ستونزه راپور کړئ",
       selectReportReason: "د راپور دلیل وټاکئ",
       fraudOrScam: "درغلي",
       wrongCategory: "ناسمه کټګوري",
@@ -923,6 +936,9 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       sendOffer: "وړاندیز ولېږئ",
       call: "زنګ",
       close: "بندول",
+      viewOriginal: "اصلي متن وګورئ",
+      showTranslated: "ژباړه وښیه",
+      translationUnavailable: "ژباړه لا تراوسه موجوده نه ده.",
       listingNo: "د اعلان شمېره",
       listingDate: "د اعلان نېټه",
     },

@@ -1,8 +1,10 @@
 import { ListingCard } from "@/components/listing-card";
 import { getApprovedListings } from "@/lib/data/queries";
+import { getDictionary } from "@/lib/i18n/server";
 
 export default async function ListingsPage() {
-  const listings = await getApprovedListings();
+  const { locale } = await getDictionary();
+  const listings = await getApprovedListings({ locale });
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="font-display text-3xl font-bold">All Listings</h1>

@@ -2,9 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { getCurrentUser, requireAdmin, requireUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSelectedCategoryNodeId, listingSchema, type ListingInput } from "@/lib/validators/listing";
+import {
+  detectOriginalListingLanguage,
+  markListingTranslationsStale,
+  processPendingListingTranslationJobs,
+  queueListingTranslationJobs,
+  sourceHash,
+} from "@/lib/listings/translation-service";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -719,9 +726,9 @@ async function buildListingPayload(
   const locationAccuracyRaw = toFormValueText(formData.get("location_accuracy"));
   const locationAccuracy = locationAccuracyRaw ? Number(locationAccuracyRaw) : null;
   const locationVisibilityRaw = toFormValueText(formData.get("location_visibility")).toLowerCase();
-  const locationVisibility = ["exact", "approximate", "hidden"].includes(locationVisibilityRaw)
-    ? locationVisibilityRaw
-    : "hidden";
+  const locationVisibility = ["exact", "approximate", "hidden", "province_district"].includes(locationVisibilityRaw)
+    ? (locationVisibilityRaw === "hidden" ? "province_district" : locationVisibilityRaw)
+    : "province_district";
   const isLocationConfirmed = toFormValueBoolean(formData.get("is_location_confirmed"));
 
   if (!provinceId || !districtId) {
@@ -800,11 +807,16 @@ async function buildListingPayload(
   const distanceToUniversity = distanceToUniversityText ? Number(distanceToUniversityText) : null;
 
   return {
+    sourceTitle: input.title,
+    sourceDescription: input.description,
     context,
     payload: {
       user_id: userId,
       title: input.title,
       description: input.description,
+      original_title: input.title,
+      original_description: input.description,
+      ...detectOriginalListingLanguage(input.title, input.description),
       category_id: context.categoryId,
       category_node_id: context.categoryNodeId,
       subcategory_id: legacySubcategoryId,
@@ -915,6 +927,14 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   await persistVehicleDamage(supabase, data.id, formData);
   await persistVehicleFeatures(supabase, data.id, formData);
 
+  await queueListingTranslationJobs(supabase, {
+    listingId: data.id,
+    title: listing.sourceTitle,
+    description: listing.sourceDescription,
+    originalLocale: listing.payload.original_locale,
+  });
+  await processPendingListingTranslationJobs(supabase, { listingId: data.id, limit: 3 });
+
   revalidatePath("/");
   revalidatePath("/listings");
   revalidatePath("/dashboard/my-ads");
@@ -928,7 +948,10 @@ export async function createListingAction(formData: FormData): Promise<{
   message: string;
   listingId?: string;
 }> {
-  const user = await requireUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return { ok: false, message: "Please log in or register to publish your ad." };
+  }
   const supabase = await createSupabaseServerClient();
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -981,6 +1004,14 @@ export async function createListingAction(formData: FormData): Promise<{
   await persistVehicleDamage(supabase, data.id, formData);
   await persistVehicleFeatures(supabase, data.id, formData);
 
+  await queueListingTranslationJobs(supabase, {
+    listingId: data.id,
+    title: createdListing.sourceTitle,
+    description: createdListing.sourceDescription,
+    originalLocale: createdListing.payload.original_locale,
+  });
+  await processPendingListingTranslationJobs(supabase, { listingId: data.id, limit: 3 });
+
   revalidatePath("/");
   revalidatePath("/listings");
   revalidatePath("/dashboard/my-ads");
@@ -1006,7 +1037,7 @@ export async function updateListingAction(
   // Verify ownership
   const { data: listing, error: fetchError } = await supabase
     .from("listings")
-    .select("user_id, price, currency")
+    .select("user_id, price, currency, original_title, original_description")
     .eq("id", listingId)
     .single();
 
@@ -1076,6 +1107,22 @@ export async function updateListingAction(
   });
   await persistVehicleDamage(supabase, listingId, formData);
   await persistVehicleFeatures(supabase, listingId, formData);
+
+  const previousSourceHash = sourceHash(
+    String(listing.original_title ?? ""),
+    String(listing.original_description ?? "")
+  );
+  const nextSourceHash = sourceHash(createdListing.sourceTitle, createdListing.sourceDescription);
+  if (previousSourceHash !== nextSourceHash) {
+    await markListingTranslationsStale(
+      supabase,
+      listingId,
+      createdListing.sourceTitle,
+      createdListing.sourceDescription,
+      createdListing.payload.original_locale
+    );
+    await processPendingListingTranslationJobs(supabase, { listingId, limit: 3 });
+  }
 
   revalidatePath("/listings");
   revalidatePath("/dashboard/my-ads");

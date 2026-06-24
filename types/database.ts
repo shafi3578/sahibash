@@ -13,10 +13,14 @@ export type NotificationType =
   | "listing_offer"
   | "system";
 export type LanguageCode = "en" | "fa" | "ps";
+export type ListingLanguageCode = "en" | "fa-AF" | "ps-AF";
+export type ListingTranslationStatus = "pending" | "completed" | "failed" | "needs_review";
+export type ListingTranslationActor = "ai" | "human" | "seller";
 
 // Location Types
 export type LocationSource = "manual" | "device" | "browser" | "gps" | "map_pin";
-export type LocationVisibility = "exact" | "approximate" | "hidden";
+export type LocationVisibility = "exact" | "approximate" | "hidden" | "province_district";
+export type ListingType = "for_sale" | "wanted";
 
 export type CategoryId = number;
 export type CategoryNodeId = number;
@@ -131,8 +135,13 @@ export type Listing = {
   gender_allowed: string | null;
   payment_period: string | null;
   distance_to_university: number | null;
+  listing_type?: ListingType;
   title: string;
   description: string;
+  original_title: string | null;
+  original_description: string | null;
+  original_language: string | null;
+  original_locale: ListingLanguageCode | null;
   price: number;
   currency: Currency;
   city: string;
@@ -356,6 +365,27 @@ export type ListingWithRelations = Listing & {
   vehicle_damage?: VehicleDamageReport | null;
   vehicle_variant?: VehicleVariantRecord | null;
   vehicle_features?: ListingVehicleFeature[];
+  listing_translations?: ListingTranslation[];
+  translated_title?: string;
+  translated_description?: string;
+  display_language?: ListingLanguageCode;
+  translation_note?: string | null;
+};
+
+export type ListingTranslation = {
+  id: string;
+  listing_id: string;
+  language_code: ListingLanguageCode;
+  title: string;
+  description: string;
+  normalized_keywords: string | null;
+  translation_status: ListingTranslationStatus;
+  translated_by: ListingTranslationActor;
+  translation_quality: string | null;
+  source_hash: string | null;
+  is_stale: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ListingWithImages = ListingWithRelations;

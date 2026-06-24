@@ -212,7 +212,7 @@ export default async function SearchPage({
 }: {
   searchParams: RawSearchParams;
 }) {
-  const { t } = await getDictionary();
+  const { t, locale } = await getDictionary();
   const raw = await searchParams;
   const params = Object.fromEntries(
     Object.entries(raw).map(([key, value]) => [key, pickFirst(value)])
@@ -242,6 +242,7 @@ export default async function SearchPage({
   const listingType = params.listingType ?? params.listing_type;
 
   const listings = await getApprovedListings({
+    locale,
     search: params.q,
     province: params.province,
     district: params.district,
