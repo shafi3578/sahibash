@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -8,47 +9,20 @@ import { AFGHAN_PROVINCES, CITIES, CURRENCIES } from "@/lib/constants/marketplac
 import type { Category, CategoryField, CategoryNode } from "@/types/database";
 import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
-import { VehicleFeaturesChecklist } from "@/components/vehicles/VehicleFeaturesChecklist";
 
 type Props = { categories: Category[] };
 
+type Step = 1 | 2 | 3 | 4;
+
 type StagedImage = { file: File; previewUrl: string; isPrimary: boolean };
 
-type AiSuggestion = {
-  rootSlug: "real-estate" | "vehicles" | "mobile-phones-tablets" | "electronics-computers" | "home-furniture-appliances" | "clothing-personal-items" | "jobs" | "services" | "business-industry" | "farm-animals" | "education" | "sports-hobbies" | "other";
-  pathSlugs: string[];
-  label: string;
-  reason: string;
-  confidence: number;
+type PostingConfig = {
+  requires_images: boolean;
+  min_images: number;
+  max_images: number;
+  recommended_images: string | null;
+  allow_video: boolean;
 };
-
-type SuggestedProduct = {
-  categoryNodeId: number;
-  categoryPath: string;
-  brand: string;
-  model: string;
-};
-
-type ProductSpecChoice = {
-  category_node_id: number;
-  brand: string;
-  model: string;
-  specs: Record<string, unknown>;
-};
-
-type AiResponse = {
-  suggestion: AiSuggestion | null;
-  suggestedProduct: SuggestedProduct | null;
-  suggestedSpecs: Record<string, unknown> | null;
-  labels: Array<{ label: string; score: number }>;
-  lowConfidence: boolean;
-  message: string | null;
-};
-
-type Step = 1 | 2 | 3 | 4 | 5 | 6;
-
-const MIN_VEHICLE_YEAR = 1950;
-const MAX_VEHICLE_YEAR = new Date().getFullYear() + 1;
 
 type CoreForm = {
   title: string;
@@ -56,130 +30,57 @@ type CoreForm = {
   province: string;
   city: string;
   district: string;
+  area: string;
   address_optional: string;
   contact_phone: string;
   contact_name: string;
-  rulesAccepted: boolean;
-  delivery_preference: string;
-  meeting_preference: string;
-  owner_agent: string;
-  available_for_viewing: boolean;
-  seller_type: string;
-  exchange_available: boolean;
+  contact_preferences: string;
   price: string;
   currency: "AFN" | "USD";
   negotiable: boolean;
   minimum_offer: string;
+  rulesAccepted: boolean;
 };
 
-const CORE_KEYS = new Set([
-  "title",
-  "description",
-  "price",
-  "currency",
-  "province",
-  "city",
-  "district",
-  "address_optional",
-  "contact_name",
-  "contact_phone",
-  "negotiable",
-  "minimum_offer",
-  "delivery_preference",
-  "meeting_preference",
-]);
-
-const VEHICLE_MANAGED_FIELD_KEYS = new Set([
-  "year",
-  "mileage",
-  "color",
-  "vehicle_status",
-  "warranty",
-  "salvage_record",
-  "plate_status",
-  "seller_type",
-  "exchange_available",
-  "neighborhood",
-  "video_url",
-]);
+const DRAFT_KEY = "sahibash_post_ad_draft_v2";
+const ACTIVE_POSTING_CATEGORY_SLUGS = [
+  "vehicles",
+  "real-estate",
+  "mobile-phones-tablets",
+  "second-hand-items",
+] as const;
 
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
   if (!optionsJson) return [];
-  if (Array.isArray(optionsJson)) return optionsJson.map((v) => String(v));
-  return Object.values(optionsJson).map((v) => String(v));
+  if (Array.isArray(optionsJson)) return optionsJson.map((value) => String(value));
+  return Object.values(optionsJson).map((value) => String(value));
 }
 
-function fieldGroupLabel(groupKey?: string | null) {
-  switch (groupKey) {
-    case "property_details":
-      return "Property Details";
-    case "category_specific":
-      return "Category Specific";
-    case "interior_features":
-      return "Interior Features";
-    case "exterior_features":
-      return "Exterior Features";
-    case "location_nearby":
-      return "Location & Nearby Places";
-    case "transportation":
-      return "Transportation";
-    case "view":
-      return "View";
-    case "utilities":
-      return "Utilities";
-    default:
-      return "Other";
+function renderFieldLabel(fieldKey: string) {
+  return fieldKey.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function inferImageConfig(rootSlug: string, path: string | undefined): PostingConfig {
+  if (rootSlug === "vehicles") {
+    return { requires_images: true, min_images: 1, max_images: 15, recommended_images: "6-15", allow_video: true };
   }
-}
 
-function seriesFromProductSpec(spec: ProductSpecChoice) {
-  return typeof spec.specs.series === "string" ? spec.specs.series : "";
-}
-
-function extractLockedSpecs(specs: Record<string, unknown>) {
-  const locked: Record<string, string | number | boolean> = {};
-
-  for (const [key, value] of Object.entries(specs)) {
-    if (key.endsWith("_options")) continue;
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      locked[key] = value;
+  if (rootSlug === "real-estate") {
+    if ((path ?? "").includes("/land")) {
+      return { requires_images: false, min_images: 0, max_images: 15, recommended_images: "1-8", allow_video: true };
     }
+    return { requires_images: true, min_images: 1, max_images: 15, recommended_images: "5-15", allow_video: true };
   }
 
-  return locked;
-}
+  if (rootSlug === "mobile-phones-tablets" || rootSlug === "electronics-computers") {
+    return { requires_images: true, min_images: 1, max_images: 12, recommended_images: "3-8", allow_video: false };
+  }
 
-function labelForLockedSpec(key: string) {
-  const labels: Record<string, string> = {
-    make: "Make",
-    brand: "Brand",
-    model: "Model",
-    series: "Series",
-    variant: "Variant",
-    operating_system: "Operating System",
-    screen_size: "Screen Size",
-    device_type: "Device Type",
-    sim_type: "SIM Type",
-    release_year: "Release Year",
-    network_type: "Network Type",
-    charging_port: "Charging Port",
-    biometric: "Face ID / Fingerprint",
-    processor: "Processor",
-    vehicle_type: "Vehicle Type",
-    body_type: "Body Type",
-    fuel_type: "Fuel Type",
-    gear: "Gear / Transmission",
-    transmission: "Transmission",
-    engine_power: "Engine Power",
-    engine_capacity: "Engine Capacity",
-    engine_size: "Engine Size",
-    wheel_drive: "Wheel Drive",
-    drive_type: "Wheel Drive",
-    doors: "Doors",
-    seats: "Seats",
-  };
+  if (rootSlug === "second-hand-items") {
+    return { requires_images: true, min_images: 1, max_images: 12, recommended_images: "3-8", allow_video: false };
+  }
 
-  return labels[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return { requires_images: false, min_images: 0, max_images: 10, recommended_images: null, allow_video: false };
 }
 
 export default function PostAdForm({ categories }: Props) {
@@ -189,30 +90,30 @@ export default function PostAdForm({ categories }: Props) {
 
   const [step, setStep] = useState<Step>(1);
   const [stepError, setStepError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
-  const [images, setImages] = useState<StagedImage[]>([]);
   const [selectedRoot, setSelectedRoot] = useState<Category | null>(null);
   const [pathNodes, setPathNodes] = useState<CategoryNode[]>([]);
   const [currentOptions, setCurrentOptions] = useState<CategoryNode[]>([]);
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
   const [dynamicFields, setDynamicFields] = useState<CategoryField[]>([]);
+  const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean>>({});
   const [loadingTree, setLoadingTree] = useState(false);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [productSpecOptions, setProductSpecOptions] = useState<ProductSpecChoice[]>([]);
-  const [selectedSeries, setSelectedSeries] = useState("");
-  const [selectedProductModel, setSelectedProductModel] = useState("");
-  const [lockedSpecs, setLockedSpecs] = useState<Record<string, string | number | boolean>>({});
 
-  // Vehicle-specific state
-  const [vehicleSelection, setVehicleSelection] = useState<VehicleSelection>({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
+  const [postingConfig, setPostingConfig] = useState<PostingConfig | null>(null);
+
+  const [images, setImages] = useState<StagedImage[]>([]);
+
+  const [vehicleSelection, setVehicleSelection] = useState<VehicleSelection>({
+    brand: null,
+    series: null,
+    model: null,
+    generation: null,
+    variant: null,
+    specs: [],
+  });
   const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultDamageParts());
-  const [selectedVehicleFeatureIds, setSelectedVehicleFeatureIds] = useState<number[]>([]);
-
-  const [aiResult, setAiResult] = useState<AiResponse | null>(null);
-  const [isDetecting, setIsDetecting] = useState(false);
-
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const [core, setCore] = useState<CoreForm>({
     title: "",
@@ -220,97 +121,71 @@ export default function PostAdForm({ categories }: Props) {
     province: "",
     city: "",
     district: "",
+    area: "",
     address_optional: "",
     contact_phone: "",
     contact_name: "",
-    rulesAccepted: false,
-    delivery_preference: "",
-    meeting_preference: "",
-    owner_agent: "",
-    available_for_viewing: false,
-    seller_type: "",
-    exchange_available: false,
+    contact_preferences: "",
     price: "",
     currency: "AFN",
     negotiable: false,
     minimum_offer: "",
+    rulesAccepted: false,
   });
 
-  const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean>>({});
-
-  const breadcrumb = useMemo(() => pathNodes.map((n) => n.name).join(" > "), [pathNodes]);
-  const rootSlug = selectedRoot?.slug ?? "";
-  const manualVehicleMode = rootSlug === "vehicles" && Boolean(dynamicValues.vehicle_is_manual);
-  const resolvedVehicleYear = Number(String(dynamicValues.vehicle_year ?? dynamicValues.year ?? ""));
-  const classicVehicleMode = Number.isFinite(resolvedVehicleYear) && resolvedVehicleYear < 2000;
-
-  const seriesOptions = useMemo(() => {
-    return Array.from(new Set(productSpecOptions.map(seriesFromProductSpec).filter(Boolean)));
-  }, [productSpecOptions]);
-
-  const filteredProductSpecOptions = useMemo(() => {
-    if (!selectedSeries) return productSpecOptions;
-    return productSpecOptions.filter((spec) => seriesFromProductSpec(spec) === selectedSeries);
-  }, [productSpecOptions, selectedSeries]);
-
-  const selectedProductSpec = useMemo(() => {
-    if (!selectedProductModel) {
-      return filteredProductSpecOptions.length === 1 ? filteredProductSpecOptions[0] : null;
-    }
-
-    return filteredProductSpecOptions.find((spec) => spec.model === selectedProductModel) ?? null;
-  }, [filteredProductSpecOptions, selectedProductModel]);
-
-  const visibleFields = useMemo(() => {
-    return dynamicFields
-      .filter((field) => !CORE_KEYS.has(field.field_key))
-      .filter((field) => !(rootSlug === "vehicles" && VEHICLE_MANAGED_FIELD_KEYS.has(field.field_key)))
-      .filter((field) => {
-        const vehicleLockedSpecKeys = new Set(
-          vehicleSelection.specs.filter((spec) => spec.is_locked).map((spec) => spec.spec_key)
-        );
-        return !(field.field_key in lockedSpecs) && !vehicleLockedSpecKeys.has(field.field_key);
-      })
-      .filter((field) => {
-        const rules = field.visibility_rules;
-        if (!rules || Array.isArray(rules)) return true;
-
-        const rentalTypeRules = rules.rental_types;
-        if (Array.isArray(rentalTypeRules) && rentalTypeRules.length > 0) {
-          const selected = String(dynamicValues.rental_type ?? "");
-          return selected.length > 0 && rentalTypeRules.some((value) => String(value) === selected);
-        }
-
-        return true;
-      });
-  }, [dynamicFields, dynamicValues.rental_type, lockedSpecs, rootSlug, vehicleSelection.specs]);
-
-  const fieldsByGroup = useMemo(() => {
-    const groups: Record<string, CategoryField[]> = {};
-    for (const field of visibleFields) {
-      const group = field.group_key ?? "other";
-      if (!groups[group]) groups[group] = [];
-      groups[group].push(field);
-    }
-    return groups;
-  }, [visibleFields]);
-
-  const previewSummary = useMemo(
-    () => ({
-      photos: images.length,
-      category: breadcrumb || "Not selected",
-      title: core.title || "-",
-      description: core.description ? `${core.description.slice(0, 180)}${core.description.length > 180 ? "..." : ""}` : "-",
-      location: core.province ? `${core.province}${core.city ? `, ${core.city}` : ""}` : "-",
-      contact: core.contact_phone || "-",
-      price: core.price ? `${core.price} ${core.currency}` : "-",
-    }),
-    [images.length, breadcrumb, core]
+  const activeCategories = useMemo(
+    () => categories.filter((category) =>
+      ACTIVE_POSTING_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_POSTING_CATEGORY_SLUGS)[number])
+      && !category.is_coming_soon
+    ),
+    [categories]
   );
 
-  const selectedRentalType = String(dynamicValues.rental_type ?? "");
+  const comingSoonCategories = useMemo(
+    () => categories.filter((category) =>
+      !ACTIVE_POSTING_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_POSTING_CATEGORY_SLUGS)[number])
+      || category.is_coming_soon
+    ),
+    [categories]
+  );
+
+  const breadcrumb = useMemo(() => pathNodes.map((node) => node.name).join(" -> "), [pathNodes]);
+  const rootSlug = selectedRoot?.slug ?? "";
+  const finalPath = finalNode?.path;
   const isRealEstate = rootSlug === "real-estate";
-  const isGerawyType = selectedRentalType === "Gerawy / Rahn" || selectedRentalType === "Gerawy + Monthly Rent";
+  const isDormitory = finalPath === "real-estate/dormitory";
+  const isStudentCollection = finalPath === "real-estate/room-house-for-students";
+  const isHouseCategory = (finalPath ?? "").startsWith("real-estate/houses");
+  const isApartmentCategory = (finalPath ?? "").startsWith("real-estate/apartments");
+  const isRoomCategory = (finalPath ?? "").startsWith("real-estate/rooms");
+  const listingPurpose = String(dynamicValues.listing_purpose ?? "");
+  const showStudentSuitabilityToggle = isRealEstate
+    && !isDormitory
+    && (isHouseCategory || isApartmentCategory || isRoomCategory)
+    && listingPurpose === "For Rent";
+  const suitableForStudents = Boolean(dynamicValues.suitable_for_students);
+
+  const resolvedImageConfig = useMemo(() => {
+    if (!finalNode) return null;
+    return postingConfig ?? inferImageConfig(rootSlug, finalPath);
+  }, [finalNode, finalPath, postingConfig, rootSlug]);
+
+  const showPhotoStep = Boolean(resolvedImageConfig?.requires_images || images.length > 0);
+  const isPreviewStep = step === 4 || (step === 3 && !showPhotoStep);
+
+  const visualSteps = showPhotoStep
+    ? ["Category", "Details", "Photos", "Preview"]
+    : ["Category", "Details", "Preview"];
+
+  const currentVisualStep = (() => {
+    if (step === 1) return 1;
+    if (step === 2) return 2;
+    if (showPhotoStep) {
+      if (step === 3) return 3;
+      return 4;
+    }
+    return 3;
+  })();
 
   async function fetchChildren(parentId: number) {
     const supabase = createSupabaseBrowserClient();
@@ -320,6 +195,7 @@ export default function PostAdForm({ categories }: Props) {
       .eq("parent_id", parentId)
       .eq("is_active", true)
       .order("display_order", { ascending: true });
+
     return (data as CategoryNode[]) ?? [];
   }
 
@@ -331,8 +207,8 @@ export default function PostAdForm({ categories }: Props) {
       .eq("category_id", categoryId)
       .is("parent_id", null)
       .eq("is_active", true)
-      .limit(1)
       .maybeSingle();
+
     return (data as CategoryNode | null) ?? null;
   }
 
@@ -346,8 +222,8 @@ export default function PostAdForm({ categories }: Props) {
       .order("sort_order", { ascending: true })
       .order("display_order", { ascending: true });
 
-    if (!orderedBySort.error) {
-      setDynamicFields((orderedBySort.data as CategoryField[]) ?? []);
+    if (!orderedBySort.error && orderedBySort.data) {
+      setDynamicFields(orderedBySort.data as CategoryField[]);
       return;
     }
 
@@ -361,93 +237,42 @@ export default function PostAdForm({ categories }: Props) {
     setDynamicFields((fallback.data as CategoryField[]) ?? []);
   }
 
-  function resetSmartProductState() {
-    setProductSpecOptions([]);
-    setSelectedSeries("");
-    setSelectedProductModel("");
-    setLockedSpecs({});
-  }
-
-  function applyProductSpecSelection(spec: ProductSpecChoice | null) {
-    if (!spec) {
-      setSelectedProductModel("");
-      setLockedSpecs({});
-      return;
-    }
-
-    setSelectedProductModel(spec.model);
-    const series = seriesFromProductSpec(spec);
-    if (series) {
-      setSelectedSeries(series);
-    }
-    setLockedSpecs(extractLockedSpecs(spec.specs));
-  }
-
-  async function fetchProductSpecs(categoryNodeId: number) {
-    setLoadingProducts(true);
+  async function fetchPostingConfig(categoryId: number) {
     const supabase = createSupabaseBrowserClient();
-    const { data } = await supabase
-      .from("product_specs")
-      .select("category_node_id, brand, model, specs")
-      .eq("category_node_id", categoryNodeId)
+    const { data, error } = await supabase
+      .from("posting_category_config")
+      .select("requires_images, min_images, max_images, recommended_images, allow_video")
+      .eq("category_id", categoryId)
       .eq("is_active", true)
-      .order("brand", { ascending: true })
-      .order("model", { ascending: true });
+      .maybeSingle();
 
-    const options = (data as ProductSpecChoice[]) ?? [];
-    setProductSpecOptions(options);
-
-    if (options.length === 0) {
-      resetSmartProductState();
-      setLoadingProducts(false);
+    if (error || !data) {
+      setPostingConfig(null);
       return;
     }
 
-    const suggested = aiResult?.suggestedProduct
-      ? options.find((option) => option.brand === aiResult.suggestedProduct?.brand && option.model === aiResult.suggestedProduct?.model)
-      : null;
-
-    if (suggested) {
-      applyProductSpecSelection(suggested);
-    } else if (options.length === 1) {
-      applyProductSpecSelection(options[0]);
-    } else {
-      setSelectedSeries("");
-      setSelectedProductModel("");
-      setLockedSpecs({});
-    }
-
-    setLoadingProducts(false);
+    setPostingConfig({
+      requires_images: Boolean((data as Record<string, unknown>).requires_images),
+      min_images: Number((data as Record<string, unknown>).min_images ?? 0),
+      max_images: Number((data as Record<string, unknown>).max_images ?? 10),
+      recommended_images: ((data as Record<string, unknown>).recommended_images as string | null) ?? null,
+      allow_video: Boolean((data as Record<string, unknown>).allow_video),
+    });
   }
 
-  function fieldOptionsForRender(field: CategoryField) {
-    if (field.field_key === "storage" && selectedProductSpec) {
-      const values = selectedProductSpec.specs.storage_options;
-      if (Array.isArray(values)) {
-        return values.map((value) => String(value));
-      }
+  const chooseRoot = useCallback(async (category: Category) => {
+    if (category.is_coming_soon) {
+      return;
     }
 
-    if (field.field_key === "ram" && selectedProductSpec) {
-      const values = selectedProductSpec.specs.ram_options;
-      if (Array.isArray(values)) {
-        return values.map((value) => String(value));
-      }
-    }
-
-    return fieldOptions(field.options_json);
-  }
-
-  async function chooseRoot(category: Category) {
     setLoadingTree(true);
     setSelectedRoot(category);
     setFinalNode(null);
     setDynamicFields([]);
     setDynamicValues({});
-    setSelectedVehicleFeatureIds([]);
+    setPostingConfig(null);
     setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
     setDamageParts(defaultDamageParts());
-    resetSmartProductState();
 
     const root = await fetchRootNode(category.id);
     if (!root) {
@@ -463,34 +288,39 @@ export default function PostAdForm({ categories }: Props) {
 
     if (children.length === 0) {
       setFinalNode(root);
-      await Promise.all([fetchFields(root.id), fetchProductSpecs(root.id)]);
+      await Promise.all([fetchFields(root.id), fetchPostingConfig(category.id)]);
     }
 
     setLoadingTree(false);
-  }
+  }, []);
 
   async function chooseNode(node: CategoryNode) {
     setLoadingTree(true);
-    const nextPath = [...pathNodes, node];
-    const children = await fetchChildren(node.id);
 
+    const nextPath = [...pathNodes, node];
     setPathNodes(nextPath);
+
+    const children = await fetchChildren(node.id);
     setCurrentOptions(children);
 
     if (children.length === 0) {
       setFinalNode(node);
-      setDynamicValues({});
-      setSelectedVehicleFeatureIds([]);
       setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
       setDamageParts(defaultDamageParts());
-      await Promise.all([fetchFields(node.id), fetchProductSpecs(node.id)]);
+      await Promise.all([fetchFields(node.id), fetchPostingConfig(node.category_id)]);
+
+      if (node.path === "real-estate/dormitory") {
+        setDynamicValues((prev) => ({
+          ...prev,
+          listing_purpose: "For Rent",
+          suitable_for_students: true,
+          student_housing_type: "dormitory",
+        }));
+      }
     } else {
       setFinalNode(null);
       setDynamicFields([]);
-      setSelectedVehicleFeatureIds([]);
-      setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
-      setDamageParts(defaultDamageParts());
-      resetSmartProductState();
+      setPostingConfig(null);
     }
 
     setLoadingTree(false);
@@ -503,24 +333,17 @@ export default function PostAdForm({ categories }: Props) {
       setCurrentOptions([]);
       setFinalNode(null);
       setDynamicFields([]);
-      setDynamicValues({});
-      setSelectedVehicleFeatureIds([]);
-      setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
-      setDamageParts(defaultDamageParts());
-      resetSmartProductState();
+      setPostingConfig(null);
       return;
     }
 
     const next = pathNodes.slice(0, -1);
     const parent = next[next.length - 1];
+
     setPathNodes(next);
     setFinalNode(null);
     setDynamicFields([]);
-    setDynamicValues({});
-    setSelectedVehicleFeatureIds([]);
-    setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
-    setDamageParts(defaultDamageParts());
-    resetSmartProductState();
+    setPostingConfig(null);
 
     setLoadingTree(true);
     setCurrentOptions(await fetchChildren(parent.id));
@@ -539,13 +362,14 @@ export default function PostAdForm({ categories }: Props) {
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
 
+    const maxImages = Math.max(1, resolvedImageConfig?.max_images ?? 10);
     const next = files.map((file, index) => ({
       file,
       previewUrl: URL.createObjectURL(file),
       isPrimary: images.length === 0 && index === 0,
     }));
-    setImages((prev) => [...prev, ...next].slice(0, 10));
 
+    setImages((prev) => [...prev, ...next].slice(0, maxImages));
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -556,190 +380,161 @@ export default function PostAdForm({ categories }: Props) {
   function removeImage(index: number) {
     setImages((prev) => {
       const next = prev.filter((_, i) => i !== index);
-      if (next.length > 0 && !next.some((img) => img.isPrimary)) next[0] = { ...next[0], isPrimary: true };
+      if (next.length > 0 && !next.some((img) => img.isPrimary)) {
+        next[0] = { ...next[0], isPrimary: true };
+      }
       return next;
     });
   }
 
-  const runAiDetection = useCallback(async () => {
-    const primary = images.find((image) => image.isPrimary) ?? images[0];
-    if (!primary && !core.title && !core.description) {
-      setStepError("Add a photo or write title/description before AI detection.");
-      return;
-    }
-
-    setIsDetecting(true);
-    setStepError(null);
+  useEffect(() => {
+    const raw = globalThis.localStorage?.getItem(DRAFT_KEY);
+    if (!raw) return;
 
     try {
-      const body = new FormData();
-      if (primary) body.append("image", primary.file);
-      body.append("title", core.title);
-      body.append("description", core.description);
-
-      const response = await fetch("/api/ai/category-suggestion", {
-        method: "POST",
-        body,
-      });
-
-      const payload = (await response.json()) as AiResponse;
-      setAiResult(payload);
-
-      if (payload.suggestedSpecs) {
-        const prefill: Record<string, string | boolean> = {};
-        for (const [key, value] of Object.entries(payload.suggestedSpecs)) {
-          if (typeof value === "string" || typeof value === "boolean") {
-            prefill[key] = value;
-          }
-        }
-        setDynamicValues((prev) => ({ ...prefill, ...prev }));
+      const parsed = JSON.parse(raw) as {
+        core?: CoreForm;
+        dynamicValues?: Record<string, string | boolean>;
+      };
+      if (parsed.core) {
+        setCore(parsed.core);
+      }
+      if (parsed.dynamicValues) {
+        setDynamicValues(parsed.dynamicValues);
       }
     } catch {
-      setAiResult(null);
-    } finally {
-      setIsDetecting(false);
+      // ignore broken draft
     }
-  }, [images, core.title, core.description]);
+  }, []);
 
   useEffect(() => {
-    if (step !== 2 || isDetecting || aiResult) return;
-
-    const primary = images.find((image) => image.isPrimary) ?? images[0];
-    if (!primary && !core.title && !core.description) return;
-
     const timer = setTimeout(() => {
-      void runAiDetection();
-    }, 0);
+      globalThis.localStorage?.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ core, dynamicValues })
+      );
+    }, 600);
 
     return () => clearTimeout(timer);
-  }, [step, isDetecting, aiResult, images, core.title, core.description, runAiDetection]);
+  }, [core, dynamicValues]);
 
-  async function applyAiCategorySuggestion() {
-    if (!aiResult?.suggestion) return;
-    const suggestion = aiResult.suggestion;
+  const requiredDynamicKeys = useMemo(() => {
+    return new Set(dynamicFields.filter((field) => field.is_required).map((field) => field.field_key));
+  }, [dynamicFields]);
 
-    const root = categories.find((category) => category.slug === suggestion.rootSlug);
-    if (!root) return;
-
-    await chooseRoot(root);
-    const rootNode = await fetchRootNode(root.id);
-    if (!rootNode) return;
-
-    const supabase = createSupabaseBrowserClient();
-    const { data } = await supabase
-      .from("category_nodes")
-      .select("*")
-      .eq("category_id", root.id)
-      .eq("is_active", true)
-      .in("slug", suggestion.pathSlugs);
-
-    const bySlug = new Map(((data as CategoryNode[]) ?? []).map((node) => [node.slug, node]));
-    let current: CategoryNode | null = rootNode;
-    const resolved = current ? [current] : [];
-
-    for (let i = 1; i < suggestion.pathSlugs.length; i += 1) {
-      const candidate = bySlug.get(suggestion.pathSlugs[i]);
-      if (!candidate) break;
-      if (current && candidate.parent_id !== current.id) break;
-      resolved.push(candidate);
-      current = candidate;
+  function validateCategoryStep() {
+    if (!selectedRoot || !finalNode) {
+      return "Select a final category to continue.";
     }
-
-    if (resolved.length > 1) {
-      setPathNodes(resolved);
-      const maybeFinal = resolved[resolved.length - 1];
-      const children = await fetchChildren(maybeFinal.id);
-      setCurrentOptions(children);
-      if (children.length === 0) {
-        setFinalNode(maybeFinal);
-        await Promise.all([fetchFields(maybeFinal.id), fetchProductSpecs(maybeFinal.id)]);
-      }
+    if (selectedRoot.is_coming_soon) {
+      return "This category is coming soon. Posting is not available yet.";
     }
+    return null;
   }
 
-  function validateStep(currentStep: Step) {
-    if (currentStep === 1) {
-      if (images.length === 0) return "Please upload at least one photo.";
-      if (core.title.trim().length < 5) return "Title must be at least 5 characters.";
-      if (core.description.trim().length < 20) return "Description must be at least 20 characters.";
-      if (!core.province) return "Required field: province.";
-      if (!core.city) return "Required field: city.";
-      if (!core.contact_phone) return "Required field: contact phone.";
-      if (!core.rulesAccepted) return "You must accept the posting rules to continue.";
-      return null;
-    }
+  function validateDetailsStep() {
+    if (!core.title || core.title.trim().length < 5) return "Title must be at least 5 characters.";
+    if (!core.description || core.description.trim().length < 20) return "Description must be at least 20 characters.";
+    if (!core.price || Number(core.price) <= 0) return "Please enter a valid price.";
+    if (!core.province) return "Province is required.";
+    if (!core.district) return "District is required.";
+    if (!core.contact_phone) return "Contact phone is required.";
+    if (!core.rulesAccepted) return "You must accept the posting rules to continue.";
 
-    if (currentStep === 2) {
-      if (!finalNode) return "Select a final category to continue.";
-      return null;
-    }
-
-    if (currentStep === 3) {
-      // Vehicle: require variant selected
-      if (rootSlug === "vehicles" && finalNode) {
-        const isManualVehicle = Boolean(dynamicValues.vehicle_is_manual);
-        const yearValue = String(isManualVehicle ? dynamicValues.vehicle_year ?? "" : dynamicValues.year ?? "").trim();
-
-        if (!isManualVehicle && !vehicleSelection.variant) {
-          return "Select a vehicle variant to continue.";
-        }
-
-        if (!yearValue) return "Required field: Year.";
-        const numericYear = Number(yearValue);
-        if (!Number.isFinite(numericYear) || numericYear < MIN_VEHICLE_YEAR || numericYear > MAX_VEHICLE_YEAR) {
-          return `Year must be between ${MIN_VEHICLE_YEAR} and ${MAX_VEHICLE_YEAR}.`;
-        }
-
-        if (!String(dynamicValues.mileage ?? "").trim()) return "Required field: KM.";
-        if (!String(dynamicValues.vehicle_status ?? "").trim()) return "Required field: Vehicle Status.";
-        if (isManualVehicle && !String(dynamicValues.vehicle_type ?? "").trim()) {
-          return "Required field: Vehicle Type (manual mode).";
-        }
+    for (const key of requiredDynamicKeys) {
+      if (!String(dynamicValues[key] ?? "").trim()) {
+        return `${renderFieldLabel(key)} is required.`;
       }
-      if (productSpecOptions.length > 0 && !selectedProductSpec) return "Select a model to continue.";
-      const missingRequired = visibleFields.find(
-        (field) => field.is_required && !String(dynamicValues[field.field_key] ?? "").trim()
-      );
-      if (missingRequired) return `Required field: ${missingRequired.field_label}.`;
-      return null;
     }
 
-    if (currentStep === 5) {
-      if (!core.price || Number(core.price) <= 0) return "Required field: valid price.";
-      return null;
+    const isVehicle = rootSlug === "vehicles";
+    if (isVehicle) {
+      const year = String(dynamicValues.year ?? dynamicValues.vehicle_year ?? "").trim();
+      if (!year) return "Vehicle year is required.";
+    }
+
+    if (isDormitory) {
+      if (!listingPurpose) return "Listing Purpose is required.";
+      if (listingPurpose !== "For Rent") return "Dormitory listings must be For Rent.";
+      if (!String(dynamicValues.payment_period ?? "").trim()) return "Payment Period is required for dormitory.";
+      if (!String(dynamicValues.gender_allowed ?? "").trim()) return "Gender Allowed is required for dormitory.";
+      if (!String(dynamicValues.room_type ?? "").trim()) return "Room Type is required for dormitory.";
     }
 
     return null;
   }
 
+  function validatePhotoStep() {
+    if (!resolvedImageConfig) return null;
+    if (resolvedImageConfig.requires_images && images.length < Math.max(1, resolvedImageConfig.min_images)) {
+      return `Please upload at least ${Math.max(1, resolvedImageConfig.min_images)} photo(s).`;
+    }
+    return null;
+  }
+
   function goNext() {
+    setError(null);
     setStepError(null);
-    const validationError = validateStep(step);
-    if (validationError) {
-      setStepError(validationError);
+
+    if (step === 1) {
+      const err = validateCategoryStep();
+      if (err) {
+        setStepError(err);
+        return;
+      }
+      setStep(2);
       return;
     }
 
-    if (step < 6) {
-      setStep((prev) => (prev + 1) as Step);
+    if (step === 2) {
+      const err = validateDetailsStep();
+      if (err) {
+        setStepError(err);
+        return;
+      }
+      setStep(showPhotoStep ? 3 : 4);
+      return;
+    }
+
+    if (step === 3) {
+      const err = validatePhotoStep();
+      if (err) {
+        setStepError(err);
+        return;
+      }
+      setStep(4);
     }
   }
 
   function goPrev() {
+    setError(null);
     setStepError(null);
-    if (step > 1) setStep((prev) => (prev - 1) as Step);
+
+    if (step === 4) {
+      setStep(showPhotoStep ? 3 : 2);
+      return;
+    }
+
+    if (step === 3) {
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
+      setStep(1);
+    }
   }
 
   async function onPublish() {
     setError(null);
     setStepError(null);
 
-    const step1Error = validateStep(1);
-    const step2Error = validateStep(2);
-    const step3Error = validateStep(3);
-    const step5Error = validateStep(5);
-    if (step1Error || step2Error || step3Error || step5Error) {
-      setError(step1Error || step2Error || step3Error || step5Error || "Please complete required fields.");
+    const categoryErr = validateCategoryStep();
+    const detailErr = validateDetailsStep();
+    const photoErr = showPhotoStep ? validatePhotoStep() : null;
+
+    if (categoryErr || detailErr || photoErr) {
+      setError(categoryErr || detailErr || photoErr || "Please complete required fields.");
       return;
     }
 
@@ -753,19 +548,51 @@ export default function PostAdForm({ categories }: Props) {
     form.set("description", core.description);
     form.set("category_id", String(selectedRoot.id));
     form.set("category_node_id", String(finalNode.id));
-    form.set("subcategory_id", String(finalNode.id));
+    form.set("subcategory_id", String(pathNodes[1]?.id ?? finalNode.id));
     form.set("price", core.price);
     form.set("currency", core.currency);
     form.set("city", core.city);
     form.set("province", core.province);
     form.set("district", core.district);
-    form.set("address_optional", core.address_optional);
+    form.set("address_optional", core.address_optional || core.area);
     form.set("contact_phone", core.contact_phone);
     form.set("contact_name", core.contact_name);
-    form.set("delivery_preference", core.delivery_preference);
-    form.set("meeting_preference", core.meeting_preference);
+    form.set("meeting_preference", core.contact_preferences);
     form.set("negotiable", core.negotiable ? "true" : "false");
     if (core.minimum_offer) form.set("minimum_offer", core.minimum_offer);
+
+    form.set("main_category_id", String(selectedRoot.id));
+    form.set("subcategory_id", String(pathNodes[1]?.id ?? finalNode.id));
+    form.set("child_category_id", String(finalNode.id));
+
+    const asAny = vehicleSelection as unknown as {
+      brand?: { id?: number | null } | null;
+      model?: { id?: number | null } | null;
+      variant?: { id?: number | null } | null;
+      specs?: Array<{ spec_key: string; spec_value: string; is_locked?: boolean }>;
+    };
+
+    if (asAny.brand?.id) form.set("brand_id", String(asAny.brand.id));
+    if (asAny.model?.id) form.set("model_id", String(asAny.model.id));
+    if (asAny.variant?.id) form.set("vehicle_variant_id", String(asAny.variant.id));
+
+    if (asAny.specs && asAny.specs.length > 0) {
+      const lockedSpecs: Record<string, string> = {};
+      for (const spec of asAny.specs) {
+        if (spec.is_locked) {
+          lockedSpecs[spec.spec_key] = spec.spec_value;
+        }
+      }
+      if (Object.keys(lockedSpecs).length > 0) {
+        form.set("locked_specs_json", JSON.stringify(lockedSpecs));
+      }
+    }
+
+    if (rootSlug === "vehicles") {
+      form.set("damage_parts_json", JSON.stringify(damageParts));
+      const nonOriginal = damageParts.filter((part) => part.condition !== "original");
+      form.set("damage_all_original", nonOriginal.length === 0 ? "true" : "false");
+    }
 
     for (const [key, value] of Object.entries(dynamicValues)) {
       if (typeof value === "boolean") {
@@ -774,88 +601,6 @@ export default function PostAdForm({ categories }: Props) {
         form.set(key, String(value));
       }
     }
-
-    if (selectedProductSpec) {
-      form.set("selected_product_brand", selectedProductSpec.brand);
-      const selectedSeriesLabel = seriesFromProductSpec(selectedProductSpec);
-      if (selectedSeriesLabel) form.set("selected_product_series", selectedSeriesLabel);
-      form.set("selected_product_model", selectedProductSpec.model);
-    }
-
-    if (Object.keys(lockedSpecs).length > 0) {
-      form.set("locked_specs_json", JSON.stringify(lockedSpecs));
-    }
-
-    if (rootSlug === "vehicles") {
-      const vehicleYear = String(dynamicValues.vehicle_year ?? dynamicValues.year ?? "").trim();
-      const manualSpecs = {
-        motorcycle_class: String(dynamicValues.manual__motorcycle_class ?? "").trim(),
-        engine_cc: String(dynamicValues.manual__engine_cc ?? "").trim(),
-        rickshaw_fuel_type: String(dynamicValues.manual__rickshaw_fuel_type ?? "").trim(),
-        passenger_capacity: String(dynamicValues.manual__passenger_capacity ?? "").trim(),
-        cargo_capacity: String(dynamicValues.manual__cargo_capacity ?? "").trim(),
-        gear_type: String(dynamicValues.manual__gear_type ?? "").trim(),
-        frame_type: String(dynamicValues.manual__frame_type ?? "").trim(),
-        brake_type: String(dynamicValues.manual__brake_type ?? "").trim(),
-        original_engine: Boolean(dynamicValues.manual__original_engine),
-        engine_swapped: Boolean(dynamicValues.manual__engine_swapped),
-        restored: Boolean(dynamicValues.manual__restored),
-        needs_restoration: Boolean(dynamicValues.manual__needs_restoration),
-        imported: Boolean(dynamicValues.manual__imported),
-        documents_available: Boolean(dynamicValues.manual__documents_available),
-        custom_modification: Boolean(dynamicValues.manual__custom_modification),
-      };
-
-      form.set("vehicle_type", String(dynamicValues.vehicle_type ?? ""));
-      form.set("vehicle_subtype", String(dynamicValues.vehicle_subtype ?? ""));
-      form.set("vehicle_brand", String(dynamicValues.vehicle_brand ?? ""));
-      form.set("vehicle_model", String(dynamicValues.vehicle_model ?? ""));
-      form.set("vehicle_year", vehicleYear);
-      form.set("vehicle_is_manual", manualVehicleMode ? "true" : "false");
-      form.set("vehicle_is_classic", classicVehicleMode ? "true" : "false");
-      form.set("vehicle_is_custom", Boolean(dynamicValues.vehicle_is_custom) ? "true" : "false");
-      form.set("vehicle_manual_specs_json", JSON.stringify(manualSpecs));
-    }
-
-    // Vehicle smart posting payload
-    if (rootSlug === "vehicles" && vehicleSelection.variant) {
-      form.set("vehicle_variant_id", String(vehicleSelection.variant.id));
-      form.set("year", String(dynamicValues.year ?? ""));
-      form.set("mileage", String(dynamicValues.mileage ?? ""));
-      form.set("color", String(dynamicValues.color ?? ""));
-      form.set("vehicle_status", String(dynamicValues.vehicle_status ?? ""));
-      form.set("warranty", String(dynamicValues.warranty ?? ""));
-      form.set("salvage_record", String(dynamicValues.salvage_record ?? ""));
-      form.set("plate_status", String(dynamicValues.plate_status ?? ""));
-      form.set("neighborhood", String(dynamicValues.neighborhood ?? ""));
-      form.set("video_url", String(dynamicValues.video_url ?? ""));
-      form.set("vehicle_features_json", JSON.stringify(selectedVehicleFeatureIds));
-      const vehicleLockedSpecs: Record<string, string> = {};
-      for (const spec of vehicleSelection.specs) {
-        if (spec.is_locked) vehicleLockedSpecs[spec.spec_key] = spec.spec_value;
-      }
-      if (Object.keys(vehicleLockedSpecs).length > 0) {
-        form.set("locked_specs_json", JSON.stringify(vehicleLockedSpecs));
-      }
-      // Damage report
-      const nonOriginal = damageParts.filter((p) => p.condition !== "original");
-      form.set("damage_all_original", nonOriginal.length === 0 ? "true" : "false");
-      form.set("damage_parts_json", JSON.stringify(damageParts));
-    }
-
-    if (rootSlug === "vehicles" && !vehicleSelection.variant) {
-      form.set("year", String(dynamicValues.year ?? dynamicValues.vehicle_year ?? ""));
-      form.set("vehicle_features_json", JSON.stringify(selectedVehicleFeatureIds));
-      const nonOriginal = damageParts.filter((p) => p.condition !== "original");
-      form.set("damage_all_original", nonOriginal.length === 0 ? "true" : "false");
-      form.set("damage_parts_json", JSON.stringify(damageParts));
-    }
-
-    // Additional step-4 specific fields
-    if (core.owner_agent) form.set("owner_agent", core.owner_agent);
-    if (core.available_for_viewing) form.set("available_for_viewing", "true");
-    if (core.seller_type) form.set("seller_type", core.seller_type);
-    if (core.exchange_available) form.set("exchange_available", "true");
 
     startTransition(async () => {
       setStatus("Creating listing...");
@@ -877,6 +622,7 @@ export default function PostAdForm({ categories }: Props) {
         }
       }
 
+      globalThis.localStorage?.removeItem(DRAFT_KEY);
       setStatus("Listing created. Redirecting...");
       const destination = `/listings/${created.listingId}/manage`;
       router.push(destination);
@@ -885,18 +631,551 @@ export default function PostAdForm({ categories }: Props) {
     });
   }
 
+  const rootSpecificFieldKeys = new Set([
+    "listing_purpose",
+    "rooms",
+    "bathrooms",
+    "property_size",
+    "land_size",
+    "floor",
+    "total_floors",
+    "furnished",
+    "parking",
+    "water",
+    "electricity",
+    "road_access",
+    "document_type",
+    "owner_type",
+    "brand",
+    "model",
+    "year",
+    "variant",
+    "km",
+    "fuel_type",
+    "transmission",
+    "body_type",
+    "engine_capacity",
+    "condition",
+    "plate_status",
+    "customs_status",
+    "imported_from",
+    "motorcycle_type",
+    "engine_cc",
+    "rickshaw_type",
+    "passenger_capacity",
+    "cargo_capacity",
+    "storage",
+    "ram",
+    "battery_health",
+    "original_refurbished",
+    "item_type",
+    "suitable_for_students",
+    "student_housing_type",
+    "gender_allowed",
+    "payment_period",
+    "distance_to_university",
+    "shared_allowed",
+    "students_allowed",
+    "room_type",
+    "number_of_beds",
+    "meals_included",
+    "internet",
+    "heating",
+    "air_conditioning",
+    "security",
+    "contact_preferences",
+  ]);
+
+  const renderDynamicFields = dynamicFields.filter((field) => !rootSpecificFieldKeys.has(field.field_key));
+
   return (
     <div className="relative pb-28">
       <div className="sticky top-0 z-10 rounded-2xl bg-sky-700 px-4 py-3 text-white">
         <p className="text-xs font-semibold uppercase tracking-wide">Post Ad</p>
-        <p className="text-sm">Step {step} of 6</p>
+        <p className="text-sm">Step {currentVisualStep} of {visualSteps.length}</p>
+        <p className="mt-1 text-xs text-sky-100">{visualSteps.join(" -> ")}</p>
       </div>
 
       <div className="mt-4 space-y-4">
         {step === 1 ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Step 1: Listing Info</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">Upload photos, write listing info, and accept rules.</p>
+            <h2 className="font-display text-lg font-bold">1. Category</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">Select main category first, then go deeper until final category.</p>
+
+            {breadcrumb ? <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb}</p> : null}
+            {selectedRoot ? (
+              <button type="button" onClick={goBackCategoryLevel} className="mt-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">
+                Back One Level
+              </button>
+            ) : null}
+
+            {!selectedRoot ? (
+              <>
+                <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
+                  {activeCategories.map((category) => (
+                    <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
+                      <span>{category.slug === "mobile-phones-tablets" ? "Phones & Electronics" : category.name}</span>
+                      <span aria-hidden>&gt;</span>
+                    </button>
+                  ))}
+                </div>
+
+                {comingSoonCategories.length > 0 ? (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Coming Soon</p>
+                    <div className="mt-2 space-y-2">
+                      {comingSoonCategories.map((category) => (
+                        <div key={category.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
+                          <p className="text-sm font-semibold text-slate-700">{category.name}</p>
+                          <Link href={`/categories/${category.slug}`} className="rounded-lg border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-700">
+                            Notify Me
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
+                {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">Loading...</div> : null}
+                {!loadingTree && currentOptions.length === 0 && finalNode ? (
+                  <div className="px-4 py-3 text-sm font-semibold text-green-700">Final category selected: {finalNode.name}</div>
+                ) : null}
+                {!loadingTree
+                  ? currentOptions.map((node) => (
+                      <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
+                        <span className="break-words">{node.name}</span>
+                        <span aria-hidden>&gt;</span>
+                      </button>
+                    ))
+                  : null}
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {step === 2 ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">2. Details</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">Form adapts to your selected category path.</p>
+
+            <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || "Category not selected"}</p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold sm:col-span-2">Title
+                <input value={core.title} onChange={(event) => updateCore("title", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">Description
+                <textarea rows={4} value={core.description} onChange={(event) => updateCore("description", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Price
+                <input type="number" min={1} value={core.price} onChange={(event) => updateCore("price", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Currency
+                <select value={core.currency} onChange={(event) => updateCore("currency", event.target.value as "AFN" | "USD")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  {CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">Province
+                <select value={core.province} onChange={(event) => updateCore("province", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select province</option>
+                  {AFGHAN_PROVINCES.map((province) => <option key={province} value={province}>{province}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">Area / City
+                <select value={core.city} onChange={(event) => updateCore("city", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select area</option>
+                  {CITIES.map((city) => <option key={city} value={city}>{city}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">District
+                <input value={core.district} onChange={(event) => updateCore("district", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Neighborhood / Area (optional)
+                <input value={core.area} onChange={(event) => updateCore("area", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Contact Phone
+                <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Contact Name
+                <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">Contact Preferences
+                <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder="Call, WhatsApp, message, etc." className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+            </div>
+
+            {rootSlug === "real-estate" ? (
+              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+                <h3 className="text-sm font-bold">Real Estate Details</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-semibold">Listing Purpose
+                    <select value={String(dynamicValues.listing_purpose ?? "")} onChange={(event) => updateDynamic("listing_purpose", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" disabled={isDormitory}>
+                      <option value="">Select</option>
+                      <option value="For Sale">For Sale</option>
+                      <option value="For Rent">For Rent</option>
+                      <option value="Gerawy / Rahn">Gerawy / Rahn</option>
+                      <option value="Exchange">Exchange</option>
+                      <option value="Wanted">Wanted</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold">Rooms
+                    <input type="number" min={0} value={String(dynamicValues.rooms ?? "")} onChange={(event) => updateDynamic("rooms", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Bathrooms
+                    <input type="number" min={0} value={String(dynamicValues.bathrooms ?? "")} onChange={(event) => updateDynamic("bathrooms", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Property Size
+                    <input value={String(dynamicValues.property_size ?? "")} onChange={(event) => updateDynamic("property_size", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Land Size (optional)
+                    <input value={String(dynamicValues.land_size ?? "")} onChange={(event) => updateDynamic("land_size", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Document Type
+                    <input value={String(dynamicValues.document_type ?? "")} onChange={(event) => updateDynamic("document_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Owner / Agent
+                    <select value={String(dynamicValues.owner_type ?? "")} onChange={(event) => updateDynamic("owner_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="owner">Owner</option>
+                      <option value="agent">Agent</option>
+                    </select>
+                  </label>
+
+                  {showStudentSuitabilityToggle ? (
+                    <section className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                      <h4 className="text-sm font-bold">Student Housing</h4>
+                      <label className="mt-2 block text-sm font-semibold">Is this suitable for students?</label>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateDynamic("suitable_for_students", true)}
+                          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${suitableForStudents ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-[var(--line)]"}`}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateDynamic("suitable_for_students", false)}
+                          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${!suitableForStudents ? "border-slate-600 bg-slate-50 text-slate-700" : "border-[var(--line)]"}`}
+                        >
+                          No
+                        </button>
+                      </div>
+
+                      {suitableForStudents ? (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <label className="text-sm font-semibold">Gender Suitable
+                            <select value={String(dynamicValues.gender_allowed ?? "")} onChange={(event) => updateDynamic("gender_allowed", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                              <option value="">Select</option>
+                              <option value="male">Male</option>
+                              <option value="female">Female</option>
+                              <option value="family">Family</option>
+                              <option value="everyone">Everyone</option>
+                            </select>
+                          </label>
+                          <label className="text-sm font-semibold">Distance to University (km)
+                            <input type="number" min={0} step="0.1" value={String(dynamicValues.distance_to_university ?? "")} onChange={(event) => updateDynamic("distance_to_university", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                          </label>
+                          <label className="text-sm font-semibold">
+                            <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                              <input type="checkbox" checked={Boolean(dynamicValues.furnished)} onChange={(event) => updateDynamic("furnished", event.target.checked)} className="h-4 w-4" />
+                              Furnished
+                            </span>
+                          </label>
+                          <label className="text-sm font-semibold">
+                            <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                              <input type="checkbox" checked={Boolean(dynamicValues.shared_allowed)} onChange={(event) => updateDynamic("shared_allowed", event.target.checked)} className="h-4 w-4" />
+                              Shared Allowed
+                            </span>
+                          </label>
+                          <label className="text-sm font-semibold">Number of Students Allowed
+                            <input type="number" min={1} value={String(dynamicValues.students_allowed ?? "")} onChange={(event) => updateDynamic("students_allowed", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                          </label>
+                        </div>
+                      ) : null}
+                    </section>
+                  ) : null}
+
+                  {isDormitory ? (
+                    <section className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                      <h4 className="text-sm font-bold">Dormitory Details</h4>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label className="text-sm font-semibold">Payment Period
+                          <select value={String(dynamicValues.payment_period ?? "")} onChange={(event) => updateDynamic("payment_period", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                            <option value="">Select</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                            <option value="semester">Semester</option>
+                            <option value="daily">Daily</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </label>
+                        <label className="text-sm font-semibold">Gender Allowed
+                          <select value={String(dynamicValues.gender_allowed ?? "")} onChange={(event) => updateDynamic("gender_allowed", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                            <option value="">Select</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="family">Family</option>
+                            <option value="everyone">Everyone</option>
+                          </select>
+                        </label>
+                        <label className="text-sm font-semibold">Room Type
+                          <select value={String(dynamicValues.room_type ?? "")} onChange={(event) => updateDynamic("room_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                            <option value="">Select</option>
+                            <option value="Single Room">Single Room</option>
+                            <option value="Shared Room">Shared Room</option>
+                            <option value="Private Room">Private Room</option>
+                            <option value="Bed Space">Bed Space</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </label>
+                        <label className="text-sm font-semibold">Number of Beds
+                          <input type="number" min={0} value={String(dynamicValues.number_of_beds ?? "")} onChange={(event) => updateDynamic("number_of_beds", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                        </label>
+                        <label className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                            <input type="checkbox" checked={Boolean(dynamicValues.meals_included)} onChange={(event) => updateDynamic("meals_included", event.target.checked)} className="h-4 w-4" />
+                            Meals Included
+                          </span>
+                        </label>
+                        <label className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                            <input type="checkbox" checked={Boolean(dynamicValues.water)} onChange={(event) => updateDynamic("water", event.target.checked)} className="h-4 w-4" />
+                            Water
+                          </span>
+                        </label>
+                        <label className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                            <input type="checkbox" checked={Boolean(dynamicValues.electricity)} onChange={(event) => updateDynamic("electricity", event.target.checked)} className="h-4 w-4" />
+                            Electricity
+                          </span>
+                        </label>
+                        <label className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                            <input type="checkbox" checked={Boolean(dynamicValues.internet)} onChange={(event) => updateDynamic("internet", event.target.checked)} className="h-4 w-4" />
+                            Internet
+                          </span>
+                        </label>
+                        <label className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                            <input type="checkbox" checked={Boolean(dynamicValues.heating)} onChange={(event) => updateDynamic("heating", event.target.checked)} className="h-4 w-4" />
+                            Heating
+                          </span>
+                        </label>
+                        <label className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                            <input type="checkbox" checked={Boolean(dynamicValues.air_conditioning)} onChange={(event) => updateDynamic("air_conditioning", event.target.checked)} className="h-4 w-4" />
+                            Air Conditioning
+                          </span>
+                        </label>
+                        <label className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                            <input type="checkbox" checked={Boolean(dynamicValues.security)} onChange={(event) => updateDynamic("security", event.target.checked)} className="h-4 w-4" />
+                            Security
+                          </span>
+                        </label>
+                        <label className="text-sm font-semibold">Distance to University (km)
+                          <input type="number" min={0} step="0.1" value={String(dynamicValues.distance_to_university ?? "")} onChange={(event) => updateDynamic("distance_to_university", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                        </label>
+                        <label className="text-sm font-semibold sm:col-span-2">Rules (optional)
+                          <input value={String(dynamicValues.rules ?? "")} onChange={(event) => updateDynamic("rules", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                        </label>
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {isStudentCollection ? (
+                    <section className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                      <h4 className="text-sm font-bold">Student Housing Collection Details</h4>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label className="text-sm font-semibold">Property Type
+                          <select value={String(dynamicValues.student_housing_type ?? "")} onChange={(event) => updateDynamic("student_housing_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                            <option value="">Select</option>
+                            <option value="house">House</option>
+                            <option value="apartment">Apartment</option>
+                            <option value="room">Room</option>
+                            <option value="dormitory">Dormitory</option>
+                          </select>
+                        </label>
+                        <label className="text-sm font-semibold">Gender Suitable
+                          <select value={String(dynamicValues.gender_allowed ?? "")} onChange={(event) => updateDynamic("gender_allowed", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                            <option value="">Select</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="family">Family</option>
+                            <option value="everyone">Everyone</option>
+                          </select>
+                        </label>
+                        <label className="text-sm font-semibold">Distance to University (km)
+                          <input type="number" min={0} step="0.1" value={String(dynamicValues.distance_to_university ?? "")} onChange={(event) => updateDynamic("distance_to_university", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                        </label>
+                        <label className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
+                            <input type="checkbox" checked={Boolean(dynamicValues.furnished)} onChange={(event) => updateDynamic("furnished", event.target.checked)} className="h-4 w-4" />
+                            Furnished
+                          </span>
+                        </label>
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
+            {rootSlug === "vehicles" ? (
+              <section className="mt-4 space-y-4 rounded-xl border border-[var(--line)] p-3">
+                <h3 className="text-sm font-bold">Vehicle Details</h3>
+                <VehicleSmartSelector categoryNodeId={finalNode?.id ?? 0} onChange={setVehicleSelection} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-semibold">Brand
+                    <input value={String(dynamicValues.brand ?? "")} onChange={(event) => updateDynamic("brand", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Model
+                    <input value={String(dynamicValues.model ?? "")} onChange={(event) => updateDynamic("model", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Year
+                    <input type="number" value={String(dynamicValues.year ?? "")} onChange={(event) => updateDynamic("year", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">KM
+                    <input type="number" value={String(dynamicValues.km ?? dynamicValues.mileage ?? "")} onChange={(event) => updateDynamic("km", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Fuel Type
+                    <input value={String(dynamicValues.fuel_type ?? "")} onChange={(event) => updateDynamic("fuel_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Transmission
+                    <input value={String(dynamicValues.transmission ?? "")} onChange={(event) => updateDynamic("transmission", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Condition
+                    <input value={String(dynamicValues.condition ?? "")} onChange={(event) => updateDynamic("condition", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Plate Status
+                    <input value={String(dynamicValues.plate_status ?? "")} onChange={(event) => updateDynamic("plate_status", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-semibold">Damage / Paint Report</p>
+                  <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} />
+                </div>
+              </section>
+            ) : null}
+
+            {(rootSlug === "mobile-phones-tablets" || rootSlug === "electronics-computers") ? (
+              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+                <h3 className="text-sm font-bold">Phones & Electronics Details</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-semibold">Brand
+                    <input value={String(dynamicValues.brand ?? "")} onChange={(event) => updateDynamic("brand", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Model
+                    <input value={String(dynamicValues.model ?? "")} onChange={(event) => updateDynamic("model", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Storage
+                    <input value={String(dynamicValues.storage ?? "")} onChange={(event) => updateDynamic("storage", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">RAM (optional)
+                    <input value={String(dynamicValues.ram ?? "")} onChange={(event) => updateDynamic("ram", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Condition
+                    <input value={String(dynamicValues.condition ?? "")} onChange={(event) => updateDynamic("condition", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Warranty
+                    <input value={String(dynamicValues.warranty ?? "")} onChange={(event) => updateDynamic("warranty", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                </div>
+              </section>
+            ) : null}
+
+            {rootSlug === "second-hand-items" ? (
+              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+                <h3 className="text-sm font-bold">Second Hand Details</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-semibold">Item Type
+                    <input value={String(dynamicValues.item_type ?? "")} onChange={(event) => updateDynamic("item_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Condition
+                    <input value={String(dynamicValues.condition ?? "")} onChange={(event) => updateDynamic("condition", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Brand (optional)
+                    <input value={String(dynamicValues.brand ?? "")} onChange={(event) => updateDynamic("brand", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                </div>
+              </section>
+            ) : null}
+
+            {renderDynamicFields.length > 0 ? (
+              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+                <h3 className="text-sm font-bold">Additional Category Fields</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {renderDynamicFields.map((field) => {
+                    const value = dynamicValues[field.field_key];
+
+                    if (field.field_type === "boolean") {
+                      return (
+                        <label key={field.id} className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(value)}
+                              onChange={(event) => updateDynamic(field.field_key, event.target.checked)}
+                              className="h-4 w-4"
+                            />
+                            {field.field_label}
+                          </span>
+                        </label>
+                      );
+                    }
+
+                    if (field.field_type === "select") {
+                      const options = fieldOptions(field.options_json);
+                      return (
+                        <label key={field.id} className="text-sm font-semibold">
+                          {field.field_label}
+                          <select
+                            value={String(value ?? "")}
+                            onChange={(event) => updateDynamic(field.field_key, event.target.value)}
+                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                          >
+                            <option value="">Select</option>
+                            {options.map((option) => (
+                              <option key={`${field.id}-${option}`} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    }
+
+                    return (
+                      <label key={field.id} className="text-sm font-semibold">
+                        {field.field_label}
+                        <input
+                          type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
+                          value={String(value ?? "")}
+                          onChange={(event) => updateDynamic(field.field_key, event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
+            <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={core.rulesAccepted} onChange={(event) => updateCore("rulesAccepted", event.target.checked)} className="h-4 w-4" />
+              I confirm this listing follows Sahibash rules.
+            </label>
+          </section>
+        ) : null}
+
+        {step === 3 && showPhotoStep ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">3. Photos</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">
+              {resolvedImageConfig?.requires_images ? "Photos are required for this category." : "Photos are optional for this category."}
+              {resolvedImageConfig?.recommended_images ? ` Recommended: ${resolvedImageConfig.recommended_images}` : ""}
+            </p>
 
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
             {images.length === 0 ? (
@@ -905,7 +1184,7 @@ export default function PostAdForm({ categories }: Props) {
                 onClick={() => fileInputRef.current?.click()}
                 className="mt-3 w-full rounded-2xl border-2 border-dashed border-[var(--line)] py-10 text-sm font-semibold"
               >
-                Add photos (max 10)
+                Add photos
               </button>
             ) : (
               <div className="mt-3 space-y-3">
@@ -926,812 +1205,19 @@ export default function PostAdForm({ categories }: Props) {
                 </button>
               </div>
             )}
-
-            <div className="mt-4 space-y-3">
-              <label className="block text-sm font-semibold">
-                Title
-                <input
-                  value={core.title}
-                  onChange={(event) => updateCore("title", event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                />
-              </label>
-              <label className="block text-sm font-semibold">
-                Description
-                <textarea
-                  rows={4}
-                  value={core.description}
-                  onChange={(event) => updateCore("description", event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-sm font-semibold">
-                  Province
-                  <select value={core.province} onChange={(event) => updateCore("province", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                    <option value="">Select province</option>
-                    {AFGHAN_PROVINCES.map((province) => (
-                      <option key={province} value={province}>{province}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-sm font-semibold">
-                  City
-                  <select value={core.city} onChange={(event) => updateCore("city", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                    <option value="">Select city</option>
-                    {CITIES.map((city) => (
-                      <option key={city} value={city}>{city}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <label className="block text-sm font-semibold">
-                District
-                <input value={core.district} onChange={(event) => updateCore("district", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
-              <label className="block text-sm font-semibold">
-                Contact Phone
-                <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
-              <label className="block text-sm font-semibold">
-                Contact Name
-                <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
-              <label className="flex items-center gap-2 text-sm font-semibold">
-                <input type="checkbox" checked={core.rulesAccepted} onChange={(event) => updateCore("rulesAccepted", event.target.checked)} className="h-4 w-4" />
-                I confirm this listing follows Sahibash rules.
-              </label>
-            </div>
           </section>
         ) : null}
 
-        {step === 2 ? (
+        {isPreviewStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Step 2: Category Selection</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">AI suggestions appear first. You can always choose manually.</p>
-
-            <button
-              type="button"
-              onClick={runAiDetection}
-              disabled={isDetecting}
-              className="mt-3 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold"
-            >
-              {isDetecting ? "Analyzing..." : aiResult ? "Re-analyze" : "Analyze photo + title + description"}
-            </button>
-
-            {aiResult?.suggestion ? (
-              <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                <p className="text-sm font-semibold">Suggested from your photo and description</p>
-                <p className="mt-1 text-sm">{aiResult.suggestion.label}</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">{aiResult.suggestion.reason}</p>
-                <button type="button" onClick={applyAiCategorySuggestion} className="mt-2 rounded-xl bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white">
-                  Use suggestion
-                </button>
-              </div>
-            ) : null}
-
-            {aiResult?.lowConfidence ? (
-              <p className="mt-2 text-xs font-semibold text-amber-700">{aiResult.message ?? "We could not detect clearly. Please choose category manually."}</p>
-            ) : null}
-
-            {breadcrumb ? <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb}</p> : null}
-            {selectedRoot ? (
-              <button type="button" onClick={goBackCategoryLevel} className="mt-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">Back</button>
-            ) : null}
-
-            {!selectedRoot ? (
-              <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-                {categories.map((category) => (
-                  <button key={category.id} type="button" onClick={() => chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
-                    <span>{category.name}</span>
-                    <span aria-hidden>›</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-                {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">Loading...</div> : null}
-                {!loadingTree && currentOptions.length === 0 && finalNode ? (
-                  <div className="px-4 py-3 text-sm font-semibold text-green-700">Final category selected: {finalNode.name}</div>
-                ) : null}
-                {!loadingTree
-                  ? currentOptions.map((node) => (
-                      <button key={node.id} type="button" onClick={() => chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
-                        <span className="break-words">{node.name}</span>
-                        <span aria-hidden>›</span>
-                      </button>
-                    ))
-                  : null}
-              </div>
-            )}
-          </section>
-        ) : null}
-
-        {step === 3 ? (
-          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Step 3: {rootSlug === "vehicles" ? "Vehicle Details" : "Category-Specific Fields"}</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">
-              {rootSlug === "vehicles"
-                ? "Select brand, model, and variant. Specifications are auto-filled."
-                : "Fields are loaded from your final category. AI-filled values are editable."}
-            </p>
-
-            {!finalNode ? (
-              <p className="mt-3 text-sm text-red-600">Select a final category first.</p>
-            ) : rootSlug === "vehicles" ? (
-              /* ── Vehicle smart posting flow ─────────────────────────────── */
-              <div className="mt-3 space-y-4">
-                <section className="rounded-xl border border-[var(--line)] p-3">
-                  <h3 className="text-sm font-bold">Afghanistan Vehicle Mode</h3>
-                  <p className="mt-1 text-xs text-[var(--ink-2)]">
-                    Cannot find your vehicle? Use manual entry. Old (1950-1990s), rebuilt, handmade, imported, and unknown vehicles are always allowed.
-                  </p>
-                  <label className="mt-3 inline-flex items-center gap-2 text-sm font-semibold">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(dynamicValues.vehicle_is_manual)}
-                      onChange={(event) => updateDynamic("vehicle_is_manual", event.target.checked)}
-                      className="h-4 w-4"
-                    />
-                    Use Manual Vehicle Entry (never block my listing)
-                  </label>
-
-                  {manualVehicleMode ? (
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <label className="text-sm font-semibold">
-                        Vehicle Type
-                        <select
-                          value={String(dynamicValues.vehicle_type ?? "")}
-                          onChange={(event) => updateDynamic("vehicle_type", event.target.value)}
-                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                        >
-                          <option value="">Select</option>
-                          <option value="passenger_vehicles">Passenger Vehicles</option>
-                          <option value="motorcycles">Motorcycles</option>
-                          <option value="rickshaw_three_wheelers">Rickshaw / Three-Wheelers</option>
-                          <option value="bicycles">Bicycles</option>
-                          <option value="commercial_vehicles">Commercial Vehicles</option>
-                          <option value="agricultural_rural_vehicles">Agricultural & Rural Vehicles</option>
-                          <option value="other_custom">Other / Custom Vehicles</option>
-                        </select>
-                      </label>
-                      <label className="text-sm font-semibold">
-                        Vehicle Subtype
-                        <input
-                          type="text"
-                          placeholder="e.g. Honda 70, Auto Rickshaw, Old Soviet Car"
-                          value={String(dynamicValues.vehicle_subtype ?? "")}
-                          onChange={(event) => updateDynamic("vehicle_subtype", event.target.value)}
-                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                        />
-                      </label>
-                      <label className="text-sm font-semibold">
-                        Brand (manual)
-                        <input
-                          type="text"
-                          placeholder="e.g. Toyota, Honda, Unknown"
-                          value={String(dynamicValues.vehicle_brand ?? "")}
-                          onChange={(event) => updateDynamic("vehicle_brand", event.target.value)}
-                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                        />
-                      </label>
-                      <label className="text-sm font-semibold">
-                        Model (manual)
-                        <input
-                          type="text"
-                          placeholder="e.g. Corolla, 70, Unknown Model"
-                          value={String(dynamicValues.vehicle_model ?? "")}
-                          onChange={(event) => updateDynamic("vehicle_model", event.target.value)}
-                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                        />
-                      </label>
-                      <label className="text-sm font-semibold">
-                        Vehicle Year
-                        <input
-                          type="number"
-                          min={MIN_VEHICLE_YEAR}
-                          max={MAX_VEHICLE_YEAR}
-                          placeholder="e.g. 1995"
-                          value={String(dynamicValues.vehicle_year ?? dynamicValues.year ?? "")}
-                          onChange={(event) => {
-                            updateDynamic("vehicle_year", event.target.value);
-                            updateDynamic("year", event.target.value);
-                          }}
-                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                        />
-                      </label>
-                      <label className="text-sm font-semibold">
-                        <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(dynamicValues.vehicle_is_custom)}
-                            onChange={(event) => updateDynamic("vehicle_is_custom", event.target.checked)}
-                            className="h-4 w-4"
-                          />
-                          Custom / Modified vehicle
-                        </span>
-                      </label>
-
-                      {String(dynamicValues.vehicle_type ?? "") === "motorcycles" ? (
-                        <>
-                          <label className="text-sm font-semibold">
-                            Motorcycle Class
-                            <select
-                              value={String(dynamicValues.manual__motorcycle_class ?? "")}
-                              onChange={(event) => updateDynamic("manual__motorcycle_class", event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            >
-                              <option value="">Select</option>
-                              <option value="honda_70">Honda 70</option>
-                              <option value="100_250cc">100cc-250cc</option>
-                              <option value="chinese">Chinese Motorcycle</option>
-                              <option value="indian">Indian Motorcycle</option>
-                              <option value="electric">Electric Bike</option>
-                              <option value="dirt_bike">Dirt Bike</option>
-                              <option value="unknown">Unknown</option>
-                            </select>
-                          </label>
-                          <label className="text-sm font-semibold">
-                            Engine CC (manual)
-                            <input
-                              type="text"
-                              placeholder="e.g. 70cc / 125cc"
-                              value={String(dynamicValues.manual__engine_cc ?? "")}
-                              onChange={(event) => updateDynamic("manual__engine_cc", event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            />
-                          </label>
-                        </>
-                      ) : null}
-
-                      {String(dynamicValues.vehicle_type ?? "") === "rickshaw_three_wheelers" ? (
-                        <>
-                          <label className="text-sm font-semibold">
-                            Fuel Type
-                            <input
-                              type="text"
-                              placeholder="Petrol / CNG / Electric"
-                              value={String(dynamicValues.manual__rickshaw_fuel_type ?? "")}
-                              onChange={(event) => updateDynamic("manual__rickshaw_fuel_type", event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            />
-                          </label>
-                          <label className="text-sm font-semibold">
-                            Passenger Capacity
-                            <input
-                              type="text"
-                              placeholder="e.g. 3-4"
-                              value={String(dynamicValues.manual__passenger_capacity ?? "")}
-                              onChange={(event) => updateDynamic("manual__passenger_capacity", event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            />
-                          </label>
-                          <label className="text-sm font-semibold">
-                            Cargo Capacity
-                            <input
-                              type="text"
-                              placeholder="e.g. 500kg"
-                              value={String(dynamicValues.manual__cargo_capacity ?? "")}
-                              onChange={(event) => updateDynamic("manual__cargo_capacity", event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            />
-                          </label>
-                        </>
-                      ) : null}
-
-                      {String(dynamicValues.vehicle_type ?? "") === "bicycles" ? (
-                        <>
-                          <label className="text-sm font-semibold">
-                            Gear Type
-                            <input
-                              type="text"
-                              placeholder="Single / Multi-speed"
-                              value={String(dynamicValues.manual__gear_type ?? "")}
-                              onChange={(event) => updateDynamic("manual__gear_type", event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            />
-                          </label>
-                          <label className="text-sm font-semibold">
-                            Frame Type
-                            <input
-                              type="text"
-                              placeholder="Steel / Aluminum"
-                              value={String(dynamicValues.manual__frame_type ?? "")}
-                              onChange={(event) => updateDynamic("manual__frame_type", event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            />
-                          </label>
-                          <label className="text-sm font-semibold">
-                            Brake Type
-                            <input
-                              type="text"
-                              placeholder="Disc / Rim"
-                              value={String(dynamicValues.manual__brake_type ?? "")}
-                              onChange={(event) => updateDynamic("manual__brake_type", event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            />
-                          </label>
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {classicVehicleMode ? (
-                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                      <p className="text-xs font-semibold text-amber-900">Classic / Old Vehicle Mode (Year &lt; 2000)</p>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        {[
-                          ["manual__original_engine", "Original engine"],
-                          ["manual__engine_swapped", "Engine swapped"],
-                          ["manual__restored", "Restored"],
-                          ["manual__needs_restoration", "Needs restoration"],
-                          ["manual__imported", "Imported"],
-                          ["manual__documents_available", "Documents available"],
-                          ["manual__custom_modification", "Custom modification"],
-                        ].map(([key, label]) => (
-                          <label key={key} className="text-sm font-semibold">
-                            <span className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
-                              <input
-                                type="checkbox"
-                                checked={Boolean(dynamicValues[key])}
-                                onChange={(event) => updateDynamic(key, event.target.checked)}
-                                className="h-4 w-4"
-                              />
-                              {label}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </section>
-
-                <VehicleSmartSelector
-                  categoryNodeId={finalNode.id}
-                  aiSuggestedBrand={aiResult?.suggestedProduct?.brand ?? null}
-                  aiSuggestedModel={aiResult?.suggestedProduct?.model ?? null}
-                  onChange={setVehicleSelection}
-                />
-
-                {vehicleSelection.variant || manualVehicleMode ? (
-                  <>
-                    {/* Editable vehicle fields */}
-                    <section className="rounded-xl border border-[var(--line)] p-3">
-                      <h3 className="text-sm font-bold">Your Vehicle Details</h3>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <label className="text-sm font-semibold">
-                          Year
-                          <input
-                            type="number"
-                            min={MIN_VEHICLE_YEAR}
-                            max={MAX_VEHICLE_YEAR}
-                            placeholder="e.g. 2020"
-                            value={String(dynamicValues.year ?? "")}
-                            onChange={(e) => updateDynamic("year", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          />
-                        </label>
-                        <label className="text-sm font-semibold">
-                          KM / Mileage
-                          <input
-                            type="number"
-                            min={0}
-                            placeholder="e.g. 45000"
-                            value={String(dynamicValues.mileage ?? "")}
-                            onChange={(e) => updateDynamic("mileage", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          />
-                        </label>
-                        <label className="text-sm font-semibold">
-                          Color
-                          <input
-                            type="text"
-                            placeholder="e.g. White"
-                            value={String(dynamicValues.color ?? "")}
-                            onChange={(e) => updateDynamic("color", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          />
-                        </label>
-                        <label className="text-sm font-semibold">
-                          Vehicle Status
-                          <select
-                            value={String(dynamicValues.vehicle_status ?? "")}
-                            onChange={(e) => updateDynamic("vehicle_status", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          >
-                            <option value="">Select</option>
-                            <option>New</option>
-                            <option>Like New</option>
-                            <option>Used</option>
-                            <option>Damaged</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          Warranty
-                          <select
-                            value={String(dynamicValues.warranty ?? "")}
-                            onChange={(e) => updateDynamic("warranty", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          >
-                            <option value="">Select</option>
-                            <option>Yes</option>
-                            <option>No</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          Salvage Record
-                          <select
-                            value={String(dynamicValues.salvage_record ?? "")}
-                            onChange={(e) => updateDynamic("salvage_record", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          >
-                            <option value="">Select</option>
-                            <option>No</option>
-                            <option>Yes</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          Plate Status
-                          <input
-                            type="text"
-                            placeholder="e.g. Kabul plate"
-                            value={String(dynamicValues.plate_status ?? "")}
-                            onChange={(e) => updateDynamic("plate_status", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          />
-                        </label>
-                        <label className="text-sm font-semibold">
-                          Neighborhood (optional)
-                          <input
-                            type="text"
-                            placeholder="e.g. Karte Seh"
-                            value={String(dynamicValues.neighborhood ?? "")}
-                            onChange={(e) => updateDynamic("neighborhood", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          />
-                        </label>
-                        <label className="text-sm font-semibold">
-                          Video URL (optional)
-                          <input
-                            type="url"
-                            placeholder="https://..."
-                            value={String(dynamicValues.video_url ?? "")}
-                            onChange={(e) => updateDynamic("video_url", e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          />
-                        </label>
-                      </div>
-                    </section>
-
-                    {/* Paint & damage diagram */}
-                    <section className="rounded-xl border border-[var(--line)] p-3">
-                      <h3 className="text-sm font-bold">Painted or Replaced Parts</h3>
-                      <p className="mb-3 mt-1 text-xs text-[var(--ink-2)]">Tap each part on the diagram to indicate its condition.</p>
-                      <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} />
-                    </section>
-
-                    {Object.entries(fieldsByGroup).map(([groupKey, groupFields]) => (
-                      <section key={groupKey} className="rounded-xl border border-[var(--line)] p-3">
-                        <h3 className="text-sm font-bold">{fieldGroupLabel(groupKey)}</h3>
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                          {groupFields.map((field) => {
-                            const value = dynamicValues[field.field_key];
-                            const isMissing = field.is_required && !String(value ?? "").trim();
-
-                            if (field.field_type === "boolean") {
-                              return (
-                                <label key={field.id} className="text-sm font-semibold">
-                                  <span className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(value)}
-                                      onChange={(event) => updateDynamic(field.field_key, event.target.checked)}
-                                      className="h-4 w-4"
-                                    />
-                                    {field.field_label}
-                                  </span>
-                                </label>
-                              );
-                            }
-
-                            if (field.field_type === "select") {
-                              const options = fieldOptionsForRender(field);
-                              return (
-                                <label key={field.id} className="text-sm font-semibold">
-                                  {field.field_label}
-                                  <select
-                                    value={String(value ?? "")}
-                                    onChange={(event) => updateDynamic(field.field_key, event.target.value)}
-                                    className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                                  >
-                                    <option value="">Select</option>
-                                    {options.map((option) => (
-                                      <option key={`${field.id}-${option}`} value={option}>{option}</option>
-                                    ))}
-                                  </select>
-                                  {isMissing ? <p className="mt-1 text-xs font-semibold text-red-600">Required field</p> : null}
-                                </label>
-                              );
-                            }
-
-                            return (
-                              <label key={field.id} className="text-sm font-semibold">
-                                {field.field_label}
-                                <input
-                                  type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
-                                  value={String(value ?? "")}
-                                  onChange={(event) => updateDynamic(field.field_key, event.target.value)}
-                                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                                />
-                                {isMissing ? <p className="mt-1 text-xs font-semibold text-red-600">Required field</p> : null}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    ))}
-                  </>
-                ) : null}
-                {!vehicleSelection.variant && !manualVehicleMode ? (
-                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                    Select a known variant, or enable manual vehicle entry above. Posting unknown/custom vehicles is always allowed.
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              /* ── Non-vehicle dynamic fields ─────────────────────────────── */
-              <div className="mt-3 space-y-4">
-                {loadingProducts ? <p className="text-sm text-[var(--ink-2)]">Loading model specifications...</p> : null}
-
-                {productSpecOptions.length > 0 ? (
-                  <section className="rounded-xl border border-[var(--line)] p-3">
-                    <h3 className="text-sm font-bold">Known Product Specifications</h3>
-                    <p className="mt-1 text-sm text-[var(--ink-2)]">Known specs are auto-filled and locked so users only answer changeable details.</p>
-
-                    {seriesOptions.length > 1 ? (
-                      <label className="mt-3 block text-sm font-semibold">
-                        Series
-                        <select
-                          value={selectedSeries}
-                          onChange={(event) => {
-                            const nextSeries = event.target.value;
-                            setSelectedSeries(nextSeries);
-                            const nextOptions = productSpecOptions.filter((spec) => !nextSeries || seriesFromProductSpec(spec) === nextSeries);
-                            if (nextOptions.length === 1) {
-                              applyProductSpecSelection(nextOptions[0]);
-                            } else {
-                              setSelectedProductModel("");
-                              setLockedSpecs({});
-                            }
-                          }}
-                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                        >
-                          <option value="">Select series</option>
-                          {seriesOptions.map((option) => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-
-                    {filteredProductSpecOptions.length > 1 ? (
-                      <label className="mt-3 block text-sm font-semibold">
-                        Model
-                        <select
-                          value={selectedProductModel}
-                          onChange={(event) => {
-                            const next = filteredProductSpecOptions.find((spec) => spec.model === event.target.value) ?? null;
-                            applyProductSpecSelection(next);
-                          }}
-                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                        >
-                          <option value="">Select model</option>
-                          {filteredProductSpecOptions.map((option) => (
-                            <option key={`${option.brand}-${option.model}`} value={option.model}>{option.model}</option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-
-                    {selectedProductSpec ? (
-                      <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-2)]">Locked Specs</p>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                          {Object.entries(lockedSpecs).map(([key, value]) => (
-                            <div key={key} className="rounded-lg bg-white px-3 py-2 text-sm">
-                              <p className="text-[var(--ink-2)]">{labelForLockedSpec(key)}</p>
-                              <p className="font-semibold text-[var(--ink-1)]">{String(value)}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-3 text-sm text-amber-700">Select a model to auto-fill locked specifications.</p>
-                    )}
-                  </section>
-                ) : null}
-
-                {Object.entries(fieldsByGroup).map(([groupKey, groupFields]) => (
-                  <section key={groupKey} className="rounded-xl border border-[var(--line)] p-3">
-                    <h3 className="text-sm font-bold">{fieldGroupLabel(groupKey)}</h3>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      {groupFields.map((field) => {
-                        const value = dynamicValues[field.field_key];
-                        const isMissing = field.is_required && !String(value ?? "").trim();
-
-                        if (field.field_type === "boolean") {
-                          return (
-                            <label key={field.id} className="text-sm font-semibold">
-                              <span className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(value)}
-                                  onChange={(event) => updateDynamic(field.field_key, event.target.checked)}
-                                  className="h-4 w-4"
-                                />
-                                {field.field_label}
-                              </span>
-                            </label>
-                          );
-                        }
-
-                        if (field.field_type === "select") {
-                          const options = fieldOptionsForRender(field);
-                          return (
-                            <label key={field.id} className="text-sm font-semibold">
-                              {field.field_label}
-                              <select
-                                value={String(value ?? "")}
-                                onChange={(event) => updateDynamic(field.field_key, event.target.value)}
-                                className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                              >
-                                <option value="">Select</option>
-                                {options.map((option) => (
-                                  <option key={`${field.id}-${option}`} value={option}>{option}</option>
-                                ))}
-                              </select>
-                              {isMissing ? <p className="mt-1 text-xs font-semibold text-red-600">Required field</p> : null}
-                            </label>
-                          );
-                        }
-
-                        return (
-                          <label key={field.id} className="text-sm font-semibold">
-                            {field.field_label}
-                            <input
-                              type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
-                              value={String(value ?? "")}
-                              onChange={(event) => updateDynamic(field.field_key, event.target.value)}
-                              className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                            />
-                            {isMissing ? <p className="mt-1 text-xs font-semibold text-red-600">Required field</p> : null}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            )}
-          </section>
-        ) : null}
-
-        {step === 4 ? (
-          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Step 4: {rootSlug === "vehicles" ? "Seller & Features" : "Context Preferences"}</h2>
-
-            {(rootSlug === "mobile-phones-tablets" || rootSlug === "electronics-computers" || rootSlug === "home-furniture-appliances" || rootSlug === "clothing-personal-items") ? (
-              <div className="mt-3 grid gap-3">
-                <label className="text-sm font-semibold">Delivery Preference
-                  <select value={core.delivery_preference} onChange={(event) => updateCore("delivery_preference", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                    <option value="">Select</option>
-                    <option value="meet_and_deliver">I can meet and deliver</option>
-                    <option value="delivery_available">Delivery available</option>
-                    <option value="pickup_only">Buyer can pick up</option>
-                  </select>
-                </label>
-                <label className="text-sm font-semibold">Meeting Preference
-                  <input value={core.meeting_preference} onChange={(event) => updateCore("meeting_preference", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                </label>
-              </div>
-            ) : null}
-
-            {rootSlug === "real-estate" ? (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="text-sm font-semibold">Owner / Agent
-                  <select value={String(dynamicValues.owner_type ?? "")} onChange={(event) => updateDynamic("owner_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                    <option value="">Select</option>
-                    <option value="owner">Owner</option>
-                    <option value="agent">Agent</option>
-                    <option value="manager">Manager</option>
-                    <option value="developer">Developer</option>
-                  </select>
-                </label>
-                <label className="text-sm font-semibold">
-                  <span className="flex items-center gap-2">
-                    <input type="checkbox" checked={core.available_for_viewing} onChange={(event) => updateCore("available_for_viewing", event.target.checked)} className="h-4 w-4" />
-                    Available for viewing
-                  </span>
-                </label>
-                <label className="text-sm font-semibold sm:col-span-2">Address
-                  <input value={core.address_optional} onChange={(event) => updateCore("address_optional", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                </label>
-              </div>
-            ) : null}
-
-            {rootSlug === "vehicles" ? (
-              <div className="mt-3 space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-sm font-semibold">Seller Type
-                    <select value={core.seller_type} onChange={(event) => updateCore("seller_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="owner">Owner</option>
-                      <option value="dealer">Dealer</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-semibold">
-                    <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3">
-                      <input type="checkbox" checked={core.exchange_available} onChange={(event) => updateCore("exchange_available", event.target.checked)} className="h-4 w-4" />
-                      Exchange available
-                    </span>
-                  </label>
-                </div>
-
-                <section className="rounded-xl border border-[var(--line)] p-3">
-                  <h3 className="text-sm font-bold">Feature Checklist</h3>
-                  <div className="mt-3">
-                    <VehicleFeaturesChecklist value={selectedVehicleFeatureIds} onChange={setSelectedVehicleFeatureIds} />
-                  </div>
-                </section>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
-        {step === 5 ? (
-          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Step 5: Price / Payment</h2>
-            {isRealEstate ? (
-              <p className="mt-1 text-sm text-[var(--ink-2)]">
-                Rental type: {selectedRentalType || "Not selected"}
-              </p>
-            ) : null}
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-semibold">{isGerawyType ? "Primary Amount" : "Price"}
-                <input type="number" min={1} value={core.price} onChange={(event) => updateCore("price", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                {!core.price ? <p className="mt-1 text-xs font-semibold text-red-600">Required field</p> : null}
-              </label>
-              <label className="text-sm font-semibold">Currency
-                <select value={core.currency} onChange={(event) => updateCore("currency", event.target.value as "AFN" | "USD")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  {CURRENCIES.map((currency) => (
-                    <option key={currency} value={currency}>{currency}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-semibold">
-                <span className="flex items-center gap-2">
-                  <input type="checkbox" checked={core.negotiable} onChange={(event) => updateCore("negotiable", event.target.checked)} className="h-4 w-4" />
-                  Negotiable
-                </span>
-              </label>
-              <label className="text-sm font-semibold">Minimum Offer (optional)
-                <input type="number" min={1} value={core.minimum_offer} onChange={(event) => updateCore("minimum_offer", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
-            </div>
-          </section>
-        ) : null}
-
-        {step === 6 ? (
-          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Step 6: Preview and Publish</h2>
+            <h2 className="font-display text-lg font-bold">{showPhotoStep ? "4. Preview" : "3. Preview"}</h2>
             <div className="mt-3 grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-              <p><span className="font-semibold">Photos:</span> {previewSummary.photos}</p>
-              <p><span className="font-semibold">Category:</span> {previewSummary.category}</p>
-              <p><span className="font-semibold">Title:</span> {previewSummary.title}</p>
-              <p><span className="font-semibold">Description:</span> {previewSummary.description}</p>
-              <p><span className="font-semibold">Location:</span> {previewSummary.location}</p>
-              <p><span className="font-semibold">Contact:</span> {previewSummary.contact}</p>
-              <p><span className="font-semibold">Price:</span> {previewSummary.price}</p>
+              <p><span className="font-semibold">Category:</span> {breadcrumb || "-"}</p>
+              <p><span className="font-semibold">Title:</span> {core.title || "-"}</p>
+              <p><span className="font-semibold">Description:</span> {core.description || "-"}</p>
+              <p><span className="font-semibold">Price:</span> {core.price ? `${core.price} ${core.currency}` : "-"}</p>
+              <p><span className="font-semibold">Province / District:</span> {core.province || "-"} / {core.district || "-"}</p>
+              <p><span className="font-semibold">Photos:</span> {images.length}</p>
             </div>
           </section>
         ) : null}
@@ -1748,12 +1234,12 @@ export default function PostAdForm({ categories }: Props) {
             </button>
           ) : null}
 
-          {step < 6 ? (
+          {!isPreviewStep ? (
             <button type="button" onClick={goNext} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white">
               Continue
             </button>
           ) : (
-            <button type="button" onClick={onPublish} disabled={isPending} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
+            <button type="button" onClick={() => void onPublish()} disabled={isPending} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
               {isPending ? status ?? "Publishing..." : "Publish"}
             </button>
           )}

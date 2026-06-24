@@ -4,6 +4,8 @@ import type { ListingWithImages } from "@/types/database";
 
 export function ListingCard({ listing, showStatus = false }: { listing: ListingWithImages; showStatus?: boolean }) {
   const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
+  const isDormitory = listing.category_node?.path === "real-estate/dormitory" || listing.category_node?.slug === "dormitory";
+  const isStudentSuitable = Boolean(listing.suitable_for_students);
   return (
     <article className="overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <Link href={`/listings/${listing.id}`}>
@@ -13,6 +15,16 @@ export function ListingCard({ listing, showStatus = false }: { listing: ListingW
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-[var(--ink-2)]">No image</div>
           )}
+          {(isDormitory || isStudentSuitable) ? (
+            <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+              {isStudentSuitable ? (
+                <span className="rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-semibold text-white">Suitable for Students</span>
+              ) : null}
+              {isDormitory ? (
+                <span className="rounded-full bg-indigo-600 px-2 py-1 text-[10px] font-semibold text-white">Dormitory</span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Link>
       <div className="space-y-2 p-4">

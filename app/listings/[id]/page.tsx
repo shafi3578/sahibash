@@ -173,6 +173,11 @@ export default async function ListingDetailPage({
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h1 className="mt-1 font-display text-2xl font-bold leading-tight sm:text-3xl">{listing.title}</h1>
+          {listing.suitable_for_students ? (
+            <p className="mt-2 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+              This place is suitable for students.
+            </p>
+          ) : null}
           <p className="mt-3 text-3xl font-bold text-[var(--accent)]">{new Intl.NumberFormat("en-US").format(listing.price)} {listing.currency}</p>
           <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-3 text-sm text-[var(--ink-2)] sm:grid-cols-2">
             {locationParts.length > 0 ? <p>{locationParts.join(" / ")}</p> : null}

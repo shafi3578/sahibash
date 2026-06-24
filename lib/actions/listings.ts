@@ -51,6 +51,42 @@ const RESERVED_FORM_KEYS = new Set([
   "vehicle_is_classic",
   "vehicle_is_custom",
   "vehicle_manual_specs_json",
+  "main_category_id",
+  "child_category_id",
+  "brand_id",
+  "model_id",
+  "electronics_category_id",
+  "electronics_brand_id",
+  "electronics_model_id",
+  "manual_brand",
+  "manual_model",
+  "electronics_condition",
+  "electronics_storage",
+  "electronics_ram",
+  "electronics_color",
+  "electronics_battery_health",
+  "electronics_warranty",
+  "electronics_box_included",
+  "electronics_charger_included",
+  "electronics_repair_history",
+  "electronics_network_registered",
+  "electronics_area",
+  "electronics_description",
+  "suitable_for_students",
+  "student_housing_type",
+  "gender_allowed",
+  "payment_period",
+  "distance_to_university",
+  "shared_allowed",
+  "students_allowed",
+  "room_type",
+  "number_of_beds",
+  "meals_included",
+  "internet",
+  "heating",
+  "air_conditioning",
+  "security",
+  "contact_preferences",
 ]);
 
 const VEHICLE_META_FIELDS: Record<string, { type: "text" | "number" | "boolean"; label: string; unit?: string | null }> = {
@@ -76,6 +112,11 @@ const VEHICLE_META_FIELDS: Record<string, { type: "text" | "number" | "boolean";
 
 function toFormValueText(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function toFormValueBoolean(value: FormDataEntryValue | null) {
+  const text = toFormValueText(value).toLowerCase();
+  return text === "true" || text === "1" || text === "on" || text === "yes";
 }
 
 function toAttributePayload(field: {
@@ -342,6 +383,134 @@ async function persistVehicleMetaAttributes(
   });
 }
 
+async function persistListingCategoryPath(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  listingId: string,
+  formData: FormData,
+  fallback: {
+    mainCategoryId: number;
+    subcategoryId: number;
+    childCategoryId: number;
+  }
+) {
+  const parseId = (value: FormDataEntryValue | null, defaultValue: number) => {
+    if (typeof value !== "string") return defaultValue;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+  };
+
+  const mainCategoryId = parseId(formData.get("main_category_id"), fallback.mainCategoryId);
+  const subcategoryId = parseId(formData.get("subcategory_id"), fallback.subcategoryId);
+  const childCategoryId = parseId(formData.get("child_category_id"), fallback.childCategoryId);
+
+  const parseOptionalId = (value: FormDataEntryValue | null) => {
+    if (typeof value !== "string") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const brandId = parseOptionalId(formData.get("brand_id"));
+  const modelId = parseOptionalId(formData.get("model_id"));
+
+  try {
+    await supabase
+      .from("listing_category_path")
+      .upsert(
+        {
+          listing_id: listingId,
+          main_category_id: mainCategoryId,
+          subcategory_id: subcategoryId,
+          child_category_id: childCategoryId,
+          brand_id: brandId,
+          model_id: modelId,
+        },
+        { onConflict: "listing_id" }
+      );
+  } catch {
+    // listing_category_path may not exist in older environments yet
+  }
+}
+
+async function persistElectronicsListing(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  listingId: string,
+  formData: FormData,
+  fallback: {
+    categoryNodeId: number;
+    province: string | null;
+    district: string | null;
+    description: string;
+    price: number;
+    currency: "AFN" | "USD";
+  }
+) {
+  const toNum = (value: FormDataEntryValue | null): number | null => {
+    if (typeof value !== "string") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const categoryId = toNum(formData.get("electronics_category_id"));
+  const brandId = toNum(formData.get("electronics_brand_id"));
+  const modelId = toNum(formData.get("electronics_model_id"));
+  const manualBrand = toFormValueText(formData.get("manual_brand")) || null;
+  const manualModel = toFormValueText(formData.get("manual_model")) || null;
+
+  if (!categoryId || (!brandId && !manualBrand)) {
+    return;
+  }
+
+  const electronicsDescription = toFormValueText(formData.get("electronics_description")) || fallback.description;
+  const area = toFormValueText(formData.get("electronics_area")) || null;
+  const condition = toFormValueText(formData.get("electronics_condition")) || null;
+  const storage = toFormValueText(formData.get("electronics_storage")) || null;
+  const ram = toFormValueText(formData.get("electronics_ram")) || null;
+  const color = toFormValueText(formData.get("electronics_color")) || null;
+  const batteryHealth = toFormValueText(formData.get("electronics_battery_health")) || null;
+  const warranty = toFormValueText(formData.get("electronics_warranty")) || null;
+  const repairHistory = toFormValueText(formData.get("electronics_repair_history")) || null;
+  const networkRegistered = toFormValueText(formData.get("electronics_network_registered")) || null;
+
+  const toBool = (value: FormDataEntryValue | null) => {
+    const text = toFormValueText(value);
+    return text === "true" || text === "1" || text === "on";
+  };
+
+  try {
+    await supabase
+      .from("electronics_listings")
+      .upsert(
+        {
+          listing_id: listingId,
+          category_id: categoryId,
+          brand_id: brandId,
+          model_id: modelId,
+          manual_brand: manualBrand,
+          manual_model: manualModel,
+          condition,
+          price: fallback.price,
+          currency: fallback.currency,
+          storage,
+          ram,
+          color,
+          battery_health: batteryHealth,
+          warranty,
+          box_included: toBool(formData.get("electronics_box_included")),
+          charger_included: toBool(formData.get("electronics_charger_included")),
+          repair_history: repairHistory,
+          network_registered: networkRegistered,
+          province: fallback.province,
+          district: fallback.district,
+          area,
+          description: electronicsDescription,
+        },
+        { onConflict: "listing_id" }
+      );
+  } catch {
+    // electronics_listings may not exist before migration is applied
+  }
+}
+
 async function persistListingAttributes(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   listingId: string,
@@ -539,6 +708,46 @@ async function buildListingPayload(
   const isClassicByYear = Number.isFinite(manualYear as number) && (manualYear as number) < 2000;
   const isCustom = toBool(toFormValueText(formData.get("vehicle_is_custom")));
 
+  const path = context.categoryPath || "";
+  const isRealEstate = path.startsWith("real-estate");
+  const listingPurpose = toFormValueText(formData.get("listing_purpose")).toLowerCase();
+  const isRentListing = listingPurpose === "for rent";
+  const isDormitory = path === "real-estate/dormitory";
+
+  const normalizeChoice = (
+    value: string,
+    allowed: readonly string[]
+  ): string | null => {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return null;
+    return allowed.includes(normalized) ? normalized : null;
+  };
+
+  const explicitSuitable = toFormValueBoolean(formData.get("suitable_for_students"));
+  const suitableForStudents = isRealEstate
+    ? (isDormitory || (isRentListing && explicitSuitable))
+    : false;
+
+  const studentHousingType = isRealEstate
+    ? normalizeChoice(toFormValueText(formData.get("student_housing_type")), ["house", "apartment", "room", "dormitory"])
+      ?? (path.startsWith("real-estate/houses") ? "house"
+        : path.startsWith("real-estate/apartments") ? "apartment"
+          : path.startsWith("real-estate/rooms") ? "room"
+            : isDormitory ? "dormitory"
+              : null)
+    : null;
+
+  const genderAllowed = isRealEstate
+    ? normalizeChoice(toFormValueText(formData.get("gender_allowed")), ["male", "female", "family", "everyone"])
+    : null;
+
+  const paymentPeriod = isRealEstate
+    ? normalizeChoice(toFormValueText(formData.get("payment_period")), ["monthly", "yearly", "semester", "daily", "other"])
+    : null;
+
+  const distanceToUniversityText = toFormValueText(formData.get("distance_to_university"));
+  const distanceToUniversity = distanceToUniversityText ? Number(distanceToUniversityText) : null;
+
   return {
     context,
     payload: {
@@ -570,6 +779,11 @@ async function buildListingPayload(
       vehicle_is_classic: isClassicExplicit || isClassicByYear,
       vehicle_is_custom: isCustom,
       vehicle_manual_specs: manualSpecs,
+      suitable_for_students: suitableForStudents,
+      student_housing_type: studentHousingType,
+      gender_allowed: genderAllowed,
+      payment_period: paymentPeriod,
+      distance_to_university: Number.isFinite(distanceToUniversity as number) ? distanceToUniversity : null,
     },
     formData,
   };
@@ -608,6 +822,19 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   await persistListingAttributes(supabase, data.id, listing.context.categoryNodeId, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
+  await persistElectronicsListing(supabase, data.id, formData, {
+    categoryNodeId: listing.context.categoryNodeId,
+    province: listing.payload.province,
+    district: listing.payload.district,
+    description: listing.payload.description,
+    price: listing.payload.price,
+    currency: listing.payload.currency,
+  });
+  await persistListingCategoryPath(supabase, data.id, formData, {
+    mainCategoryId: listing.context.categoryId,
+    subcategoryId: listing.context.categoryNodeId,
+    childCategoryId: listing.context.categoryNodeId,
+  });
   await persistVehicleDamage(supabase, data.id, formData);
   await persistVehicleFeatures(supabase, data.id, formData);
 
@@ -656,6 +883,19 @@ export async function createListingAction(formData: FormData): Promise<{
   await persistListingAttributes(supabase, data.id, createdListing.context.categoryNodeId, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
+  await persistElectronicsListing(supabase, data.id, formData, {
+    categoryNodeId: createdListing.context.categoryNodeId,
+    province: createdListing.payload.province,
+    district: createdListing.payload.district,
+    description: createdListing.payload.description,
+    price: createdListing.payload.price,
+    currency: createdListing.payload.currency,
+  });
+  await persistListingCategoryPath(supabase, data.id, formData, {
+    mainCategoryId: createdListing.context.categoryId,
+    subcategoryId: createdListing.context.categoryNodeId,
+    childCategoryId: createdListing.context.categoryNodeId,
+  });
   await persistVehicleDamage(supabase, data.id, formData);
   await persistVehicleFeatures(supabase, data.id, formData);
 
@@ -739,6 +979,19 @@ export async function updateListingAction(
   await persistListingAttributes(supabase, listingId, createdListing.context.categoryNodeId, formData, true);
   await persistLockedListingSpecs(supabase, listingId, formData);
   await persistVehicleMetaAttributes(supabase, listingId, formData);
+  await persistElectronicsListing(supabase, listingId, formData, {
+    categoryNodeId: createdListing.context.categoryNodeId,
+    province: createdListing.payload.province,
+    district: createdListing.payload.district,
+    description: createdListing.payload.description,
+    price: createdListing.payload.price,
+    currency: createdListing.payload.currency,
+  });
+  await persistListingCategoryPath(supabase, listingId, formData, {
+    mainCategoryId: createdListing.context.categoryId,
+    subcategoryId: createdListing.context.categoryNodeId,
+    childCategoryId: createdListing.context.categoryNodeId,
+  });
   await persistVehicleDamage(supabase, listingId, formData);
   await persistVehicleFeatures(supabase, listingId, formData);
 

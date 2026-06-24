@@ -126,6 +126,11 @@ export type Listing = {
   vehicle_is_classic: boolean;
   vehicle_is_custom: boolean;
   vehicle_manual_specs: Record<string, unknown> | null;
+  suitable_for_students: boolean;
+  student_housing_type: string | null;
+  gender_allowed: string | null;
+  payment_period: string | null;
+  distance_to_university: number | null;
   title: string;
   description: string;
   price: number;

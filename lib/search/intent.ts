@@ -328,10 +328,10 @@ const SPECIFIC_INTENTS: SpecificIntent[] = [
     matchedRule: "apartments",
   },
   {
-    terms: ["dormitory", "dormitories", "student accommodation"],
-    categoryPath: "real-estate/student-accommodation-dormitories",
+    terms: ["dormitory", "dormitories", "student accommodation", "student room", "student house", "university room", "محصل", "دانشجو", "لیلیه", "خوابگاه"],
+    categoryPath: "real-estate/room-house-for-students",
     confidence: "high",
-    matchedRule: "student-accommodation",
+    matchedRule: "student-housing",
   },
   {
     terms: ["land"],
@@ -427,7 +427,7 @@ const RULES: Array<{
   {
     name: "real-estate",
     confidence: "high",
-    match: (input) => /\bapartment\b|\bhouse\b|\bhaweli\b|\bhaveli\b|\bflat\b|\bland\b|\bdormitory\b|\brent\b|\bgerawy\b|\bgarawi\b|\brahn\b|\bvilla\b|\bduplex\b|\bshop\b/.test(input),
+    match: (input) => /\bapartment\b|\bhouse\b|\bhaweli\b|\bhaveli\b|\bflat\b|\bland\b|\bdormitory\b|\brent\b|\bgerawy\b|\bgarawi\b|\brahn\b|\bvilla\b|\bduplex\b|\bshop\b|student\s+room|student\s+house|university\s+room|محصل|دانشجو|لیلیه|خوابگاه/u.test(input),
     categoryPath: "real-estate",
   },
   {

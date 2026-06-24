@@ -1,0 +1,702 @@
+"use client";
+
+import { useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
+import { CURRENCIES, AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
+
+type ElectronicsCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  category_node_id: number | null;
+};
+
+type ElectronicsBrand = {
+  id: number;
+  name: string;
+  slug: string;
+  is_popular: boolean;
+};
+
+type ElectronicsModel = {
+  id: number;
+  name: string;
+  slug: string;
+  release_year: number | null;
+  is_popular: boolean;
+};
+
+type ElectronicsSpec = {
+  id: number;
+  spec_key: string;
+  spec_label: string;
+  spec_value: string;
+  spec_group: string | null;
+};
+
+type ElectronicsOption = {
+  id: number;
+  option_type: string;
+  option_value: string;
+};
+
+type PostingConfig = {
+  requires_images: boolean;
+  min_images: number;
+  max_images: number;
+  recommended_images: string | null;
+  allow_manual_model: boolean;
+};
+
+type StagedImage = { file: File; previewUrl: string; isPrimary: boolean };
+
+type Props = {
+  subcategories: ElectronicsCategory[];
+};
+
+type Step = "category" | "brandModel" | "details" | "photos" | "location" | "preview";
+
+const STEP_LABELS: Record<Step, string> = {
+  category: "Category",
+  brandModel: "Brand & Model",
+  details: "Details",
+  photos: "Photos",
+  location: "Location",
+  preview: "Preview",
+};
+
+const CONDITION_OPTIONS = ["New", "Like New", "Excellent", "Good", "Fair", "Damaged", "For Parts"];
+const WARRANTY_OPTIONS = ["No Warranty", "Shop Warranty", "Official Warranty", "International Warranty"];
+const REPAIR_HISTORY_OPTIONS = [
+  "No Repair",
+  "Screen Replaced",
+  "Battery Replaced",
+  "Back Glass Replaced",
+  "Camera Repaired",
+  "Board Repaired",
+  "Unknown",
+];
+const NETWORK_REGISTERED_OPTIONS = ["Registered", "Not Registered", "Unknown"];
+
+function optionsByType(options: ElectronicsOption[], type: string) {
+  return options
+    .filter((option) => option.option_type === type)
+    .map((option) => option.option_value);
+}
+
+export default function ElectronicsPostAdForm({ subcategories }: Props) {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const [step, setStep] = useState<Step>("category");
+  const [stepError, setStepError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const [selectedCategory, setSelectedCategory] = useState<ElectronicsCategory | null>(null);
+  const [brands, setBrands] = useState<ElectronicsBrand[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<ElectronicsBrand | null>(null);
+  const [models, setModels] = useState<ElectronicsModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState<ElectronicsModel | null>(null);
+  const [manualModel, setManualModel] = useState(false);
+  const [manualBrandName, setManualBrandName] = useState("");
+  const [manualModelName, setManualModelName] = useState("");
+
+  const [knownSpecs, setKnownSpecs] = useState<ElectronicsSpec[]>([]);
+  const [modelOptions, setModelOptions] = useState<ElectronicsOption[]>([]);
+  const [postingConfig, setPostingConfig] = useState<PostingConfig>({
+    requires_images: true,
+    min_images: 1,
+    max_images: 8,
+    recommended_images: "3-8",
+    allow_manual_model: true,
+  });
+
+  const [images, setImages] = useState<StagedImage[]>([]);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState<"AFN" | "USD">("AFN");
+  const [storage, setStorage] = useState("");
+  const [ram, setRam] = useState("");
+  const [color, setColor] = useState("");
+  const [batteryHealth, setBatteryHealth] = useState("");
+  const [condition, setCondition] = useState("");
+  const [warranty, setWarranty] = useState("");
+  const [boxIncluded, setBoxIncluded] = useState(false);
+  const [chargerIncluded, setChargerIncluded] = useState(false);
+  const [repairHistory, setRepairHistory] = useState("");
+  const [networkRegistered, setNetworkRegistered] = useState("");
+
+  const [province, setProvince] = useState("");
+  const [district, setDistrict] = useState("");
+  const [area, setArea] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactName, setContactName] = useState("");
+
+  const breadcrumb = useMemo(() => {
+    const categoryName = selectedCategory?.name ?? "Phones & Electronics";
+    const brandName = manualModel ? (manualBrandName || "Manual Brand") : (selectedBrand?.name ?? "Brand");
+    const modelName = manualModel ? (manualModelName || "Manual Model") : (selectedModel?.name ?? "Model");
+    return `Phones & Electronics -> ${categoryName} -> ${brandName} -> ${modelName}`;
+  }, [selectedCategory?.name, selectedBrand?.name, selectedModel?.name, manualModel, manualBrandName, manualModelName]);
+
+  const storageOptions = useMemo(() => optionsByType(modelOptions, "storage"), [modelOptions]);
+  const colorOptions = useMemo(() => optionsByType(modelOptions, "color"), [modelOptions]);
+
+  async function loadBrands(categoryId: number) {
+    const response = await fetch(`/api/electronics/brands?categoryId=${categoryId}`, { method: "GET" });
+    const payload = (await response.json()) as { brands: ElectronicsBrand[] };
+    setBrands(payload.brands ?? []);
+  }
+
+  async function loadModels(brandId: number) {
+    const response = await fetch(`/api/electronics/models?brandId=${brandId}`, { method: "GET" });
+    const payload = (await response.json()) as { models: ElectronicsModel[] };
+    setModels(payload.models ?? []);
+  }
+
+  async function loadModelMeta(modelId: number, categoryId: number) {
+    const response = await fetch(`/api/electronics/model-meta?modelId=${modelId}&categoryId=${categoryId}`, { method: "GET" });
+    const payload = (await response.json()) as {
+      specs: ElectronicsSpec[];
+      options: ElectronicsOption[];
+      config: PostingConfig | null;
+    };
+
+    setKnownSpecs(payload.specs ?? []);
+    setModelOptions(payload.options ?? []);
+
+    if (payload.config) {
+      setPostingConfig(payload.config);
+    }
+  }
+
+  async function loadCategoryConfig(categoryId: number) {
+    const response = await fetch(`/api/electronics/category-config?categoryId=${categoryId}`, { method: "GET" });
+    const payload = (await response.json()) as { config: PostingConfig | null };
+    if (payload.config) {
+      setPostingConfig(payload.config);
+    }
+  }
+
+  async function onSelectCategory(category: ElectronicsCategory) {
+    setSelectedCategory(category);
+    setSelectedBrand(null);
+    setSelectedModel(null);
+    setManualModel(false);
+    setManualBrandName("");
+    setManualModelName("");
+    setKnownSpecs([]);
+    setModelOptions([]);
+    setStepError(null);
+    setError(null);
+
+    await Promise.all([loadBrands(category.id), loadCategoryConfig(category.id)]);
+    setStep("brandModel");
+  }
+
+  async function onSelectBrand(brand: ElectronicsBrand) {
+    setSelectedBrand(brand);
+    setSelectedModel(null);
+    setKnownSpecs([]);
+    setModelOptions([]);
+    setStepError(null);
+    setError(null);
+    await loadModels(brand.id);
+  }
+
+  async function onSelectModel(model: ElectronicsModel) {
+    if (!selectedCategory) return;
+    setSelectedModel(model);
+    setStepError(null);
+    setError(null);
+    await loadModelMeta(model.id, selectedCategory.id);
+  }
+
+  function pickFiles(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+
+    const next = files.map((file, index) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+      isPrimary: images.length === 0 && index === 0,
+    }));
+
+    setImages((prev) => [...prev, ...next].slice(0, postingConfig.max_images));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function setPrimary(index: number) {
+    setImages((prev) => prev.map((img, i) => ({ ...img, isPrimary: i === index })));
+  }
+
+  function removeImage(index: number) {
+    setImages((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length > 0 && !next.some((img) => img.isPrimary)) {
+        next[0] = { ...next[0], isPrimary: true };
+      }
+      return next;
+    });
+  }
+
+  const orderedSteps: Step[] = ["category", "brandModel", "details", "photos", "location", "preview"];
+
+  function gotoNext() {
+    setStepError(null);
+
+    if (step === "category") {
+      if (!selectedCategory) {
+        setStepError("Select a subcategory to continue.");
+        return;
+      }
+      setStep("brandModel");
+      return;
+    }
+
+    if (step === "brandModel") {
+      if (!selectedBrand && !manualModel) {
+        setStepError("Select a brand to continue.");
+        return;
+      }
+      if (!selectedModel && !manualModel) {
+        setStepError("Select a model or use manual model entry.");
+        return;
+      }
+      if (manualModel) {
+        if (!manualBrandName.trim()) {
+          setStepError("Enter manual brand name.");
+          return;
+        }
+        if (!manualModelName.trim()) {
+          setStepError("Enter manual model name.");
+          return;
+        }
+      }
+      setStep("details");
+      return;
+    }
+
+    if (step === "details") {
+      if (!title.trim() || title.trim().length < 5) {
+        setStepError("Title must be at least 5 characters.");
+        return;
+      }
+      if (!description.trim() || description.trim().length < 20) {
+        setStepError("Description must be at least 20 characters.");
+        return;
+      }
+      if (!condition) {
+        setStepError("Condition is required.");
+        return;
+      }
+      if (!price || Number(price) <= 0) {
+        setStepError("Enter valid price.");
+        return;
+      }
+      if (selectedCategory?.slug === "mobile-phones" && !storage.trim()) {
+        setStepError("Storage is required for mobile phones.");
+        return;
+      }
+      setStep("photos");
+      return;
+    }
+
+    if (step === "photos") {
+      if (postingConfig.requires_images && images.length < postingConfig.min_images) {
+        setStepError(`Please add at least ${postingConfig.min_images} photo(s).`);
+        return;
+      }
+      setStep("location");
+      return;
+    }
+
+    if (step === "location") {
+      if (!province) {
+        setStepError("Province is required.");
+        return;
+      }
+      if (!district) {
+        setStepError("District is required.");
+        return;
+      }
+      if (!contactPhone.trim() || contactPhone.trim().length < 7) {
+        setStepError("Contact phone is required (minimum 7 digits).");
+        return;
+      }
+      setStep("preview");
+    }
+  }
+
+  function gotoPrev() {
+    setStepError(null);
+    const index = orderedSteps.indexOf(step);
+    if (index > 0) {
+      setStep(orderedSteps[index - 1]);
+    }
+  }
+
+  async function onPublish() {
+    setError(null);
+    setStepError(null);
+
+    if (!selectedCategory) {
+      setError("Electronics subcategory is required.");
+      return;
+    }
+
+    const postingNodeId = selectedCategory.category_node_id;
+    if (!postingNodeId) {
+      setError("Selected electronics subcategory is not linked to posting categories yet.");
+      return;
+    }
+
+    const form = new FormData();
+    form.set("title", title || `${selectedCategory.name} - ${manualModel ? manualModelName : selectedModel?.name ?? "Listing"}`);
+    form.set("description", description || "Electronics listing with complete details and condition.");
+    form.set("category_node_id", String(postingNodeId));
+    form.set("subcategory_id", String(postingNodeId));
+
+    form.set("price", price);
+    form.set("currency", currency);
+    form.set("province", province);
+    form.set("city", province);
+    form.set("district", district);
+    form.set("address_optional", area);
+    form.set("contact_phone", contactPhone.trim());
+    form.set("contact_name", contactName.trim());
+
+    form.set("electronics_category_id", String(selectedCategory.id));
+    if (!manualModel && selectedBrand) form.set("electronics_brand_id", String(selectedBrand.id));
+    if (!manualModel && selectedModel) form.set("electronics_model_id", String(selectedModel.id));
+    if (manualModel) {
+      form.set("manual_brand", manualBrandName);
+      form.set("manual_model", manualModelName);
+    }
+
+    form.set("electronics_condition", condition);
+    form.set("electronics_storage", storage);
+    form.set("electronics_ram", ram);
+    form.set("electronics_color", color);
+    form.set("electronics_battery_health", batteryHealth);
+    form.set("electronics_warranty", warranty);
+    form.set("electronics_box_included", boxIncluded ? "true" : "false");
+    form.set("electronics_charger_included", chargerIncluded ? "true" : "false");
+    form.set("electronics_repair_history", repairHistory);
+    form.set("electronics_network_registered", networkRegistered);
+    form.set("electronics_area", area);
+    form.set("electronics_description", description);
+
+    form.set("condition", condition);
+    if (storage.trim()) form.set("storage", storage);
+    if (ram.trim()) form.set("ram", ram);
+    if (batteryHealth.trim()) form.set("battery_health", batteryHealth);
+    if (networkRegistered.trim()) form.set("network_registered", networkRegistered);
+
+    startTransition(async () => {
+      setStatus("Creating listing...");
+      const created = await createListingAction(form);
+      if (!created.ok || !created.listingId) {
+        setError(created.message || "Failed to create listing.");
+        setStatus(null);
+        return;
+      }
+
+      const ordered = [...images].sort((a, b) => (a.isPrimary ? -1 : b.isPrimary ? 1 : 0));
+      for (let i = 0; i < ordered.length; i += 1) {
+        setStatus(`Uploading image ${i + 1} of ${ordered.length}...`);
+        const uploaded = await uploadListingImageAction(created.listingId, ordered[i].file, ordered[i].isPrimary);
+        if (!uploaded.ok) {
+          setError(`Listing created, but image ${i + 1} failed: ${uploaded.message}`);
+          setStatus(null);
+          return;
+        }
+      }
+
+      setStatus("Listing created. Redirecting...");
+      const destination = `/listings/${created.listingId}/manage`;
+      router.push(destination);
+      router.refresh();
+      window.location.assign(destination);
+    });
+  }
+
+  return (
+    <div className="relative pb-28">
+      <div className="sticky top-0 z-10 rounded-2xl bg-sky-700 px-4 py-3 text-white">
+        <p className="text-xs font-semibold uppercase tracking-wide">Phones & Electronics</p>
+        <p className="text-sm">{STEP_LABELS[step]}</p>
+        <p className="mt-1 text-xs text-sky-100 break-words">{breadcrumb}</p>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {step === "category" ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">Category</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">Choose a Phones & Electronics subcategory.</p>
+            <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
+              {subcategories.map((category) => (
+                <button key={category.id} type="button" onClick={() => void onSelectCategory(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
+                  <span>{category.name}</span>
+                  <span aria-hidden>&gt;</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {step === "brandModel" ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">Brand & Model</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">Popular brands are prioritized for faster posting.</p>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold">Brand
+                <select value={selectedBrand?.id ? String(selectedBrand.id) : ""} onChange={(event) => {
+                  const next = brands.find((brand) => brand.id === Number(event.target.value)) ?? null;
+                  if (next) {
+                    void onSelectBrand(next);
+                  }
+                }} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select brand</option>
+                  {brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>{brand.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-sm font-semibold">Model
+                <select value={selectedModel?.id ? String(selectedModel.id) : ""} onChange={(event) => {
+                  const next = models.find((model) => model.id === Number(event.target.value)) ?? null;
+                  if (next) {
+                    void onSelectModel(next);
+                  }
+                }} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select model</option>
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id}>{model.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                <input type="checkbox" checked={manualModel} onChange={(event) => setManualModel(event.target.checked)} className="h-4 w-4" />
+                Can\'t find your model? Add manually.
+              </label>
+
+              {manualModel ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-semibold">Manual Brand
+                    <input value={manualBrandName} onChange={(event) => setManualBrandName(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Manual Model
+                    <input value={manualModelName} onChange={(event) => setManualModelName(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {step === "details" ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">Details</h2>
+
+            {knownSpecs.length > 0 ? (
+              <details className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                <summary className="cursor-pointer text-sm font-semibold">Known Specs</summary>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 text-sm">
+                  {knownSpecs.map((spec) => (
+                    <p key={spec.id}><span className="font-semibold">{spec.spec_label}:</span> {spec.spec_value}</p>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold">Title
+                <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Condition
+                <select value={condition} onChange={(event) => setCondition(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select</option>
+                  {CONDITION_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">Price
+                <input type="number" min={1} value={price} onChange={(event) => setPrice(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Currency
+                <select value={currency} onChange={(event) => setCurrency(event.target.value as "AFN" | "USD")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  {CURRENCIES.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">Storage
+                <select value={storage} onChange={(event) => setStorage(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select</option>
+                  {(storageOptions.length > 0 ? storageOptions : ["64GB", "128GB", "256GB", "512GB", "1TB", "Other"]).map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">RAM (optional)
+                <input value={ram} onChange={(event) => setRam(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Color
+                <select value={color} onChange={(event) => setColor(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select</option>
+                  {(colorOptions.length > 0 ? colorOptions : ["Black", "White", "Blue", "Red", "Green", "Silver", "Gold", "Other"]).map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">Battery Health (optional)
+                <input value={batteryHealth} onChange={(event) => setBatteryHealth(event.target.value)} placeholder="e.g. 92%" className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Warranty
+                <select value={warranty} onChange={(event) => setWarranty(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select</option>
+                  {WARRANTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">Repair History
+                <select value={repairHistory} onChange={(event) => setRepairHistory(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select</option>
+                  {REPAIR_HISTORY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">Network Registered
+                <select value={networkRegistered} onChange={(event) => setNetworkRegistered(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select</option>
+                  {NETWORK_REGISTERED_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">
+                <span className="flex items-center gap-2">
+                  <input type="checkbox" checked={boxIncluded} onChange={(event) => setBoxIncluded(event.target.checked)} className="h-4 w-4" />
+                  Box Included
+                </span>
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">
+                <span className="flex items-center gap-2">
+                  <input type="checkbox" checked={chargerIncluded} onChange={(event) => setChargerIncluded(event.target.checked)} className="h-4 w-4" />
+                  Charger Included
+                </span>
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">Description
+                <textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+            </div>
+          </section>
+        ) : null}
+
+        {step === "photos" ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">Photos</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">
+              {postingConfig.requires_images ? `Photos required. Minimum ${postingConfig.min_images}.` : "Photos optional."}
+              {postingConfig.recommended_images ? ` Recommended: ${postingConfig.recommended_images}` : ""}
+            </p>
+
+            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={pickFiles} />
+            {images.length === 0 ? (
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="mt-3 w-full rounded-2xl border-2 border-dashed border-[var(--line)] py-10 text-sm font-semibold">
+                Add photos
+              </button>
+            ) : (
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-3 gap-3">
+                  {images.map((img, index) => (
+                    <div key={`${img.previewUrl}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--line)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.previewUrl} alt={`Upload ${index + 1}`} className="h-full w-full object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-1 text-[10px] font-semibold text-white">
+                        <button type="button" onClick={() => setPrimary(index)}>Primary</button>
+                        <button type="button" onClick={() => removeImage(index)}>Remove</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {images.length < postingConfig.max_images ? (
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">
+                    Add more
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {step === "location" ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">Location</h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold">Province
+                <select value={province} onChange={(event) => setProvince(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                  <option value="">Select province</option>
+                  {AFGHAN_PROVINCES.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">District
+                <input value={district} onChange={(event) => setDistrict(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">Area (optional)
+                <input value={area} onChange={(event) => setArea(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Contact Phone
+                <input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold">Contact Name (optional)
+                <input value={contactName} onChange={(event) => setContactName(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+            </div>
+          </section>
+        ) : null}
+
+        {step === "preview" ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
+            <h2 className="font-display text-lg font-bold">Preview</h2>
+            <div className="mt-3 grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+              <p><span className="font-semibold">Path:</span> {breadcrumb}</p>
+              <p><span className="font-semibold">Price:</span> {price ? `${price} ${currency}` : "-"}</p>
+              <p><span className="font-semibold">Condition:</span> {condition || "-"}</p>
+              <p><span className="font-semibold">Storage:</span> {storage || "-"}</p>
+              <p><span className="font-semibold">Location:</span> {province || "-"}{district ? `, ${district}` : ""}</p>
+              <p><span className="font-semibold">Photos:</span> {images.length}</p>
+            </div>
+          </section>
+        ) : null}
+
+        {stepError ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{stepError}</p> : null}
+        {error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--line)] bg-white px-4 py-3">
+        <div className="mx-auto flex w-full max-w-5xl gap-2">
+          {step !== "category" ? (
+            <button type="button" onClick={gotoPrev} className="rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-semibold">
+              Back
+            </button>
+          ) : null}
+
+          {step !== "preview" ? (
+            <button type="button" onClick={gotoNext} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white">
+              Continue
+            </button>
+          ) : (
+            <button type="button" onClick={() => void onPublish()} disabled={isPending} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
+              {isPending ? status ?? "Publishing..." : "Publish"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

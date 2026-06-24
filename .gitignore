@@ -44,3 +44,4 @@ next-env.d.ts
 .temp/
 .vscode/
 tmp_test_image.png
+.vercel

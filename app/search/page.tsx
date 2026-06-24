@@ -239,6 +239,10 @@ export default async function SearchPage({
 
     propertyType: params.propertyType ?? params.property_type,
     rentalType: autoRentalType,
+    suitableForStudents: toBoolean(params.suitableForStudents ?? params.suitable_for_students),
+    genderSuitable: params.genderSuitable ?? params.gender_allowed ?? params.dormitoryGender ?? params.dormitory_gender,
+    distanceToUniversityMax: toNumber(params.distanceToUniversityMax ?? params.distance_to_university_max),
+    photosOnly: toBoolean(params.photosOnly ?? params.photos_only),
     minMonthlyRent: toNumber(params.minMonthlyRent ?? params.min_monthly_rent),
     maxMonthlyRent: toNumber(params.maxMonthlyRent ?? params.max_monthly_rent),
     minGerawyAmount: toNumber(params.minGerawyAmount ?? params.min_gerawy_amount),

@@ -11,7 +11,11 @@ import type {
   Offer,
   ListingVehicleFeature,
 } from "@/types/database";
-import { ACTIVE_HOME_CATEGORY_SLUGS, LAUNCH_ACTIVE_CATEGORY_SLUGS } from "@/lib/categories/categoryTree";
+import {
+  ACTIVE_HOME_CATEGORY_SLUGS,
+  COMING_SOON_HOME_CATEGORY_SLUGS,
+  LAUNCH_ACTIVE_CATEGORY_SLUGS,
+} from "@/lib/categories/categoryTree";
 
 type ListingFilters = {
   categoryId?: number;
@@ -27,6 +31,10 @@ type ListingFilters = {
   maxPrice?: number;
   propertyType?: string;
   rentalType?: string;
+  suitableForStudents?: boolean;
+  genderSuitable?: string;
+  distanceToUniversityMax?: number;
+  photosOnly?: boolean;
   minMonthlyRent?: number;
   maxMonthlyRent?: number;
   minGerawyAmount?: number;
@@ -246,7 +254,75 @@ export async function getApprovedListings(
           .eq("id", filters.categoryNodeId)
           .maybeSingle();
 
-        const isRealEstateScope = typeof scopedRoot?.path === "string" && scopedRoot.path.startsWith("real-estate");
+        const scopedPath = typeof scopedRoot?.path === "string" ? scopedRoot.path : "";
+        const isRealEstateScope = scopedPath.startsWith("real-estate");
+        const isStudentHousingScope =
+          scopedPath === "real-estate/room-house-for-students"
+          || scopedPath.startsWith("real-estate/room-house-for-students/");
+
+        if (isStudentHousingScope) {
+          const { data: listingIds, error: listingIdsError } = await supabase.rpc("search_student_housing_listing_ids", {
+            collection_node_id: filters.categoryNodeId,
+            category_scope: filters.categoryScope === "exact" ? "exact" : "subtree",
+            province_filter: filters.province ?? null,
+            district_filter: filters.district ?? null,
+            price_min_filter: filters.minPrice ?? null,
+            price_max_filter: filters.maxPrice ?? null,
+            property_type_filter: filters.propertyType ?? null,
+            rooms_min_filter: filters.minRooms ?? null,
+            furnished_filter: typeof filters.furnished === "boolean" ? filters.furnished : null,
+            owner_type_filter: filters.ownerType ?? null,
+            gender_allowed_filter: filters.genderSuitable ?? filters.dormitoryGender ?? null,
+            distance_to_university_max_filter: filters.distanceToUniversityMax ?? null,
+            photos_only_filter: typeof filters.photosOnly === "boolean" ? filters.photosOnly : null,
+          });
+
+          if (!listingIdsError) {
+            const ids = Array.isArray(listingIds)
+              ? listingIds
+                  .map((row) => String((row as { listing_id?: string }).listing_id ?? ""))
+                  .filter((id) => id.length > 0)
+              : [];
+
+            if (ids.length === 0) {
+              return [];
+            }
+
+            let studentQuery = supabase
+              .from("listings")
+              .select(
+                `
+                *,
+                category:category_id(*),
+                category_node:category_node_id(*),
+                listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at)
+              `
+              )
+              .eq("status", "approved")
+              .in("category_id", lifecycleCategoryIds)
+              .in("id", ids)
+              .limit(120);
+
+            if (filters.search) {
+              studentQuery = studentQuery.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+            }
+
+            if (filters.sort === "price_low") {
+              studentQuery = studentQuery.order("price", { ascending: true }).order("created_at", { ascending: false });
+            } else if (filters.sort === "price_high") {
+              studentQuery = studentQuery.order("price", { ascending: false }).order("created_at", { ascending: false });
+            } else {
+              studentQuery = studentQuery.order("created_at", { ascending: false });
+            }
+
+            const { data, error } = await studentQuery;
+            if (error || !data) {
+              return [];
+            }
+
+            return (data as ListingWithRelations[]).slice(0, 40);
+          }
+        }
 
         if (isRealEstateScope) {
           const hasAdvancedRealEstateFilters = Boolean(
@@ -254,6 +330,10 @@ export async function getApprovedListings(
             filters.district ||
             filters.propertyType ||
             filters.rentalType ||
+            typeof filters.suitableForStudents === "boolean" ||
+            filters.genderSuitable ||
+            typeof filters.distanceToUniversityMax === "number" ||
+            typeof filters.photosOnly === "boolean" ||
             typeof filters.minMonthlyRent === "number" ||
             typeof filters.maxMonthlyRent === "number" ||
             typeof filters.minGerawyAmount === "number" ||
@@ -381,6 +461,18 @@ export async function getApprovedListings(
 
       if (filters?.district) {
         query = query.ilike("district", `%${filters.district}%`);
+      }
+
+      if (typeof filters?.suitableForStudents === "boolean") {
+        query = query.eq("suitable_for_students", filters.suitableForStudents);
+      }
+
+      if (filters?.genderSuitable) {
+        query = query.eq("gender_allowed", filters.genderSuitable.toLowerCase());
+      }
+
+      if (typeof filters?.distanceToUniversityMax === "number") {
+        query = query.lte("distance_to_university", filters.distanceToUniversityMax);
       }
 
       if (filters?.search) {
@@ -901,6 +993,40 @@ export const getCategories = cache(async (): Promise<Category[]> => {
     }
 
     return data as Category[];
+  } catch {
+    return [];
+  }
+});
+
+export const getPostingRootCategories = cache(async (): Promise<Category[]> => {
+  try {
+    const supabase = await createSupabaseServerClient();
+
+    const lifecycle = await supabase
+      .from("categories")
+      .select("*")
+      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS, ...COMING_SOON_HOME_CATEGORY_SLUGS])
+      .order("display_order", { ascending: true });
+
+    if (!lifecycle.error && lifecycle.data) {
+      return lifecycle.data as Category[];
+    }
+
+    const fallback = await supabase
+      .from("categories")
+      .select("*")
+      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS, ...COMING_SOON_HOME_CATEGORY_SLUGS])
+      .order("display_order", { ascending: true });
+
+    if (fallback.error || !fallback.data) {
+      return [];
+    }
+
+    return (fallback.data as Category[]).map((category) => ({
+      ...category,
+      is_coming_soon: !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
+      launch_date: null,
+    }));
   } catch {
     return [];
   }
