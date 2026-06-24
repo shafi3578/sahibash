@@ -797,7 +797,6 @@ export default function PostAdForm({ categories }: Props) {
     form.set("province_id", String(selectedProvinceId ?? ""));
     form.set("district_id", String(selectedDistrictId ?? ""));
     form.set("area_text", areaText);
-    form.set("city", selectedProvince?.name ?? "");
     form.set("address_optional", core.address_optional || areaText);
     if (deviceLatitude !== null) form.set("latitude", String(deviceLatitude));
     if (deviceLongitude !== null) form.set("longitude", String(deviceLongitude));
