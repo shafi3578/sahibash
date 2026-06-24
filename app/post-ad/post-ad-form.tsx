@@ -50,6 +50,17 @@ const ACTIVE_POSTING_CATEGORY_SLUGS = [
   "second-hand-items",
 ] as const;
 
+const LOCATION_DYNAMIC_KEYS = new Set([
+  "city",
+  "province",
+  "district",
+  "province_id",
+  "district_id",
+  "area",
+  "area_text",
+  "neighborhood",
+]);
+
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
   if (!optionsJson) return [];
   if (Array.isArray(optionsJson)) return optionsJson.map((value) => String(value));
@@ -612,7 +623,11 @@ export default function PostAdForm({ categories }: Props) {
   }, [core, dynamicValues]);
 
   const requiredDynamicKeys = useMemo(() => {
-    return new Set(dynamicFields.filter((field) => field.is_required).map((field) => field.field_key));
+    return new Set(
+      dynamicFields
+        .filter((field) => field.is_required && !LOCATION_DYNAMIC_KEYS.has(field.field_key))
+        .map((field) => field.field_key)
+    );
   }, [dynamicFields]);
 
   function validateCategoryStep() {
@@ -935,7 +950,9 @@ export default function PostAdForm({ categories }: Props) {
     "contact_preferences",
   ]);
 
-  const renderDynamicFields = dynamicFields.filter((field) => !rootSpecificFieldKeys.has(field.field_key));
+  const renderDynamicFields = dynamicFields.filter(
+    (field) => !rootSpecificFieldKeys.has(field.field_key) && !LOCATION_DYNAMIC_KEYS.has(field.field_key)
+  );
 
   return (
     <div className="relative pb-28">
