@@ -500,19 +500,25 @@ export default function PostAdForm({ categories }: Props) {
         );
         if (matchedProvince) {
           setSelectedProvinceId(matchedProvince.id);
-        }
-      }
 
-      if (districtHint) {
-        setTimeout(() => {
-          setSelectedDistrictId((prev) => {
-            if (prev) return prev;
-            const matchedDistrict = districtOptions.find(
+          if (districtHint) {
+            const supabase = createSupabaseBrowserClient();
+            const { data: districtsForProvince } = await supabase
+              .from("districts")
+              .select("id, name, province_id")
+              .eq("province_id", matchedProvince.id)
+              .eq("is_active", true)
+              .order("name", { ascending: true });
+
+            const matchedDistrict = ((districtsForProvince ?? []) as DistrictOption[]).find(
               (option) => normalizeLocationName(option.name) === normalizeLocationName(districtHint)
             );
-            return matchedDistrict?.id ?? null;
-          });
-        }, 250);
+
+            if (matchedDistrict) {
+              setSelectedDistrictId(matchedDistrict.id);
+            }
+          }
+        }
       }
     } catch {
       // Best-effort only.
