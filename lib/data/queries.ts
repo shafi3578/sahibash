@@ -23,6 +23,8 @@ import {
   type ListingLanguageCode,
 } from "@/lib/listings/translation-service";
 import type { AppLocale } from "@/lib/i18n/translations";
+import { buildSearchKeywordIndex, normalizeSearchText } from "@/lib/search/multilingual";
+import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
 
 type ListingFilters = {
   locale?: AppLocale;
@@ -93,6 +95,7 @@ type ListingFilters = {
   bathroomsMin?: number;
   parking?: boolean;
   listingType?: "for_sale" | "wanted";
+  postedWithin?: "24h" | "7d" | "30d";
 };
 
 function attachPreferredTranslation(
@@ -143,6 +146,24 @@ function applyPublicListingQualityFilters<T>(query: T): T {
   }
 
   return next as T;
+}
+
+function buildSearchOrClause(searchTerms: string[], includeIds?: string[]) {
+  const termClauses: string[] = [];
+  for (const term of searchTerms) {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      continue;
+    }
+    termClauses.push(`title.ilike.%${trimmed}%`);
+    termClauses.push(`description.ilike.%${trimmed}%`);
+  }
+
+  if (includeIds && includeIds.length > 0) {
+    termClauses.push(`id.in.(${includeIds.join(",")})`);
+  }
+
+  return termClauses.join(",");
 }
 
 export type SearchIntent = {
@@ -211,14 +232,27 @@ export async function getApprovedListings(
 
       let attributeScopedListingIds: string[] | null = null;
       let translatedSearchListingIds: string[] = [];
+      const rewriteContext = await resolveSearchRewriteContext({
+        supabase,
+        queryText: filters?.search?.trim() ?? "",
+        categoryScope: null,
+      });
+      const searchVariants = rewriteContext.variants.slice(0, 20);
 
-      if (filters?.search?.trim()) {
-        const queryText = filters.search.trim();
+      if (searchVariants.length > 0) {
+        const translationSearchClause = searchVariants
+          .flatMap((term) => [
+            `title.ilike.%${term}%`,
+            `description.ilike.%${term}%`,
+            `normalized_keywords.ilike.%${term}%`,
+          ])
+          .join(",");
+
         const { data: translationRows } = await supabase
           .from("listing_translations")
           .select("listing_id")
           .eq("translation_status", "completed")
-          .or(`title.ilike.%${queryText}%,description.ilike.%${queryText}%,normalized_keywords.ilike.%${queryText}%`)
+          .or(translationSearchClause)
           .limit(5000);
 
         translatedSearchListingIds = Array.from(
@@ -410,12 +444,8 @@ export async function getApprovedListings(
 
             studentQuery = applyPublicListingQualityFilters(studentQuery);
 
-            if (filters.search) {
-              if (translatedSearchListingIds.length > 0) {
-                studentQuery = studentQuery.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,id.in.(${translatedSearchListingIds.join(",")})`);
-              } else {
-                studentQuery = studentQuery.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
-              }
+            if (searchVariants.length > 0) {
+              studentQuery = studentQuery.or(buildSearchOrClause(searchVariants, translatedSearchListingIds));
             }
 
             if (filters.sort === "price_low") {
@@ -589,16 +619,8 @@ export async function getApprovedListings(
         query = query.lte("distance_to_university", filters.distanceToUniversityMax);
       }
 
-      if (filters?.search) {
-        if (translatedSearchListingIds.length > 0) {
-          query = query.or(
-            `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,id.in.(${translatedSearchListingIds.join(",")})`
-          );
-        } else {
-          query = query.or(
-            `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`
-          );
-        }
+      if (searchVariants.length > 0) {
+        query = query.or(buildSearchOrClause(searchVariants, translatedSearchListingIds));
       }
 
       if (typeof filters?.minPrice === "number") {
@@ -607,6 +629,16 @@ export async function getApprovedListings(
 
       if (typeof filters?.maxPrice === "number") {
         query = query.lte("price", filters.maxPrice);
+      }
+
+      if (filters?.postedWithin) {
+        const now = Date.now();
+        const millis = filters.postedWithin === "24h"
+          ? 24 * 60 * 60 * 1000
+          : filters.postedWithin === "7d"
+            ? 7 * 24 * 60 * 60 * 1000
+            : 30 * 24 * 60 * 60 * 1000;
+        query = query.gte("created_at", new Date(now - millis).toISOString());
       }
 
       if (filters?.vehicleType) {
@@ -721,16 +753,19 @@ export async function getApprovedListings(
       const translatedRows = attachPreferredTranslation(rows, translationsByListingId, requestedLanguage);
 
       if (filters?.sort === "relevant" && filters.search?.trim()) {
-        const queryText = filters.search.trim().toLowerCase();
-        const terms = queryText.split(/\s+/).filter((term) => term.length > 1);
+        const terms = Array.from(new Set(searchVariants.flatMap((variant) => variant.split(/\s+/))))
+          .filter((term) => term.length > 1)
+          .slice(0, 40);
         const nowMs = Date.now();
 
         const scored = translatedRows.map((listing) => {
-          const title = String(listing.translated_title ?? listing.title ?? "").toLowerCase();
-          const description = String(listing.translated_description ?? listing.description ?? "").toLowerCase();
+          const title = normalizeSearchText(String(listing.translated_title ?? listing.title ?? ""));
+          const description = normalizeSearchText(String(listing.translated_description ?? listing.description ?? ""));
+          const indexed = buildSearchKeywordIndex(title, description);
 
           let titleHits = 0;
           let descHits = 0;
+          let indexHits = 0;
           for (const term of terms) {
             if (title.includes(term)) {
               titleHits += 1;
@@ -738,10 +773,13 @@ export async function getApprovedListings(
             if (description.includes(term)) {
               descHits += 1;
             }
+            if (indexed.includes(term)) {
+              indexHits += 1;
+            }
           }
 
           const textScore = terms.length > 0
-            ? (titleHits * 2 + descHits) / (terms.length * 3)
+            ? (titleHits * 2 + descHits + indexHits * 1.5) / (terms.length * 4.5)
             : 0;
 
           const createdAtMs = listing.created_at ? new Date(listing.created_at).getTime() : nowMs;

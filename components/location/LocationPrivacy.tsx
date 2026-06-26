@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export type LocationVisibility = 'exact' | 'approximate' | 'hidden';
+export type LocationVisibility = 'exact' | 'approximate' | 'province_district';
 
 interface LocationPrivacyProps {
   initialVisibility?: LocationVisibility;
@@ -33,7 +33,7 @@ const visibilityOptions: Array<{
     recommendation: 'Recommended for vehicles and personal items',
   },
   {
-    value: 'hidden',
+    value: 'province_district',
     title: 'Hide Exact Location',
     description: 'Buyers only see province and district. Full privacy for your exact location.',
     icon: '🔒',
@@ -120,7 +120,7 @@ export default function LocationPrivacy({
             <strong>Approximate:</strong> Province, district, area. Approximate location circle, not exact pin.
           </p>
           <p>
-            <strong>Hidden:</strong> Province and district only. No map, no coordinates.
+            <strong>Province/District Only:</strong> Province and district only. No map, no coordinates.
           </p>
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
 } from "@/lib/categories/getCategories";
 import { getCategoryListingCount } from "@/lib/categories/getCategoryCounts";
 import { getCurrentUser } from "@/lib/auth";
+import { getDictionary } from "@/lib/i18n/server";
 
 export default async function CategoryBrowsePage({
   params,
@@ -20,6 +21,7 @@ export default async function CategoryBrowsePage({
 }) {
   const { slug } = await params;
   const { node } = await searchParams;
+  const { t } = await getDictionary();
   const nodeId = node ? Number(node) : null;
 
   if (!Number.isFinite(nodeId)) {
@@ -34,16 +36,15 @@ export default async function CategoryBrowsePage({
 
       return (
         <main className="min-h-screen bg-[#efefef] pb-8">
-          <style>{`header.sticky{display:none;} main+footer{display:none;}`}</style>
           <div className="mx-auto w-full max-w-3xl px-4 pt-6">
             <section className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Coming Soon</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{t.home.comingSoon}</p>
               <h1 className="mt-2 font-display text-3xl font-bold text-[var(--ink-1)]">{launchState.categoryName}</h1>
               <p className="mt-2 text-sm text-[var(--ink-2)]">
-                Posting and browsing in this category is not available yet.
+                {t.home.comingSoon}
               </p>
               <p className="mt-1 text-sm text-[var(--ink-2)]">
-                Join the waitlist and we will notify you as soon as it launches.
+                {t.postAd.notifyMe}
               </p>
               {launchState.launchDate ? (
                 <p className="mt-2 text-xs font-semibold text-amber-700">Planned launch: {launchState.launchDate}</p>
@@ -80,7 +81,6 @@ export default async function CategoryBrowsePage({
 
   return (
     <main className="min-h-screen bg-[#efefef] pb-8">
-      <style>{`header.sticky{display:none;} main+footer{display:none;}`}</style>
       <div className="mx-auto w-full max-w-3xl px-0 pt-0">
         <CategoryBrowser
           node={categoryNode}

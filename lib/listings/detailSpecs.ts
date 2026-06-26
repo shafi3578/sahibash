@@ -76,7 +76,11 @@ function normalize(value: string) {
 
 function toValue(attr: ListingAttribute): string | null {
   if (typeof attr.attribute_value_text === "string" && attr.attribute_value_text.trim().length > 0) {
-    return attr.attribute_value_text.trim();
+    const text = attr.attribute_value_text.trim();
+    if (["-", "null", "undefined"].includes(text.toLowerCase())) {
+      return null;
+    }
+    return text;
   }
   if (typeof attr.attribute_value_number === "number") {
     return String(attr.attribute_value_number);
@@ -140,15 +144,18 @@ export function buildListingSpecView(
 
   const basicRows = [
     { label: "Price", value: `${new Intl.NumberFormat("en-US").format(listing.price)} ${listing.currency}` },
-    { label: "Property Type", value: listing.category_node?.name ?? "-" },
-    { label: "Listing Type", value: grouped.property_details?.find((x) => x.key === "rental_type")?.value ?? "-" },
+    { label: "Property Type", value: listing.category_node?.name ?? "" },
+    { label: "Listing Type", value: grouped.property_details?.find((x) => x.key === "rental_type")?.value ?? "" },
     { label: "Listing Date", value: new Date(listing.created_at).toLocaleDateString() },
     { label: "Listing ID", value: listing.id },
-    { label: "Province", value: listing.province ?? "-" },
-    { label: "District", value: listing.district ?? "-" },
-    { label: "Area", value: listing.city ?? "-" },
-    { label: "Address", value: listing.address_optional ?? "-" },
-  ];
+    { label: "Province", value: listing.province ?? "" },
+    { label: "District", value: listing.district ?? "" },
+    { label: "Area", value: listing.neighborhood ?? "" },
+    { label: "Address", value: listing.address_optional ?? "" },
+  ].filter((row) => {
+    const normalized = String(row.value ?? "").trim().toLowerCase();
+    return Boolean(normalized) && normalized !== "-" && normalized !== "null" && normalized !== "undefined";
+  });
 
   return { basicRows, grouped };
 }

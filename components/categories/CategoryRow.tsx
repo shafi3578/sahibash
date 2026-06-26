@@ -12,6 +12,7 @@ type Props = {
   compact?: boolean;
   showIcon?: boolean;
   emphasize?: boolean;
+  comingSoonLabel?: string;
 };
 
 function iconFromName(icon?: string | null) {
@@ -69,6 +70,7 @@ export function CategoryRow({
   compact = false,
   showIcon = false,
   emphasize = false,
+  comingSoonLabel = "Coming soon",
 }: Props) {
   const content = (
     <div className={`flex items-center gap-3 bg-white px-4 ${compact ? "py-2" : "py-2.5"}`}>
@@ -80,7 +82,7 @@ export function CategoryRow({
       <div className="min-w-0 flex-1 pr-2">
         <p className={`leading-6 break-words ${emphasize ? "font-semibold text-[#236dab]" : "text-slate-800"} ${compact ? "text-[17px]" : "text-[18px]"}`}>{title}</p>
         {subtitle ? <p className="mt-0.5 text-[12px] leading-4 text-slate-400 break-words">{subtitle}</p> : null}
-        {comingSoon ? <p className="mt-0.5 text-xs font-semibold text-amber-600">Coming soon</p> : null}
+        {comingSoon ? <p className="mt-0.5 text-xs font-semibold text-amber-600">{comingSoonLabel}</p> : null}
       </div>
       {showCount && !comingSoon ? <p className="shrink-0 text-[14px] text-slate-400">{formatCount(count, countStyle)}</p> : null}
       <span className="text-[22px] leading-none text-slate-300">›</span>

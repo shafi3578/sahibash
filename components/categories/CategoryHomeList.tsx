@@ -1,8 +1,12 @@
 import { CategoryRow } from "@/components/categories/CategoryRow";
 import type { CategoryNodeWithCount } from "@/lib/categories/getCategories";
+import type { AppLocale } from "@/lib/i18n/translations";
+import { localizeCategoryName, localizeCategorySubtitle } from "@/lib/i18n/category-labels";
+import { getDictionary } from "@/lib/i18n/server";
 
 type Props = {
   categories: CategoryNodeWithCount[];
+  locale?: AppLocale;
 };
 
 const FALLBACK_HOME_ROWS = [
@@ -19,21 +23,26 @@ const FALLBACK_HOME_ROWS = [
   { slug: "other", name: "Other", subtitle: "Manual posting for anything else", icon: "dots-horizontal", is_coming_soon: true },
 ] as const;
 
-export function CategoryHomeList({ categories }: Props) {
+export async function CategoryHomeList({ categories, locale = "en" }: Props) {
+  const { t } = await getDictionary();
   const rows = categories.length > 0
     ? categories.map((category) => ({
         id: category.id,
         slug: category.slug,
-        name: category.slug === "mobile-phones-tablets" ? "Phones & Electronics" : category.name,
-        subtitle: category.subtitle,
+        name: localizeCategoryName({
+          locale,
+          fallbackName: category.slug === "mobile-phones-tablets" ? "Phones & Electronics" : category.name,
+          slug: category.slug,
+        }),
+        subtitle: localizeCategorySubtitle({ locale, fallbackSubtitle: category.subtitle, slug: category.slug }),
         icon: category.icon,
         is_coming_soon: Boolean(category.is_coming_soon),
       }))
     : FALLBACK_HOME_ROWS.map((row, index) => ({
         id: -(index + 1),
         slug: row.slug,
-        name: row.name,
-        subtitle: row.subtitle,
+        name: localizeCategoryName({ locale, fallbackName: row.name, slug: row.slug }),
+        subtitle: localizeCategorySubtitle({ locale, fallbackSubtitle: row.subtitle, slug: row.slug }),
         icon: row.icon,
         is_coming_soon: row.is_coming_soon,
       }));
@@ -45,7 +54,7 @@ export function CategoryHomeList({ categories }: Props) {
     <div className="space-y-3">
       <section className="overflow-hidden border border-slate-200 bg-white">
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Featured Categories
+          {t.home.mainCategories}
         </div>
         {launchRows.map((category) => (
           <CategoryRow
@@ -63,7 +72,7 @@ export function CategoryHomeList({ categories }: Props) {
       {comingSoonRows.length > 0 ? (
         <section className="overflow-hidden border border-slate-200 bg-white">
           <div className="border-b border-slate-200 bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
-            More Categories (Coming Soon)
+            {`${t.home.moreCategories} (${t.home.comingSoon})`}
           </div>
           {comingSoonRows.map((category) => (
             <CategoryRow
@@ -75,6 +84,7 @@ export function CategoryHomeList({ categories }: Props) {
               showCount={false}
               showIcon
               comingSoon
+              comingSoonLabel={t.home.comingSoon}
             />
           ))}
         </section>

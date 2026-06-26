@@ -54,6 +54,7 @@ export default async function AdminListingsPage() {
                       <option value="pending">pending</option>
                       <option value="completed">completed</option>
                       <option value="failed">failed</option>
+                      <option value="stale">stale</option>
                       <option value="needs_review">needs_review</option>
                     </select>
                   </div>

@@ -7,6 +7,7 @@ import { getHomeCategoryNodes } from "@/lib/categories/getCategories";
 import { getCategoriesWithStats } from "@/lib/data/listings";
 import { getApprovedListings } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
 
 export default async function HomePage() {
   const { t, locale } = await getDictionary();
@@ -85,7 +86,7 @@ export default async function HomePage() {
       <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
         <h2 className="mb-4 font-display text-2xl font-bold sm:text-3xl">{t.home.mainCategories}</h2>
         <div className="mb-5 block lg:hidden">
-          <CategoryHomeList categories={mobileCategories} />
+          <CategoryHomeList categories={mobileCategories} locale={locale} />
           <Link
             href="/categories"
             className="mt-3 inline-flex rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold"
@@ -95,7 +96,7 @@ export default async function HomePage() {
         </div>
         <div className="hidden grid-cols-1 gap-4 sm:grid-cols-2 lg:grid lg:grid-cols-4">
           {launchCategories.map((category) => (
-            <CategoryCard key={category.id} category={category} />
+            <CategoryCard key={category.id} category={category} locale={locale} />
           ))}
         </div>
         {comingSoonCategories.length > 0 ? (
@@ -108,7 +109,9 @@ export default async function HomePage() {
                   href={`/categories/${category.slug}`}
                   className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left"
                 >
-                  <p className="font-display text-base font-semibold text-[var(--ink-1)]">{category.name}</p>
+                  <p className="font-display text-base font-semibold text-[var(--ink-1)]">
+                    {localizeCategoryName({ locale, fallbackName: category.name, slug: category.slug })}
+                  </p>
                   <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{t.home.comingSoon}</p>
                 </Link>
               ))}

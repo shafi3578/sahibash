@@ -1,9 +1,10 @@
 import type { AppLocale } from "@/lib/i18n/translations";
+import { buildSearchKeywordIndex, normalizeSearchText } from "@/lib/search/multilingual";
 
 export const LISTING_LANGUAGE_CODES = ["en", "fa-AF", "ps-AF"] as const;
 export type ListingLanguageCode = (typeof LISTING_LANGUAGE_CODES)[number];
 
-export type TranslationStatus = "pending" | "completed" | "failed" | "needs_review";
+export type TranslationStatus = "pending" | "completed" | "failed" | "stale" | "needs_review";
 export type TranslationActor = "ai" | "human" | "seller";
 
 export type ListingTranslationRecord = {
@@ -43,6 +44,7 @@ type GlossaryEntry = {
 };
 
 const AFGHAN_MARKETPLACE_GLOSSARY: GlossaryEntry[] = [
+  { canonical: "phone", en: "phone", fa: "موبایل", ps: "تلیفون", aliases: ["مبایل", "mobile", "cellphone"] },
   { canonical: "negotiable", en: "negotiable", fa: "جور آمد", ps: "جوړ راشه", aliases: ["جورامد"] },
   { canonical: "fixed price", en: "fixed price", fa: "مقطوع", ps: "ثابت نرخ" },
   { canonical: "last price", en: "last price", fa: "قیمت آخر", ps: "وروستی نرخ" },
@@ -264,8 +266,14 @@ export function normalizeTranslationKeywords(
   sourceDescription: string,
   sourceLocale: ListingLanguageCode
 ): string {
-  const text = `${sourceTitle} ${sourceDescription}`.toLowerCase();
+  const text = normalizeSearchText(`${sourceTitle} ${sourceDescription}`);
   const terms = new Set<string>();
+  const indexedTerms = buildSearchKeywordIndex(sourceTitle, sourceDescription)
+    .split(" ")
+    .map((term) => term.trim())
+    .filter(Boolean);
+
+  indexedTerms.forEach((term) => terms.add(term));
 
   for (const entry of AFGHAN_MARKETPLACE_GLOSSARY) {
     const sourceTerm = getTerm(entry, sourceLocale).toLowerCase();
@@ -284,7 +292,7 @@ export function normalizeTranslationKeywords(
   const sourceTokens = normalizeWhitespace(text)
     .split(" ")
     .map((token) => token.replace(/[^\p{L}\p{N}]/gu, ""))
-    .filter((token) => token.length >= 3)
+    .filter((token) => token.length >= 2)
     .slice(0, 40);
 
   sourceTokens.forEach((token) => terms.add(token));
@@ -397,6 +405,7 @@ export async function markListingTranslationsStale(
     .from("listing_translations")
     .update({
       is_stale: true,
+      translation_status: "stale",
     })
     .eq("listing_id", listingId);
 

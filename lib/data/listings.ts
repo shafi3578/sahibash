@@ -7,6 +7,15 @@ import {
 } from "@/lib/categories/categoryTree";
 import type { Category } from "@/types/database";
 
+const PUBLIC_TEST_TEXT_PATTERNS = [
+  "%test listing%",
+  "%demo listing%",
+  "%dummy listing%",
+  "%this is a test%",
+  "%for testing%",
+  "%sample ad%",
+];
+
 export const getCategoriesWithStats = cache(
   async (): Promise<
     (Category & {
@@ -37,11 +46,17 @@ export const getCategoriesWithStats = cache(
       // Get count for each category
       const withCounts = await Promise.all(
         normalized.map(async (cat) => {
-          const { count } = await supabase
+          let countQuery = supabase
             .from("listings")
             .select("id", { count: "exact", head: true })
             .eq("category_id", cat.id)
             .eq("status", "approved");
+
+          for (const pattern of PUBLIC_TEST_TEXT_PATTERNS) {
+            countQuery = countQuery.not("title", "ilike", pattern).not("description", "ilike", pattern);
+          }
+
+          const { count } = await countQuery;
 
           return {
             ...cat,

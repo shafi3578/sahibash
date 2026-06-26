@@ -2,8 +2,16 @@ begin;
 
 do $$
 begin
+  if exists (select 1 from pg_type where typname = 'listing_translation_status') then
+    begin
+      alter type public.listing_translation_status add value if not exists 'stale';
+    exception when duplicate_object then
+      null;
+    end;
+  end if;
+
   if not exists (select 1 from pg_type where typname = 'listing_translation_status') then
-    create type public.listing_translation_status as enum ('pending', 'completed', 'failed', 'needs_review');
+    create type public.listing_translation_status as enum ('pending', 'completed', 'failed', 'stale', 'needs_review');
   end if;
 
   if not exists (select 1 from pg_type where typname = 'listing_translation_actor') then

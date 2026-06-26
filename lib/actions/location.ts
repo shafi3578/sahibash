@@ -307,7 +307,7 @@ export async function getListingLocationInfo(listingId: string) {
     const lonOffset = (randomDistance * Math.sin(randomAngle)) / 111;
     latitude = latitude + latOffset;
     longitude = longitude + lonOffset;
-  } else if (data.location_visibility === 'hidden') {
+  } else if (data.location_visibility === 'hidden' || data.location_visibility === 'province_district') {
     latitude = null;
     longitude = null;
   }
@@ -320,7 +320,7 @@ export async function getListingLocationInfo(listingId: string) {
     provinceName: data.provinces?.[0]?.name,
     districtName: data.districts?.[0]?.name,
     areaName: data.areas?.[0]?.name,
-    addressText: data.location_visibility !== 'hidden' ? data.address_text : null,
+    addressText: (data.location_visibility !== 'hidden' && data.location_visibility !== 'province_district') ? data.address_text : null,
     latitude,
     longitude,
     accuracy: data.location_accuracy,

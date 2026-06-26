@@ -3,6 +3,7 @@ import { Space_Grotesk, Source_Sans_3 } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentLocale } from "@/lib/i18n/server";
+import { LocaleSync } from "@/components/locale-sync";
 import "./globals.css";
 
 const displayFont = Space_Grotesk({
@@ -30,12 +31,16 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getCurrentLocale();
+  const dir = locale === "en" ? "ltr" : "rtl";
+  const htmlLang = locale === "fa" ? "fa-AF" : locale === "ps" ? "ps-AF" : "en";
   return (
     <html
-      lang={locale}
+      lang={htmlLang}
+      dir={dir}
       className={`${displayFont.variable} ${bodyFont.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <LocaleSync locale={locale} />
         <SiteHeader />
         {children}
         <SiteFooter />

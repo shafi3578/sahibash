@@ -14,6 +14,7 @@ import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
 import LocationCard from "@/components/location/LocationCard";
 import { getDictionary } from "@/lib/i18n/server";
 import { appLocaleToListingLanguage } from "@/lib/listings/translation-service";
+import { recordSearchTelemetryClick } from "@/lib/search/telemetry";
 
 function readAttributeValue(value: unknown) {
   if (typeof value === "string") return value;
@@ -22,18 +23,29 @@ function readAttributeValue(value: unknown) {
   return "";
 }
 
+function isMeaningfulValue(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim();
+  return (
+    normalized.length > 0
+    && normalized !== "-"
+    && normalized.toLowerCase() !== "null"
+    && normalized.toLowerCase() !== "undefined"
+  );
+}
+
 export default async function ListingDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ message?: string; offer?: string; compose?: string; offerbox?: string; view?: string; translation?: string }>;
+  searchParams: Promise<{ message?: string; offer?: string; compose?: string; offerbox?: string; view?: string; translation?: string; st?: string }>;
 }) {
   const { t, locale } = await getDictionary();
   const { id } = await params;
   const qp = await searchParams;
   const listing = await getListingById(id, locale);
   if (!listing) notFound();
+  await recordSearchTelemetryClick(qp.st, id);
   const viewerLanguageCode = appLocaleToListingLanguage(locale);
   const showOriginal = qp.view === "original";
   const translationUnavailable = !showOriginal && viewerLanguageCode !== listing.display_language;
@@ -57,7 +69,9 @@ export default async function ListingDetailPage({
     })
   );
   const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
-  const locationParts = [listing.province, listing.district, listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean);
+  const locationParts = listing.location_visibility === "exact"
+    ? [listing.province, listing.district, listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean)
+    : [listing.province, listing.district].filter(Boolean);
   const listingTypeValue = String(
     (listing as { listing_type?: string }).listing_type
     ?? attributeMap.get("listing_type")
@@ -78,9 +92,8 @@ export default async function ListingDetailPage({
         month: "short",
       })
     : null;
-  const sellerName = listing.contact_name || listing.profile?.full_name || "Seller";
-  const sellerPhone = listing.contact_phone || listing.profile?.phone || "Not provided";
   const groupedSpecs = Object.entries(specView.grouped)
+    .map(([group, rows]) => [group, rows.filter((row) => isMeaningfulValue(row.value))] as const)
     .filter(([, rows]) => rows.length > 0)
     .sort(([a], [b]) => {
       const order = ["locked_specs", "property_details", "category_specific", "interior_features", "exterior_features", "location_nearby", "transportation", "view", "utilities"];
@@ -91,6 +104,89 @@ export default async function ListingDetailPage({
       if (bIndex === -1) return -1;
       return aIndex - bIndex;
     });
+
+  const localeUi = {
+    en: {
+      sellerFallback: "Seller",
+      notProvided: "Not provided",
+      originalLanguage: "Original language",
+      messageInvalid: "Please write a message before sending.",
+      messageError: "Unable to send message right now. Please try again.",
+      offerSent: "Your offer has been sent. Please wait for seller approval.",
+      offerTooLow: "Your offer is below the minimum offer for this listing.",
+      overview: "Overview",
+      specifications: "Specifications",
+      condition: "Condition",
+      location: "Location",
+    },
+    fa: {
+      sellerFallback: "فروشنده",
+      notProvided: "ثبت نشده",
+      originalLanguage: "زبان اصلی",
+      messageInvalid: "لطفا قبل از ارسال پیام بنویسید.",
+      messageError: "در حال حاضر ارسال پیام ممکن نیست. لطفا دوباره تلاش کنید.",
+      offerSent: "پیشنهاد شما ارسال شد. لطفا منتظر تایید فروشنده باشید.",
+      offerTooLow: "پیشنهاد شما از حداقل پیشنهاد این اعلان کمتر است.",
+      overview: "مرور کلی",
+      specifications: "مشخصات",
+      condition: "وضعیت",
+      location: "موقعیت",
+    },
+    ps: {
+      sellerFallback: "پلورونکی",
+      notProvided: "نه دی ورکړل شوی",
+      originalLanguage: "اصلي ژبه",
+      messageInvalid: "مهرباني وکړئ له لېږلو مخکې پیغام ولیکئ.",
+      messageError: "اوس مهال پیغام نه لېږل کېږي. بیا هڅه وکړئ.",
+      offerSent: "ستاسو وړاندیز ولېږل شو. د پلورونکي تایید ته انتظار وباسئ.",
+      offerTooLow: "ستاسو وړاندیز د دې اعلان له لږ تر لږه بیې ټیټ دی.",
+      overview: "لنډه کتنه",
+      specifications: "ځانګړتیاوې",
+      condition: "حالت",
+      location: "ځای",
+    },
+  }[locale] ?? {
+    sellerFallback: "Seller",
+    notProvided: "Not provided",
+    originalLanguage: "Original language",
+    messageInvalid: "Please write a message before sending.",
+    messageError: "Unable to send message right now. Please try again.",
+    offerSent: "Your offer has been sent. Please wait for seller approval.",
+    offerTooLow: "Your offer is below the minimum offer for this listing.",
+    overview: "Overview",
+    specifications: "Specifications",
+    condition: "Condition",
+    location: "Location",
+  };
+
+  const safeSellerName = listing.contact_name || listing.profile?.full_name || localeUi.sellerFallback;
+  const safeSellerPhone = listing.contact_phone || listing.profile?.phone || localeUi.notProvided;
+
+  const overviewRows = specView.basicRows.filter((row) => isMeaningfulValue(row.value));
+  const displaySectionLabel = (group: string) => {
+    if (group === "location_nearby") return localeUi.location;
+    if (group === "category_specific" || group === "property_details") return localeUi.condition;
+    return localeUi.specifications;
+  };
+
+  const dedupedSections = groupedSpecs.reduce<Array<{ label: string; rows: Array<{ key: string; label: string; value: string; group: string }> }>>((acc, [group, rows]) => {
+    const sectionLabel = displaySectionLabel(group);
+    const existing = acc.find((item) => item.label === sectionLabel);
+    const existingKeys = new Set((existing?.rows ?? []).map((row) => `${row.label.toLowerCase()}::${row.value.toLowerCase()}`));
+    const nextRows = rows.filter((row) => {
+      const sig = `${row.label.toLowerCase()}::${row.value.toLowerCase()}`;
+      if (existingKeys.has(sig)) return false;
+      existingKeys.add(sig);
+      return true;
+    });
+    if (nextRows.length === 0) return acc;
+    if (existing) {
+      existing.rows.push(...nextRows);
+      return acc;
+    }
+    acc.push({ label: sectionLabel, rows: [...nextRows] });
+    return acc;
+  }, []);
   const vehicleVariant = listing.vehicle_variant as ({
     name: string;
     fuel_type?: string | null;
@@ -161,6 +257,106 @@ export default async function ListingDetailPage({
         { label: "Custom Vehicle", value: listing.vehicle_is_custom ? "Yes" : "No" },
       ]
     : [];
+  const seenVehicleLabels = new Set<string>();
+  const cleanedVehicleSummaryRows = vehicleSummaryRows.filter((row) => {
+    if (!isMeaningfulValue(row.value)) return false;
+    const key = row.label.toLowerCase();
+    if (seenVehicleLabels.has(key)) return false;
+    seenVehicleLabels.add(key);
+    return true;
+  });
+
+  const categorySlug = listing.category?.slug ?? "";
+  const safetyTips = (() => {
+    const tipsByLocale = {
+      en: {
+        vehicles: [
+          "Do not send advance payment before seeing the vehicle.",
+          "Check vehicle documents.",
+          "Verify ownership before payment.",
+          "Meet in a safe public place.",
+        ],
+        realEstate: [
+          "Visit the property before payment.",
+          "Verify ownership documents.",
+          "Do not pay deposit before confirming the property.",
+          "Use written agreement when possible.",
+        ],
+        phones: [
+          "Test phone before payment.",
+          "Check IMEI and registration status.",
+          "Check battery, screen, camera, and biometric features.",
+          "Avoid advance payment.",
+        ],
+        general: [
+          "Meet in a safe public place.",
+          "Check item before payment.",
+          "Do not send money before seeing the item.",
+        ],
+      },
+      fa: {
+        vehicles: [
+          "قبل از دیدن واسطه، پیش پرداخت نفرستید.",
+          "اسناد واسطه را بررسی کنید.",
+          "مالکیت را پیش از پرداخت تایید کنید.",
+          "در محل عمومی امن ملاقات کنید.",
+        ],
+        realEstate: [
+          "قبل از پرداخت از ملک بازدید کنید.",
+          "اسناد مالکیت را بررسی کنید.",
+          "قبل از تایید ملک، بیعانه نپردازید.",
+          "در صورت امکان قرارداد کتبی داشته باشید.",
+        ],
+        phones: [
+          "قبل از پرداخت گوشی را تست کنید.",
+          "IMEI و وضعیت راجستر را بررسی کنید.",
+          "باتری، صفحه، کمره و سنسورها را بررسی کنید.",
+          "از پیش پرداخت خودداری کنید.",
+        ],
+        general: [
+          "در محل عمومی امن ملاقات کنید.",
+          "قبل از پرداخت جنس را بررسی کنید.",
+          "قبل از دیدن جنس پول نفرستید.",
+        ],
+      },
+      ps: {
+        vehicles: [
+          "موټر له لیدلو مخکې مخکې پیسې مه لېږئ.",
+          "د موټر اسناد وګورئ.",
+          "له پیسو مخکې مالکیت تایید کړئ.",
+          "په خوندي عامه ځای کې ووینئ.",
+        ],
+        realEstate: [
+          "له پیسو مخکې ملکیت وګورئ.",
+          "د مالکیت اسناد تایید کړئ.",
+          "له تایید مخکې بیعانه مه ورکوئ.",
+          "که ممکن وي لیکلی تړون وکړئ.",
+        ],
+        phones: [
+          "له پیسو مخکې تلیفون وازمویئ.",
+          "IMEI او راجستر حالت وګورئ.",
+          "بیټرۍ، سکرین، کامره او بایومیټریک وګورئ.",
+          "مخکې له مخکې پیسې مه ورکوئ.",
+        ],
+        general: [
+          "په خوندي عامه ځای کې ووینئ.",
+          "له پیسو مخکې توکی وګورئ.",
+          "توکی له لیدلو مخکې پیسې مه لېږئ.",
+        ],
+      },
+    } as const;
+    const localeTips = tipsByLocale[locale] ?? tipsByLocale.en;
+    if (categorySlug === "vehicles") {
+      return localeTips.vehicles;
+    }
+    if (categorySlug === "real-estate") {
+      return localeTips.realEstate;
+    }
+    if (categorySlug === "mobile-phones-tablets") {
+      return localeTips.phones;
+    }
+    return localeTips.general;
+  })();
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -171,22 +367,22 @@ export default async function ListingDetailPage({
       )}
       {qp.message === "invalid" && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Please write a message before sending.
+          {localeUi.messageInvalid}
         </div>
       )}
       {qp.message === "error" && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          Unable to send message right now. Please try again.
+          {localeUi.messageError}
         </div>
       )}
       {qp.offer === "sent" && (
         <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          Your offer has been sent. Please wait for seller approval.
+          {localeUi.offerSent}
         </div>
       )}
       {qp.offer === "too-low" && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Your offer is below the minimum offer for this listing.
+          {localeUi.offerTooLow}
         </div>
       )}
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -207,7 +403,7 @@ export default async function ListingDetailPage({
           <h1 className="mt-1 font-display text-2xl font-bold leading-tight sm:text-3xl">{displayTitle}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1 text-[var(--ink-2)]">
-              {listing.translation_note || "Original language"}
+              {listing.translation_note || localeUi.originalLanguage}
             </span>
             {showOriginal ? (
               <Link href={`/listings/${listing.id}`} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
@@ -235,7 +431,7 @@ export default async function ListingDetailPage({
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
             <h2 className="text-base font-bold">{t.listing.vehicleSummary}</h2>
             <div className="mt-3 grid overflow-hidden rounded-xl border border-[var(--line)] md:grid-cols-2">
-              {vehicleSummaryRows.map((row) => (
+              {cleanedVehicleSummaryRows.map((row) => (
                 <div key={row.label} className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0 md:nth-[2n]:border-l">
                   <span className="text-[var(--ink-2)]">{row.label}</span>
                   <span className="text-right font-semibold text-[var(--ink-1)]">{row.value}</span>
@@ -248,8 +444,8 @@ export default async function ListingDetailPage({
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.sellerInformation}</h2>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-            <p><span className="text-[var(--ink-2)]">{t.listing.name}:</span> <span className="font-semibold">{sellerName}</span></p>
-            <p><span className="text-[var(--ink-2)]">{t.listing.phone}:</span> <span className="font-semibold">{sellerPhone}</span></p>
+            <p><span className="text-[var(--ink-2)]">{t.listing.name}:</span> <span className="font-semibold">{safeSellerName}</span></p>
+            <p><span className="text-[var(--ink-2)]">{t.listing.phone}:</span> <span className="font-semibold">{safeSellerPhone}</span></p>
             {sellerJoinedDate ? (
               <p><span className="text-[var(--ink-2)]">{t.listing.joined}:</span> <span className="font-semibold">{sellerJoinedDate}</span></p>
             ) : null}
@@ -280,9 +476,9 @@ export default async function ListingDetailPage({
               provinceName: (listing.provinces as any)?.name,
               districtName: (listing.districts as any)?.name,
               areaName: (listing.areas as any)?.name,
-              addressText: listing.address_text,
-              latitude: listing.latitude,
-              longitude: listing.longitude,
+              addressText: listing.location_visibility === "exact" ? listing.address_text : null,
+              latitude: listing.location_visibility === "exact" ? listing.latitude : null,
+              longitude: listing.location_visibility === "exact" ? listing.longitude : null,
               accuracy: listing.location_accuracy,
               visibility: listing.location_visibility as any,
             }}
@@ -334,20 +530,36 @@ export default async function ListingDetailPage({
         ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-          <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : t.listing.specifications}</h2>
+          <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : localeUi.specifications}</h2>
 
-          {groupedSpecs.length === 0 ? (
+          {overviewRows.length > 0 ? (
+            <section className="mt-3 overflow-hidden rounded-xl border border-[var(--line)]">
+              <header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2">
+                <h3 className="text-sm font-semibold">{localeUi.overview}</h3>
+              </header>
+              <div className="grid divide-y divide-[var(--line)] md:grid-cols-2 md:divide-x md:divide-y-0">
+                {overviewRows.map((row) => (
+                  <div key={`overview-${row.label}`} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                    <span className="text-[var(--ink-2)]">{row.label}</span>
+                    <span className="text-right font-semibold text-[var(--ink-1)]">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {dedupedSections.length === 0 ? (
             <p className="mt-3 text-sm text-[var(--ink-2)]">{t.listing.noAdditionalDetails}</p>
           ) : (
             <div className="mt-3 space-y-4">
-              {groupedSpecs.map(([group, rows]) => (
-                <section key={group} className="overflow-hidden rounded-xl border border-[var(--line)]">
+              {dedupedSections.map((section) => (
+                <section key={section.label} className="overflow-hidden rounded-xl border border-[var(--line)]">
                   <header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2">
-                    <h3 className="text-sm font-semibold">{group === "locked_specs" ? t.listing.autoFilledSpecifications : group.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</h3>
+                    <h3 className="text-sm font-semibold">{section.label}</h3>
                   </header>
                   <div className="grid divide-y divide-[var(--line)] md:grid-cols-2 md:divide-x md:divide-y-0">
-                    {rows.map((row) => (
-                      <div key={`${group}-${row.key}`} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                    {section.rows.map((row) => (
+                      <div key={`${section.label}-${row.key}-${row.value}`} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
                         <span className="text-[var(--ink-2)]">{row.label}</span>
                         <span className="text-right font-semibold text-[var(--ink-1)]">{row.value}</span>
                       </div>
@@ -362,10 +574,9 @@ export default async function ListingDetailPage({
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
           <h2 className="text-base font-bold text-amber-900">{t.listing.buyerSafetyWarning}</h2>
           <ul className="mt-3 space-y-2 text-sm text-amber-900">
-            <li>{t.listing.safety1}</li>
-            <li>{t.listing.safety2}</li>
-            <li>{t.listing.safety3}</li>
-            <li>{t.listing.safety4}</li>
+            {safetyTips.map((tip) => (
+              <li key={tip}>{tip}</li>
+            ))}
           </ul>
         </section>
       </div>

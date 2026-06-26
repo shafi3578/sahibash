@@ -14,7 +14,7 @@ export type NotificationType =
   | "system";
 export type LanguageCode = "en" | "fa" | "ps";
 export type ListingLanguageCode = "en" | "fa-AF" | "ps-AF";
-export type ListingTranslationStatus = "pending" | "completed" | "failed" | "needs_review";
+export type ListingTranslationStatus = "pending" | "completed" | "failed" | "stale" | "needs_review";
 export type ListingTranslationActor = "ai" | "human" | "seller";
 
 // Location Types
@@ -386,6 +386,32 @@ export type ListingTranslation = {
   is_stale: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type SearchAliasDictionary = {
+  id: string;
+  canonical_term: string;
+  aliases: string[];
+  language: "en" | "fa" | "ps" | "multi";
+  category_scope: string | null;
+  is_active: boolean;
+  approved_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SearchTelemetry = {
+  id: string;
+  query_text: string;
+  normalized_query: string;
+  selected_language: string;
+  result_count: number;
+  clicked_listing_id: string | null;
+  category_filter: string | null;
+  province_filter: string | null;
+  district_filter: string | null;
+  rewritten_terms: string[];
+  created_at: string;
 };
 
 export type ListingWithImages = ListingWithRelations;

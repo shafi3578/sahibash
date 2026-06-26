@@ -9,7 +9,8 @@ import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
 import type { Category, CategoryField, CategoryNode } from "@/types/database";
 import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
-import type { TRANSLATIONS } from "@/lib/i18n/translations";
+import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -96,7 +97,7 @@ function inferImageConfig(rootSlug: string, path: string | undefined): PostingCo
   return { requires_images: false, min_images: 0, max_images: 10, recommended_images: null, allow_video: false };
 }
 
-export default function PostAdForm({ categories, t }: Props & { t: Dictionary }) {
+export default function PostAdForm({ categories, t, locale }: Props & { t: Dictionary; locale: AppLocale }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -115,6 +116,7 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
   const [loadingTree, setLoadingTree] = useState(false);
 
   const [postingConfig, setPostingConfig] = useState<PostingConfig | null>(null);
+  const [listingTypeChoice, setListingTypeChoice] = useState<"for_sale" | "wanted">("for_sale");
 
   const [images, setImages] = useState<StagedImage[]>([]);
 
@@ -172,7 +174,20 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
     [categories]
   );
 
-  const breadcrumb = useMemo(() => pathNodes.map((node) => node.name).join(" -> "), [pathNodes]);
+  const breadcrumb = useMemo(
+    () =>
+      pathNodes
+        .map((node) =>
+          localizeCategoryName({
+            locale,
+            fallbackName: node.name,
+            slug: node.slug,
+            path: node.path,
+          })
+        )
+        .join(" -> "),
+    [pathNodes, locale]
+  );
   const rootSlug = selectedRoot?.slug ?? "";
   const finalPath = finalNode?.path;
   const isRealEstate = rootSlug === "real-estate";
@@ -384,6 +399,14 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
 
   function updateDynamic(key: string, value: string | boolean) {
     setDynamicValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateDynamicPair(primaryKey: string, secondaryKey: string, value: string | boolean) {
+    setDynamicValues((prev) => ({
+      ...prev,
+      [primaryKey]: value,
+      [secondaryKey]: value,
+    }));
   }
 
   const normalizeLocationName = useCallback((value: string) => {
@@ -804,6 +827,18 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
       return;
     }
 
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        window.location.assign(`/login?returnTo=${encodeURIComponent("/post-ad")}`);
+        return;
+      }
+    } catch {
+      window.location.assign(`/login?returnTo=${encodeURIComponent("/post-ad")}`);
+      return;
+    }
+
     const selectedProvince = provinceOptions.find((item) => item.id === selectedProvinceId);
     const selectedDistrict = districtOptions.find((item) => item.id === selectedDistrictId);
 
@@ -814,6 +849,7 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
     form.set("category_node_id", String(finalNode.id));
     form.set("subcategory_id", String(pathNodes[1]?.id ?? finalNode.id));
     form.set("price", core.price);
+    form.set("listing_type", listingTypeChoice);
     form.set("currency", core.currency);
     form.set("province", selectedProvince?.name ?? "");
     form.set("district", selectedDistrict?.name ?? "");
@@ -938,6 +974,17 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
     "cargo_capacity",
     "storage",
     "ram",
+    "battery_capacity",
+    "registered_status",
+    "sim_lock_bypass",
+    "fingerprint_works",
+    "face_id_works",
+    "camera_works",
+    "box_available",
+    "charger_included",
+    "imei_status",
+    "price_type",
+    "exchange_accepted",
     "battery_health",
     "original_refurbished",
     "item_type",
@@ -988,7 +1035,13 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
                 <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
                   {activeCategories.map((category) => (
                     <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
-                      <span>{category.slug === "mobile-phones-tablets" ? "Phones & Electronics" : category.name}</span>
+                      <span>
+                        {localizeCategoryName({
+                          locale,
+                          fallbackName: category.slug === "mobile-phones-tablets" ? "Phones & Electronics" : category.name,
+                          slug: category.slug,
+                        })}
+                      </span>
                       <span aria-hidden>&gt;</span>
                     </button>
                   ))}
@@ -1000,7 +1053,9 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
                     <div className="mt-2 space-y-2">
                       {comingSoonCategories.map((category) => (
                         <div key={category.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
-                          <p className="text-sm font-semibold text-slate-700">{category.name}</p>
+                          <p className="text-sm font-semibold text-slate-700">
+                            {localizeCategoryName({ locale, fallbackName: category.name, slug: category.slug })}
+                          </p>
                           <Link href={`/categories/${category.slug}`} className="rounded-lg border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-700">
                             {t.postAd.notifyMe}
                           </Link>
@@ -1014,12 +1069,16 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
               <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
                 {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">{t.postAd.loading}</div> : null}
                 {!loadingTree && currentOptions.length === 0 && finalNode ? (
-                  <div className="px-4 py-3 text-sm font-semibold text-green-700">{t.postAd.finalCategorySelected}: {finalNode.name}</div>
+                  <div className="px-4 py-3 text-sm font-semibold text-green-700">
+                    {t.postAd.finalCategorySelected}: {localizeCategoryName({ locale, fallbackName: finalNode.name, slug: finalNode.slug, path: finalNode.path })}
+                  </div>
                 ) : null}
                 {!loadingTree
                   ? currentOptions.map((node) => (
                       <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
-                        <span className="break-words">{node.name}</span>
+                        <span className="break-words">
+                          {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
+                        </span>
                         <span aria-hidden>&gt;</span>
                       </button>
                     ))
@@ -1033,6 +1092,26 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
             <h2 className="font-display text-lg font-bold">{t.postAd.detailsStepTitle}</h2>
             <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.detailsStepSubtitle}</p>
+
+            <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+              <p className="text-sm font-semibold">{t.postAd.listingPurpose}</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setListingTypeChoice("for_sale")}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold ${listingTypeChoice === "for_sale" ? "bg-[var(--ink-1)] text-white" : "border border-[var(--line)] bg-white"}`}
+                >
+                  {t.postAd.forSale}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setListingTypeChoice("wanted")}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold ${listingTypeChoice === "wanted" ? "bg-[var(--ink-1)] text-white" : "border border-[var(--line)] bg-white"}`}
+                >
+                  {t.postAd.wanted}
+                </button>
+              </div>
+            </div>
 
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
 
@@ -1331,16 +1410,78 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
                     <input value={String(dynamicValues.model ?? "")} onChange={(event) => updateDynamic("model", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
                   </label>
                   <label className="text-sm font-semibold">Storage
-                    <input value={String(dynamicValues.storage ?? "")} onChange={(event) => updateDynamic("storage", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                    <input value={String(dynamicValues.storage ?? "")} onChange={(event) => updateDynamicPair("storage", "electronics_storage", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
                   </label>
                   <label className="text-sm font-semibold">RAM (optional)
-                    <input value={String(dynamicValues.ram ?? "")} onChange={(event) => updateDynamic("ram", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                    <input value={String(dynamicValues.ram ?? "")} onChange={(event) => updateDynamicPair("ram", "electronics_ram", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
                   </label>
                   <label className="text-sm font-semibold">Condition
-                    <input value={String(dynamicValues.condition ?? "")} onChange={(event) => updateDynamic("condition", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                    <input value={String(dynamicValues.condition ?? "")} onChange={(event) => updateDynamicPair("condition", "electronics_condition", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
                   </label>
                   <label className="text-sm font-semibold">Warranty
-                    <input value={String(dynamicValues.warranty ?? "")} onChange={(event) => updateDynamic("warranty", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                    <input value={String(dynamicValues.warranty ?? "")} onChange={(event) => updateDynamicPair("warranty", "electronics_warranty", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Battery Health / Capacity
+                    <input value={String(dynamicValues.battery_health ?? "")} onChange={(event) => updateDynamicPair("battery_health", "electronics_battery_health", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Box / Carton Available
+                    <select value={String(dynamicValues.box_available ?? "")} onChange={(event) => updateDynamicPair("box_available", "electronics_box_included", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold">Registered Status
+                    <input value={String(dynamicValues.registered_status ?? "")} onChange={(event) => updateDynamicPair("registered_status", "electronics_network_registered", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">SIM Lock / Bypass
+                    <input value={String(dynamicValues.sim_lock_bypass ?? "")} onChange={(event) => updateDynamic("sim_lock_bypass", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Fingerprint Works
+                    <select value={String(dynamicValues.fingerprint_works ?? "")} onChange={(event) => updateDynamic("fingerprint_works", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold">Face ID Works
+                    <select value={String(dynamicValues.face_id_works ?? "")} onChange={(event) => updateDynamic("face_id_works", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold">Camera Works
+                    <select value={String(dynamicValues.camera_works ?? "")} onChange={(event) => updateDynamic("camera_works", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold">Charger Included
+                    <select value={String(dynamicValues.charger_included ?? "")} onChange={(event) => updateDynamicPair("charger_included", "electronics_charger_included", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold">IMEI / Registration
+                    <input value={String(dynamicValues.imei_status ?? "")} onChange={(event) => updateDynamic("imei_status", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                  </label>
+                  <label className="text-sm font-semibold">Price Type
+                    <select value={String(dynamicValues.price_type ?? "")} onChange={(event) => updateDynamic("price_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="fixed">Fixed</option>
+                      <option value="negotiable">Negotiable</option>
+                      <option value="contact">Contact</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-semibold">Exchange Accepted
+                    <select value={String(dynamicValues.exchange_accepted ?? "")} onChange={(event) => updateDynamic("exchange_accepted", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                      <option value="">Select</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
                   </label>
                 </div>
               </section>
@@ -1505,7 +1646,7 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
 
             {(locationMethod === "manual" || locationMethod === "device") ? (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="text-sm font-semibold">Province
+                <label className="text-sm font-semibold">{t.postAd.province}
                   <select
                     value={selectedProvinceId ? String(selectedProvinceId) : ""}
                     onChange={(event) => {
@@ -1514,14 +1655,14 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
                     }}
                     className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
                   >
-                    <option value="">Select province</option>
+                    <option value="">{t.postAd.select} {t.postAd.province}</option>
                     {provinceOptions.map((province) => (
                       <option key={province.id} value={province.id}>{province.name}</option>
                     ))}
                   </select>
                 </label>
 
-                <label className="text-sm font-semibold">District
+                <label className="text-sm font-semibold">{t.postAd.district}
                   <select
                     value={selectedDistrictId ? String(selectedDistrictId) : ""}
                     onChange={(event) => {
@@ -1531,18 +1672,18 @@ export default function PostAdForm({ categories, t }: Props & { t: Dictionary })
                     className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
                     disabled={!selectedProvinceId}
                   >
-                    <option value="">Select district</option>
+                    <option value="">{t.postAd.select} {t.postAd.district}</option>
                     {districtOptions.map((district) => (
                       <option key={district.id} value={district.id}>{district.name}</option>
                     ))}
                   </select>
                 </label>
 
-                <label className="text-sm font-semibold sm:col-span-2">Area / Neighborhood (optional)
+                <label className="text-sm font-semibold sm:col-span-2">{t.postAd.areaNeighborhoodOptional}
                   <input value={areaText} onChange={(event) => setAreaText(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
                 </label>
 
-                <label className="text-sm font-semibold sm:col-span-2">Location Visibility
+                <label className="text-sm font-semibold sm:col-span-2">{t.postAd.locationVisibility}
                   <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "province_district")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
                     <option value="province_district">{t.postAd.hideExactShowProvinceDistrict}</option>
                     <option value="approximate">{t.postAd.showApproximateLocation}</option>

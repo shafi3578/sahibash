@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export type LocationVisibility = 'exact' | 'approximate' | 'hidden';
+export type LocationVisibility = 'exact' | 'approximate' | 'hidden' | 'province_district';
 
 interface LocationInfo {
   countryId?: number | null;
@@ -26,13 +26,14 @@ interface LocationCardProps {
 
 export default function LocationCard({ location, buyerDistance }: LocationCardProps) {
   const [showDirections, setShowDirections] = useState(false);
+  const canUseExactCoordinates = location.visibility === 'exact' && Boolean(location.latitude && location.longitude);
 
   if (!location.provinceName && !location.districtName) {
     return null;
   }
 
   const getGoogleMapsUrl = () => {
-    if (location.latitude && location.longitude) {
+    if (canUseExactCoordinates) {
       return `https://www.google.com/maps/search/${location.latitude},${location.longitude}`;
     }
     const query = [location.provinceName, location.districtName, location.areaName]
@@ -42,14 +43,14 @@ export default function LocationCard({ location, buyerDistance }: LocationCardPr
   };
 
   const getWazeUrl = () => {
-    if (location.latitude && location.longitude) {
+    if (canUseExactCoordinates) {
       return `https://www.waze.com/navigate?to=${location.latitude},${location.longitude}`;
     }
     return '';
   };
 
   const renderLocationText = () => {
-    if (location.visibility === 'hidden') {
+    if (location.visibility === 'hidden' || location.visibility === 'province_district') {
       return (
         <div className="space-y-2">
           <p className="text-sm text-gray-700">
@@ -87,13 +88,9 @@ export default function LocationCard({ location, buyerDistance }: LocationCardPr
     );
   };
 
-  const canShowMap =
-    location.visibility === 'exact' ||
-    (location.visibility === 'approximate' &&
-      location.latitude &&
-      location.longitude);
+  const canShowMap = canUseExactCoordinates;
 
-  const canShowDirections = location.visibility === 'exact' && location.latitude && location.longitude;
+  const canShowDirections = canUseExactCoordinates;
 
   return (
     <div className="border rounded-lg p-4 bg-white">
@@ -113,15 +110,17 @@ export default function LocationCard({ location, buyerDistance }: LocationCardPr
             <p className="text-xs text-gray-500">
               Map integration coming soon. Open in external map below.
             </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Coordinates: {location.latitude?.toFixed(4)}, {location.longitude?.toFixed(4)}
-            </p>
+            {canUseExactCoordinates ? (
+              <p className="text-xs text-gray-500 mt-1">
+                Coordinates: {location.latitude?.toFixed(4)}, {location.longitude?.toFixed(4)}
+              </p>
+            ) : null}
           </div>
         </div>
       )}
 
       {/* Action Buttons */}
-      {(canShowDirections || getGoogleMapsUrl()) && (
+      {(canShowDirections || Boolean(getGoogleMapsUrl())) && (
         <div className="mt-4 grid grid-cols-2 gap-2">
           {canShowDirections && (
             <>
@@ -171,7 +170,7 @@ export default function LocationCard({ location, buyerDistance }: LocationCardPr
         {location.visibility === 'approximate' && (
           <p>✓ Only approximate area is visible. Exact coordinates are hidden.</p>
         )}
-        {location.visibility === 'hidden' && (
+        {(location.visibility === 'hidden' || location.visibility === 'province_district') && (
           <p>✓ Only province and district are visible. Exact location is hidden.</p>
         )}
       </div>

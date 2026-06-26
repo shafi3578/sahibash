@@ -10,8 +10,12 @@ import {
   type FilterDefinition,
 } from "@/lib/data/queries";
 import { detectSearchIntent } from "@/lib/search/intent";
+import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
+import { logSearchTelemetry } from "@/lib/search/telemetry";
 import { ListingCard } from "@/components/listing-card";
 import { getDictionary } from "@/lib/i18n/server";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -129,11 +133,13 @@ function FilterFields({
   categories,
   filterDefinitions,
   t,
+  locale,
 }: {
   params: Record<string, string | undefined>;
-  categories: Array<{ id: number; name: string }>;
+  categories: Array<{ id: number; name: string; slug: string }>;
   filterDefinitions: FilterDefinition[];
   t: Awaited<ReturnType<typeof getDictionary>>["t"];
+  locale: Awaited<ReturnType<typeof getDictionary>>["locale"];
 }) {
   return (
     <>
@@ -172,7 +178,7 @@ function FilterFields({
         <option value="">{t.search.allCategories}</option>
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.name}
+            {localizeCategoryName({ locale, fallbackName: c.name, slug: c.slug })}
           </option>
         ))}
       </select>
@@ -186,6 +192,17 @@ function FilterFields({
         <option value="relevant">{t.search.relevant}</option>
         <option value="price_low">{t.search.priceLowHigh}</option>
         <option value="price_high">{t.search.priceHighLow}</option>
+      </select>
+
+      <select
+        name="postedWithin"
+        defaultValue={params.postedWithin ?? ""}
+        className="rounded-xl border border-[var(--line)] px-3 py-2"
+      >
+        <option value="">{t.search.postedWithin}: {t.search.anyTime}</option>
+        <option value="24h">{t.search.last24Hours}</option>
+        <option value="7d">{t.search.last7Days}</option>
+        <option value="30d">{t.search.last30Days}</option>
       </select>
 
       <select
@@ -319,7 +336,51 @@ export default async function SearchPage({
     bathroomsMin: toNumber(params.bathroomsMin ?? params.bathrooms_min),
     parking: toBoolean(params.parking),
     listingType: listingType === "wanted" ? "wanted" : listingType === "for_sale" ? "for_sale" : undefined,
+    postedWithin:
+      params.postedWithin === "24h" || params.postedWithin === "7d" || params.postedWithin === "30d"
+        ? params.postedWithin
+        : undefined,
   });
+
+  const hasSearchSignal = Boolean(
+    params.q ||
+    params.province ||
+    params.district ||
+    params.categoryId ||
+    params.categoryNodeId
+  );
+
+  const rewriteContext = hasSearchSignal
+    ? await (async () => {
+        try {
+          const supabase = await createSupabaseServerClient();
+          return resolveSearchRewriteContext({
+            supabase,
+            queryText: params.q,
+            categoryScope: effectiveNode?.path ?? null,
+          });
+        } catch {
+          return {
+            normalizedQuery: String(params.q ?? "").trim().toLowerCase(),
+            variants: [],
+            rewrittenTerms: [],
+          };
+        }
+      })()
+    : { normalizedQuery: "", variants: [], rewrittenTerms: [] };
+
+  const telemetryId = hasSearchSignal
+    ? await logSearchTelemetry({
+        queryText: params.q ?? "",
+        normalizedQuery: rewriteContext.normalizedQuery,
+        selectedLanguage: locale,
+        resultCount: listings.length,
+        categoryFilter: effectiveNode?.path ?? params.categoryId ?? null,
+        provinceFilter: params.province ?? null,
+        districtFilter: params.district ?? null,
+        rewrittenTerms: rewriteContext.rewrittenTerms,
+      })
+    : "";
 
   const activeEntries = Object.entries(params).filter(
     ([key, value]) =>
@@ -361,7 +422,7 @@ export default async function SearchPage({
                 href={buildUrlWithParams(next)}
                 className="rounded-full border border-[var(--line)] bg-[var(--wash)] px-3 py-1 text-xs"
               >
-                {node.name}
+                {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
               </a>
             );
           })}
@@ -382,7 +443,7 @@ export default async function SearchPage({
                   href={buildUrlWithParams(next)}
                   className="rounded-full border border-[var(--line)] px-3 py-1 text-xs hover:border-[var(--ink-1)]"
                 >
-                    {t.search.related}: {node.name}
+                    {t.search.related}: {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
                 </a>
               );
             })}
@@ -401,7 +462,7 @@ export default async function SearchPage({
                 href={buildUrlWithParams(next)}
                 className="rounded-full border border-[var(--line)] px-3 py-1 text-sm hover:border-[var(--ink-1)]"
               >
-                {t.search.subcategory}: {child.name}
+                {t.search.subcategory}: {localizeCategoryName({ locale, fallbackName: child.name, slug: child.slug, path: child.path })}
               </a>
             );
           })}
@@ -411,7 +472,7 @@ export default async function SearchPage({
       <div className="mt-5 grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="hidden rounded-2xl border border-[var(--line)] bg-white p-4 lg:block">
           <form className="grid gap-3">
-            <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} t={t} />
+            <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} t={t} locale={locale} />
 
             <button
               type="submit"
@@ -463,7 +524,11 @@ export default async function SearchPage({
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                href={telemetryId ? `/listings/${listing.id}?st=${telemetryId}` : undefined}
+              />
             ))}
           </div>
 
@@ -496,7 +561,7 @@ export default async function SearchPage({
               </a>
             </div>
             <form className="grid max-h-[80vh] gap-3 overflow-y-auto p-4 pb-24">
-              <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} t={t} />
+                  <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} t={t} locale={locale} />
               {effectiveCategoryNodeId ? (
                 <input type="hidden" name="categoryNodeId" value={String(effectiveCategoryNodeId)} />
               ) : null}
