@@ -1,4 +1,4 @@
-import { AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
+import { AFGHAN_PROVINCES, getProvinceLabel } from "@/lib/constants/marketplace";
 import {
   getApprovedListings,
   getCategories,
@@ -15,6 +15,7 @@ import { logSearchTelemetry } from "@/lib/search/telemetry";
 import { ListingCard } from "@/components/listing-card";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -61,9 +62,9 @@ function toOptionList(def: FilterDefinition): string[] {
   return [];
 }
 
-function buildUrlWithParams(params: URLSearchParams): string {
+function buildUrlWithParams(params: URLSearchParams, locale: Awaited<ReturnType<typeof getDictionary>>["locale"]): string {
   const query = params.toString();
-  return query ? `/search?${query}` : "/search";
+  return localizePath(query ? `/search?${query}` : "/search", locale);
 }
 
 function buildParamsFromRecord(params: Record<string, string | undefined>): URLSearchParams {
@@ -158,7 +159,7 @@ function FilterFields({
         <option value="">{t.home.allAfghanistan}</option>
         {AFGHAN_PROVINCES.map((province) => (
           <option key={province} value={province}>
-            {province}
+            {getProvinceLabel(province, locale)}
           </option>
         ))}
       </select>
@@ -419,7 +420,7 @@ export default async function SearchPage({
             return (
               <a
                 key={`path-${node.id}`}
-                href={buildUrlWithParams(next)}
+                href={buildUrlWithParams(next, locale)}
                 className="rounded-full border border-[var(--line)] bg-[var(--wash)] px-3 py-1 text-xs"
               >
                 {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
@@ -440,7 +441,7 @@ export default async function SearchPage({
               return (
                 <a
                   key={`sibling-${node.id}`}
-                  href={buildUrlWithParams(next)}
+                  href={buildUrlWithParams(next, locale)}
                   className="rounded-full border border-[var(--line)] px-3 py-1 text-xs hover:border-[var(--ink-1)]"
                 >
                     {t.search.related}: {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
@@ -459,7 +460,7 @@ export default async function SearchPage({
             return (
               <a
                 key={child.id}
-                href={buildUrlWithParams(next)}
+                href={buildUrlWithParams(next, locale)}
                 className="rounded-full border border-[var(--line)] px-3 py-1 text-sm hover:border-[var(--ink-1)]"
               >
                 {t.search.subcategory}: {localizeCategoryName({ locale, fallbackName: child.name, slug: child.slug, path: child.path })}
@@ -482,7 +483,7 @@ export default async function SearchPage({
             </button>
 
             <a
-              href="/search"
+              href={localizePath("/search", locale)}
               className="rounded-xl border border-[var(--line)] px-4 py-2 text-center text-sm font-semibold"
             >
               {t.search.clearAll}
@@ -507,7 +508,7 @@ export default async function SearchPage({
               return (
                 <a
                   key={key}
-                  href={buildUrlWithParams(next)}
+                  href={buildUrlWithParams(next, locale)}
                   className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs"
                 >
                   {key}: {value} ×
@@ -518,7 +519,7 @@ export default async function SearchPage({
 
           {effectiveNode ? (
             <p className="mb-4 text-sm text-[var(--ink-2)]">
-              {t.search.showing}: {effectiveNode.name} ({params.scope === "exact" ? "exact" : "subtree"})
+              {t.search.showing}: {localizeCategoryName({ locale, fallbackName: effectiveNode.name, slug: effectiveNode.slug, path: effectiveNode.path })} ({params.scope === "exact" ? "exact" : "subtree"})
             </p>
           ) : null}
 
@@ -527,7 +528,7 @@ export default async function SearchPage({
               <ListingCard
                 key={listing.id}
                 listing={listing}
-                href={telemetryId ? `/listings/${listing.id}?st=${telemetryId}` : undefined}
+                href={telemetryId ? localizePath(`/listings/${listing.id}?st=${telemetryId}`, locale) : undefined}
               />
             ))}
           </div>
@@ -542,7 +543,7 @@ export default async function SearchPage({
 
       <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 lg:hidden">
         <a
-          href={buildUrlWithParams(openMobileFilterParams)}
+          href={buildUrlWithParams(openMobileFilterParams, locale)}
           className="mx-auto flex w-full max-w-7xl items-center justify-between rounded-2xl bg-[var(--ink-1)] px-4 py-3 text-sm font-semibold text-white shadow-lg"
         >
           {t.search.filters}
@@ -552,11 +553,11 @@ export default async function SearchPage({
 
       {mobileFiltersOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <a href={buildUrlWithParams(closeMobileFilterParams)} className="absolute inset-0 bg-black/35" />
+          <a href={buildUrlWithParams(closeMobileFilterParams, locale)} className="absolute inset-0 bg-black/35" />
           <div className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-hidden rounded-t-3xl border border-[var(--line)] bg-white">
             <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
               <h2 className="text-sm font-semibold">{t.search.filters}</h2>
-              <a href={buildUrlWithParams(closeMobileFilterParams)} className="text-sm text-[var(--ink-2)]">
+              <a href={buildUrlWithParams(closeMobileFilterParams, locale)} className="text-sm text-[var(--ink-2)]">
                 {t.search.close}
               </a>
             </div>
@@ -568,7 +569,7 @@ export default async function SearchPage({
               <input type="hidden" name="scope" value={params.scope === "exact" ? "exact" : "subtree"} />
               <div className="sticky bottom-0 -mx-4 mt-2 flex gap-2 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur">
                 <a
-                  href="/search"
+                  href={localizePath("/search", locale)}
                   className="flex-1 rounded-xl border border-[var(--line)] px-4 py-3 text-center text-sm font-semibold"
                 >
                   {t.search.reset}

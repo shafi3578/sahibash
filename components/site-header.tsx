@@ -44,7 +44,7 @@ export async function SiteHeader() {
       <header className="sticky top-0 z-30 border-b border-black/10 bg-[var(--brand)] text-[var(--ink-1)]">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4 lg:px-8">
           <Link href={href("/")} className="shrink-0 font-display text-2xl font-bold sm:text-3xl">Sahibash</Link>
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
             <LanguageSwitcher locale={locale} label={t.header.language} />
 
             <Link href={user ? href("/post-ad") : guestPostAdHref} className="hidden whitespace-nowrap rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold leading-none text-white lg:inline-flex lg:text-sm">{t.header.postAd}</Link>
@@ -53,13 +53,13 @@ export async function SiteHeader() {
                 {isAdmin && (
                   <Link href={href("/admin")} className="hidden whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">{t.header.admin}</Link>
                 )}
-                <Link href={href("/dashboard")} className="whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.myProfile}</Link>
-                <form action={signOutAction}><button className="whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.logout}</button></form>
+                <Link href={href("/dashboard")} className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.myProfile}</Link>
+                <form action={signOutAction}><button className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.logout}</button></form>
               </>
             ) : (
               <>
-                <Link href={href("/login")} className="whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.login}</Link>
-                <Link href={href("/register")} className="whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.register}</Link>
+                <Link href={href("/login")} className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.login}</Link>
+                <Link href={href("/register")} className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.register}</Link>
               </>
             )}
           </div>

@@ -51,7 +51,7 @@ export function LanguageSwitcher({ locale, label }: Props) {
 
   return (
     <div ref={menuRef} className="relative">
-      <div className="hidden items-center gap-1 rounded-full border border-black/20 bg-white px-2 py-1 text-xs font-semibold md:flex">
+      <div className="hidden items-center gap-1 rounded-full border border-black/20 bg-white px-2 py-1 text-xs font-semibold lg:flex">
         <span className="px-1 text-[var(--ink-2)]">{label}:</span>
         {(["en", "fa", "ps"] as AppLocale[]).map((nextLocale) => (
           <form key={nextLocale} action={setLocaleAction}>
@@ -69,7 +69,7 @@ export function LanguageSwitcher({ locale, label }: Props) {
 
       <button
         type="button"
-        className="inline-flex min-h-10 items-center gap-1 rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold md:hidden"
+        className="inline-flex min-h-10 items-center gap-1 rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold lg:hidden"
         aria-label="Change language"
         aria-expanded={open}
         aria-haspopup="menu"
@@ -87,7 +87,7 @@ export function LanguageSwitcher({ locale, label }: Props) {
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-40 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg md:hidden"
+          className="absolute right-0 top-full z-50 mt-2 w-40 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg lg:hidden"
         >
           {(["en", "fa", "ps"] as AppLocale[]).map((nextLocale) => (
             <form key={nextLocale} action={setLocaleAction}>
@@ -98,7 +98,7 @@ export function LanguageSwitcher({ locale, label }: Props) {
                 role="menuitemradio"
                 aria-checked={locale === nextLocale}
                 onClick={() => setOpen(false)}
-                className={`block w-full px-3 py-2 text-left text-sm ${locale === nextLocale ? "bg-[var(--surface-2)] font-semibold text-[var(--ink-1)]" : "text-[var(--ink-2)]"}`}
+                className={`block w-full px-3 py-2 text-start text-sm ${locale === nextLocale ? "bg-[var(--surface-2)] font-semibold text-[var(--ink-1)]" : "text-[var(--ink-2)]"}`}
               >
                 {nextLocale === "en" ? "English" : localeLabel(nextLocale)}
               </button>

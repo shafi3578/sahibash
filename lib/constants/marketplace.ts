@@ -1,3 +1,5 @@
+import type { AppLocale } from "@/lib/i18n/translations";
+
 export const CITIES = [
   "Kabul",
   "Herat",
@@ -49,3 +51,45 @@ export const AFGHAN_PROVINCES = [
   "Wardak",
   "Zabul",
 ] as const;
+
+const AFGHAN_PROVINCE_LABELS: Record<(typeof AFGHAN_PROVINCES)[number], Record<AppLocale, string>> = {
+  Badakhshan: { en: "Badakhshan", fa: "بدخشان", ps: "بدخشان" },
+  Badghis: { en: "Badghis", fa: "بادغیس", ps: "بادغیس" },
+  Baghlan: { en: "Baghlan", fa: "بغلان", ps: "بغلان" },
+  Balkh: { en: "Balkh", fa: "بلخ", ps: "بلخ" },
+  Bamyan: { en: "Bamyan", fa: "بامیان", ps: "بامیان" },
+  Daykundi: { en: "Daykundi", fa: "دایکندی", ps: "دایکنډي" },
+  Farah: { en: "Farah", fa: "فراه", ps: "فراه" },
+  Faryab: { en: "Faryab", fa: "فاریاب", ps: "فاریاب" },
+  Ghazni: { en: "Ghazni", fa: "غزنی", ps: "غزني" },
+  Ghor: { en: "Ghor", fa: "غور", ps: "غور" },
+  Helmand: { en: "Helmand", fa: "هلمند", ps: "هلمند" },
+  Herat: { en: "Herat", fa: "هرات", ps: "هرات" },
+  Jowzjan: { en: "Jowzjan", fa: "جوزجان", ps: "جوزجان" },
+  Kabul: { en: "Kabul", fa: "کابل", ps: "کابل" },
+  Kandahar: { en: "Kandahar", fa: "کندهار", ps: "کندهار" },
+  Kapisa: { en: "Kapisa", fa: "کاپیسا", ps: "کاپیسا" },
+  Khost: { en: "Khost", fa: "خوست", ps: "خوست" },
+  Kunar: { en: "Kunar", fa: "کنر", ps: "کنړ" },
+  Kunduz: { en: "Kunduz", fa: "کندز", ps: "کندز" },
+  Laghman: { en: "Laghman", fa: "لغمان", ps: "لغمان" },
+  Logar: { en: "Logar", fa: "لوگر", ps: "لوګر" },
+  Nangarhar: { en: "Nangarhar", fa: "ننگرهار", ps: "ننګرهار" },
+  Nimruz: { en: "Nimruz", fa: "نیمروز", ps: "نیمروز" },
+  Nuristan: { en: "Nuristan", fa: "نورستان", ps: "نورستان" },
+  Paktia: { en: "Paktia", fa: "پکتیا", ps: "پکتیا" },
+  Paktika: { en: "Paktika", fa: "پکتیکا", ps: "پکتیکا" },
+  Panjshir: { en: "Panjshir", fa: "پنجشیر", ps: "پنجشېر" },
+  Parwan: { en: "Parwan", fa: "پروان", ps: "پروان" },
+  Samangan: { en: "Samangan", fa: "سمنگان", ps: "سمنګان" },
+  "Sar-e Pol": { en: "Sar-e Pol", fa: "سرپل", ps: "سرپل" },
+  Takhar: { en: "Takhar", fa: "تخار", ps: "تخار" },
+  Uruzgan: { en: "Uruzgan", fa: "ارزگان", ps: "اروزګان" },
+  Wardak: { en: "Wardak", fa: "وردک", ps: "وردګ" },
+  Zabul: { en: "Zabul", fa: "زابل", ps: "زابل" },
+};
+
+export function getProvinceLabel(province: string, locale: AppLocale): string {
+  const labels = AFGHAN_PROVINCE_LABELS[province as (typeof AFGHAN_PROVINCES)[number]];
+  return labels?.[locale] ?? province;
+}

@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ListingWithImages } from "@/types/database";
 import { getDictionary } from "@/lib/i18n/server";
+import { localizePath } from "@/lib/i18n/routing";
 
 export async function ListingCard({
   listing,
@@ -12,10 +13,10 @@ export async function ListingCard({
   showStatus?: boolean;
   href?: string;
 }) {
-  const { t } = await getDictionary();
+  const { t, locale } = await getDictionary();
   const displayTitle = listing.translated_title || listing.title;
   const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
-  const listingHref = href ?? `/listings/${listing.id}`;
+  const listingHref = href ?? localizePath(`/listings/${listing.id}`, locale);
   const listingType = String((listing as { listing_type?: string }).listing_type ?? "").toLowerCase();
   const isWanted = listingType === "wanted" || /\bwanted\b/i.test(displayTitle);
   const isDormitory = listing.category_node?.path === "real-estate/dormitory" || listing.category_node?.slug === "dormitory";

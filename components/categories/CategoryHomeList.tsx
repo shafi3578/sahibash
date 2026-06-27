@@ -2,6 +2,7 @@ import { CategoryRow } from "@/components/categories/CategoryRow";
 import type { CategoryNodeWithCount } from "@/lib/categories/getCategories";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { localizeCategoryName, localizeCategorySubtitle } from "@/lib/i18n/category-labels";
+import { localizePath } from "@/lib/i18n/routing";
 import { getDictionary } from "@/lib/i18n/server";
 
 type Props = {
@@ -59,7 +60,7 @@ export async function CategoryHomeList({ categories, locale = "en" }: Props) {
         {launchRows.map((category) => (
           <CategoryRow
             key={category.id}
-            href={category.id > 0 ? `/categories/${category.slug}?node=${category.id}` : `/categories/${category.slug}`}
+              href={category.id > 0 ? localizePath(`/categories/${category.slug}?node=${category.id}`, locale) : localizePath(`/categories/${category.slug}`, locale)}
             title={category.name}
             subtitle={category.subtitle}
             icon={category.icon}
@@ -77,7 +78,7 @@ export async function CategoryHomeList({ categories, locale = "en" }: Props) {
           {comingSoonRows.map((category) => (
             <CategoryRow
               key={category.id}
-              href={`/categories/${category.slug}`}
+              href={localizePath(`/categories/${category.slug}`, locale)}
               title={category.name}
               subtitle={category.subtitle}
               icon={category.icon}
