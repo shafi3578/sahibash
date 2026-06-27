@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { joinCategoryWaitlistAction } from "@/lib/actions/categories";
+import { usePathname } from "next/navigation";
+import { getUiTranslations } from "@/lib/i18n/ui";
+import type { AppLocale } from "@/lib/i18n/translations";
 
 type Props = {
   categorySlug: string;
@@ -9,6 +12,9 @@ type Props = {
 };
 
 export function ComingSoonWaitlistForm({ categorySlug, defaultEmail = "" }: Props) {
+  const pathname = usePathname();
+  const locale: AppLocale = pathname.startsWith("/ps") ? "ps" : pathname.startsWith("/en") ? "en" : "fa";
+  const ui = getUiTranslations(locale);
   const [email, setEmail] = useState(defaultEmail);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,13 +44,13 @@ export function ComingSoonWaitlistForm({ categorySlug, defaultEmail = "" }: Prop
       className="space-y-3"
     >
       <label className="block text-sm font-semibold text-[var(--ink-1)]">
-        Email
+        {ui.waitlist.email}
         <input
           type="email"
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@example.com"
+          placeholder={ui.waitlist.emailPlaceholder}
           className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2"
         />
       </label>
@@ -54,7 +60,7 @@ export function ComingSoonWaitlistForm({ categorySlug, defaultEmail = "" }: Prop
         disabled={isPending}
         className="rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
-        {isPending ? "Joining..." : "Notify Me When Available"}
+        {isPending ? ui.waitlist.joining : ui.waitlist.notifyWhenAvailable}
       </button>
 
       {message ? <p className="text-sm font-medium text-emerald-700">{message}</p> : null}

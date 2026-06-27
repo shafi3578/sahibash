@@ -3,9 +3,13 @@ import { DashboardSection } from "@/components/dashboard-section";
 import { getMyMessageThreads } from "@/lib/data/queries";
 import { replyMessageAction } from "@/lib/actions/messages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentLocale } from "@/lib/i18n/server";
+import { getUiTranslations } from "@/lib/i18n/ui";
 
 export default async function MessagesPage() {
   const user = await requireUser();
+  const locale = await getCurrentLocale();
+  const ui = getUiTranslations(locale);
   const supabase = await createSupabaseServerClient();
 
   await supabase
@@ -48,14 +52,14 @@ export default async function MessagesPage() {
   return (
     <DashboardSection
       currentPath="/dashboard/messages"
-      title="Messages"
-      description="View conversations with buyers and sellers for your listings."
+      title={ui.dashboard.messages}
+      description={ui.dashboard.messagesDescription}
     >
       {threads.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--surface-2)] p-5">
-          <p className="font-semibold text-[var(--ink-1)]">No messages yet</p>
+          <p className="font-semibold text-[var(--ink-1)]">{ui.dashboard.noMessagesYet}</p>
           <p className="mt-1 text-sm text-[var(--ink-2)]">
-            Message threads will appear here when users contact you.
+            {ui.dashboard.messageThreadsAppear}
           </p>
         </div>
       ) : (
@@ -63,10 +67,10 @@ export default async function MessagesPage() {
           {threads.map((thread) => (
             <div key={`${thread.listingId}:${thread.participantId}`} className="rounded-xl border border-[var(--line)] bg-white p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-[var(--ink-2)]">Listing ID: {thread.listingId.slice(0, 8)} • Participant: {thread.participantId.slice(0, 8)}</p>
+                <p className="text-xs text-[var(--ink-2)]">{ui.dashboard.listingId}: {thread.listingId.slice(0, 8)} • {ui.dashboard.participant}: {thread.participantId.slice(0, 8)}</p>
                 {thread.unreadIncomingCount > 0 ? (
                   <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
-                    New reply ({thread.unreadIncomingCount})
+                    {ui.dashboard.newReply} ({thread.unreadIncomingCount})
                   </span>
                 ) : null}
               </div>
@@ -77,7 +81,7 @@ export default async function MessagesPage() {
                   return (
                     <div key={msg.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${mine ? "ml-auto bg-[var(--ink-1)] text-white" : "bg-[var(--surface-2)] text-[var(--ink-1)]"} ${isLatestUnreadIncoming ? "ring-2 ring-red-300" : ""}`}>
                       {!mine && isLatestUnreadIncoming ? (
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-red-700">New seller reply</p>
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-red-700">{ui.dashboard.newSellerReply}</p>
                       ) : null}
                       <p>{msg.body}</p>
                       <p className={`mt-1 text-[10px] ${mine ? "text-white/80" : "text-[var(--ink-2)]"}`}>
@@ -90,8 +94,8 @@ export default async function MessagesPage() {
               <form action={replyMessageAction} className="mt-3 flex flex-wrap gap-2">
                 <input type="hidden" name="listingId" value={thread.listingId} />
                 <input type="hidden" name="recipientUserId" value={thread.participantId} />
-                <input name="body" required placeholder="Type your reply..." className="flex-1 rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm" />
-                <button className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">Reply</button>
+                <input name="body" required placeholder={ui.dashboard.typeReply} className="flex-1 rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm" />
+                <button className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{ui.dashboard.reply}</button>
               </form>
             </div>
           ))}

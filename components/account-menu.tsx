@@ -1,21 +1,25 @@
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-const accountLinks = [
-  { href: "/dashboard/my-ads", label: "My Listings" },
-  { href: "/dashboard/favorites", label: "Favorite Listings" },
-  { href: "/dashboard/favorite-searches", label: "Favorite Searches" },
-  { href: "/dashboard/messages", label: "Messages" },
-  { href: "/dashboard/questions", label: "Questions & Answers" },
-  { href: "/dashboard/offers", label: "Offers" },
-  { href: "/dashboard/account-information", label: "Account Information" },
-  { href: "/dashboard/account-security", label: "Account Security" },
-  { href: "/dashboard/settings", label: "Settings" },
-  { href: "/dashboard/help", label: "Help Center" },
-  { href: "/dashboard/privacy", label: "Privacy & Terms" },
-] as const;
+import { getCurrentLocale } from "@/lib/i18n/server";
+import { getUiTranslations } from "@/lib/i18n/ui";
 
 export async function AccountMenu({ currentPath }: { currentPath: string }) {
+  const locale = await getCurrentLocale();
+  const ui = getUiTranslations(locale);
+  const accountLinks = [
+    { href: "/dashboard/my-ads", label: ui.dashboard.myListings },
+    { href: "/dashboard/favorites", label: ui.dashboard.favoriteListings },
+    { href: "/dashboard/favorite-searches", label: ui.dashboard.favoriteSearches },
+    { href: "/dashboard/messages", label: ui.dashboard.messages },
+    { href: "/dashboard/questions", label: ui.dashboard.questionsAnswers },
+    { href: "/dashboard/offers", label: ui.dashboard.offers },
+    { href: "/dashboard/account-information", label: ui.dashboard.accountInformation },
+    { href: "/dashboard/account-security", label: ui.dashboard.accountSecurity },
+    { href: "/dashboard/settings", label: ui.dashboard.settings },
+    { href: "/dashboard/help", label: ui.dashboard.helpCenter },
+    { href: "/dashboard/privacy", label: ui.dashboard.privacyTerms },
+  ] as const;
+
   let newMessages = 0;
   let newOffers = 0;
 

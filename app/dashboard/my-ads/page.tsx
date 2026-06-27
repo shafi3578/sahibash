@@ -8,6 +8,8 @@ import {
   uploadListingImageFormAction,
 } from "@/lib/actions/listings";
 import { getMyListings } from "@/lib/data/queries";
+import { getCurrentLocale } from "@/lib/i18n/server";
+import { getUiTranslations } from "@/lib/i18n/ui";
 
 type SearchParams = {
   tab?: "active" | "inactive";
@@ -20,8 +22,8 @@ function formatDate(dateValue: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString("en-GB");
 }
 
-function getStatusLabel(status: string) {
-  if (status === "pending") return "Under Review";
+function getStatusLabel(status: string, underReview: string) {
+  if (status === "pending") return underReview;
   return status;
 }
 
@@ -31,6 +33,8 @@ export default async function MyAdsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const user = await requireUser();
+  const locale = await getCurrentLocale();
+  const ui = getUiTranslations(locale);
   const listings = await getMyListings(user.id);
   const params = await searchParams;
 
@@ -54,22 +58,22 @@ export default async function MyAdsPage({
   return (
     <DashboardSection
       currentPath="/dashboard/my-ads"
-      title="My Listings"
-      description="Manage active/inactive listings, status, media, and performance."
+      title={ui.dashboard.myListings}
+      description={ui.dashboard.myListingsDescription}
     >
       <form className="mb-4 grid gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 sm:grid-cols-[1fr_auto]">
         <input type="hidden" name="tab" value={activeTab} />
         <input
           name="q"
           defaultValue={params.q ?? ""}
-          placeholder="Search my listings by title or listing ID"
+          placeholder={ui.dashboard.searchListingsByTitleOrId}
           className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm"
         />
         <button
           type="submit"
           className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white"
         >
-          Search
+          {ui.dashboard.search}
         </button>
       </form>
 
@@ -82,7 +86,7 @@ export default async function MyAdsPage({
               : "rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-sm font-semibold"
           }
         >
-          Active Listings
+          {ui.dashboard.activeListings}
         </Link>
         <Link
           href={`/dashboard/my-ads?tab=inactive${params.q ? `&q=${encodeURIComponent(params.q)}` : ""}`}
@@ -92,7 +96,7 @@ export default async function MyAdsPage({
               : "rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-sm font-semibold"
           }
         >
-          Inactive Listings
+          {ui.dashboard.inactiveListings}
         </Link>
       </div>
 
@@ -106,27 +110,27 @@ export default async function MyAdsPage({
 
             <div className="grid grid-cols-2 gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-xs text-[var(--ink-2)] sm:grid-cols-4">
               <p>
-                ID
+                {ui.dashboard.id}
                 <span className="mt-1 block font-semibold text-[var(--ink-1)]">{listing.id.slice(0, 8)}</span>
               </p>
               <p>
-                Views
+                {ui.dashboard.views}
                 <span className="mt-1 block font-semibold text-[var(--ink-1)]">{listing.views_count}</span>
               </p>
               <p>
-                Favorites
+                {ui.dashboard.favorites}
                 <span className="mt-1 block font-semibold text-[var(--ink-1)]">{listing.favorites_count}</span>
               </p>
               <p>
-                Messages
+                {ui.dashboard.messages}
                 <span className="mt-1 block font-semibold text-[var(--ink-1)]">{listing.messages_count}</span>
               </p>
               <p>
-                Status
-                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{getStatusLabel(listing.status)}</span>
+                {ui.dashboard.status}
+                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{getStatusLabel(listing.status, ui.dashboard.underReview)}</span>
               </p>
               <p>
-                Expiry
+                {ui.dashboard.expiry}
                 <span className="mt-1 block font-semibold text-[var(--ink-1)]">{formatDate(listing.expires_at)}</span>
               </p>
             </div>
@@ -139,7 +143,7 @@ export default async function MyAdsPage({
                 }}
               >
                 <button className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm font-semibold">
-                  Mark as Sold
+                  {ui.dashboard.markAsSold}
                 </button>
               </form>
               <form
@@ -149,7 +153,7 @@ export default async function MyAdsPage({
                 }}
               >
                 <button className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white">
-                  Delete
+                  {ui.dashboard.delete}
                 </button>
               </form>
             </div>
@@ -161,7 +165,7 @@ export default async function MyAdsPage({
               <input type="hidden" name="listingId" value={listing.id} />
               <input name="image" type="file" accept="image/*" required className="text-sm" />
               <button className="rounded-lg bg-[var(--ink-1)] px-3 py-1.5 text-sm font-semibold text-white">
-                Upload Image
+                {ui.dashboard.uploadImage}
               </button>
             </form>
           </div>

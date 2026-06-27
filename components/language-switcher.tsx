@@ -72,7 +72,7 @@ export function LanguageSwitcher({ locale, label }: Props) {
       <button
         type="button"
         className="inline-flex min-h-10 items-center gap-1 rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold lg:hidden"
-        aria-label="Change language"
+        aria-label={label}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((prev) => !prev)}

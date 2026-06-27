@@ -2,21 +2,18 @@ import { getPostingRootCategories } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import Link from "next/link";
 import { localizePath } from "@/lib/i18n/routing";
+import { getUiTranslations } from "@/lib/i18n/ui";
 
 export default async function PostAdPage() {
   const [categories, { t, locale }] = await Promise.all([getPostingRootCategories(), getDictionary()]);
+  const ui = getUiTranslations(locale);
 
   const activeCategories = categories.filter((category) => !category.is_coming_soon);
   const optionCards = [
     {
       key: "sell",
-      title: locale === "fa" ? "چیزی برای فروش" : locale === "ps" ? "د خرڅلاو اعلان" : "Sell something",
-      description:
-        locale === "fa"
-          ? "اعلان معمولی فروش ایجاد کنید."
-          : locale === "ps"
-            ? "د خرڅلاو عادي اعلان جوړ کړئ."
-            : "Create a normal for-sale listing.",
+      title: ui.postAdLanding.sellSomething,
+      description: ui.postAdLanding.sellSomethingDescription,
       href: localizePath("/post-ad/create?posting=sell", locale),
     },
   ];
@@ -24,14 +21,10 @@ export default async function PostAdPage() {
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="font-display text-3xl font-bold">
-        {locale === "fa" ? "چه کاری می خواهید انجام دهید؟" : locale === "ps" ? "تاسو څه کول غواړئ؟" : "What do you want to do?"}
+        {ui.postAdLanding.whatDoYouWantToDo}
       </h1>
       <p className="mt-2 text-sm text-[var(--ink-2)]">
-        {locale === "fa"
-          ? "نوع اعلان را انتخاب کنید. سپس قبل از انتشار می توانید همه فیلدها را ویرایش کنید."
-          : locale === "ps"
-            ? "د اعلان ډول وټاکئ. د خپرولو مخکې ټول معلومات ایډیټ کولی شئ."
-            : "Choose your posting flow. You can edit everything before publishing."}
+        {ui.postAdLanding.chooseFlowDescription}
       </p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-1">
@@ -50,23 +43,19 @@ export default async function PostAdPage() {
 
       <div className="mt-4 rounded-2xl border border-[var(--line)] bg-white p-4">
         <h2 className="text-base font-bold">
-          {locale === "fa" ? "پست سریع" : locale === "ps" ? "چټک پوسټ" : "Quick Post"}
+          {ui.postAdLanding.quickPost}
         </h2>
         <p className="mt-1 text-sm text-[var(--ink-2)]">
-          {locale === "fa"
-            ? "فقط عنوان، قیمت، عکس و موقعیت را وارد کنید؛ بقیه فیلدها به طور هوشمند پیشنهاد می شود."
-            : locale === "ps"
-              ? "یوازې سرلیک، بیه، انځورونه او ځای ولیکئ؛ نور معلومات به هوښیار وړاندیز شي."
-              : "Enter title, price, photos, and location first; we will suggest the rest intelligently."}
+          {ui.postAdLanding.quickPostDescription}
         </p>
         <Link href={localizePath("/post-ad/create?posting=quick", locale)} className="mt-3 inline-block rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">
-          {locale === "fa" ? "شروع پست سریع" : locale === "ps" ? "چټک پوسټ پیل کړئ" : "Start Quick Post"}
+          {ui.postAdLanding.startQuickPost}
         </Link>
       </div>
 
       <div className="mt-6 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
         <p className="text-sm font-semibold">
-          {locale === "fa" ? "دسته های فعال" : locale === "ps" ? "فعاله کټګورۍ" : "Active categories"}
+          {ui.postAdLanding.activeCategories}
         </p>
         <p className="mt-1 text-sm text-[var(--ink-2)]">{activeCategories.map((category) => category.name).join(" • ")}</p>
       </div>
