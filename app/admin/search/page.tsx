@@ -67,9 +67,21 @@ export default async function AdminSearchPage() {
             {telemetry.suggestedAliases.length === 0 ? (
               <li className="rounded-lg border border-[var(--line)] p-2 text-[var(--ink-2)]">No suggestions yet.</li>
             ) : telemetry.suggestedAliases.map((entry) => (
-              <li key={`suggest-${entry.term}`} className="flex items-center justify-between rounded-lg border border-[var(--line)] p-2">
-                <span>{entry.term}</span>
-                <span className="text-xs text-[var(--ink-2)]">{entry.count}</span>
+              <li key={`suggest-${entry.term}`} className="rounded-lg border border-[var(--line)] p-2">
+                <div className="flex items-center justify-between">
+                  <span>{entry.term}</span>
+                  <span className="text-xs text-[var(--ink-2)]">{entry.count}</span>
+                </div>
+                <form action={adminCreateSearchAliasAction} className="mt-2 flex flex-wrap gap-2">
+                  <input type="hidden" name="canonical_term" value={entry.term} />
+                  <input type="hidden" name="aliases" value={entry.term} />
+                  <input type="hidden" name="language" value="multi" />
+                  <input type="hidden" name="category_scope" value="" />
+                  <input type="hidden" name="is_active" value="true" />
+                  <button className="rounded-lg border border-[var(--line)] bg-white px-2 py-1 text-xs font-semibold">
+                    Add As Alias
+                  </button>
+                </form>
               </li>
             ))}
           </ul>
