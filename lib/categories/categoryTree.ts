@@ -3,15 +3,20 @@ export const LAUNCH_ACTIVE_CATEGORY_SLUGS = [
   "real-estate",
   "mobile-phones-tablets",
   "second-hand-items",
+  "jobs",
+  "services",
+  "electronics-computers",
+  "home-furniture-appliances",
+  "farm-animals",
+  "wanted-request-ads",
 ] as const;
 
 export const COMING_SOON_HOME_CATEGORY_SLUGS = [
-  "jobs",
-  "services",
   "business-industry",
-  "farm-animals",
   "education",
   "sports-hobbies",
+  "clothing-personal-items",
+  "general-items-other",
   "other",
 ] as const;
 
@@ -83,5 +88,10 @@ export const RELATED_CATEGORIES: Record<string, string[]> = {
   ],
   other: [
     "services",
+  ],
+  "wanted-request-ads": [
+    "jobs",
+    "services",
+    "real-estate",
   ],
 };

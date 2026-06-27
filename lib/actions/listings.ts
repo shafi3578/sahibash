@@ -727,8 +727,8 @@ async function buildListingPayload(
   const locationAccuracy = locationAccuracyRaw ? Number(locationAccuracyRaw) : null;
   const locationVisibilityRaw = toFormValueText(formData.get("location_visibility")).toLowerCase();
   const locationVisibility = ["exact", "approximate", "hidden", "province_district"].includes(locationVisibilityRaw)
-    ? (locationVisibilityRaw === "hidden" ? "province_district" : locationVisibilityRaw)
-    : "province_district";
+    ? locationVisibilityRaw
+    : "hidden";
   const isLocationConfirmed = toFormValueBoolean(formData.get("is_location_confirmed"));
 
   if (!provinceId || !districtId) {
@@ -861,6 +861,52 @@ async function buildListingPayload(
   };
 }
 
+async function insertListingWithSchemaFallback(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  payload: Record<string, unknown>
+) {
+  const workingPayload: Record<string, unknown> = { ...payload };
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const result = await supabase
+      .from("listings")
+      .insert(workingPayload)
+      .select("id")
+      .single();
+
+    if (!result.error) {
+      return result;
+    }
+
+    const message = String(result.error.message ?? "");
+
+    if (
+      message.toLowerCase().includes("invalid input value for enum")
+      && message.toLowerCase().includes("location_visibility")
+      && String(workingPayload.location_visibility ?? "") === "province_district"
+    ) {
+      workingPayload.location_visibility = "hidden";
+      continue;
+    }
+
+    const missingColumnMatch = message.match(/Could not find the '([^']+)' column of 'listings'/i)
+      ?? message.match(/column\s+"([^"]+)"\s+of relation\s+"listings"\s+does not exist/i);
+
+    const missingColumn = missingColumnMatch?.[1];
+    if (!missingColumn || !(missingColumn in workingPayload)) {
+      return result;
+    }
+
+    delete workingPayload[missingColumn];
+  }
+
+  return await supabase
+    .from("listings")
+    .insert(workingPayload)
+    .select("id")
+    .single();
+}
+
 function validatePostingLocationFormData(formData: FormData): { ok: true } | { ok: false; message: string } {
   const provinceId = Number(toFormValueText(formData.get("province_id")));
   const districtId = Number(toFormValueText(formData.get("district_id")));
@@ -898,11 +944,7 @@ export async function createListingFormAction(formData: FormData): Promise<void>
     return;
   }
 
-  const { data, error } = await supabase
-    .from("listings")
-    .insert(listing.payload)
-    .select("id")
-    .single();
+  const { data, error } = await insertListingWithSchemaFallback(supabase, listing.payload as Record<string, unknown>);
 
   if (error) {
     return;
@@ -946,11 +988,12 @@ export async function createListingFormAction(formData: FormData): Promise<void>
 export async function createListingAction(formData: FormData): Promise<{
   ok: boolean;
   message: string;
+  statusCode?: number;
   listingId?: string;
 }> {
   const user = await getCurrentUser();
   if (!user) {
-    return { ok: false, message: "Please log in or register to publish your ad." };
+    return { ok: false, message: "Please log in or register to publish your ad.", statusCode: 401 };
   }
   const supabase = await createSupabaseServerClient();
 
@@ -975,11 +1018,7 @@ export async function createListingAction(formData: FormData): Promise<{
     return { ok: false, message: "Must select a category" };
   }
 
-  const { data, error } = await supabase
-    .from("listings")
-    .insert(createdListing.payload)
-    .select("id")
-    .single();
+  const { data, error } = await insertListingWithSchemaFallback(supabase, createdListing.payload as Record<string, unknown>);
 
   if (error) {
     return { ok: false, message: error.message };
@@ -1030,8 +1069,12 @@ export async function updateListingAction(
 ): Promise<{
   ok: boolean;
   message: string;
+  statusCode?: number;
 }> {
-  const user = await requireUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return { ok: false, message: "Unauthorized", statusCode: 401 };
+  }
   const supabase = await createSupabaseServerClient();
 
   // Verify ownership
@@ -1046,7 +1089,7 @@ export async function updateListingAction(
   }
 
   if (listing.user_id !== user.id) {
-    return { ok: false, message: "Unauthorized" };
+    return { ok: false, message: "Forbidden", statusCode: 403 };
   }
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -1168,8 +1211,12 @@ export async function updateListingStatusAction(
 export async function deleteListingAction(listingId: string): Promise<{
   ok: boolean;
   message: string;
+  statusCode?: number;
 }> {
-  const user = await requireUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return { ok: false, message: "Unauthorized", statusCode: 401 };
+  }
   const supabase = await createSupabaseServerClient();
 
   // Verify ownership or admin
@@ -1191,7 +1238,7 @@ export async function deleteListingAction(listingId: string): Promise<{
       .single();
 
     if (profile?.role !== "admin") {
-      return { ok: false, message: "Unauthorized" };
+      return { ok: false, message: "Forbidden", statusCode: 403 };
     }
   }
 
@@ -1289,13 +1336,39 @@ export async function uploadListingImageAction(
 ): Promise<{
   ok: boolean;
   message: string;
+  statusCode?: number;
   imageId?: string;
 }> {
-  const user = await requireUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return { ok: false, message: "Unauthorized", statusCode: 401 };
+  }
   const supabase = await createSupabaseServerClient();
 
   if (!image || image.size === 0) {
     return { ok: false, message: "Invalid image" };
+  }
+
+  const { data: listing, error: listingError } = await supabase
+    .from("listings")
+    .select("user_id")
+    .eq("id", listingId)
+    .single();
+
+  if (listingError || !listing) {
+    return { ok: false, message: "Listing not found" };
+  }
+
+  if (listing.user_id !== user.id) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.role !== "admin") {
+      return { ok: false, message: "Forbidden", statusCode: 403 };
+    }
   }
 
   const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";

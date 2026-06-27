@@ -11,9 +11,12 @@ import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicl
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
+import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
+type PostMode = "standard" | "quick" | "telegram";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -44,12 +47,25 @@ type CoreForm = {
 type ProvinceOption = { id: number; name: string };
 type DistrictOption = { id: number; name: string; province_id: number };
 type LocationMethod = "device" | "manual" | null;
+type StoredLocation = {
+  provinceId: number;
+  districtId: number;
+  areaText: string;
+  locationVisibility: "exact" | "approximate" | "province_district";
+};
 
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
+const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
 const ACTIVE_POSTING_CATEGORY_SLUGS = [
   "vehicles",
   "real-estate",
   "mobile-phones-tablets",
+  "electronics-computers",
+  "jobs",
+  "services",
+  "home-furniture-appliances",
+  "farm-animals",
+  "wanted-request-ads",
   "second-hand-items",
 ] as const;
 
@@ -62,6 +78,12 @@ const LOCATION_DYNAMIC_KEYS = new Set([
   "area",
   "area_text",
   "neighborhood",
+  "location_visibility",
+  "is_location_confirmed",
+  "location_source",
+  "latitude",
+  "longitude",
+  "location_accuracy",
 ]);
 
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
@@ -72,6 +94,12 @@ function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
 
 function renderFieldLabel(fieldKey: string) {
   return fieldKey.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function toPostingType(mode: PostMode, listingType: "for_sale" | "wanted") {
+  if (mode === "telegram") return "telegram" as const;
+  if (mode === "quick") return "quick" as const;
+  return listingType === "wanted" ? ("wanted" as const) : ("sell" as const);
 }
 
 function inferImageConfig(rootSlug: string, path: string | undefined): PostingConfig {
@@ -97,10 +125,26 @@ function inferImageConfig(rootSlug: string, path: string | undefined): PostingCo
   return { requires_images: false, min_images: 0, max_images: 10, recommended_images: null, allow_video: false };
 }
 
-export default function PostAdForm({ categories, t, locale }: Props & { t: Dictionary; locale: AppLocale }) {
+export default function PostAdForm({
+    categories,
+    t,
+    locale,
+    initialListingType = "for_sale",
+    initialMode = "standard",
+  }: Props & {
+    t: Dictionary;
+    locale: AppLocale;
+    initialListingType?: "for_sale" | "wanted";
+    initialMode?: PostMode;
+  }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
+  const [draftStorageKey, setDraftStorageKey] = useState(DRAFT_KEY);
+  const [pendingDraft, setPendingDraft] = useState<{
+    core?: CoreForm;
+    dynamicValues?: Record<string, string | boolean>;
+  } | null>(null);
 
   const [step, setStep] = useState<Step>(1);
   const [stepError, setStepError] = useState<string | null>(null);
@@ -116,7 +160,10 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
   const [loadingTree, setLoadingTree] = useState(false);
 
   const [postingConfig, setPostingConfig] = useState<PostingConfig | null>(null);
-  const [listingTypeChoice, setListingTypeChoice] = useState<"for_sale" | "wanted">("for_sale");
+  const [listingTypeChoice, setListingTypeChoice] = useState<"for_sale" | "wanted">(initialListingType);
+  const [postMode] = useState<PostMode>(initialMode);
+  const [smartRawInput, setSmartRawInput] = useState("");
+  const [smartSuggestion, setSmartSuggestion] = useState<SmartPostingParseResult | null>(null);
 
   const [images, setImages] = useState<StagedImage[]>([]);
 
@@ -157,6 +204,7 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
   const [locationConfirmed, setLocationConfirmed] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationHint, setLocationHint] = useState<string | null>(null);
+  const [previousLocation, setPreviousLocation] = useState<StoredLocation | null>(null);
 
   const activeCategories = useMemo(
     () => categories.filter((category) =>
@@ -422,6 +470,21 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
   }, []);
 
   useEffect(() => {
+    try {
+      const raw = globalThis.localStorage?.getItem(PREVIOUS_LOCATION_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as StoredLocation;
+      if (parsed?.provinceId && parsed?.districtId) {
+        setPreviousLocation(parsed);
+      }
+    } catch {
+      // ignore invalid previous location payload
+    }
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     const loadProvinces = async () => {
@@ -593,6 +656,21 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
     setLocationHint("Location confirmed.");
   }
 
+  function handleUsePreviousLocation() {
+    if (!previousLocation) {
+      setLocationHint("No previous location saved yet.");
+      return;
+    }
+
+    setLocationMethod("manual");
+    setSelectedProvinceId(previousLocation.provinceId);
+    setSelectedDistrictId(previousLocation.districtId);
+    setAreaText(previousLocation.areaText || "");
+    setLocationVisibility(previousLocation.locationVisibility || "province_district");
+    setLocationConfirmed(true);
+    setLocationHint("Previous location applied.");
+  }
+
   function onPickFiles(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     if (files.length === 0) return;
@@ -623,7 +701,72 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
   }
 
   useEffect(() => {
-    const raw = globalThis.localStorage?.getItem(DRAFT_KEY);
+    let active = true;
+
+    const resolveDraftScope = async () => {
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { data } = await supabase.auth.getUser();
+        const userId = data.user?.id ?? "guest";
+        if (!active) return;
+        setDraftStorageKey(`${DRAFT_KEY}:${userId}`);
+      } catch {
+        if (!active) return;
+        setDraftStorageKey(`${DRAFT_KEY}:guest`);
+      }
+    };
+
+    void resolveDraftScope();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadServerDraft = async () => {
+      const response = await getMyActiveDraftAction();
+      if (!active || !response.ok || !response.draft) {
+        return;
+      }
+
+      const details = (response.draft.details ?? {}) as Record<string, unknown>;
+      const category = (response.draft.category ?? {}) as Record<string, unknown>;
+
+      setPendingDraft({
+        core: {
+          ...core,
+          title: String(details.title ?? ""),
+          description: String(details.description ?? ""),
+          address_optional: String(details.address_optional ?? ""),
+          contact_phone: String(details.contact_phone ?? ""),
+          contact_name: String(details.contact_name ?? ""),
+          contact_preferences: String(details.contact_preferences ?? ""),
+          price: String(details.price ?? ""),
+          currency: String(details.currency ?? "AFN") as "AFN" | "USD",
+          negotiable: Boolean(details.negotiable),
+          minimum_offer: String(details.minimum_offer ?? ""),
+          rulesAccepted: true,
+        },
+        dynamicValues: (details.dynamic_values as Record<string, string | boolean>) ?? {},
+      });
+
+      const listingTypeFromDraft = String(category.listing_type ?? "");
+      if (listingTypeFromDraft === "wanted") {
+        setListingTypeChoice("wanted");
+      }
+    };
+
+    void loadServerDraft();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const raw = globalThis.localStorage?.getItem(draftStorageKey);
     if (!raw) return;
 
     try {
@@ -631,27 +774,87 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
         core?: CoreForm;
         dynamicValues?: Record<string, string | boolean>;
       };
-      if (parsed.core) {
-        setCore(parsed.core);
-      }
-      if (parsed.dynamicValues) {
-        setDynamicValues(parsed.dynamicValues);
-      }
+      setPendingDraft(parsed);
     } catch {
       // ignore broken draft
     }
-  }, []);
+  }, [draftStorageKey]);
+
+  function continueDraft() {
+    if (pendingDraft?.core) {
+      setCore(pendingDraft.core);
+    }
+    if (pendingDraft?.dynamicValues) {
+      setDynamicValues(pendingDraft.dynamicValues);
+    }
+    setPendingDraft(null);
+  }
+
+  function startNewWithoutDraft() {
+    globalThis.localStorage?.removeItem(draftStorageKey);
+    setPendingDraft(null);
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
       globalThis.localStorage?.setItem(
-        DRAFT_KEY,
+        draftStorageKey,
         JSON.stringify({ core, dynamicValues })
       );
+
+      void saveListingDraftAction({
+        postingType: toPostingType(postMode, listingTypeChoice),
+        category: {
+          root_slug: rootSlug,
+          final_path: finalPath,
+          listing_type: listingTypeChoice,
+        },
+        details: {
+          title: core.title,
+          description: core.description,
+          address_optional: core.address_optional,
+          contact_phone: core.contact_phone,
+          contact_name: core.contact_name,
+          contact_preferences: core.contact_preferences,
+          price: core.price,
+          currency: core.currency,
+          negotiable: core.negotiable,
+          minimum_offer: core.minimum_offer,
+          dynamic_values: dynamicValues,
+        },
+        photos: images.map((img, index) => ({
+          name: img.file.name,
+          size: img.file.size,
+          index,
+          is_primary: img.isPrimary,
+        })),
+        location: {
+          province_id: selectedProvinceId,
+          district_id: selectedDistrictId,
+          area_text: areaText,
+          location_visibility: locationVisibility,
+        },
+        language: locale,
+        status: "in_progress",
+      });
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [core, dynamicValues]);
+  }, [
+    core,
+    dynamicValues,
+    draftStorageKey,
+    images,
+    selectedProvinceId,
+    selectedDistrictId,
+    areaText,
+    locationVisibility,
+    locale,
+    rootSlug,
+    finalPath,
+    postMode,
+    listingTypeChoice,
+  ]);
 
   const requiredDynamicKeys = useMemo(() => {
     return new Set(
@@ -831,11 +1034,11 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
       const supabase = createSupabaseBrowserClient();
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        window.location.assign(`/login?returnTo=${encodeURIComponent("/post-ad")}`);
+        window.location.assign(`/login?redirect=${encodeURIComponent("/post-ad")}&reason=post`);
         return;
       }
     } catch {
-      window.location.assign(`/login?returnTo=${encodeURIComponent("/post-ad")}`);
+      window.location.assign(`/login?redirect=${encodeURIComponent("/post-ad")}&reason=post`);
       return;
     }
 
@@ -861,7 +1064,8 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
     if (deviceLongitude !== null) form.set("longitude", String(deviceLongitude));
     if (deviceAccuracy !== null) form.set("location_accuracy", String(deviceAccuracy));
     form.set("location_source", locationMethod === "device" ? "device" : "manual");
-    form.set("location_visibility", locationVisibility);
+    const submitLocationVisibility = locationVisibility === "province_district" ? "hidden" : locationVisibility;
+    form.set("location_visibility", submitLocationVisibility);
     form.set("is_location_confirmed", locationMethod === "device" ? (locationConfirmed ? "true" : "false") : "true");
     form.set("contact_phone", core.contact_phone);
     form.set("contact_name", core.contact_name);
@@ -903,6 +1107,9 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
     }
 
     for (const [key, value] of Object.entries(dynamicValues)) {
+      if (LOCATION_DYNAMIC_KEYS.has(key)) {
+        continue;
+      }
       if (typeof value === "boolean") {
         if (value) form.set(key, "true");
       } else if (String(value).trim()) {
@@ -930,7 +1137,17 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
         }
       }
 
-      globalThis.localStorage?.removeItem(DRAFT_KEY);
+      globalThis.localStorage?.removeItem(draftStorageKey);
+      if (selectedProvinceId && selectedDistrictId) {
+        const snapshot: StoredLocation = {
+          provinceId: selectedProvinceId,
+          districtId: selectedDistrictId,
+          areaText,
+          locationVisibility,
+        };
+        globalThis.localStorage?.setItem(PREVIOUS_LOCATION_KEY, JSON.stringify(snapshot));
+      }
+      await deleteMyDraftAction();
       setStatus("Listing created. Redirecting...");
       const destination = `/listings/${created.listingId}/manage`;
       router.push(destination);
@@ -1009,6 +1226,38 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
     (field) => !rootSpecificFieldKeys.has(field.field_key) && !LOCATION_DYNAMIC_KEYS.has(field.field_key)
   );
 
+  const suggestedCategoryLabel = useMemo(() => {
+    if (!smartSuggestion || smartSuggestion.categorySlug === "other") {
+      return null;
+    }
+
+    const category = activeCategories.find((item) => item.slug === smartSuggestion.categorySlug);
+    if (!category) {
+      return null;
+    }
+
+    return localizeCategoryName({
+      locale,
+      fallbackName: category.name,
+      slug: category.slug,
+    });
+  }, [activeCategories, locale, smartSuggestion]);
+
+  const applySmartSuggestion = useCallback(async () => {
+    if (!smartSuggestion) return;
+
+    if (smartSuggestion.listingType === "wanted") {
+      setListingTypeChoice("wanted");
+    }
+
+    if (smartSuggestion.categorySlug !== "other") {
+      const suggestedRoot = activeCategories.find((item) => item.slug === smartSuggestion.categorySlug);
+      if (suggestedRoot) {
+        await chooseRoot(suggestedRoot);
+      }
+    }
+  }, [activeCategories, chooseRoot, smartSuggestion]);
+
   return (
     <div className="relative pb-28">
       <div className="sticky top-0 z-10 rounded-2xl bg-sky-700 px-4 py-3 text-white">
@@ -1018,6 +1267,117 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
       </div>
 
       <div className="mt-4 space-y-4">
+        {pendingDraft ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
+            <p className="text-sm font-semibold">You have an unfinished ad. Continue?</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={continueDraft}
+                className="rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white"
+              >
+                Continue draft
+              </button>
+              <button
+                type="button"
+                onClick={startNewWithoutDraft}
+                className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
+              >
+                Start new ad
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {postMode !== "standard" ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
+            <p className="text-sm font-semibold">
+              {postMode === "telegram"
+                ? "We organized your ad. Please review before publishing."
+                : "Quick post mode: add essentials first, then review before publishing."}
+            </p>
+            {postMode === "telegram" ? (
+              <label className="mt-3 block text-sm font-semibold">
+                Telegram text
+                <textarea
+                  rows={4}
+                  value={smartRawInput}
+                  onChange={(event) => setSmartRawInput(event.target.value)}
+                  placeholder="Paste ad text from Telegram"
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                />
+              </label>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                const parsed = parseSmartPostingText({
+                  rawText: smartRawInput,
+                  title: core.title,
+                  description: core.description,
+                });
+                setSmartSuggestion(parsed);
+                if (smartRawInput.trim()) {
+                  if (!core.title.trim()) {
+                    updateCore("title", parsed.titleSuggestion || smartRawInput.slice(0, 100));
+                  }
+                  if (!core.description.trim()) {
+                    updateCore("description", parsed.descriptionSuggestion || smartRawInput);
+                  }
+                }
+                if (parsed.price && !core.price) {
+                  updateCore("price", String(parsed.price));
+                }
+                if (parsed.listingType === "wanted") {
+                  setListingTypeChoice("wanted");
+                }
+                if (parsed.negotiable) {
+                  updateCore("negotiable", true);
+                }
+                if (parsed.storage) {
+                  updateDynamicPair("storage", "electronics_storage", parsed.storage);
+                }
+                if (parsed.ram) {
+                  updateDynamicPair("ram", "electronics_ram", parsed.ram);
+                }
+              }}
+              className="mt-3 rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
+            >
+              {postMode === "telegram" ? "Parse Telegram text" : "Auto-detect details"}
+            </button>
+
+            {smartSuggestion ? (
+              <div className="mt-3 rounded-xl border border-[var(--line)] bg-white p-3 text-sm">
+                <p className="font-semibold">
+                  Suggested category: {suggestedCategoryLabel ?? "Other"}
+                </p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">
+                  Confidence: {Math.round(smartSuggestion.confidence * 100)}% {smartSuggestion.reasons.length > 0 ? `(${smartSuggestion.reasons.join(", ")})` : ""}
+                </p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">
+                  Detected listing type: {smartSuggestion.listingType === "wanted" ? "Wanted" : "For Sale"}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void applySmartSuggestion()}
+                    className="rounded-lg bg-[var(--ink-1)] px-3 py-2 text-xs font-semibold text-white"
+                  >
+                    Apply suggestion
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSmartSuggestion(null)}
+                    className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         {step === 1 ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
             <h2 className="font-display text-lg font-bold">{t.postAd.categoryStepTitle}</h2>
@@ -1613,7 +1973,7 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
             <h2 className="font-display text-lg font-bold">{t.postAd.whereLocated}</h2>
             <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.chooseLocationMethod}</p>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={handleUseMyLocation}
@@ -1633,6 +1993,14 @@ export default function PostAdForm({ categories, t, locale }: Props & { t: Dicti
               >
                 <p className="text-sm font-bold">{t.postAd.manualLocation}</p>
                 <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.chooseProvinceDistrict}</p>
+              </button>
+              <button
+                type="button"
+                onClick={handleUsePreviousLocation}
+                className={`rounded-xl border p-4 text-left ${previousLocation ? "border-amber-500 bg-amber-50" : "border-[var(--line)] opacity-60"}`}
+              >
+                <p className="text-sm font-bold">Use Previous Location</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">Apply your last used province/district</p>
               </button>
             </div>
 

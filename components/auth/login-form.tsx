@@ -29,8 +29,8 @@ export function LoginForm({ locale }: { locale: AppLocale }) {
         setIsLoading(false);
         return;
       }
-      const returnTo = searchParams.get("returnTo");
-      router.push(returnTo && returnTo.startsWith("/") ? returnTo : "/dashboard");
+      const redirectPath = searchParams.get("redirect") || searchParams.get("returnTo");
+      router.push(redirectPath && redirectPath.startsWith("/") ? redirectPath : "/post-ad");
       router.refresh();
     } catch {
       setError(dict.auth.supabaseMissing);

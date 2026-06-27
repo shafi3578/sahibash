@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { TRANSLATIONS, getSafeTranslations, type AppLocale } from "@/lib/i18n/translations";
 
@@ -9,6 +9,7 @@ type Dictionary = (typeof TRANSLATIONS)["en"];
 
 export function RegisterForm({ locale }: { locale: AppLocale }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +34,8 @@ export function RegisterForm({ locale }: { locale: AppLocale }) {
         setIsLoading(false);
         return;
       }
-      router.push("/dashboard");
+      const redirectPath = searchParams.get("redirect") || searchParams.get("returnTo");
+      router.push(redirectPath && redirectPath.startsWith("/") ? redirectPath : "/post-ad");
       router.refresh();
     } catch {
       setError(dict.auth.supabaseMissing);

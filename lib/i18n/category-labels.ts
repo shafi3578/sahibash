@@ -17,6 +17,8 @@ const CATEGORY_LABELS: Record<AppLocale, Record<string, CategoryLocalization>> =
     "farm-animals": { name: "Farm & Animals", subtitle: "Livestock, farm tools, feed, and pets." },
     "education": { name: "Education", subtitle: "Books, tutoring, classes, and training." },
     "sports-hobbies": { name: "Sports & Hobbies", subtitle: "Sports items, music, games, and leisure goods." },
+    "wanted-request-ads": { name: "Wanted / Request Ads", subtitle: "Post what you need to buy, rent, hire, or find." },
+    "general-items-other": { name: "General Items / Other", subtitle: "Catch-all items that do not fit strict categories." },
     "other": { name: "Other", subtitle: "Miscellaneous items with manual entry." },
 
     "cars": { name: "Cars" },
@@ -90,6 +92,8 @@ const CATEGORY_LABELS: Record<AppLocale, Record<string, CategoryLocalization>> =
     "farm-animals": { name: "زراعت و حیوانات", subtitle: "مالداری، ابزار زراعت، خوراک و حیوانات خانگی." },
     "education": { name: "آموزش", subtitle: "کتاب، تدریس، کورس و آموزش." },
     "sports-hobbies": { name: "ورزش و سرگرمی", subtitle: "وسایل ورزشی، موسیقی، بازی و سرگرمی." },
+    "wanted-request-ads": { name: "نیازمندی / درخواست", subtitle: "چیزی که می خواهید بخرید، کرایه کنید یا پیدا کنید ثبت کنید." },
+    "general-items-other": { name: "اجناس عمومی / سایر", subtitle: "اجناس عمومی که در دسته مشخص جا نمی شوند." },
     "other": { name: "سایر", subtitle: "آیتم های متفرقه با ثبت دستی." },
 
     "cars": { name: "موتر" },
@@ -163,6 +167,8 @@ const CATEGORY_LABELS: Record<AppLocale, Record<string, CategoryLocalization>> =
     "farm-animals": { name: "کرنه او حیوانات", subtitle: "څاروي، کرنیز وسایل، خوراک او کورني حیوانات." },
     "education": { name: "زده کړه", subtitle: "کتابونه، ښوونه، کورسونه او روزنه." },
     "sports-hobbies": { name: "ورزش او شوق", subtitle: "ورزشي توکي، موسیقي، لوبې او تفریحي وسایل." },
+    "wanted-request-ads": { name: "غوښتنه / Wanted اعلانونه", subtitle: "هغه څه پوسټ کړئ چې غواړئ واخلئ، کرایه کړئ یا ومومئ." },
+    "general-items-other": { name: "عمومي توکي / نور", subtitle: "هغه عمومي توکي چې په ځانګړې کټګورۍ کې نه ځاييږي." },
     "other": { name: "نور", subtitle: "نور متفرقه توکي د لاسي ثبت سره." },
 
     "cars": { name: "موټر" },

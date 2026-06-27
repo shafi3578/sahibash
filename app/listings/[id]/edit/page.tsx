@@ -23,7 +23,7 @@ export default async function EditListingPage({ params }: PageProps) {
   const { id: listingId } = await params;
 
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(`/login?redirect=${encodeURIComponent(`/listings/${listingId}/edit`)}`);
 
   const supabase = await createSupabaseServerClient();
 

@@ -19,6 +19,7 @@ export default async function AdminPage() {
       <div className="mt-6 flex flex-wrap gap-2">
         <Link href="/admin/listings" className="inline-block rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">Listing Approval Queue</Link>
         <Link href="/admin/search" className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Search Admin</Link>
+        <Link href="/admin/categories" className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Category Admin</Link>
       </div>
     </main>
   );

@@ -21,7 +21,7 @@ export default async function ListingManagePage({ params }: PageProps) {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect(`/login?redirect=${encodeURIComponent(`/listings/${listingId}/manage`)}`);
   }
 
   const data = await getListingWithOwnerStats(listingId, user.id);

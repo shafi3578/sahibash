@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { updateSession } from "@/lib/supabase/middleware";
 import { LOCALE_COOKIE } from "@/lib/i18n/server";
 import { localizePath, normalizeLocaleInput, splitLocaleFromPath } from "@/lib/i18n/routing";
+import { getSupabaseEnv, hasSupabaseEnv } from "@/lib/supabase/env";
+import { isPostAdPath, isProtectedPostingPath } from "@/lib/auth/protected-routes";
 
 const EXCLUDED_PATH_PREFIXES = ["/api", "/_next", "/favicon.ico", "/robots.txt", "/sitemap.xml"];
 
@@ -36,6 +39,43 @@ export async function proxy(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-sahibash-locale", pathLocale);
+
+  if (isProtectedPostingPath(strippedPath) && hasSupabaseEnv()) {
+    const authResponse = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+
+    const { url, anonKey } = getSupabaseEnv();
+    const supabase = createServerClient(url, anonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            authResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    });
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = localizePath("/login", pathLocale);
+      loginUrl.searchParams.set("redirect", `${strippedPath}${search || ""}`);
+      if (isPostAdPath(strippedPath)) {
+        loginUrl.searchParams.set("reason", "post");
+      }
+      return NextResponse.redirect(loginUrl);
+    }
+  }
 
   const response = NextResponse.rewrite(rewriteUrl, {
     request: {

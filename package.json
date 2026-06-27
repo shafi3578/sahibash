@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:search-parity": "node --import tsx --test tests/multilingual-search-parity.test.ts"
+    "test:search-parity": "node --import tsx --test tests/multilingual-search-parity.test.ts",
+    "test:posting-access": "node --import tsx --test tests/posting-access-control.test.ts",
+    "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts"
   },
   "dependencies": {
     "@huggingface/inference": "^4.13.19",
