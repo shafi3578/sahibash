@@ -157,6 +157,8 @@ function buildSearchOrClause(searchTerms: string[], includeIds?: string[]) {
     }
     termClauses.push(`title.ilike.%${trimmed}%`);
     termClauses.push(`description.ilike.%${trimmed}%`);
+    termClauses.push(`vehicle_brand.ilike.%${trimmed}%`);
+    termClauses.push(`vehicle_model.ilike.%${trimmed}%`);
   }
 
   if (includeIds && includeIds.length > 0) {

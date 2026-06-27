@@ -113,3 +113,11 @@ test("Exchange variants return equivalent relevant listings", () => {
     "تبادله",
   ]);
 });
+
+test("Fielder variants return equivalent relevant listings", () => {
+  expectEquivalentResults("fielder", [
+    "fielder",
+    "فیلدر",
+    "فیلډر",
+  ]);
+});
