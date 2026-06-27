@@ -30,17 +30,6 @@ export default async function PostAdPage() {
             : "Post what you are looking for and let sellers contact you.",
       href: localizePath("/post-ad/create?posting=wanted", locale),
     },
-    {
-      key: "telegram",
-      title: locale === "fa" ? "چسپاندن اعلان تلگرام" : locale === "ps" ? "د ټیلیګرام اعلان پیسټ" : "Paste Telegram ad",
-      description:
-        locale === "fa"
-          ? "متن اعلان را پیست کنید تا سیستم فیلدها را استخراج کند."
-          : locale === "ps"
-            ? "د اعلان متن پیسټ کړئ، سیستم به ساحې استخراج کړي."
-            : "Paste ad text and let the system organize fields for review.",
-      href: localizePath("/post-ad/create?posting=telegram", locale),
-    },
   ];
 
   return (
@@ -56,7 +45,7 @@ export default async function PostAdPage() {
             : "Choose your posting flow. You can edit everything before publishing."}
       </p>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
         {optionCards.map((option) => (
           <Link
             key={option.key}

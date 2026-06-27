@@ -16,7 +16,7 @@ import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } f
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
-type PostMode = "standard" | "quick" | "telegram";
+type PostMode = "standard" | "quick";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -97,7 +97,6 @@ function renderFieldLabel(fieldKey: string) {
 }
 
 function toPostingType(mode: PostMode, listingType: "for_sale" | "wanted") {
-  if (mode === "telegram") return "telegram" as const;
   if (mode === "quick") return "quick" as const;
   return listingType === "wanted" ? ("wanted" as const) : ("sell" as const);
 }
@@ -1292,22 +1291,8 @@ export default function PostAdForm({
         {postMode !== "standard" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
             <p className="text-sm font-semibold">
-              {postMode === "telegram"
-                ? "We organized your ad. Please review before publishing."
-                : "Quick post mode: add essentials first, then review before publishing."}
+              Quick post mode: add essentials first, then review before publishing.
             </p>
-            {postMode === "telegram" ? (
-              <label className="mt-3 block text-sm font-semibold">
-                Telegram text
-                <textarea
-                  rows={4}
-                  value={smartRawInput}
-                  onChange={(event) => setSmartRawInput(event.target.value)}
-                  placeholder="Paste ad text from Telegram"
-                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                />
-              </label>
-            ) : null}
             <button
               type="button"
               onClick={() => {
@@ -1343,7 +1328,7 @@ export default function PostAdForm({
               }}
               className="mt-3 rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
             >
-              {postMode === "telegram" ? "Parse Telegram text" : "Auto-detect details"}
+              Auto-detect details
             </button>
 
             {smartSuggestion ? (
