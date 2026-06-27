@@ -1029,11 +1029,11 @@ export default function PostAdForm({
       const supabase = createSupabaseBrowserClient();
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        window.location.assign(`/login?redirect=${encodeURIComponent("/post-ad")}&reason=post`);
+        window.location.assign(`/login?redirect=${encodeURIComponent("/post-ad/create?posting=sell")}&reason=post`);
         return;
       }
     } catch {
-      window.location.assign(`/login?redirect=${encodeURIComponent("/post-ad")}&reason=post`);
+      window.location.assign(`/login?redirect=${encodeURIComponent("/post-ad/create?posting=sell")}&reason=post`);
       return;
     }
 

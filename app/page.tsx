@@ -11,13 +11,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export default async function HomePage() {
   const { t, locale } = await getDictionary();
   const href = (path: string) => localizePath(path, locale);
-  const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent("/post-ad")}&reason=post`;
+  const postAdCreatePath = "/post-ad/create?posting=sell";
+  const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent(postAdCreatePath)}&reason=post`;
   let postAdHref = guestPostAdHref;
   try {
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase.auth.getUser();
     if (data.user) {
-      postAdHref = href("/post-ad");
+      postAdHref = href(postAdCreatePath);
     }
   } catch {
     postAdHref = guestPostAdHref;

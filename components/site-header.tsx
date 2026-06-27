@@ -18,7 +18,8 @@ async function signOutAction() {
 export async function SiteHeader() {
   const { locale, t } = await getDictionary();
   const href = (path: string) => localizePath(path, locale);
-  const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent("/post-ad")}&reason=post`;
+  const postAdCreatePath = "/post-ad/create?posting=sell";
+  const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent(postAdCreatePath)}&reason=post`;
   let user: { id: string } | null = null;
   let isAdmin = false;
   try {
@@ -47,7 +48,7 @@ export async function SiteHeader() {
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
             <LanguageSwitcher locale={locale} label={t.header.language} />
 
-            <Link href={user ? href("/post-ad") : guestPostAdHref} className="hidden whitespace-nowrap rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold leading-none text-white lg:inline-flex lg:text-sm">{t.header.postAd}</Link>
+            <Link href={user ? href(postAdCreatePath) : guestPostAdHref} className="hidden whitespace-nowrap rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold leading-none text-white lg:inline-flex lg:text-sm">{t.header.postAd}</Link>
             {user ? (
               <>
                 {isAdmin && (
@@ -65,7 +66,7 @@ export async function SiteHeader() {
           </div>
         </div>
       </header>
-      <FloatingPostAdButton locale={locale} label={t.header.postAd} href={user ? href("/post-ad") : guestPostAdHref} />
+      <FloatingPostAdButton locale={locale} label={t.header.postAd} href={user ? href(postAdCreatePath) : guestPostAdHref} />
     </>
   );
 }
