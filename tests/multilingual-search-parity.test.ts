@@ -24,6 +24,11 @@ const FIXTURES: FixtureListing[] = [
     title: "ټیلیفون ایفون سامسنگ",
     description: "بدل او تبادله، قیمت قابل جور آمد",
   },
+  {
+    id: "listing-fielder-core",
+    title: "Toyota Fielder 2008",
+    description: "فیلدر clean condition فیلډر",
+  },
 ];
 
 function findRelevantListingIds(query: string): string[] {

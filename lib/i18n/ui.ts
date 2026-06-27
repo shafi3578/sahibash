@@ -53,6 +53,12 @@ type DashboardUi = {
   typeReply: string;
   reply: string;
   removeFavorite: string;
+  privacyPlaceholderPrimary: string;
+  privacyPlaceholderSecondary: string;
+  settingsLanguageTitle: string;
+  settingsLanguageDescription: string;
+  settingsNotificationsTitle: string;
+  settingsNotificationsDescription: string;
 };
 
 type AdminUi = {
@@ -362,6 +368,12 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       typeReply: "Type your reply...",
       reply: "Reply",
       removeFavorite: "Remove Favorite",
+      privacyPlaceholderPrimary: "Privacy policy and marketplace terms will be managed from this section.",
+      privacyPlaceholderSecondary: "For launch, this page is prepared as the legal placeholder for your final policies.",
+      settingsLanguageTitle: "Language",
+      settingsLanguageDescription: "English is active. Dari and Pashto can be enabled next.",
+      settingsNotificationsTitle: "Notifications",
+      settingsNotificationsDescription: "Saved-search and message notifications will be configurable here.",
     },
     admin: {
       dashboard: "Admin Dashboard",
@@ -644,6 +656,12 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       typeReply: "پاسخ خود را بنویسید...",
       reply: "پاسخ",
       removeFavorite: "حذف از علاقه‌مندی",
+      privacyPlaceholderPrimary: "سیاست حریم خصوصی و شرایط بازار از این بخش مدیریت خواهد شد.",
+      privacyPlaceholderSecondary: "برای شروع، این صفحه به عنوان جایگزین حقوقی برای سیاست‌های نهایی شما آماده شده است.",
+      settingsLanguageTitle: "زبان",
+      settingsLanguageDescription: "فارسی فعال است. انگلیسی و پشتو را می‌توانید تغییر دهید.",
+      settingsNotificationsTitle: "اعلان‌ها",
+      settingsNotificationsDescription: "اعلان‌های جستجوی ذخیره‌شده و پیام‌ها از این بخش قابل تنظیم خواهد بود.",
     },
     admin: {
       dashboard: "داشبورد ادمین",
@@ -926,6 +944,12 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       typeReply: "خپل ځواب ولیکئ...",
       reply: "ځواب",
       removeFavorite: "له خوښو لرې کړئ",
+      privacyPlaceholderPrimary: "د محرمیت تګلاره او د بازار شرطونه به له همدې برخې اداره کېږي.",
+      privacyPlaceholderSecondary: "د پیل لپاره، دا پاڼه ستاسو د وروستیو پالیسو لپاره د قانوني ځایناستي په توګه چمتو شوې ده.",
+      settingsLanguageTitle: "ژبه",
+      settingsLanguageDescription: "پښتو فعاله ده. انګلیسي او دري ته هم بدلېدلای شئ.",
+      settingsNotificationsTitle: "خبرتیاوې",
+      settingsNotificationsDescription: "د خوندي لټون او پیغام خبرتیاوې به له همدې ځایه تنظیمېږي.",
     },
     admin: {
       dashboard: "د اډمین ډشبورډ",
