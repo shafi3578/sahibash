@@ -72,15 +72,46 @@ export default async function AdminSearchPage() {
                   <span>{entry.term}</span>
                   <span className="text-xs text-[var(--ink-2)]">{entry.count}</span>
                 </div>
-                <form action={adminCreateSearchAliasAction} className="mt-2 flex flex-wrap gap-2">
-                  <input type="hidden" name="canonical_term" value={entry.term} />
-                  <input type="hidden" name="aliases" value={entry.term} />
-                  <input type="hidden" name="language" value="multi" />
-                  <input type="hidden" name="category_scope" value="" />
-                  <input type="hidden" name="is_active" value="true" />
-                  <button className="rounded-lg border border-[var(--line)] bg-white px-2 py-1 text-xs font-semibold">
-                    Add As Alias
-                  </button>
+                <form action={adminCreateSearchAliasAction} className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-[var(--ink-2)]">
+                    Canonical
+                    <input
+                      name="canonical_term"
+                      defaultValue={entry.term}
+                      className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-[var(--ink-2)]">
+                    Aliases (comma-separated)
+                    <input
+                      name="aliases"
+                      defaultValue={entry.term}
+                      className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold text-[var(--ink-2)]">
+                    Language
+                    <select name="language" defaultValue="multi" className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-1 text-sm">
+                      <option value="multi">multi</option>
+                      <option value="en">en</option>
+                      <option value="fa">fa</option>
+                      <option value="ps">ps</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-[var(--ink-2)]">
+                    Category scope (optional)
+                    <input
+                      name="category_scope"
+                      placeholder="vehicles or real-estate/apartments"
+                      className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-1 text-sm"
+                    />
+                  </label>
+                  <div className="sm:col-span-2 flex items-center gap-2">
+                    <input type="hidden" name="is_active" value="true" />
+                    <button className="rounded-lg border border-[var(--line)] bg-white px-2 py-1 text-xs font-semibold">
+                      Save Alias Rule
+                    </button>
+                  </div>
                 </form>
               </li>
             ))}
