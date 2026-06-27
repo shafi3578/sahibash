@@ -79,10 +79,10 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
             >
               <span>{item.label}</span>
               {item.href === "/dashboard/messages" && currentPath !== "/dashboard/messages" && newMessages > 0 ? (
-                <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label="New messages" />
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label={ui.dashboard.newMessagesBadge} />
               ) : null}
               {item.href === "/dashboard/offers" && currentPath !== "/dashboard/offers" && newOffers > 0 ? (
-                <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label="New offers" />
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label={ui.dashboard.newOffersBadge} />
               ) : null}
             </Link>
           );

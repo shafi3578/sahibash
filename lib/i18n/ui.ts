@@ -59,6 +59,8 @@ type DashboardUi = {
   settingsLanguageDescription: string;
   settingsNotificationsTitle: string;
   settingsNotificationsDescription: string;
+  newMessagesBadge: string;
+  newOffersBadge: string;
 };
 
 type AdminUi = {
@@ -374,6 +376,8 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       settingsLanguageDescription: "English is active. Dari and Pashto can be enabled next.",
       settingsNotificationsTitle: "Notifications",
       settingsNotificationsDescription: "Saved-search and message notifications will be configurable here.",
+      newMessagesBadge: "New messages",
+      newOffersBadge: "New offers",
     },
     admin: {
       dashboard: "Admin Dashboard",
@@ -662,6 +666,8 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       settingsLanguageDescription: "فارسی فعال است. انگلیسی و پشتو را می‌توانید تغییر دهید.",
       settingsNotificationsTitle: "اعلان‌ها",
       settingsNotificationsDescription: "اعلان‌های جستجوی ذخیره‌شده و پیام‌ها از این بخش قابل تنظیم خواهد بود.",
+      newMessagesBadge: "پیام‌های جدید",
+      newOffersBadge: "پیشنهادهای جدید",
     },
     admin: {
       dashboard: "داشبورد ادمین",
@@ -950,6 +956,8 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       settingsLanguageDescription: "پښتو فعاله ده. انګلیسي او دري ته هم بدلېدلای شئ.",
       settingsNotificationsTitle: "خبرتیاوې",
       settingsNotificationsDescription: "د خوندي لټون او پیغام خبرتیاوې به له همدې ځایه تنظیمېږي.",
+      newMessagesBadge: "نوي پیغامونه",
+      newOffersBadge: "نوي وړاندیزونه",
     },
     admin: {
       dashboard: "د اډمین ډشبورډ",
