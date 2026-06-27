@@ -1351,17 +1351,34 @@ function isUsableTranslation(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0 && !BROKEN_TRANSLATION_PATTERN.test(value);
 }
 
-function mergeWithEnglishFallback(base: Record<string, unknown>, candidate: Record<string, unknown>): Record<string, unknown> {
+function mergeWithEnglishFallback(
+  base: Record<string, unknown>,
+  candidate: Record<string, unknown>,
+  locale: AppLocale,
+  path: string,
+  missingKeys: string[]
+): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, baseValue] of Object.entries(base)) {
+    const keyPath = path ? `${path}.${key}` : key;
     const candidateValue = candidate[key];
     if (typeof baseValue === "string") {
-      result[key] = isUsableTranslation(candidateValue) ? candidateValue : baseValue;
+      if (isUsableTranslation(candidateValue)) {
+        result[key] = candidateValue;
+        continue;
+      }
+
+      missingKeys.push(keyPath);
+      if (locale !== "en" && process.env.NODE_ENV !== "production") {
+        result[key] = `[missing: ${keyPath}]`;
+      } else {
+        result[key] = baseValue;
+      }
       continue;
     }
     if (isRecord(baseValue)) {
       const nestedCandidate = isRecord(candidateValue) ? candidateValue : {};
-      result[key] = mergeWithEnglishFallback(baseValue, nestedCandidate);
+      result[key] = mergeWithEnglishFallback(baseValue, nestedCandidate, locale, keyPath, missingKeys);
       continue;
     }
     result[key] = baseValue;
@@ -1574,13 +1591,22 @@ export function getSafeTranslations(locale: AppLocale): TranslationTree {
   if (locale === "en") {
     return TRANSLATIONS.en;
   }
+  const missingKeys: string[] = [];
   const safeTree = mergeWithEnglishFallback(
     TRANSLATIONS.en as Record<string, unknown>,
-    TRANSLATIONS[locale] as Record<string, unknown>
+    TRANSLATIONS[locale] as Record<string, unknown>,
+    locale,
+    "",
+    missingKeys
   );
   const overrides = CRITICAL_TRANSLATION_OVERRIDES[locale];
-  if (!overrides) {
-    return safeTree as TranslationTree;
+  const merged = overrides
+    ? (mergeOverrides(safeTree, overrides) as TranslationTree)
+    : (safeTree as TranslationTree);
+
+  if (missingKeys.length > 0) {
+    console.warn(`[i18n] Missing translations for locale ${locale}: ${missingKeys.join(", ")}`);
   }
-  return mergeOverrides(safeTree, overrides) as TranslationTree;
+
+  return merged;
 }
