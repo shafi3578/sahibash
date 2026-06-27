@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { signOutAction } from "@/lib/actions/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const accountLinks = [
@@ -61,9 +60,6 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
 
   return (
     <aside className="rounded-2xl border border-[var(--line)] bg-white p-3">
-      <p className="px-3 pb-2 pt-1 text-sm font-semibold uppercase tracking-wide text-[var(--ink-2)]">
-        My Account
-      </p>
       <nav className="space-y-1">
         {accountLinks.map((item) => {
           const active = currentPath === item.href;
@@ -88,14 +84,6 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
           );
         })}
       </nav>
-      <form action={signOutAction} className="mt-3 border-t border-[var(--line)] pt-3">
-        <button
-          type="submit"
-          className="w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink-1)]"
-        >
-          Logout
-        </button>
-      </form>
     </aside>
   );
 }

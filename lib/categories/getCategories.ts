@@ -6,6 +6,7 @@ import {
   LAUNCH_ACTIVE_CATEGORY_SLUGS,
   RELATED_CATEGORIES,
 } from "@/lib/categories/categoryTree";
+import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
 import { getCategoryCounts, getCategoryListingCount } from "@/lib/categories/getCategoryCounts";
 import type { CategoryNode } from "@/types/database";
 
@@ -118,6 +119,7 @@ export const getHomeCategoryNodes = cache(async (): Promise<CategoryNodeWithCoun
 
   const allNodes = (data as Record<string, unknown>[])
     .map(castNode)
+    .filter((node) => !isDeprecatedCategoryPath(node.path))
     .sort(sortNodes)
     .map((node) => {
       const state = categoryStateById.get(node.category_id);
@@ -248,7 +250,13 @@ export const getCategoryNodeBySlugOrId = cache(async ({
       .eq("is_active", true)
       .maybeSingle();
 
-    if (!error && data) return castNode(data as Record<string, unknown>);
+    if (!error && data) {
+      const parsed = castNode(data as Record<string, unknown>);
+      if (isDeprecatedCategoryPath(parsed.path)) {
+        return null;
+      }
+      return parsed;
+    }
   }
 
   const { data, error } = await supabase
@@ -261,7 +269,11 @@ export const getCategoryNodeBySlugOrId = cache(async ({
     .maybeSingle();
 
   if (error || !data) return null;
-  return castNode(data as Record<string, unknown>);
+  const parsed = castNode(data as Record<string, unknown>);
+  if (isDeprecatedCategoryPath(parsed.path)) {
+    return null;
+  }
+  return parsed;
 });
 
 export const getCategoryChildrenWithCounts = cache(async (parentNodeId: number): Promise<CategoryNodeWithCount[]> => {
@@ -279,6 +291,7 @@ export const getCategoryChildrenWithCounts = cache(async (parentNodeId: number):
 
   const childNodes = (data as Record<string, unknown>[])
     .map(castNode)
+    .filter((node) => !isDeprecatedCategoryPath(node.path))
     .sort(sortNodes);
 
   const childIds = childNodes.map((node) => node.id);

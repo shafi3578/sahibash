@@ -1,4 +1,5 @@
 import type { CategoryField, ListingAttribute, ListingWithRelations } from "@/types/database";
+import type { AppLocale } from "@/lib/i18n/translations";
 
 type FieldMeta = {
   label: string;
@@ -74,7 +75,13 @@ function normalize(value: string) {
   return value.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function toValue(attr: ListingAttribute): string | null {
+function yesNo(locale: AppLocale, value: boolean) {
+  if (locale === "fa") return value ? "بلی" : "خیر";
+  if (locale === "ps") return value ? "هو" : "نه";
+  return value ? "Yes" : "No";
+}
+
+function toValue(attr: ListingAttribute, locale: AppLocale): string | null {
   if (typeof attr.attribute_value_text === "string" && attr.attribute_value_text.trim().length > 0) {
     const text = attr.attribute_value_text.trim();
     if (["-", "null", "undefined"].includes(text.toLowerCase())) {
@@ -86,7 +93,7 @@ function toValue(attr: ListingAttribute): string | null {
     return String(attr.attribute_value_number);
   }
   if (typeof attr.attribute_value_boolean === "boolean") {
-    return attr.attribute_value_boolean ? "Yes" : "No";
+    return yesNo(locale, attr.attribute_value_boolean);
   }
   if (attr.attribute_value_json) {
     return JSON.stringify(attr.attribute_value_json);
@@ -97,7 +104,8 @@ function toValue(attr: ListingAttribute): string | null {
 export function buildListingSpecView(
   listing: ListingWithRelations,
   fields: CategoryField[],
-  attributes: ListingAttribute[]
+  attributes: ListingAttribute[],
+  locale: AppLocale
 ): {
   basicRows: Array<{ label: string; value: string }>;
   grouped: Record<string, AttrOut[]>;
@@ -112,7 +120,7 @@ export function buildListingSpecView(
 
   const grouped: Record<string, AttrOut[]> = {};
   for (const attr of attributes) {
-    const value = toValue(attr);
+    const value = toValue(attr, locale);
     if (!value) continue;
 
     const rawKey = unlockedKey(attr.attribute_key);
@@ -142,16 +150,52 @@ export function buildListingSpecView(
     });
   }
 
+  const basicLabels = locale === "fa"
+    ? {
+        price: "قیمت",
+        propertyType: "نوع ملک",
+        listingType: "نوع اعلان",
+        listingDate: "تاریخ اعلان",
+        listingId: "شناسه اعلان",
+        province: "ولایت",
+        district: "ولسوالی",
+        area: "ساحه",
+        address: "آدرس",
+      }
+    : locale === "ps"
+      ? {
+          price: "بیه",
+          propertyType: "د ملک ډول",
+          listingType: "د اعلان ډول",
+          listingDate: "د اعلان نېټه",
+          listingId: "د اعلان پېژند",
+          province: "ولایت",
+          district: "ولسوالي",
+          area: "سیمه",
+          address: "پته",
+        }
+      : {
+          price: "Price",
+          propertyType: "Property Type",
+          listingType: "Listing Type",
+          listingDate: "Listing Date",
+          listingId: "Listing ID",
+          province: "Province",
+          district: "District",
+          area: "Area",
+          address: "Address",
+        };
+
   const basicRows = [
-    { label: "Price", value: `${new Intl.NumberFormat("en-US").format(listing.price)} ${listing.currency}` },
-    { label: "Property Type", value: listing.category_node?.name ?? "" },
-    { label: "Listing Type", value: grouped.property_details?.find((x) => x.key === "rental_type")?.value ?? "" },
-    { label: "Listing Date", value: new Date(listing.created_at).toLocaleDateString() },
-    { label: "Listing ID", value: listing.id },
-    { label: "Province", value: listing.province ?? "" },
-    { label: "District", value: listing.district ?? "" },
-    { label: "Area", value: listing.neighborhood ?? "" },
-    { label: "Address", value: listing.address_optional ?? "" },
+    { label: basicLabels.price, value: `${new Intl.NumberFormat("en-US").format(listing.price)} ${listing.currency}` },
+    { label: basicLabels.propertyType, value: listing.category_node?.name ?? "" },
+    { label: basicLabels.listingType, value: grouped.property_details?.find((x) => x.key === "rental_type")?.value ?? "" },
+    { label: basicLabels.listingDate, value: new Date(listing.created_at).toLocaleDateString() },
+    { label: basicLabels.listingId, value: listing.id },
+    { label: basicLabels.province, value: listing.province ?? "" },
+    { label: basicLabels.district, value: listing.district ?? "" },
+    { label: basicLabels.area, value: listing.neighborhood ?? "" },
+    { label: basicLabels.address, value: listing.address_optional ?? "" },
   ].filter((row) => {
     const normalized = String(row.value ?? "").trim().toLowerCase();
     return Boolean(normalized) && normalized !== "-" && normalized !== "null" && normalized !== "undefined";

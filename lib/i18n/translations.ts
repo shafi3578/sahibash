@@ -138,6 +138,41 @@ type TranslationTree = {
     translationUnavailable: string;
     listingNo: string;
     listingDate: string;
+    sellerFallback: string;
+    notProvided: string;
+    originalLanguage: string;
+    messageInvalid: string;
+    messageError: string;
+    offerSent: string;
+    offerTooLow: string;
+    overview: string;
+    condition: string;
+    location: string;
+    vehicleMake: string;
+    vehicleSeries: string;
+    vehicleModel: string;
+    vehicleType: string;
+    vehicleSubtype: string;
+    vehicleManualBrand: string;
+    vehicleManualModel: string;
+    vehicleYear: string;
+    vehicleFuelType: string;
+    vehicleGear: string;
+    vehicleStatus: string;
+    vehicleBodyType: string;
+    vehicleKm: string;
+    vehicleEnginePower: string;
+    vehicleEngineCapacity: string;
+    vehicleWheelDrive: string;
+    vehicleColor: string;
+    vehicleWarranty: string;
+    vehicleSalvageRecord: string;
+    vehiclePlateStatus: string;
+    vehicleSellerType: string;
+    vehicleExchange: string;
+    vehicleManualEntry: string;
+    vehicleClassic: string;
+    vehicleCustom: string;
   };
   postAd: {
     postAd: string;
@@ -439,6 +474,41 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       translationUnavailable: "Translation is not available yet.",
       listingNo: "Listing No",
       listingDate: "Listing Date",
+      sellerFallback: "Seller",
+      notProvided: "Not provided",
+      originalLanguage: "Original language",
+      messageInvalid: "Please write a message before sending.",
+      messageError: "Unable to send message right now. Please try again.",
+      offerSent: "Your offer has been sent. Please wait for seller approval.",
+      offerTooLow: "Your offer is below the minimum offer for this listing.",
+      overview: "Overview",
+      condition: "Condition",
+      location: "Location",
+      vehicleMake: "برند",
+      vehicleSeries: "سری",
+      vehicleModel: "مدل",
+      vehicleType: "نوع وسیله نقلیه",
+      vehicleSubtype: "زیرنوع وسیله نقلیه",
+      vehicleManualBrand: "برند دستی",
+      vehicleManualModel: "مدل دستی",
+      vehicleYear: "سال",
+      vehicleFuelType: "نوع سوخت",
+      vehicleGear: "گیربکس",
+      vehicleStatus: "وضعیت وسیله نقلیه",
+      vehicleBodyType: "نوع بدنه",
+      vehicleKm: "کارکرد (کیلومتر)",
+      vehicleEnginePower: "قدرت انجین",
+      vehicleEngineCapacity: "حجم انجین",
+      vehicleWheelDrive: "سیستم محرک",
+      vehicleColor: "رنگ",
+      vehicleWarranty: "تضمین",
+      vehicleSalvageRecord: "سابقه خسارت",
+      vehiclePlateStatus: "وضعیت پلیت",
+      vehicleSellerType: "نوع فروشنده",
+      vehicleExchange: "معاوضه",
+      vehicleManualEntry: "ورود دستی",
+      vehicleClassic: "وسیله نقلیه کلاسیک",
+      vehicleCustom: "وسیله نقلیه سفارشی",
     },
     postAd: {
       postAd: "Post Ad",
@@ -738,6 +808,41 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       translationUnavailable: "+�+�+�+�+� +�+�+�+� +�+� +�+�+�+�+� +��+�+�.",
       listingNo: "+�+�+�+�+� +�+�+�+�+�",
       listingDate: "+�+�+���+� +�+�+�+�+�",
+      sellerFallback: "Seller",
+      notProvided: "Not provided",
+      originalLanguage: "Original language",
+      messageInvalid: "Please write a message before sending.",
+      messageError: "Unable to send message right now. Please try again.",
+      offerSent: "Your offer has been sent. Please wait for seller approval.",
+      offerTooLow: "Your offer is below the minimum offer for this listing.",
+      overview: "Overview",
+      condition: "Condition",
+      location: "Location",
+      vehicleMake: "برند",
+      vehicleSeries: "سری",
+      vehicleModel: "مدل",
+      vehicleType: "نوع وسیله نقلیه",
+      vehicleSubtype: "زیرنوع وسیله نقلیه",
+      vehicleManualBrand: "برند دستی",
+      vehicleManualModel: "مدل دستی",
+      vehicleYear: "سال",
+      vehicleFuelType: "نوع سوخت",
+      vehicleGear: "گیربکس",
+      vehicleStatus: "وضعیت وسیله نقلیه",
+      vehicleBodyType: "نوع بدنه",
+      vehicleKm: "کارکرد (کیلومتر)",
+      vehicleEnginePower: "قدرت انجین",
+      vehicleEngineCapacity: "حجم انجین",
+      vehicleWheelDrive: "سیستم محرک",
+      vehicleColor: "رنگ",
+      vehicleWarranty: "تضمین",
+      vehicleSalvageRecord: "سابقه خسارت",
+      vehiclePlateStatus: "وضعیت پلیت",
+      vehicleSellerType: "نوع فروشنده",
+      vehicleExchange: "معاوضه",
+      vehicleManualEntry: "ورود دستی",
+      vehicleClassic: "وسیله نقلیه کلاسیک",
+      vehicleCustom: "وسیله نقلیه سفارشی",
     },
     postAd: {
       postAd: "+�+�+� +�+�+�+�+�",
@@ -1037,6 +1142,41 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       translationUnavailable: "+�+�+�+�+� +�+� +�+�+�+�+�+� +�+�+�+�+�+� +�+� +�+�.",
       listingNo: "+� +�+�+�+�+� +�+��+�+�",
       listingDate: "+� +�+�+�+�+� +��+++�",
+      sellerFallback: "Seller",
+      notProvided: "Not provided",
+      originalLanguage: "Original language",
+      messageInvalid: "Please write a message before sending.",
+      messageError: "Unable to send message right now. Please try again.",
+      offerSent: "Your offer has been sent. Please wait for seller approval.",
+      offerTooLow: "Your offer is below the minimum offer for this listing.",
+      overview: "Overview",
+      condition: "Condition",
+      location: "Location",
+      vehicleMake: "برانډ",
+      vehicleSeries: "لړۍ",
+      vehicleModel: "ماډل",
+      vehicleType: "د موټر ډول",
+      vehicleSubtype: "د موټر فرعي ډول",
+      vehicleManualBrand: "لاسي برانډ",
+      vehicleManualModel: "لاسي ماډل",
+      vehicleYear: "کال",
+      vehicleFuelType: "د سونګ ډول",
+      vehicleGear: "ګیر",
+      vehicleStatus: "د موټر حالت",
+      vehicleBodyType: "د بدنې ډول",
+      vehicleKm: "کیلومتر",
+      vehicleEnginePower: "د انجن ځواک",
+      vehicleEngineCapacity: "د انجن حجم",
+      vehicleWheelDrive: "د ډرایو سیستم",
+      vehicleColor: "رنګ",
+      vehicleWarranty: "تضمین",
+      vehicleSalvageRecord: "د تاوان سابقه",
+      vehiclePlateStatus: "د پلېټ حالت",
+      vehicleSellerType: "د پلورونکي ډول",
+      vehicleExchange: "تبادله",
+      vehicleManualEntry: "لاسي ثبت",
+      vehicleClassic: "کلاسیک موټر",
+      vehicleCustom: "سفارشي موټر",
     },
     postAd: {
       postAd: "+�+�+�+�+� +�+�+�",

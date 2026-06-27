@@ -16,10 +16,14 @@ import { getDictionary } from "@/lib/i18n/server";
 import { appLocaleToListingLanguage } from "@/lib/listings/translation-service";
 import { recordSearchTelemetryClick } from "@/lib/search/telemetry";
 
-function readAttributeValue(value: unknown) {
+function readAttributeValue(value: unknown, locale: "en" | "fa" | "ps") {
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") {
+    if (locale === "fa") return value ? "بلی" : "خیر";
+    if (locale === "ps") return value ? "هو" : "نه";
+    return value ? "Yes" : "No";
+  }
   return "";
 }
 
@@ -61,11 +65,11 @@ export default async function ListingDetailPage({
   const callHref = `tel:${listing.contact_phone.replace(/[^\d+]/g, "")}`;
   const fields = await getCategoryFieldsWithOptions(listing.category_node_id);
   const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
-  const specView = buildListingSpecView(listing, fields, attrs);
+  const specView = buildListingSpecView(listing, fields, attrs, locale);
   const attributeMap = new Map(
     attrs.map((item) => {
       const value = item.attribute_value_text ?? item.attribute_value_number ?? item.attribute_value_boolean ?? "";
-      return [item.attribute_key, readAttributeValue(value)];
+      return [item.attribute_key, readAttributeValue(value, locale)];
     })
   );
   const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
@@ -81,13 +85,14 @@ export default async function ListingDetailPage({
   ).toLowerCase();
   const isWanted = listingTypeValue.includes("wanted") || /\bwanted\b/i.test(displayTitle);
   const videoUrl = listing.video_url || attributeMap.get("video_url") || "";
-  const postedDate = new Date(listing.created_at).toLocaleDateString("en-US", {
+  const dateLocale = locale === "fa" ? "fa-AF" : locale === "ps" ? "ps-AF" : "en-US";
+  const postedDate = new Date(listing.created_at).toLocaleDateString(dateLocale, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
   const sellerJoinedDate = listing.profile?.created_at
-    ? new Date(listing.profile.created_at).toLocaleDateString("en-US", {
+    ? new Date(listing.profile.created_at).toLocaleDateString(dateLocale, {
         year: "numeric",
         month: "short",
       })
@@ -105,68 +110,14 @@ export default async function ListingDetailPage({
       return aIndex - bIndex;
     });
 
-  const localeUi = {
-    en: {
-      sellerFallback: "Seller",
-      notProvided: "Not provided",
-      originalLanguage: "Original language",
-      messageInvalid: "Please write a message before sending.",
-      messageError: "Unable to send message right now. Please try again.",
-      offerSent: "Your offer has been sent. Please wait for seller approval.",
-      offerTooLow: "Your offer is below the minimum offer for this listing.",
-      overview: "Overview",
-      specifications: "Specifications",
-      condition: "Condition",
-      location: "Location",
-    },
-    fa: {
-      sellerFallback: "فروشنده",
-      notProvided: "ثبت نشده",
-      originalLanguage: "زبان اصلی",
-      messageInvalid: "لطفا قبل از ارسال پیام بنویسید.",
-      messageError: "در حال حاضر ارسال پیام ممکن نیست. لطفا دوباره تلاش کنید.",
-      offerSent: "پیشنهاد شما ارسال شد. لطفا منتظر تایید فروشنده باشید.",
-      offerTooLow: "پیشنهاد شما از حداقل پیشنهاد این اعلان کمتر است.",
-      overview: "مرور کلی",
-      specifications: "مشخصات",
-      condition: "وضعیت",
-      location: "موقعیت",
-    },
-    ps: {
-      sellerFallback: "پلورونکی",
-      notProvided: "نه دی ورکړل شوی",
-      originalLanguage: "اصلي ژبه",
-      messageInvalid: "مهرباني وکړئ له لېږلو مخکې پیغام ولیکئ.",
-      messageError: "اوس مهال پیغام نه لېږل کېږي. بیا هڅه وکړئ.",
-      offerSent: "ستاسو وړاندیز ولېږل شو. د پلورونکي تایید ته انتظار وباسئ.",
-      offerTooLow: "ستاسو وړاندیز د دې اعلان له لږ تر لږه بیې ټیټ دی.",
-      overview: "لنډه کتنه",
-      specifications: "ځانګړتیاوې",
-      condition: "حالت",
-      location: "ځای",
-    },
-  }[locale] ?? {
-    sellerFallback: "Seller",
-    notProvided: "Not provided",
-    originalLanguage: "Original language",
-    messageInvalid: "Please write a message before sending.",
-    messageError: "Unable to send message right now. Please try again.",
-    offerSent: "Your offer has been sent. Please wait for seller approval.",
-    offerTooLow: "Your offer is below the minimum offer for this listing.",
-    overview: "Overview",
-    specifications: "Specifications",
-    condition: "Condition",
-    location: "Location",
-  };
-
-  const safeSellerName = listing.contact_name || listing.profile?.full_name || localeUi.sellerFallback;
-  const safeSellerPhone = listing.contact_phone || listing.profile?.phone || localeUi.notProvided;
+  const safeSellerName = listing.contact_name || listing.profile?.full_name || t.listing.sellerFallback;
+  const safeSellerPhone = listing.contact_phone || listing.profile?.phone || t.listing.notProvided;
 
   const overviewRows = specView.basicRows.filter((row) => isMeaningfulValue(row.value));
   const displaySectionLabel = (group: string) => {
-    if (group === "location_nearby") return localeUi.location;
-    if (group === "category_specific" || group === "property_details") return localeUi.condition;
-    return localeUi.specifications;
+    if (group === "location_nearby") return t.listing.location;
+    if (group === "category_specific" || group === "property_details") return t.listing.condition;
+    return t.listing.specifications;
   };
 
   const dedupedSections = groupedSpecs.reduce<Array<{ label: string; rows: Array<{ key: string; label: string; value: string; group: string }> }>>((acc, [group, rows]) => {
@@ -230,31 +181,31 @@ export default async function ListingDetailPage({
     ? [
         { label: t.listing.listingNo, value: listing.id },
         { label: t.listing.listingDate, value: postedDate },
-        { label: "Make", value: attributeMap.get("locked__make") || attributeMap.get("locked__brand") || vehicleVariant?.generation?.model?.brand?.name || "-" },
-        { label: "Series", value: attributeMap.get("locked__series") || vehicleVariant?.generation?.model?.series?.name || "-" },
-        { label: "Model", value: attributeMap.get("locked__model") || vehicleVariant?.generation?.model?.name || "-" },
-        { label: "Vehicle Type", value: listing.vehicle_type || "-" },
-        { label: "Vehicle Subtype", value: listing.vehicle_subtype || "-" },
-        { label: "Manual Brand", value: listing.vehicle_brand || "-" },
-        { label: "Manual Model", value: listing.vehicle_model || "-" },
-        { label: "Year", value: attributeMap.get("year") || "-" },
-        { label: "Fuel Type", value: attributeMap.get("locked__fuel_type") || vehicleVariant?.fuel_type || "-" },
-        { label: "Gear", value: attributeMap.get("locked__gear") || attributeMap.get("locked__transmission") || vehicleVariant?.transmission || "-" },
-        { label: "Vehicle Status", value: attributeMap.get("vehicle_status") || "-" },
-        { label: "Body Type", value: attributeMap.get("locked__body_type") || vehicleVariant?.body_type || "-" },
-        { label: "KM", value: attributeMap.get("mileage") || "-" },
-        { label: "Engine Power", value: attributeMap.get("locked__engine_power") || vehicleVariant?.engine_power || "-" },
-        { label: "Engine Capacity", value: attributeMap.get("locked__engine_capacity") || vehicleVariant?.engine_capacity || vehicleVariant?.engine_size || "-" },
-        { label: "Wheel Drive", value: attributeMap.get("locked__wheel_drive") || vehicleVariant?.wheel_drive || vehicleVariant?.drive_type || "-" },
-        { label: "Color", value: attributeMap.get("color") || "-" },
-        { label: "Warranty", value: attributeMap.get("warranty") || "-" },
-        { label: "Salvage Record", value: attributeMap.get("salvage_record") || "-" },
-        { label: "Plate Status", value: attributeMap.get("plate_status") || "-" },
-        { label: "Seller Type", value: attributeMap.get("seller_type") || "-" },
-        { label: "Exchange", value: attributeMap.get("exchange_available") || "-" },
-        { label: "Manual Entry", value: listing.vehicle_is_manual ? "Yes" : "No" },
-        { label: "Classic Vehicle", value: listing.vehicle_is_classic ? "Yes" : "No" },
-        { label: "Custom Vehicle", value: listing.vehicle_is_custom ? "Yes" : "No" },
+        { label: t.listing.vehicleMake, value: attributeMap.get("locked__make") || attributeMap.get("locked__brand") || vehicleVariant?.generation?.model?.brand?.name || "-" },
+        { label: t.listing.vehicleSeries, value: attributeMap.get("locked__series") || vehicleVariant?.generation?.model?.series?.name || "-" },
+        { label: t.listing.vehicleModel, value: attributeMap.get("locked__model") || vehicleVariant?.generation?.model?.name || "-" },
+        { label: t.listing.vehicleType, value: listing.vehicle_type || "-" },
+        { label: t.listing.vehicleSubtype, value: listing.vehicle_subtype || "-" },
+        { label: t.listing.vehicleManualBrand, value: listing.vehicle_brand || "-" },
+        { label: t.listing.vehicleManualModel, value: listing.vehicle_model || "-" },
+        { label: t.listing.vehicleYear, value: attributeMap.get("year") || "-" },
+        { label: t.listing.vehicleFuelType, value: attributeMap.get("locked__fuel_type") || vehicleVariant?.fuel_type || "-" },
+        { label: t.listing.vehicleGear, value: attributeMap.get("locked__gear") || attributeMap.get("locked__transmission") || vehicleVariant?.transmission || "-" },
+        { label: t.listing.vehicleStatus, value: attributeMap.get("vehicle_status") || "-" },
+        { label: t.listing.vehicleBodyType, value: attributeMap.get("locked__body_type") || vehicleVariant?.body_type || "-" },
+        { label: t.listing.vehicleKm, value: attributeMap.get("mileage") || "-" },
+        { label: t.listing.vehicleEnginePower, value: attributeMap.get("locked__engine_power") || vehicleVariant?.engine_power || "-" },
+        { label: t.listing.vehicleEngineCapacity, value: attributeMap.get("locked__engine_capacity") || vehicleVariant?.engine_capacity || vehicleVariant?.engine_size || "-" },
+        { label: t.listing.vehicleWheelDrive, value: attributeMap.get("locked__wheel_drive") || vehicleVariant?.wheel_drive || vehicleVariant?.drive_type || "-" },
+        { label: t.listing.vehicleColor, value: attributeMap.get("color") || "-" },
+        { label: t.listing.vehicleWarranty, value: attributeMap.get("warranty") || "-" },
+        { label: t.listing.vehicleSalvageRecord, value: attributeMap.get("salvage_record") || "-" },
+        { label: t.listing.vehiclePlateStatus, value: attributeMap.get("plate_status") || "-" },
+        { label: t.listing.vehicleSellerType, value: attributeMap.get("seller_type") || "-" },
+        { label: t.listing.vehicleExchange, value: attributeMap.get("exchange_available") || "-" },
+        { label: t.listing.vehicleManualEntry, value: listing.vehicle_is_manual ? t.search.yes : t.search.no },
+        { label: t.listing.vehicleClassic, value: listing.vehicle_is_classic ? t.search.yes : t.search.no },
+        { label: t.listing.vehicleCustom, value: listing.vehicle_is_custom ? t.search.yes : t.search.no },
       ]
     : [];
   const seenVehicleLabels = new Set<string>();
@@ -367,22 +318,22 @@ export default async function ListingDetailPage({
       )}
       {qp.message === "invalid" && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {localeUi.messageInvalid}
+          {t.listing.messageInvalid}
         </div>
       )}
       {qp.message === "error" && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {localeUi.messageError}
+          {t.listing.messageError}
         </div>
       )}
       {qp.offer === "sent" && (
         <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          {localeUi.offerSent}
+          {t.listing.offerSent}
         </div>
       )}
       {qp.offer === "too-low" && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {localeUi.offerTooLow}
+          {t.listing.offerTooLow}
         </div>
       )}
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -403,7 +354,7 @@ export default async function ListingDetailPage({
           <h1 className="mt-1 font-display text-2xl font-bold leading-tight sm:text-3xl">{displayTitle}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1 text-[var(--ink-2)]">
-              {listing.translation_note || localeUi.originalLanguage}
+              {listing.translation_note || t.listing.originalLanguage}
             </span>
             {showOriginal ? (
               <Link href={`/listings/${listing.id}`} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
@@ -530,12 +481,12 @@ export default async function ListingDetailPage({
         ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-          <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : localeUi.specifications}</h2>
+          <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : t.listing.specifications}</h2>
 
           {overviewRows.length > 0 ? (
             <section className="mt-3 overflow-hidden rounded-xl border border-[var(--line)]">
               <header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2">
-                <h3 className="text-sm font-semibold">{localeUi.overview}</h3>
+                <h3 className="text-sm font-semibold">{t.listing.overview}</h3>
               </header>
               <div className="grid divide-y divide-[var(--line)] md:grid-cols-2 md:divide-x md:divide-y-0">
                 {overviewRows.map((row) => (

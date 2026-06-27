@@ -11,6 +11,7 @@ import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicl
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
 
@@ -66,7 +67,6 @@ const ACTIVE_POSTING_CATEGORY_SLUGS = [
   "home-furniture-appliances",
   "farm-animals",
   "wanted-request-ads",
-  "second-hand-items",
 ] as const;
 
 const LOCATION_DYNAMIC_KEYS = new Set([
@@ -114,10 +114,6 @@ function inferImageConfig(rootSlug: string, path: string | undefined): PostingCo
   }
 
   if (rootSlug === "mobile-phones-tablets" || rootSlug === "electronics-computers") {
-    return { requires_images: true, min_images: 1, max_images: 12, recommended_images: "3-8", allow_video: false };
-  }
-
-  if (rootSlug === "second-hand-items") {
     return { requires_images: true, min_images: 1, max_images: 12, recommended_images: "3-8", allow_video: false };
   }
 
@@ -237,18 +233,6 @@ export default function PostAdForm({
   );
   const rootSlug = selectedRoot?.slug ?? "";
   const finalPath = finalNode?.path;
-  const isRealEstate = rootSlug === "real-estate";
-  const isDormitory = finalPath === "real-estate/dormitory";
-  const isStudentCollection = finalPath === "real-estate/room-house-for-students";
-  const isHouseCategory = (finalPath ?? "").startsWith("real-estate/houses");
-  const isApartmentCategory = (finalPath ?? "").startsWith("real-estate/apartments");
-  const isRoomCategory = (finalPath ?? "").startsWith("real-estate/rooms");
-  const listingPurpose = String(dynamicValues.listing_purpose ?? "");
-  const showStudentSuitabilityToggle = isRealEstate
-    && !isDormitory
-    && (isHouseCategory || isApartmentCategory || isRoomCategory)
-    && listingPurpose === "For Rent";
-  const suitableForStudents = Boolean(dynamicValues.suitable_for_students);
 
   const resolvedImageConfig = useMemo(() => {
     if (!finalNode) return null;
@@ -277,6 +261,117 @@ export default function PostAdForm({
     return 5;
   })();
 
+  const postAdCopy = useMemo(() => {
+    if (locale === "fa") {
+      return {
+        draftContinuePrompt: "یک اعلان ناتمام دارید. ادامه می دهید؟",
+        continueDraft: "ادامه پیش نویس",
+        startNewAd: "شروع اعلان جدید",
+        quickModeHint: "حالت ثبت سریع: ابتدا موارد ضروری را وارد کنید، سپس پیش از انتشار بازبینی کنید.",
+        autoDetectDetails: "تشخیص خودکار جزئیات",
+        suggestedCategory: "دسته بندی پیشنهادی",
+        other: "سایر",
+        confidence: "اعتماد",
+        detectedListingType: "نوع اعلان تشخیص شده",
+        applySuggestion: "اعمال پیشنهاد",
+        dismiss: "بستن",
+        usePreviousLocation: "استفاده از موقعیت قبلی",
+        applyPreviousLocation: "ولایت/ولسوالی قبلی شما اعمال می شود",
+        couldNotDetectLocation: "موقعیت شما تشخیص نشد. لطفا به صورت دستی انتخاب کنید.",
+        detectedLocationNeedsConfirmation: "موقعیت شما تشخیص شد. لطفا قبل از انتشار آن را تایید کنید.",
+        confirmProvinceDistrictForDetected: "لطفا ولایت و ولسوالی موقعیت تشخیص شده را تایید کنید.",
+        locationConfirmed: "موقعیت تایید شد.",
+        noPreviousLocation: "هنوز موقعیت قبلی ذخیره نشده است.",
+        previousLocationApplied: "موقعیت قبلی اعمال شد.",
+        selectFinalCategory: "برای ادامه یک دسته نهایی انتخاب کنید.",
+        categoryComingSoon: "این دسته به زودی فعال می شود. ثبت اعلان فعلا در دسترس نیست.",
+        titleMin: "عنوان باید حداقل ۵ کاراکتر باشد.",
+        descriptionMin: "توضیحات باید حداقل ۲۰ کاراکتر باشد.",
+        invalidPrice: "لطفا قیمت معتبر وارد کنید.",
+        contactPhoneRequired: "شماره تماس الزامی است.",
+        acceptRulesRequired: "برای ادامه باید قوانین ثبت اعلان را بپذیرید.",
+        fieldRequiredSuffix: "الزامی است.",
+        vehicleYearRequired: "سال وسیله نقلیه الزامی است.",
+        addLocationBeforePublish: "لطفا قبل از انتشار موقعیت را اضافه کنید.",
+        detectOrChooseManual: "لطفا موقعیت دستگاه را تشخیص دهید یا روش دستی را انتخاب کنید.",
+        completeRequiredFields: "لطفا فیلدهای الزامی را تکمیل کنید.",
+        categoryRequired: "دسته بندی الزامی است.",
+      };
+    }
+
+    if (locale === "ps") {
+      return {
+        draftContinuePrompt: "تاسې یو نیمګړی اعلان لرئ. دوام ورکړئ؟",
+        continueDraft: "د مسودې دوام",
+        startNewAd: "نوی اعلان پیل کړئ",
+        quickModeHint: "د چټک اعلان حالت: لومړی اړین معلومات ولیکئ، بیا د خپرولو مخکې بیاکتنه وکړئ.",
+        autoDetectDetails: "جزئیات په اوتومات ډول ومومئ",
+        suggestedCategory: "وړاندیز شوې کټګوري",
+        other: "نور",
+        confidence: "باور",
+        detectedListingType: "موندل شوی اعلان ډول",
+        applySuggestion: "وړاندیز پلي کړئ",
+        dismiss: "بندول",
+        usePreviousLocation: "پخوانی ځای وکاروئ",
+        applyPreviousLocation: "ستاسو پخوانی ولایت/ولسوالي پلي کېږي",
+        couldNotDetectLocation: "ستاسو ځای ونه موندل شو. مهرباني وکړئ لاسي انتخاب وکړئ.",
+        detectedLocationNeedsConfirmation: "ستاسو ځای وموندل شو. مهرباني وکړئ د خپرولو مخکې یې تایید کړئ.",
+        confirmProvinceDistrictForDetected: "مهرباني وکړئ د موندل شوي ځای ولایت او ولسوالي تایید کړئ.",
+        locationConfirmed: "ځای تایید شو.",
+        noPreviousLocation: "تر اوسه پخوانی ځای نه دی خوندي شوی.",
+        previousLocationApplied: "پخوانی ځای پلي شو.",
+        selectFinalCategory: "د دوام لپاره وروستۍ کټګوري وټاکئ.",
+        categoryComingSoon: "دا کټګوري ژر فعالیږي. اعلان ثبتول اوس نه دي موجود.",
+        titleMin: "سرلیک باید لږ تر لږه ۵ توري ولري.",
+        descriptionMin: "تفصیل باید لږ تر لږه ۲۰ توري ولري.",
+        invalidPrice: "مهرباني وکړئ سم قیمت دننه کړئ.",
+        contactPhoneRequired: "د اړیکې شمېره اړینه ده.",
+        acceptRulesRequired: "د دوام لپاره باید د اعلان قوانین ومنئ.",
+        fieldRequiredSuffix: "اړین دی.",
+        vehicleYearRequired: "د موټر کال اړین دی.",
+        addLocationBeforePublish: "مهرباني وکړئ د خپرولو مخکې ځای اضافه کړئ.",
+        detectOrChooseManual: "مهرباني وکړئ د وسیلې ځای ومومئ یا لاسي طریقه وټاکئ.",
+        completeRequiredFields: "مهرباني وکړئ اړین فیلډونه بشپړ کړئ.",
+        categoryRequired: "کټګوري اړینه ده.",
+      };
+    }
+
+    return {
+      draftContinuePrompt: "You have an unfinished ad. Continue?",
+      continueDraft: "Continue draft",
+      startNewAd: "Start new ad",
+      quickModeHint: "Quick post mode: add essentials first, then review before publishing.",
+      autoDetectDetails: "Auto-detect details",
+      suggestedCategory: "Suggested category",
+      other: "Other",
+      confidence: "Confidence",
+      detectedListingType: "Detected listing type",
+      applySuggestion: "Apply suggestion",
+      dismiss: "Dismiss",
+      usePreviousLocation: "Use Previous Location",
+      applyPreviousLocation: "Apply your last used province/district",
+      couldNotDetectLocation: "We could not detect your location. Please choose manually.",
+      detectedLocationNeedsConfirmation: "We detected your location. Please confirm it before publishing.",
+      confirmProvinceDistrictForDetected: "Please confirm province and district for the detected location.",
+      locationConfirmed: "Location confirmed.",
+      noPreviousLocation: "No previous location saved yet.",
+      previousLocationApplied: "Previous location applied.",
+      selectFinalCategory: "Select a final category to continue.",
+      categoryComingSoon: "This category is coming soon. Posting is not available yet.",
+      titleMin: "Title must be at least 5 characters.",
+      descriptionMin: "Description must be at least 20 characters.",
+      invalidPrice: "Please enter a valid price.",
+      contactPhoneRequired: "Contact phone is required.",
+      acceptRulesRequired: "You must accept the posting rules to continue.",
+      fieldRequiredSuffix: "is required.",
+      vehicleYearRequired: "Vehicle year is required.",
+      addLocationBeforePublish: "Please add a location before publishing your ad.",
+      detectOrChooseManual: "Please detect your device location or choose manual location.",
+      completeRequiredFields: "Please complete required fields.",
+      categoryRequired: "Category is required.",
+    };
+  }, [locale]);
+
   async function fetchChildren(parentId: number) {
     const supabase = createSupabaseBrowserClient();
     const { data } = await supabase
@@ -286,7 +381,7 @@ export default function PostAdForm({
       .eq("is_active", true)
       .order("display_order", { ascending: true });
 
-    return (data as CategoryNode[]) ?? [];
+    return ((data as CategoryNode[]) ?? []).filter((node) => !isDeprecatedCategoryPath(node.path));
   }
 
   async function fetchRootNode(categoryId: number) {
@@ -299,7 +394,11 @@ export default function PostAdForm({
       .eq("is_active", true)
       .maybeSingle();
 
-    return (data as CategoryNode | null) ?? null;
+    const parsed = (data as CategoryNode | null) ?? null;
+    if (parsed && isDeprecatedCategoryPath(parsed.path)) {
+      return null;
+    }
+    return parsed;
   }
 
   async function fetchFields(categoryNodeId: number) {
@@ -398,15 +497,6 @@ export default function PostAdForm({
       setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
       setDamageParts(defaultDamageParts());
       await Promise.all([fetchFields(node.id), fetchPostingConfig(node.category_id)]);
-
-      if (node.path === "real-estate/dormitory") {
-        setDynamicValues((prev) => ({
-          ...prev,
-          listing_purpose: "For Rent",
-          suitable_for_students: true,
-          student_housing_type: "dormitory",
-        }));
-      }
     } else {
       setFinalNode(null);
       setDynamicFields([]);
@@ -482,6 +572,23 @@ export default function PostAdForm({
       // ignore invalid previous location payload
     }
   }, []);
+
+  useEffect(() => {
+    const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
+    for (const key of LOCATION_DYNAMIC_KEYS) {
+      allowedKeys.add(key);
+    }
+
+    setDynamicValues((prev) => {
+      const next: Record<string, string | boolean> = {};
+      for (const [key, value] of Object.entries(prev)) {
+        if (allowedKeys.has(key)) {
+          next[key] = value;
+        }
+      }
+      return next;
+    });
+  }, [dynamicFields]);
 
   useEffect(() => {
     let active = true;
@@ -618,7 +725,7 @@ export default function PostAdForm({
     setLocationHint(null);
 
     if (!navigator.geolocation) {
-      setLocationHint("We could not detect your location. Please choose manually.");
+      setLocationHint(postAdCopy.couldNotDetectLocation);
       setLocationMethod("manual");
       return;
     }
@@ -630,13 +737,13 @@ export default function PostAdForm({
         setDeviceLatitude(position.coords.latitude);
         setDeviceLongitude(position.coords.longitude);
         setDeviceAccuracy(Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null);
-        setLocationHint("We detected your location. Please confirm it before publishing.");
+        setLocationHint(postAdCopy.detectedLocationNeedsConfirmation);
         void attemptReverseGeocode(position.coords.latitude, position.coords.longitude);
       },
       () => {
         setIsDetectingLocation(false);
         setLocationMethod("manual");
-        setLocationHint("We could not detect your location. Please choose manually.");
+        setLocationHint(postAdCopy.couldNotDetectLocation);
       },
       {
         enableHighAccuracy: true,
@@ -648,16 +755,16 @@ export default function PostAdForm({
 
   function handleConfirmDetectedLocation() {
     if (!selectedProvinceId || !selectedDistrictId || deviceLatitude === null || deviceLongitude === null) {
-      setStepError("Please confirm province and district for the detected location.");
+      setStepError(postAdCopy.confirmProvinceDistrictForDetected);
       return;
     }
     setLocationConfirmed(true);
-    setLocationHint("Location confirmed.");
+    setLocationHint(postAdCopy.locationConfirmed);
   }
 
   function handleUsePreviousLocation() {
     if (!previousLocation) {
-      setLocationHint("No previous location saved yet.");
+      setLocationHint(postAdCopy.noPreviousLocation);
       return;
     }
 
@@ -667,7 +774,7 @@ export default function PostAdForm({
     setAreaText(previousLocation.areaText || "");
     setLocationVisibility(previousLocation.locationVisibility || "province_district");
     setLocationConfirmed(true);
-    setLocationHint("Previous location applied.");
+    setLocationHint(postAdCopy.previousLocationApplied);
   }
 
   function onPickFiles(event: React.ChangeEvent<HTMLInputElement>) {
@@ -861,39 +968,31 @@ export default function PostAdForm({
 
   function validateCategoryStep() {
     if (!selectedRoot || !finalNode) {
-      return "Select a final category to continue.";
+      return postAdCopy.selectFinalCategory;
     }
     if (selectedRoot.is_coming_soon) {
-      return "This category is coming soon. Posting is not available yet.";
+      return postAdCopy.categoryComingSoon;
     }
     return null;
   }
 
   function validateDetailsStep() {
-    if (!core.title || core.title.trim().length < 5) return "Title must be at least 5 characters.";
-    if (!core.description || core.description.trim().length < 20) return "Description must be at least 20 characters.";
-    if (!core.price || Number(core.price) <= 0) return "Please enter a valid price.";
-    if (!core.contact_phone) return "Contact phone is required.";
-    if (!core.rulesAccepted) return "You must accept the posting rules to continue.";
+    if (!core.title || core.title.trim().length < 5) return postAdCopy.titleMin;
+    if (!core.description || core.description.trim().length < 20) return postAdCopy.descriptionMin;
+    if (!core.price || Number(core.price) <= 0) return postAdCopy.invalidPrice;
+    if (!core.contact_phone) return postAdCopy.contactPhoneRequired;
+    if (!core.rulesAccepted) return postAdCopy.acceptRulesRequired;
 
     for (const key of requiredDynamicKeys) {
       if (!String(dynamicValues[key] ?? "").trim()) {
-        return `${renderFieldLabel(key)} is required.`;
+        return `${renderFieldLabel(key)} ${postAdCopy.fieldRequiredSuffix}`;
       }
     }
 
     const isVehicle = rootSlug === "vehicles";
     if (isVehicle) {
       const year = String(dynamicValues.year ?? dynamicValues.vehicle_year ?? "").trim();
-      if (!year) return "Vehicle year is required.";
-    }
-
-    if (isDormitory) {
-      if (!listingPurpose) return "Listing Purpose is required.";
-      if (listingPurpose !== "For Rent") return "Dormitory listings must be For Rent.";
-      if (!String(dynamicValues.payment_period ?? "").trim()) return "Payment Period is required for dormitory.";
-      if (!String(dynamicValues.gender_allowed ?? "").trim()) return "Gender Allowed is required for dormitory.";
-      if (!String(dynamicValues.room_type ?? "").trim()) return "Room Type is required for dormitory.";
+      if (!year) return postAdCopy.vehicleYearRequired;
     }
 
     return null;
@@ -901,20 +1000,20 @@ export default function PostAdForm({
 
   function validateLocationStep() {
     if (!selectedProvinceId || !selectedDistrictId) {
-      return "Please add a location before publishing your ad.";
+      return postAdCopy.addLocationBeforePublish;
     }
 
     if (locationMethod === "device") {
       if (deviceLatitude === null || deviceLongitude === null) {
-        return "Please detect your device location or choose manual location.";
+        return postAdCopy.detectOrChooseManual;
       }
       if (!locationConfirmed) {
-        return "We detected your location. Please confirm it before publishing.";
+        return postAdCopy.detectedLocationNeedsConfirmation;
       }
     }
 
     if (!locationMethod) {
-      return "Please add a location before publishing your ad.";
+      return postAdCopy.addLocationBeforePublish;
     }
 
     return null;
@@ -1016,12 +1115,12 @@ export default function PostAdForm({
     const locationErr = validateLocationStep();
 
     if (categoryErr || detailErr || photoErr || locationErr) {
-      setError(categoryErr || detailErr || photoErr || locationErr || "Please complete required fields.");
+      setError(categoryErr || detailErr || photoErr || locationErr || postAdCopy.completeRequiredFields);
       return;
     }
 
     if (!selectedRoot || !finalNode) {
-      setError("Category is required.");
+      setError(postAdCopy.categoryRequired);
       return;
     }
 
@@ -1113,20 +1212,20 @@ export default function PostAdForm({
     }
 
     startTransition(async () => {
-      setStatus("Creating listing...");
+      setStatus(t.postAd.publishing);
       const created = await createListingAction(form);
       if (!created.ok || !created.listingId) {
-        setError(created.message || "Failed to create listing.");
+        setError(created.message || postAdCopy.completeRequiredFields);
         setStatus(null);
         return;
       }
 
       const ordered = [...images].sort((a, b) => (a.isPrimary ? -1 : b.isPrimary ? 1 : 0));
       for (let i = 0; i < ordered.length; i += 1) {
-        setStatus(`Uploading image ${i + 1} of ${ordered.length}...`);
+        setStatus(t.postAd.publishing);
         const uploaded = await uploadListingImageAction(created.listingId, ordered[i].file, ordered[i].isPrimary);
         if (!uploaded.ok) {
-          setError(`Listing created, but image ${i + 1} failed: ${uploaded.message}`);
+          setError(uploaded.message || postAdCopy.completeRequiredFields);
           setStatus(null);
           return;
         }
@@ -1143,7 +1242,7 @@ export default function PostAdForm({
         globalThis.localStorage?.setItem(PREVIOUS_LOCATION_KEY, JSON.stringify(snapshot));
       }
       await deleteMyDraftAction();
-      setStatus("Listing created. Redirecting...");
+      setStatus(t.postAd.publishing);
       const destination = `/listings/${created.listingId}/manage`;
       router.push(destination);
       router.refresh();
@@ -1151,75 +1250,7 @@ export default function PostAdForm({
     });
   }
 
-  const rootSpecificFieldKeys = new Set([
-    "listing_purpose",
-    "rooms",
-    "bathrooms",
-    "property_size",
-    "land_size",
-    "floor",
-    "total_floors",
-    "furnished",
-    "parking",
-    "water",
-    "electricity",
-    "road_access",
-    "document_type",
-    "owner_type",
-    "brand",
-    "model",
-    "year",
-    "variant",
-    "km",
-    "fuel_type",
-    "transmission",
-    "body_type",
-    "engine_capacity",
-    "condition",
-    "plate_status",
-    "customs_status",
-    "imported_from",
-    "motorcycle_type",
-    "engine_cc",
-    "rickshaw_type",
-    "passenger_capacity",
-    "cargo_capacity",
-    "storage",
-    "ram",
-    "battery_capacity",
-    "registered_status",
-    "sim_lock_bypass",
-    "fingerprint_works",
-    "face_id_works",
-    "camera_works",
-    "box_available",
-    "charger_included",
-    "imei_status",
-    "price_type",
-    "exchange_accepted",
-    "battery_health",
-    "original_refurbished",
-    "item_type",
-    "suitable_for_students",
-    "student_housing_type",
-    "gender_allowed",
-    "payment_period",
-    "distance_to_university",
-    "shared_allowed",
-    "students_allowed",
-    "room_type",
-    "number_of_beds",
-    "meals_included",
-    "internet",
-    "heating",
-    "air_conditioning",
-    "security",
-    "contact_preferences",
-  ]);
-
-  const renderDynamicFields = dynamicFields.filter(
-    (field) => !rootSpecificFieldKeys.has(field.field_key) && !LOCATION_DYNAMIC_KEYS.has(field.field_key)
-  );
+  const renderDynamicFields = dynamicFields.filter((field) => !LOCATION_DYNAMIC_KEYS.has(field.field_key));
 
   const suggestedCategoryLabel = useMemo(() => {
     if (!smartSuggestion || smartSuggestion.categorySlug === "other") {
@@ -1260,21 +1291,21 @@ export default function PostAdForm({
       <div className="mt-4 space-y-4">
         {pendingDraft ? (
           <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-            <p className="text-sm font-semibold">You have an unfinished ad. Continue?</p>
+            <p className="text-sm font-semibold">{postAdCopy.draftContinuePrompt}</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={continueDraft}
                 className="rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white"
               >
-                Continue draft
+                {postAdCopy.continueDraft}
               </button>
               <button
                 type="button"
                 onClick={startNewWithoutDraft}
                 className="rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
               >
-                Start new ad
+                {postAdCopy.startNewAd}
               </button>
             </div>
           </section>
@@ -1282,9 +1313,7 @@ export default function PostAdForm({
 
         {postMode !== "standard" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-            <p className="text-sm font-semibold">
-              Quick post mode: add essentials first, then review before publishing.
-            </p>
+            <p className="text-sm font-semibold">{postAdCopy.quickModeHint}</p>
             <button
               type="button"
               onClick={() => {
@@ -1317,19 +1346,19 @@ export default function PostAdForm({
               }}
               className="mt-3 rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
             >
-              Auto-detect details
+              {postAdCopy.autoDetectDetails}
             </button>
 
             {smartSuggestion ? (
               <div className="mt-3 rounded-xl border border-[var(--line)] bg-white p-3 text-sm">
                 <p className="font-semibold">
-                  Suggested category: {suggestedCategoryLabel ?? "Other"}
+                  {postAdCopy.suggestedCategory}: {suggestedCategoryLabel ?? postAdCopy.other}
                 </p>
                 <p className="mt-1 text-xs text-[var(--ink-2)]">
-                  Confidence: {Math.round(smartSuggestion.confidence * 100)}% {smartSuggestion.reasons.length > 0 ? `(${smartSuggestion.reasons.join(", ")})` : ""}
+                  {postAdCopy.confidence}: {Math.round(smartSuggestion.confidence * 100)}% {smartSuggestion.reasons.length > 0 ? `(${smartSuggestion.reasons.join(", ")})` : ""}
                 </p>
                 <p className="mt-1 text-xs text-[var(--ink-2)]">
-                  Detected listing type: For Sale
+                  {postAdCopy.detectedListingType}: {t.postAd.forSale}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
@@ -1337,14 +1366,14 @@ export default function PostAdForm({
                     onClick={() => void applySmartSuggestion()}
                     className="rounded-lg bg-[var(--ink-1)] px-3 py-2 text-xs font-semibold text-white"
                   >
-                    Apply suggestion
+                    {postAdCopy.applySuggestion}
                   </button>
                   <button
                     type="button"
                     onClick={() => setSmartSuggestion(null)}
                     className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-semibold"
                   >
-                    Dismiss
+                    {postAdCopy.dismiss}
                   </button>
                 </div>
               </div>
@@ -1443,27 +1472,27 @@ export default function PostAdForm({
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-semibold sm:col-span-2">Title
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.title}
                 <input value={core.title} onChange={(event) => updateCore("title", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
-              <label className="text-sm font-semibold sm:col-span-2">Description
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.description}
                 <textarea rows={4} value={core.description} onChange={(event) => updateCore("description", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
-              <label className="text-sm font-semibold">Price
+              <label className="text-sm font-semibold">{t.postAd.price}
                 <input type="number" min={1} value={core.price} onChange={(event) => updateCore("price", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
-              <label className="text-sm font-semibold">Currency
+              <label className="text-sm font-semibold">{t.postAd.currency}
                 <select value={core.currency} onChange={(event) => updateCore("currency", event.target.value as "AFN" | "USD")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
                   {CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
                 </select>
               </label>
-              <label className="text-sm font-semibold">Contact Phone
+              <label className="text-sm font-semibold">{t.postAd.contactPhone}
                 <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
-              <label className="text-sm font-semibold">Contact Name
+              <label className="text-sm font-semibold">{t.postAd.contactName}
                 <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
-              <label className="text-sm font-semibold sm:col-span-2">Contact Preferences
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
                 <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
               <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)] sm:col-span-2">
@@ -1471,368 +1500,20 @@ export default function PostAdForm({
               </p>
             </div>
 
-            {rootSlug === "real-estate" ? (
-              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">Real Estate Details</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="text-sm font-semibold">Listing Purpose
-                    <select value={String(dynamicValues.listing_purpose ?? "")} onChange={(event) => updateDynamic("listing_purpose", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" disabled={isDormitory}>
-                      <option value="">Select</option>
-                      <option value="For Sale">For Sale</option>
-                      <option value="For Rent">For Rent</option>
-                      <option value="Gerawy / Rahn">Gerawy / Rahn</option>
-                      <option value="Exchange">Exchange</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-semibold">Rooms
-                    <input type="number" min={0} value={String(dynamicValues.rooms ?? "")} onChange={(event) => updateDynamic("rooms", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Bathrooms
-                    <input type="number" min={0} value={String(dynamicValues.bathrooms ?? "")} onChange={(event) => updateDynamic("bathrooms", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Property Size
-                    <input value={String(dynamicValues.property_size ?? "")} onChange={(event) => updateDynamic("property_size", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Land Size (optional)
-                    <input value={String(dynamicValues.land_size ?? "")} onChange={(event) => updateDynamic("land_size", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Document Type
-                    <input value={String(dynamicValues.document_type ?? "")} onChange={(event) => updateDynamic("document_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Owner / Agent
-                    <select value={String(dynamicValues.owner_type ?? "")} onChange={(event) => updateDynamic("owner_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="owner">Owner</option>
-                      <option value="agent">Agent</option>
-                    </select>
-                  </label>
-
-                  {showStudentSuitabilityToggle ? (
-                    <section className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                      <h4 className="text-sm font-bold">Student Housing</h4>
-                      <label className="mt-2 block text-sm font-semibold">Is this suitable for students?</label>
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => updateDynamic("suitable_for_students", true)}
-                          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${suitableForStudents ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-[var(--line)]"}`}
-                        >
-                          Yes
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateDynamic("suitable_for_students", false)}
-                          className={`rounded-lg border px-3 py-2 text-sm font-semibold ${!suitableForStudents ? "border-slate-600 bg-slate-50 text-slate-700" : "border-[var(--line)]"}`}
-                        >
-                          No
-                        </button>
-                      </div>
-
-                      {suitableForStudents ? (
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                          <label className="text-sm font-semibold">Gender Suitable
-                            <select value={String(dynamicValues.gender_allowed ?? "")} onChange={(event) => updateDynamic("gender_allowed", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                              <option value="">Select</option>
-                              <option value="male">Male</option>
-                              <option value="female">Female</option>
-                              <option value="family">Family</option>
-                              <option value="everyone">Everyone</option>
-                            </select>
-                          </label>
-                          <label className="text-sm font-semibold">Distance to University (km)
-                            <input type="number" min={0} step="0.1" value={String(dynamicValues.distance_to_university ?? "")} onChange={(event) => updateDynamic("distance_to_university", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                          </label>
-                          <label className="text-sm font-semibold">
-                            <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                              <input type="checkbox" checked={Boolean(dynamicValues.furnished)} onChange={(event) => updateDynamic("furnished", event.target.checked)} className="h-4 w-4" />
-                              Furnished
-                            </span>
-                          </label>
-                          <label className="text-sm font-semibold">
-                            <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                              <input type="checkbox" checked={Boolean(dynamicValues.shared_allowed)} onChange={(event) => updateDynamic("shared_allowed", event.target.checked)} className="h-4 w-4" />
-                              Shared Allowed
-                            </span>
-                          </label>
-                          <label className="text-sm font-semibold">Number of Students Allowed
-                            <input type="number" min={1} value={String(dynamicValues.students_allowed ?? "")} onChange={(event) => updateDynamic("students_allowed", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                          </label>
-                        </div>
-                      ) : null}
-                    </section>
-                  ) : null}
-
-                  {isDormitory ? (
-                    <section className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                      <h4 className="text-sm font-bold">Dormitory Details</h4>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <label className="text-sm font-semibold">Payment Period
-                          <select value={String(dynamicValues.payment_period ?? "")} onChange={(event) => updateDynamic("payment_period", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                            <option value="">Select</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="yearly">Yearly</option>
-                            <option value="semester">Semester</option>
-                            <option value="daily">Daily</option>
-                            <option value="other">Other</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-semibold">Gender Allowed
-                          <select value={String(dynamicValues.gender_allowed ?? "")} onChange={(event) => updateDynamic("gender_allowed", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                            <option value="">Select</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                            <option value="family">Family</option>
-                            <option value="everyone">Everyone</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-semibold">Room Type
-                          <select value={String(dynamicValues.room_type ?? "")} onChange={(event) => updateDynamic("room_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                            <option value="">Select</option>
-                            <option value="Single Room">Single Room</option>
-                            <option value="Shared Room">Shared Room</option>
-                            <option value="Private Room">Private Room</option>
-                            <option value="Bed Space">Bed Space</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-semibold">Number of Beds
-                          <input type="number" min={0} value={String(dynamicValues.number_of_beds ?? "")} onChange={(event) => updateDynamic("number_of_beds", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                        </label>
-                        <label className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                            <input type="checkbox" checked={Boolean(dynamicValues.meals_included)} onChange={(event) => updateDynamic("meals_included", event.target.checked)} className="h-4 w-4" />
-                            Meals Included
-                          </span>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                            <input type="checkbox" checked={Boolean(dynamicValues.water)} onChange={(event) => updateDynamic("water", event.target.checked)} className="h-4 w-4" />
-                            Water
-                          </span>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                            <input type="checkbox" checked={Boolean(dynamicValues.electricity)} onChange={(event) => updateDynamic("electricity", event.target.checked)} className="h-4 w-4" />
-                            Electricity
-                          </span>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                            <input type="checkbox" checked={Boolean(dynamicValues.internet)} onChange={(event) => updateDynamic("internet", event.target.checked)} className="h-4 w-4" />
-                            Internet
-                          </span>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                            <input type="checkbox" checked={Boolean(dynamicValues.heating)} onChange={(event) => updateDynamic("heating", event.target.checked)} className="h-4 w-4" />
-                            Heating
-                          </span>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                            <input type="checkbox" checked={Boolean(dynamicValues.air_conditioning)} onChange={(event) => updateDynamic("air_conditioning", event.target.checked)} className="h-4 w-4" />
-                            Air Conditioning
-                          </span>
-                        </label>
-                        <label className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                            <input type="checkbox" checked={Boolean(dynamicValues.security)} onChange={(event) => updateDynamic("security", event.target.checked)} className="h-4 w-4" />
-                            Security
-                          </span>
-                        </label>
-                        <label className="text-sm font-semibold">Distance to University (km)
-                          <input type="number" min={0} step="0.1" value={String(dynamicValues.distance_to_university ?? "")} onChange={(event) => updateDynamic("distance_to_university", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                        </label>
-                        <label className="text-sm font-semibold sm:col-span-2">Rules (optional)
-                          <input value={String(dynamicValues.rules ?? "")} onChange={(event) => updateDynamic("rules", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                        </label>
-                      </div>
-                    </section>
-                  ) : null}
-
-                  {isStudentCollection ? (
-                    <section className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                      <h4 className="text-sm font-bold">Student Housing Collection Details</h4>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <label className="text-sm font-semibold">Property Type
-                          <select value={String(dynamicValues.student_housing_type ?? "")} onChange={(event) => updateDynamic("student_housing_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                            <option value="">Select</option>
-                            <option value="house">House</option>
-                            <option value="apartment">Apartment</option>
-                            <option value="room">Room</option>
-                            <option value="dormitory">Dormitory</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-semibold">Gender Suitable
-                          <select value={String(dynamicValues.gender_allowed ?? "")} onChange={(event) => updateDynamic("gender_allowed", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                            <option value="">Select</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                            <option value="family">Family</option>
-                            <option value="everyone">Everyone</option>
-                          </select>
-                        </label>
-                        <label className="text-sm font-semibold">Distance to University (km)
-                          <input type="number" min={0} step="0.1" value={String(dynamicValues.distance_to_university ?? "")} onChange={(event) => updateDynamic("distance_to_university", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                        </label>
-                        <label className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-3">
-                            <input type="checkbox" checked={Boolean(dynamicValues.furnished)} onChange={(event) => updateDynamic("furnished", event.target.checked)} className="h-4 w-4" />
-                            Furnished
-                          </span>
-                        </label>
-                      </div>
-                    </section>
-                  ) : null}
-                </div>
-              </section>
-            ) : null}
-
             {rootSlug === "vehicles" ? (
               <section className="mt-4 space-y-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">Vehicle Details</h3>
+                <h3 className="text-sm font-bold">{t.postAd.vehicleDetails}</h3>
                 <VehicleSmartSelector categoryNodeId={finalNode?.id ?? 0} onChange={setVehicleSelection} />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-sm font-semibold">Brand
-                    <input value={String(dynamicValues.brand ?? "")} onChange={(event) => updateDynamic("brand", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Model
-                    <input value={String(dynamicValues.model ?? "")} onChange={(event) => updateDynamic("model", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Year
-                    <input type="number" value={String(dynamicValues.year ?? "")} onChange={(event) => updateDynamic("year", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">KM
-                    <input type="number" value={String(dynamicValues.km ?? dynamicValues.mileage ?? "")} onChange={(event) => updateDynamic("km", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Fuel Type
-                    <input value={String(dynamicValues.fuel_type ?? "")} onChange={(event) => updateDynamic("fuel_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Transmission
-                    <input value={String(dynamicValues.transmission ?? "")} onChange={(event) => updateDynamic("transmission", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Condition
-                    <input value={String(dynamicValues.condition ?? "")} onChange={(event) => updateDynamic("condition", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Plate Status
-                    <input value={String(dynamicValues.plate_status ?? "")} onChange={(event) => updateDynamic("plate_status", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                </div>
                 <div>
-                  <p className="mb-2 text-sm font-semibold">Damage / Paint Report</p>
+                  <p className="mb-2 text-sm font-semibold">{t.postAd.damagePaintReport}</p>
                   <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} />
-                </div>
-              </section>
-            ) : null}
-
-            {(rootSlug === "mobile-phones-tablets" || rootSlug === "electronics-computers") ? (
-              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">Phones & Electronics Details</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="text-sm font-semibold">Brand
-                    <input value={String(dynamicValues.brand ?? "")} onChange={(event) => updateDynamic("brand", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Model
-                    <input value={String(dynamicValues.model ?? "")} onChange={(event) => updateDynamic("model", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Storage
-                    <input value={String(dynamicValues.storage ?? "")} onChange={(event) => updateDynamicPair("storage", "electronics_storage", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">RAM (optional)
-                    <input value={String(dynamicValues.ram ?? "")} onChange={(event) => updateDynamicPair("ram", "electronics_ram", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Condition
-                    <input value={String(dynamicValues.condition ?? "")} onChange={(event) => updateDynamicPair("condition", "electronics_condition", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Warranty
-                    <input value={String(dynamicValues.warranty ?? "")} onChange={(event) => updateDynamicPair("warranty", "electronics_warranty", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Battery Health / Capacity
-                    <input value={String(dynamicValues.battery_health ?? "")} onChange={(event) => updateDynamicPair("battery_health", "electronics_battery_health", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Box / Carton Available
-                    <select value={String(dynamicValues.box_available ?? "")} onChange={(event) => updateDynamicPair("box_available", "electronics_box_included", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-semibold">Registered Status
-                    <input value={String(dynamicValues.registered_status ?? "")} onChange={(event) => updateDynamicPair("registered_status", "electronics_network_registered", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">SIM Lock / Bypass
-                    <input value={String(dynamicValues.sim_lock_bypass ?? "")} onChange={(event) => updateDynamic("sim_lock_bypass", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Fingerprint Works
-                    <select value={String(dynamicValues.fingerprint_works ?? "")} onChange={(event) => updateDynamic("fingerprint_works", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-semibold">Face ID Works
-                    <select value={String(dynamicValues.face_id_works ?? "")} onChange={(event) => updateDynamic("face_id_works", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-semibold">Camera Works
-                    <select value={String(dynamicValues.camera_works ?? "")} onChange={(event) => updateDynamic("camera_works", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-semibold">Charger Included
-                    <select value={String(dynamicValues.charger_included ?? "")} onChange={(event) => updateDynamicPair("charger_included", "electronics_charger_included", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-semibold">IMEI / Registration
-                    <input value={String(dynamicValues.imei_status ?? "")} onChange={(event) => updateDynamic("imei_status", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Price Type
-                    <select value={String(dynamicValues.price_type ?? "")} onChange={(event) => updateDynamic("price_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="fixed">Fixed</option>
-                      <option value="negotiable">Negotiable</option>
-                      <option value="contact">Contact</option>
-                    </select>
-                  </label>
-                  <label className="text-sm font-semibold">Exchange Accepted
-                    <select value={String(dynamicValues.exchange_accepted ?? "")} onChange={(event) => updateDynamic("exchange_accepted", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                      <option value="">Select</option>
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </label>
-                </div>
-              </section>
-            ) : null}
-
-            {rootSlug === "second-hand-items" ? (
-              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">Second Hand Details</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="text-sm font-semibold">Item Type
-                    <input value={String(dynamicValues.item_type ?? "")} onChange={(event) => updateDynamic("item_type", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Condition
-                    <input value={String(dynamicValues.condition ?? "")} onChange={(event) => updateDynamic("condition", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
-                  <label className="text-sm font-semibold">Brand (optional)
-                    <input value={String(dynamicValues.brand ?? "")} onChange={(event) => updateDynamic("brand", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-                  </label>
                 </div>
               </section>
             ) : null}
 
             {renderDynamicFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">Additional Category Fields</h3>
+                <h3 className="text-sm font-bold">{t.postAd.additionalCategoryFields}</h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {renderDynamicFields.map((field) => {
                     const value = dynamicValues[field.field_key];
@@ -1863,7 +1544,7 @@ export default function PostAdForm({
                             onChange={(event) => updateDynamic(field.field_key, event.target.value)}
                             className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
                           >
-                            <option value="">Select</option>
+                            <option value="">{t.postAd.select}</option>
                             {options.map((option) => (
                               <option key={`${field.id}-${option}`} value={option}>{option}</option>
                             ))}
@@ -1890,7 +1571,7 @@ export default function PostAdForm({
 
             <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
               <input type="checkbox" checked={core.rulesAccepted} onChange={(event) => updateCore("rulesAccepted", event.target.checked)} className="h-4 w-4" />
-              I confirm this listing follows Sahibash rules.
+              {t.postAd.confirmRules}
             </label>
           </section>
         ) : null}
@@ -1965,8 +1646,8 @@ export default function PostAdForm({
                 onClick={handleUsePreviousLocation}
                 className={`rounded-xl border p-4 text-left ${previousLocation ? "border-amber-500 bg-amber-50" : "border-[var(--line)] opacity-60"}`}
               >
-                <p className="text-sm font-bold">Use Previous Location</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">Apply your last used province/district</p>
+                <p className="text-sm font-bold">{postAdCopy.usePreviousLocation}</p>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">{postAdCopy.applyPreviousLocation}</p>
               </button>
             </div>
 
