@@ -121,3 +121,8 @@ test("Fielder variants return equivalent relevant listings", () => {
     "فیلډر",
   ]);
 });
+
+test("Dari transliteration expands to useful Latin variants", () => {
+  const variants = expandSearchVariants("فیلدر");
+  assert.ok(variants.includes("fildr") || variants.includes("fielder"));
+});

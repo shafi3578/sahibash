@@ -15,6 +15,42 @@ const CHAR_NORMALIZATION_MAP: Record<string, string> = {
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
+const PERSO_LATIN_MAP: Record<string, string> = {
+  ا: "a",
+  آ: "a",
+  ب: "b",
+  پ: "p",
+  ت: "t",
+  ث: "s",
+  ج: "j",
+  چ: "ch",
+  ح: "h",
+  خ: "kh",
+  د: "d",
+  ذ: "z",
+  ر: "r",
+  ز: "z",
+  ژ: "zh",
+  س: "s",
+  ش: "sh",
+  ص: "s",
+  ض: "z",
+  ط: "t",
+  ظ: "z",
+  ع: "a",
+  غ: "gh",
+  ف: "f",
+  ق: "q",
+  ک: "k",
+  گ: "g",
+  ل: "l",
+  م: "m",
+  ن: "n",
+  و: "o",
+  ه: "h",
+  ی: "i",
+};
+
 const SYNONYM_GROUPS: string[][] = [
   ["phone", "mobile", "cellphone", "تلیفون", "ټیلیفون", "موبایل", "مبایل", "گوشی"],
   ["iphone", "i phone", "ایفون", "آیفون", "ایفون"],
@@ -107,6 +143,26 @@ function buildAliasLookup() {
 
 const ALIAS_LOOKUP = buildAliasLookup();
 
+function hasPersoArabicScript(value: string): boolean {
+  return /[\u0600-\u06ff]/.test(value);
+}
+
+function transliteratePersoToLatin(value: string): string {
+  return Array.from(value)
+    .map((char) => PERSO_LATIN_MAP[char] ?? char)
+    .join("")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function latinConsonantSkeleton(value: string): string {
+  return value
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/[aeiou]/g, "")
+    .trim();
+}
+
 export function expandSearchVariants(query: string): string[] {
   const normalized = normalizeSearchText(query);
   if (!normalized) return [];
@@ -131,6 +187,28 @@ export function expandSearchVariants(query: string): string[] {
 
   if (normalized.includes("iphone")) variants.add("i phone");
   if (normalized.includes("i phone")) variants.add("iphone");
+
+  if (hasPersoArabicScript(normalized)) {
+    const transliterated = normalizeSearchText(transliteratePersoToLatin(normalized));
+    if (transliterated) {
+      variants.add(transliterated);
+      const transliteratedTokens = tokenizeNormalizedSearch(transliterated);
+      for (const token of transliteratedTokens) {
+        variants.add(token);
+        const skeleton = latinConsonantSkeleton(token);
+        if (skeleton.length >= 4) {
+          variants.add(skeleton);
+        }
+      }
+    }
+  }
+
+  for (const token of tokens) {
+    const skeleton = latinConsonantSkeleton(token);
+    if (skeleton.length >= 4) {
+      variants.add(skeleton);
+    }
+  }
 
   return Array.from(variants)
     .map((term) => term.trim())

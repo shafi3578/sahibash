@@ -149,6 +149,18 @@ function applyPublicListingQualityFilters<T>(query: T): T {
 }
 
 function buildSearchOrClause(searchTerms: string[], includeIds?: string[]) {
+  const toLooseLatinPattern = (term: string): string | null => {
+    const base = term.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (base.length < 4) {
+      return null;
+    }
+    const skeleton = base.replace(/[aeiou]/g, "");
+    if (skeleton.length < 4) {
+      return null;
+    }
+    return skeleton.split("").join("%");
+  };
+
   const termClauses: string[] = [];
   for (const term of searchTerms) {
     const trimmed = term.trim();
@@ -159,6 +171,14 @@ function buildSearchOrClause(searchTerms: string[], includeIds?: string[]) {
     termClauses.push(`description.ilike.%${trimmed}%`);
     termClauses.push(`vehicle_brand.ilike.%${trimmed}%`);
     termClauses.push(`vehicle_model.ilike.%${trimmed}%`);
+
+    const loosePattern = toLooseLatinPattern(trimmed);
+    if (loosePattern) {
+      termClauses.push(`title.ilike.%${loosePattern}%`);
+      termClauses.push(`description.ilike.%${loosePattern}%`);
+      termClauses.push(`vehicle_brand.ilike.%${loosePattern}%`);
+      termClauses.push(`vehicle_model.ilike.%${loosePattern}%`);
+    }
   }
 
   if (includeIds && includeIds.length > 0) {
