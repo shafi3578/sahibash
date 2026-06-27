@@ -6,6 +6,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { updateListingAction, uploadListingImageFormAction } from "@/lib/actions/listings";
 import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { CITIES, CURRENCIES } from "@/lib/constants/marketplace";
+import { getCurrentLocale } from "@/lib/i18n/server";
+import { getUiTranslations } from "@/lib/i18n/ui";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -21,6 +23,8 @@ async function handleUpdateListing(listingId: string, formData: FormData) {
 
 export default async function EditListingPage({ params }: PageProps) {
   const { id: listingId } = await params;
+  const locale = await getCurrentLocale();
+  const ui = getUiTranslations(locale);
 
   const user = await getCurrentUser();
   if (!user) redirect(`/login?redirect=${encodeURIComponent(`/listings/${listingId}/edit`)}`);
@@ -46,9 +50,9 @@ export default async function EditListingPage({ params }: PageProps) {
     return (
       <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="rounded-lg border border-[var(--line)] bg-white p-6 text-center">
-          <p className="text-[var(--ink-2)]">Listing not found or unauthorized</p>
+          <p className="text-[var(--ink-2)]">{ui.listingEdit.notFoundOrUnauthorized}</p>
           <Link href="/dashboard/my-ads" className="mt-3 inline-block text-[var(--accent)] font-semibold">
-            Back to My Listings
+            {ui.listingEdit.backToMyListings}
           </Link>
         </div>
       </main>
@@ -66,14 +70,14 @@ export default async function EditListingPage({ params }: PageProps) {
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold">Edit Listing</h1>
+        <h1 className="font-display text-3xl font-bold">{ui.listingEdit.editListing}</h1>
         <p className="mt-1 text-[var(--ink-2)]">{listing.title}</p>
       </div>
 
       <form action={handleUpdateListing.bind(null, listingId)} className="space-y-6">
         {/* Category Info */}
         <div className="rounded-lg border border-[var(--line)] bg-white p-6">
-          <h2 className="mb-4 font-display text-lg font-bold">Category</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.category}</h2>
           <div className="rounded-lg bg-[var(--surface-2)] p-3">
             <div className="text-sm">
               <div className="font-semibold">{listing.category?.name}</div>
@@ -87,11 +91,11 @@ export default async function EditListingPage({ params }: PageProps) {
 
         {/* Basic Info */}
         <div className="rounded-lg border border-[var(--line)] bg-white p-6">
-          <h2 className="mb-4 font-display text-lg font-bold">Basic Information</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.basicInformation}</h2>
           <div className="space-y-4">
             {/* Title */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">Title</label>
+              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.title}</label>
               <input
                 type="text"
                 name="title"
@@ -101,12 +105,12 @@ export default async function EditListingPage({ params }: PageProps) {
                 maxLength={120}
                 className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
               />
-              <p className="mt-1 text-xs text-[var(--ink-2)]">5-120 characters</p>
+              <p className="mt-1 text-xs text-[var(--ink-2)]">{ui.listingEdit.titleHint}</p>
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">Description</label>
+              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.description}</label>
               <textarea
                 name="description"
                 defaultValue={listing.description}
@@ -116,18 +120,18 @@ export default async function EditListingPage({ params }: PageProps) {
                 rows={6}
                 className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
               />
-              <p className="mt-1 text-xs text-[var(--ink-2)]">20-5000 characters</p>
+              <p className="mt-1 text-xs text-[var(--ink-2)]">{ui.listingEdit.descriptionHint}</p>
             </div>
           </div>
         </div>
 
         {/* Location */}
         <div className="rounded-lg border border-[var(--line)] bg-white p-6">
-          <h2 className="mb-4 font-display text-lg font-bold">Location</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.location}</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {/* City */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">City</label>
+              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.city}</label>
               <select
                 name="city"
                 defaultValue={listing.city}
@@ -144,7 +148,7 @@ export default async function EditListingPage({ params }: PageProps) {
 
             {/* District */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">District (Optional)</label>
+              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.districtOptional}</label>
               <input
                 type="text"
                 name="district"
@@ -158,11 +162,11 @@ export default async function EditListingPage({ params }: PageProps) {
 
         {/* Pricing */}
         <div className="rounded-lg border border-[var(--line)] bg-white p-6">
-          <h2 className="mb-4 font-display text-lg font-bold">Pricing</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.pricing}</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Price */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">Price</label>
+              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.price}</label>
               <input
                 type="number"
                 name="price"
@@ -176,7 +180,7 @@ export default async function EditListingPage({ params }: PageProps) {
 
             {/* Currency */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">Currency</label>
+              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.currency}</label>
               <select
                 name="currency"
                 defaultValue={listing.currency}
@@ -195,11 +199,11 @@ export default async function EditListingPage({ params }: PageProps) {
 
         {/* Contact Info */}
         <div className="rounded-lg border border-[var(--line)] bg-white p-6">
-          <h2 className="mb-4 font-display text-lg font-bold">Contact Information</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.contactInformation}</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Name */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">Contact Name (Optional)</label>
+              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.contactNameOptional}</label>
               <input
                 type="text"
                 name="contact_name"
@@ -211,7 +215,7 @@ export default async function EditListingPage({ params }: PageProps) {
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">Phone</label>
+              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.phone}</label>
               <input
                 type="tel"
                 name="contact_phone"
@@ -228,7 +232,7 @@ export default async function EditListingPage({ params }: PageProps) {
         {/* Dynamic Fields by Category */}
         {categoryFields.length > 0 && (
           <div className="rounded-lg border border-[var(--line)] bg-white p-6">
-            <h2 className="mb-4 font-display text-lg font-bold">Additional Details</h2>
+            <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.additionalDetails}</h2>
             <div className="space-y-4">
               {categoryFields.map((field) => (
                 <div key={field.id}>
@@ -265,7 +269,7 @@ export default async function EditListingPage({ params }: PageProps) {
                       required={field.is_required}
                       className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
                     >
-                      <option value="">Select {field.field_label}</option>
+                      <option value="">{ui.listingEdit.selectField.replace("{field}", field.field_label)}</option>
                       {((field as unknown) as { options: Array<{ id: string; option_value: string }> }).options?.map((opt) => (
                         <option key={opt.id} value={opt.option_value}>
                           {opt.option_value}
@@ -294,24 +298,24 @@ export default async function EditListingPage({ params }: PageProps) {
 
         {/* Photos */}
         <div className="rounded-lg border border-[var(--line)] bg-white p-6">
-          <h2 className="mb-4 font-display text-lg font-bold">Photos</h2>
+          <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.photos}</h2>
 
           {/* Existing Images */}
           {listing.listing_images?.length > 0 && (
             <div className="mb-4">
-              <p className="mb-2 text-sm font-semibold">Current Photos</p>
+              <p className="mb-2 text-sm font-semibold">{ui.listingEdit.currentPhotos}</p>
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
                 {((listing.listing_images || []) as Array<{ id: string; image_url?: string; public_url?: string; is_primary: boolean }>).map((image) => (
                   <div key={image.id} className="relative aspect-square overflow-hidden rounded-lg border border-[var(--line)]">
                     <Image
                       src={image.image_url || image.public_url || "/placeholder.jpg"}
-                      alt="Listing"
+                      alt={ui.listingEdit.listingImageAlt}
                       fill
                       className="object-cover"
                     />
                     {image.is_primary && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                        <span className="text-xs font-bold text-white">PRIMARY</span>
+                        <span className="text-xs font-bold text-white">{ui.listingEdit.primary}</span>
                       </div>
                     )}
                   </div>
@@ -322,7 +326,7 @@ export default async function EditListingPage({ params }: PageProps) {
 
           {/* Upload New */}
           <div>
-            <p className="mb-2 text-sm font-semibold">Upload New Photos</p>
+            <p className="mb-2 text-sm font-semibold">{ui.listingEdit.uploadNewPhotos}</p>
             <form action={uploadListingImageFormAction}>
               <input type="hidden" name="listing_id" value={listingId} />
               <input
@@ -336,7 +340,7 @@ export default async function EditListingPage({ params }: PageProps) {
                 type="submit"
                 className="mt-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
-                Upload
+                {ui.listingEdit.upload}
               </button>
             </form>
           </div>
@@ -348,13 +352,13 @@ export default async function EditListingPage({ params }: PageProps) {
             type="submit"
             className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-3 font-semibold text-white hover:opacity-90"
           >
-            Save Changes
+            {ui.listingEdit.saveChanges}
           </button>
           <Link
             href={`/listings/${listingId}/manage`}
             className="flex-1 rounded-lg border border-[var(--line)] px-4 py-3 text-center font-semibold hover:bg-[var(--surface-2)]"
           >
-            Cancel
+            {ui.listingEdit.cancel}
           </Link>
         </div>
       </form>

@@ -55,11 +55,11 @@ export default async function AdminListingsPage() {
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-semibold">{translation.language_code}</p>
                     <select name="translationStatus" defaultValue={translation.translation_status} className="rounded border border-[var(--line)] px-2 py-1 text-xs">
-                      <option value="pending">pending</option>
-                      <option value="completed">completed</option>
-                      <option value="failed">failed</option>
-                      <option value="stale">stale</option>
-                      <option value="needs_review">needs_review</option>
+                      <option value="pending">{ui.admin.pending}</option>
+                      <option value="completed">{ui.admin.completedStatus}</option>
+                      <option value="failed">{ui.admin.failedStatus}</option>
+                      <option value="stale">{ui.admin.staleStatus}</option>
+                      <option value="needs_review">{ui.admin.needsReviewStatus}</option>
                     </select>
                   </div>
                   <input name="title" defaultValue={translation.title} className="w-full rounded border border-[var(--line)] px-2 py-1 text-xs" />

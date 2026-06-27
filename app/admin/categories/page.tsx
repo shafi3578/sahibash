@@ -49,7 +49,7 @@ export default async function AdminCategoriesPage() {
               <option value="en">en</option>
               <option value="fa">fa</option>
               <option value="ps">ps</option>
-              <option value="multi">multi</option>
+              <option value="multi">{ui.admin.multiLanguage}</option>
             </select>
             <button className="rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{ui.admin.saveAlias}</button>
           </form>

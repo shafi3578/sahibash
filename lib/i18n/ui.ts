@@ -113,6 +113,11 @@ type AdminUi = {
   categories: string;
   recentAliases: string;
   manageCategoriesAndAliases: string;
+  multiLanguage: string;
+  completedStatus: string;
+  failedStatus: string;
+  staleStatus: string;
+  needsReviewStatus: string;
 };
 
 type ResetPasswordUi = {
@@ -184,6 +189,109 @@ type LocationUi = {
   continue: string;
 };
 
+type ListingsPageUi = {
+  allListings: string;
+};
+
+type ListingManageUi = {
+  notFoundOrUnauthorized: string;
+  backToMyListings: string;
+  backToListings: string;
+  featured: string;
+  urgent: string;
+  statistics: string;
+  views: string;
+  favorites: string;
+  messages: string;
+  priceHistory: string;
+  editListing: string;
+  markAsSold: string;
+  bumpDate: string;
+  removeFeatured: string;
+  makeFeatured: string;
+  removeUrgent: string;
+  markUrgent: string;
+  expires: string;
+  expired: string;
+  thisListingHasExpired: string;
+  deleteListing: string;
+};
+
+type ListingEditUi = {
+  notFoundOrUnauthorized: string;
+  backToMyListings: string;
+  editListing: string;
+  category: string;
+  basicInformation: string;
+  title: string;
+  titleHint: string;
+  description: string;
+  descriptionHint: string;
+  location: string;
+  city: string;
+  districtOptional: string;
+  pricing: string;
+  price: string;
+  currency: string;
+  contactInformation: string;
+  contactNameOptional: string;
+  phone: string;
+  additionalDetails: string;
+  selectField: string;
+  photos: string;
+  currentPhotos: string;
+  listingImageAlt: string;
+  primary: string;
+  uploadNewPhotos: string;
+  upload: string;
+  saveChanges: string;
+  cancel: string;
+};
+
+type PriceHistoryUi = {
+  notFoundOrUnauthorized: string;
+  backToMyListings: string;
+  priceHistory: string;
+  backToListing: string;
+  noPriceChangesRecorded: string;
+  date: string;
+  oldPrice: string;
+  newPrice: string;
+  change: string;
+  reason: string;
+  originalPrice: string;
+  currentPrice: string;
+  totalChange: string;
+};
+
+type AdminElectronicsUi = {
+  title: string;
+  description: string;
+  addBrand: string;
+  selectCategory: string;
+  brandName: string;
+  sortOrder: string;
+  popular: string;
+  saveBrand: string;
+  addModel: string;
+  selectBrand: string;
+  modelName: string;
+  releaseYear: string;
+  saveModel: string;
+  upsertSpec: string;
+  selectModel: string;
+  specKey: string;
+  specLabel: string;
+  specValue: string;
+  specGroupOptional: string;
+  filterable: string;
+  saveSpec: string;
+  upsertOption: string;
+  optionType: string;
+  optionValue: string;
+  saveOption: string;
+};
+
 export type UiTranslations = {
   dashboard: DashboardUi;
   admin: AdminUi;
@@ -192,9 +300,14 @@ export type UiTranslations = {
   waitlist: WaitlistUi;
   categoriesPage: CategoriesPageUi;
   location: LocationUi;
+  listingsPage: ListingsPageUi;
+  listingManage: ListingManageUi;
+  listingEdit: ListingEditUi;
+  priceHistory: PriceHistoryUi;
+  adminElectronics: AdminElectronicsUi;
 };
 
-const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
+export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
   en: {
     dashboard: {
       myAccount: "My Account",
@@ -308,6 +421,11 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       categories: "Categories",
       recentAliases: "Recent Aliases",
       manageCategoriesAndAliases: "Manage categories, aliases, and field metadata for smart posting and search.",
+      multiLanguage: "Multi",
+      completedStatus: "Completed",
+      failedStatus: "Failed",
+      staleStatus: "Stale",
+      needsReviewStatus: "Needs review",
     },
     resetPassword: {
       requestPasswordReset: "Request Password Reset",
@@ -372,6 +490,104 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       back: "Back",
       changeLocation: "Change Location",
       continue: "Continue",
+    },
+    listingsPage: {
+      allListings: "All Listings",
+    },
+    listingManage: {
+      notFoundOrUnauthorized: "Listing not found or unauthorized",
+      backToMyListings: "Back to My Listings",
+      backToListings: "Back to Listings",
+      featured: "FEATURED",
+      urgent: "URGENT",
+      statistics: "Statistics",
+      views: "Views",
+      favorites: "Favorites",
+      messages: "Messages",
+      priceHistory: "Price History",
+      editListing: "Edit Listing",
+      markAsSold: "Mark as Sold",
+      bumpDate: "Bump Date",
+      removeFeatured: "Remove Featured",
+      makeFeatured: "Make Featured",
+      removeUrgent: "Remove Urgent",
+      markUrgent: "Mark Urgent",
+      expires: "EXPIRES",
+      expired: "Expired",
+      thisListingHasExpired: "This listing has expired",
+      deleteListing: "Delete Listing",
+    },
+    listingEdit: {
+      notFoundOrUnauthorized: "Listing not found or unauthorized",
+      backToMyListings: "Back to My Listings",
+      editListing: "Edit Listing",
+      category: "Category",
+      basicInformation: "Basic Information",
+      title: "Title",
+      titleHint: "5-120 characters",
+      description: "Description",
+      descriptionHint: "20-5000 characters",
+      location: "Location",
+      city: "City",
+      districtOptional: "District (Optional)",
+      pricing: "Pricing",
+      price: "Price",
+      currency: "Currency",
+      contactInformation: "Contact Information",
+      contactNameOptional: "Contact Name (Optional)",
+      phone: "Phone",
+      additionalDetails: "Additional Details",
+      selectField: "Select {field}",
+      photos: "Photos",
+      currentPhotos: "Current Photos",
+      listingImageAlt: "Listing",
+      primary: "PRIMARY",
+      uploadNewPhotos: "Upload New Photos",
+      upload: "Upload",
+      saveChanges: "Save Changes",
+      cancel: "Cancel",
+    },
+    priceHistory: {
+      notFoundOrUnauthorized: "Listing not found or unauthorized",
+      backToMyListings: "Back to My Listings",
+      priceHistory: "Price History",
+      backToListing: "Back to Listing",
+      noPriceChangesRecorded: "No price changes recorded yet",
+      date: "Date",
+      oldPrice: "Old Price",
+      newPrice: "New Price",
+      change: "Change",
+      reason: "Reason",
+      originalPrice: "Original Price",
+      currentPrice: "Current Price",
+      totalChange: "Total Change",
+    },
+    adminElectronics: {
+      title: "Electronics Catalog Admin",
+      description: "Manage brands, models, specs, and options without developer changes.",
+      addBrand: "Add Brand",
+      selectCategory: "Select Category",
+      brandName: "Brand Name",
+      sortOrder: "Sort Order",
+      popular: "Popular",
+      saveBrand: "Save Brand",
+      addModel: "Add Model",
+      selectBrand: "Select Brand",
+      modelName: "Model Name",
+      releaseYear: "Release Year",
+      saveModel: "Save Model",
+      upsertSpec: "Upsert Spec",
+      selectModel: "Select Model",
+      specKey: "Spec Key (e.g. screen_size)",
+      specLabel: "Spec Label",
+      specValue: "Spec Value",
+      specGroupOptional: "Spec Group (optional)",
+      filterable: "Filterable",
+      saveSpec: "Save Spec",
+      upsertOption: "Upsert Option",
+      optionType: "Option Type (storage, color, ram)",
+      optionValue: "Option Value (128GB)",
+      saveOption: "Save Option",
     },
   },
   fa: {
@@ -487,6 +703,11 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       categories: "دسته‌بندی‌ها",
       recentAliases: "هم‌معنی‌های اخیر",
       manageCategoriesAndAliases: "مدیریت دسته‌بندی‌ها، هم‌معنی‌ها و متادیتای فیلدها برای ثبت هوشمند و جستجو.",
+      multiLanguage: "چندزبانه",
+      completedStatus: "تکمیل‌شده",
+      failedStatus: "ناموفق",
+      staleStatus: "قدیمی",
+      needsReviewStatus: "نیازمند بررسی",
     },
     resetPassword: {
       requestPasswordReset: "درخواست بازنشانی رمز عبور",
@@ -551,6 +772,104 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       back: "بازگشت",
       changeLocation: "تغییر موقعیت",
       continue: "ادامه",
+    },
+    listingsPage: {
+      allListings: "همه اعلان‌ها",
+    },
+    listingManage: {
+      notFoundOrUnauthorized: "اعلان پیدا نشد یا اجازه دسترسی ندارید",
+      backToMyListings: "بازگشت به اعلان‌های من",
+      backToListings: "بازگشت به اعلان‌ها",
+      featured: "ویژه",
+      urgent: "فوری",
+      statistics: "آمار",
+      views: "بازدیدها",
+      favorites: "علاقه‌مندی‌ها",
+      messages: "پیام‌ها",
+      priceHistory: "تاریخچه قیمت",
+      editListing: "ویرایش اعلان",
+      markAsSold: "علامت‌گذاری به‌عنوان فروخته‌شده",
+      bumpDate: "تازه‌سازی تاریخ",
+      removeFeatured: "حذف حالت ویژه",
+      makeFeatured: "ویژه کردن",
+      removeUrgent: "حذف حالت فوری",
+      markUrgent: "علامت‌گذاری فوری",
+      expires: "انقضا",
+      expired: "منقضی",
+      thisListingHasExpired: "این اعلان منقضی شده است",
+      deleteListing: "حذف اعلان",
+    },
+    listingEdit: {
+      notFoundOrUnauthorized: "اعلان پیدا نشد یا اجازه دسترسی ندارید",
+      backToMyListings: "بازگشت به اعلان‌های من",
+      editListing: "ویرایش اعلان",
+      category: "دسته‌بندی",
+      basicInformation: "اطلاعات پایه",
+      title: "عنوان",
+      titleHint: "۵ تا ۱۲۰ کاراکتر",
+      description: "توضیحات",
+      descriptionHint: "۲۰ تا ۵۰۰۰ کاراکتر",
+      location: "موقعیت",
+      city: "شهر",
+      districtOptional: "ناحیه (اختیاری)",
+      pricing: "قیمت‌گذاری",
+      price: "قیمت",
+      currency: "واحد پول",
+      contactInformation: "اطلاعات تماس",
+      contactNameOptional: "نام تماس (اختیاری)",
+      phone: "تلفن",
+      additionalDetails: "جزئیات بیشتر",
+      selectField: "انتخاب {field}",
+      photos: "عکس‌ها",
+      currentPhotos: "عکس‌های فعلی",
+      listingImageAlt: "اعلان",
+      primary: "اصلی",
+      uploadNewPhotos: "آپلود عکس‌های جدید",
+      upload: "آپلود",
+      saveChanges: "ذخیره تغییرات",
+      cancel: "لغو",
+    },
+    priceHistory: {
+      notFoundOrUnauthorized: "اعلان پیدا نشد یا اجازه دسترسی ندارید",
+      backToMyListings: "بازگشت به اعلان‌های من",
+      priceHistory: "تاریخچه قیمت",
+      backToListing: "بازگشت به اعلان",
+      noPriceChangesRecorded: "هنوز تغییری در قیمت ثبت نشده است",
+      date: "تاریخ",
+      oldPrice: "قیمت قبلی",
+      newPrice: "قیمت جدید",
+      change: "تغییر",
+      reason: "دلیل",
+      originalPrice: "قیمت اولیه",
+      currentPrice: "قیمت فعلی",
+      totalChange: "تغییر کل",
+    },
+    adminElectronics: {
+      title: "ادمین کاتالوگ الکترونیک",
+      description: "برندها، مدل‌ها، مشخصات و گزینه‌ها را بدون تغییر توسط توسعه‌دهنده مدیریت کنید.",
+      addBrand: "افزودن برند",
+      selectCategory: "انتخاب دسته‌بندی",
+      brandName: "نام برند",
+      sortOrder: "ترتیب",
+      popular: "محبوب",
+      saveBrand: "ذخیره برند",
+      addModel: "افزودن مدل",
+      selectBrand: "انتخاب برند",
+      modelName: "نام مدل",
+      releaseYear: "سال عرضه",
+      saveModel: "ذخیره مدل",
+      upsertSpec: "درج یا به‌روزرسانی مشخصه",
+      selectModel: "انتخاب مدل",
+      specKey: "کلید مشخصه (مثلا screen_size)",
+      specLabel: "برچسب مشخصه",
+      specValue: "مقدار مشخصه",
+      specGroupOptional: "گروه مشخصه (اختیاری)",
+      filterable: "قابل فیلتر",
+      saveSpec: "ذخیره مشخصه",
+      upsertOption: "درج یا به‌روزرسانی گزینه",
+      optionType: "نوع گزینه (storage، color، ram)",
+      optionValue: "مقدار گزینه (128GB)",
+      saveOption: "ذخیره گزینه",
     },
   },
   ps: {
@@ -666,6 +985,11 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       categories: "کټګورۍ",
       recentAliases: "وروستي مترادفونه",
       manageCategoriesAndAliases: "د هوښیار پوسټ او لټون لپاره کټګورۍ، مترادفونه او د فیلډ متادیتا اداره کړئ.",
+      multiLanguage: "څوژبیز",
+      completedStatus: "بشپړ شوی",
+      failedStatus: "ناکام",
+      staleStatus: "زړېدلی",
+      needsReviewStatus: "بیاکتنې ته اړتیا لري",
     },
     resetPassword: {
       requestPasswordReset: "د پاسورډ بیا تنظیم غوښتنه",
@@ -730,6 +1054,104 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       back: "بېرته",
       changeLocation: "ځای بدل کړئ",
       continue: "دوام",
+    },
+    listingsPage: {
+      allListings: "ټول اعلانونه",
+    },
+    listingManage: {
+      notFoundOrUnauthorized: "اعلان ونه موندل شو یا اجازه نه لرئ",
+      backToMyListings: "زما اعلانونو ته بېرته",
+      backToListings: "اعلانونو ته بېرته",
+      featured: "ځانګړی",
+      urgent: "فوري",
+      statistics: "احصایې",
+      views: "کتنې",
+      favorites: "خوښې",
+      messages: "پیغامونه",
+      priceHistory: "د بیې تاریخچه",
+      editListing: "اعلان سمول",
+      markAsSold: "د پلورل شوي په توګه نښه کړئ",
+      bumpDate: "نېټه تازه کول",
+      removeFeatured: "ځانګړی حالت لرې کړئ",
+      makeFeatured: "ځانګړی کړئ",
+      removeUrgent: "فوري حالت لرې کړئ",
+      markUrgent: "فوري نښه کړئ",
+      expires: "ختمېدنه",
+      expired: "ختم شوی",
+      thisListingHasExpired: "دا اعلان پای ته رسېدلی دی",
+      deleteListing: "اعلان ړنګول",
+    },
+    listingEdit: {
+      notFoundOrUnauthorized: "اعلان ونه موندل شو یا اجازه نه لرئ",
+      backToMyListings: "زما اعلانونو ته بېرته",
+      editListing: "اعلان سمول",
+      category: "کټګوري",
+      basicInformation: "بنسټیز معلومات",
+      title: "سرلیک",
+      titleHint: "۵ تر ۱۲۰ توري",
+      description: "تشریح",
+      descriptionHint: "۲۰ تر ۵۰۰۰ توري",
+      location: "ځای",
+      city: "ښار",
+      districtOptional: "ولسوالي (اختیاري)",
+      pricing: "بیه ټاکنه",
+      price: "بیه",
+      currency: "اسعار",
+      contactInformation: "د اړیکې معلومات",
+      contactNameOptional: "د اړیکې نوم (اختیاري)",
+      phone: "تلیفون",
+      additionalDetails: "نور جزییات",
+      selectField: "{field} وټاکئ",
+      photos: "انځورونه",
+      currentPhotos: "اوسني انځورونه",
+      listingImageAlt: "اعلان",
+      primary: "اصلي",
+      uploadNewPhotos: "نوي انځورونه پورته کړئ",
+      upload: "پورته کول",
+      saveChanges: "بدلونونه خوندي کړئ",
+      cancel: "لغوه",
+    },
+    priceHistory: {
+      notFoundOrUnauthorized: "اعلان ونه موندل شو یا اجازه نه لرئ",
+      backToMyListings: "زما اعلانونو ته بېرته",
+      priceHistory: "د بیې تاریخچه",
+      backToListing: "اعلان ته بېرته",
+      noPriceChangesRecorded: "لا تر اوسه د بیې بدلون نه دی ثبت شوی",
+      date: "نېټه",
+      oldPrice: "پخوانۍ بیه",
+      newPrice: "نوې بیه",
+      change: "بدلون",
+      reason: "دلیل",
+      originalPrice: "اصلي بیه",
+      currentPrice: "اوسنۍ بیه",
+      totalChange: "ټول بدلون",
+    },
+    adminElectronics: {
+      title: "د الکترونیک کتلاګ اډمین",
+      description: "برانډونه، موډلونه، مشخصات او اختیارونه د پراختیاکوونکي له بدلون پرته اداره کړئ.",
+      addBrand: "برانډ زیات کړئ",
+      selectCategory: "کټګوري وټاکئ",
+      brandName: "د برانډ نوم",
+      sortOrder: "د ترتیب شمېره",
+      popular: "مشهور",
+      saveBrand: "برانډ خوندي کړئ",
+      addModel: "موډل زیات کړئ",
+      selectBrand: "برانډ وټاکئ",
+      modelName: "د موډل نوم",
+      releaseYear: "د خپرېدو کال",
+      saveModel: "موډل خوندي کړئ",
+      upsertSpec: "مشخصه درج/تازه کړئ",
+      selectModel: "موډل وټاکئ",
+      specKey: "د مشخصې کیلي (لکه screen_size)",
+      specLabel: "د مشخصې لیبل",
+      specValue: "د مشخصې ارزښت",
+      specGroupOptional: "د مشخصې ګروپ (اختیاري)",
+      filterable: "د فلټر وړ",
+      saveSpec: "مشخصه خوندي کړئ",
+      upsertOption: "اختیار درج/تازه کړئ",
+      optionType: "د اختیار ډول (storage، color، ram)",
+      optionValue: "د اختیار ارزښت (128GB)",
+      saveOption: "اختیار خوندي کړئ",
     },
   },
 };

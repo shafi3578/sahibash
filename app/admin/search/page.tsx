@@ -50,7 +50,7 @@ export default async function AdminSearchPage() {
             <input name="aliases" placeholder={ui.admin.aliasesCommaSeparated} required className="rounded-xl border border-[var(--line)] px-3 py-2" />
             <div className="grid gap-3 sm:grid-cols-2">
               <select name="language" defaultValue="multi" className="rounded-xl border border-[var(--line)] px-3 py-2">
-                <option value="multi">multi</option>
+                <option value="multi">{ui.admin.multiLanguage}</option>
                 <option value="en">en</option>
                 <option value="fa">fa</option>
                 <option value="ps">ps</option>
@@ -96,7 +96,7 @@ export default async function AdminSearchPage() {
                   <label className="text-xs font-semibold text-[var(--ink-2)]">
                     {ui.admin.language}
                     <select name="language" defaultValue="multi" className="mt-1 w-full rounded-lg border border-[var(--line)] px-2 py-1 text-sm">
-                      <option value="multi">multi</option>
+                      <option value="multi">{ui.admin.multiLanguage}</option>
                       <option value="en">en</option>
                       <option value="fa">fa</option>
                       <option value="ps">ps</option>
@@ -133,7 +133,7 @@ export default async function AdminSearchPage() {
                 <input name="canonical_term" defaultValue={row.canonical_term} className="rounded-lg border border-[var(--line)] px-2 py-1 text-sm" />
                 <input name="aliases" defaultValue={row.aliases.join(", ")} className="rounded-lg border border-[var(--line)] px-2 py-1 text-sm" />
                 <select name="language" defaultValue={row.language} className="rounded-lg border border-[var(--line)] px-2 py-1 text-sm">
-                  <option value="multi">multi</option>
+                  <option value="multi">{ui.admin.multiLanguage}</option>
                   <option value="en">en</option>
                   <option value="fa">fa</option>
                   <option value="ps">ps</option>
