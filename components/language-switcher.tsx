@@ -2,9 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { setLocaleAction } from "@/lib/actions/i18n";
 import type { AppLocale } from "@/lib/i18n/translations";
-import { localizePath } from "@/lib/i18n/routing";
 
 type Props = {
   locale: AppLocale;
@@ -28,6 +26,8 @@ export function LanguageSwitcher({ locale, label }: Props) {
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname, search]);
 
+  const localeHref = (nextLocale: AppLocale) => `/locale?locale=${nextLocale}&returnTo=${encodeURIComponent(currentPath)}`;
+
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
       if (!menuRef.current?.contains(event.target as Node)) {
@@ -49,21 +49,23 @@ export function LanguageSwitcher({ locale, label }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    setOpen(false);
+  }, [currentPath, locale]);
+
   return (
     <div ref={menuRef} className="relative">
       <div className="hidden items-center gap-1 rounded-full border border-black/20 bg-white px-2 py-1 text-xs font-semibold lg:flex">
         <span className="px-1 text-[var(--ink-2)]">{label}:</span>
         {(["en", "fa", "ps"] as AppLocale[]).map((nextLocale) => (
-          <form key={nextLocale} action={setLocaleAction}>
-            <input type="hidden" name="locale" value={nextLocale} />
-            <input type="hidden" name="returnTo" value={localizePath(currentPath, nextLocale)} />
-            <button
-              type="submit"
-              className={`rounded-full px-2 py-1 ${locale === nextLocale ? "bg-[var(--ink-1)] text-white" : ""}`}
-            >
-              {localeLabel(nextLocale)}
-            </button>
-          </form>
+          <a
+            key={nextLocale}
+            href={localeHref(nextLocale)}
+            aria-current={locale === nextLocale ? "true" : undefined}
+            className={`rounded-full px-2 py-1 ${locale === nextLocale ? "bg-[var(--ink-1)] text-white" : ""}`}
+          >
+            {localeLabel(nextLocale)}
+          </a>
         ))}
       </div>
 
@@ -90,19 +92,16 @@ export function LanguageSwitcher({ locale, label }: Props) {
           className="absolute right-0 top-full z-50 mt-2 w-40 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg lg:hidden"
         >
           {(["en", "fa", "ps"] as AppLocale[]).map((nextLocale) => (
-            <form key={nextLocale} action={setLocaleAction}>
-              <input type="hidden" name="locale" value={nextLocale} />
-              <input type="hidden" name="returnTo" value={localizePath(currentPath, nextLocale)} />
-              <button
-                type="submit"
-                role="menuitemradio"
-                aria-checked={locale === nextLocale}
-                onClick={() => setOpen(false)}
-                className={`block w-full px-3 py-2 text-start text-sm ${locale === nextLocale ? "bg-[var(--surface-2)] font-semibold text-[var(--ink-1)]" : "text-[var(--ink-2)]"}`}
-              >
-                {nextLocale === "en" ? "English" : localeLabel(nextLocale)}
-              </button>
-            </form>
+            <a
+              key={nextLocale}
+              href={localeHref(nextLocale)}
+              role="menuitemradio"
+              aria-checked={locale === nextLocale}
+              aria-current={locale === nextLocale ? "true" : undefined}
+              className={`block w-full px-3 py-2 text-start text-sm ${locale === nextLocale ? "bg-[var(--surface-2)] font-semibold text-[var(--ink-1)]" : "text-[var(--ink-2)]"}`}
+            >
+              {localeLabel(nextLocale)}
+            </a>
           ))}
         </div>
       ) : null}

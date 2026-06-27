@@ -12,7 +12,19 @@ function isSupportedLocale(value: string): value is AppLocale {
 
 function resolveRedirectTarget(request: Request): URL {
   const requestUrl = new URL(request.url);
+  const returnTo = requestUrl.searchParams.get("returnTo");
   const referer = request.headers.get("referer");
+
+  if (returnTo) {
+    try {
+      const returnToUrl = new URL(returnTo, requestUrl.origin);
+      if (returnToUrl.origin === requestUrl.origin) {
+        return returnToUrl;
+      }
+    } catch {
+      // Ignore malformed returnTo and fallback to referrer/home.
+    }
+  }
 
   if (!referer) {
     return new URL("/", requestUrl.origin);
