@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const params = await searchParams;
   const { t, locale } = await getDictionary();
   const reason = readParam(params.reason);
-  const redirectPath = readParam(params.redirect) || "/post-ad";
+  const redirectPath = readParam(params.redirect) || "/";
   const isPostLogin = reason === "post";
 
   const postMessages = {

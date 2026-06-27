@@ -30,7 +30,7 @@ export function LoginForm({ locale }: { locale: AppLocale }) {
         return;
       }
       const redirectPath = searchParams.get("redirect") || searchParams.get("returnTo");
-      router.push(redirectPath && redirectPath.startsWith("/") ? redirectPath : "/post-ad");
+      router.push(redirectPath && redirectPath.startsWith("/") ? redirectPath : "/");
       router.refresh();
     } catch {
       setError(dict.auth.supabaseMissing);
