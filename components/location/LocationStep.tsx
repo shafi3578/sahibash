@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import LocationGeolocation from './LocationGeolocation';
 import LocationSelector from './LocationSelector';
 import LocationMapPicker from './LocationMapPicker';
 import LocationPrivacy, { LocationVisibility } from './LocationPrivacy';
+import { getUiTranslations } from '@/lib/i18n/ui';
+import type { AppLocale } from '@/lib/i18n/translations';
 
 type LocationMethod = 'method-select' | 'current-location' | 'manual' | 'map' | 'privacy';
 
@@ -48,6 +51,10 @@ export default function LocationStep({
   categoryName,
   defaultPrivacyByCategory,
 }: LocationStepProps) {
+  const pathname = usePathname();
+  const pathLocale = pathname?.split('/')[1];
+  const locale: AppLocale = pathLocale === 'fa' || pathLocale === 'ps' ? pathLocale : 'en';
+  const ui = getUiTranslations(locale);
   const [method, setMethod] = useState<LocationMethod>('method-select');
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocation>(
     initialLocation || {}
@@ -74,7 +81,7 @@ export default function LocationStep({
 
   const handleSaveLocation = () => {
     if (!selectedLocation.provinceId && !selectedLocation.latitude) {
-      alert('Please select a location first');
+      alert(ui.location.selectLocationFirst);
       return;
     }
 
@@ -90,16 +97,16 @@ export default function LocationStep({
       {method === 'method-select' && (
         <div className="space-y-3">
           <h2 className="text-xl font-bold text-gray-900 mb-4">
-            How would you like to add the location?
+            {ui.location.methodTitle}
           </h2>
 
           <button
             onClick={() => setMethod('current-location')}
             className="w-full p-4 text-left border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
           >
-            <div className="font-semibold text-gray-900">📍 Use My Current Location</div>
+            <div className="font-semibold text-gray-900">📍 {ui.location.methodCurrentTitle}</div>
             <p className="text-sm text-gray-600 mt-1">
-              Let Sahibash detect your location automatically (faster)
+              {ui.location.methodCurrentDescription}
             </p>
           </button>
 
@@ -107,9 +114,9 @@ export default function LocationStep({
             onClick={() => setMethod('manual')}
             className="w-full p-4 text-left border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
           >
-            <div className="font-semibold text-gray-900">🌍 Select Manually</div>
+            <div className="font-semibold text-gray-900">🌍 {ui.location.methodManualTitle}</div>
             <p className="text-sm text-gray-600 mt-1">
-              Choose province, district, and area from lists
+              {ui.location.methodManualDescription}
             </p>
           </button>
 
@@ -117,9 +124,9 @@ export default function LocationStep({
             onClick={() => setMethod('map')}
             className="w-full p-4 text-left border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
           >
-            <div className="font-semibold text-gray-900">📌 Choose on Map</div>
+            <div className="font-semibold text-gray-900">📌 {ui.location.methodMapTitle}</div>
             <p className="text-sm text-gray-600 mt-1">
-              Enter or adjust coordinates on a map
+              {ui.location.methodMapDescription}
             </p>
           </button>
 
@@ -130,9 +137,9 @@ export default function LocationStep({
             }}
             className="w-full p-4 text-left border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
           >
-            <div className="font-semibold">⏭️ Skip for Now</div>
+            <div className="font-semibold">⏭️ {ui.location.methodSkipTitle}</div>
             <p className="text-sm text-gray-600 mt-1">
-              Add location details later
+              {ui.location.methodSkipDescription}
             </p>
           </button>
         </div>
@@ -160,7 +167,7 @@ export default function LocationStep({
             onClick={() => setMethod('method-select')}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium mb-4"
           >
-            ← Back
+            ← {ui.location.back}
           </button>
           <LocationSelector
             onLocationSelect={handleManualLocationSelect}
@@ -179,7 +186,7 @@ export default function LocationStep({
             onClick={() => setMethod('method-select')}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium mb-4"
           >
-            ← Back
+            ← {ui.location.back}
           </button>
           <LocationMapPicker
             onLocationSelected={handleMapLocationSelected}
@@ -195,7 +202,7 @@ export default function LocationStep({
             onClick={() => setMethod('method-select')}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium"
           >
-            ← Change Location
+            ← {ui.location.changeLocation}
           </button>
 
           <LocationPrivacy
@@ -212,7 +219,7 @@ export default function LocationStep({
             onClick={handleSaveLocation}
             className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
           >
-            Continue
+            {ui.location.continue}
           </button>
         </div>
       )}

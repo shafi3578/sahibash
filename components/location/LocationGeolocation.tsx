@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import { getUiTranslations } from '@/lib/i18n/ui';
+import type { AppLocale } from '@/lib/i18n/translations';
 
 interface GeolocationLocation {
   countryId: number;
@@ -24,6 +27,10 @@ export default function LocationGeolocation({
   onError,
   onSkip,
 }: LocationGeolocationProps) {
+  const pathname = usePathname();
+  const pathLocale = pathname?.split('/')[1];
+  const locale: AppLocale = pathLocale === 'fa' || pathLocale === 'ps' ? pathLocale : 'en';
+  const ui = getUiTranslations(locale);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +44,7 @@ export default function LocationGeolocation({
     setError(null);
 
     if (!navigator.geolocation) {
-      const errorMsg = 'Geolocation is not supported by your browser';
+      const errorMsg = ui.location.geolocationNotSupported;
       setError(errorMsg);
       onError?.(errorMsg);
       setLoading(false);
@@ -60,13 +67,13 @@ export default function LocationGeolocation({
         setLoading(false);
       },
       (err) => {
-        let errorMsg = 'Unable to retrieve location';
+        let errorMsg = ui.location.geolocationUnavailable;
         if (err.code === 1) {
-          errorMsg = 'Location permission denied. Please enable location access.';
+          errorMsg = ui.location.geolocationPermissionDenied;
         } else if (err.code === 2) {
-          errorMsg = 'Position information is unavailable.';
+          errorMsg = ui.location.geolocationPositionUnavailable;
         } else if (err.code === 3) {
-          errorMsg = 'Location request timed out.';
+          errorMsg = ui.location.geolocationTimedOut;
         }
 
         setError(errorMsg);
@@ -85,10 +92,10 @@ export default function LocationGeolocation({
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="text-sm font-semibold text-blue-900 mb-2">
-          📍 Use Your Current Location
+          📍 {ui.location.geolocationTitle}
         </h3>
         <p className="text-sm text-blue-800 mb-4">
-          We'll use your device location to automatically fill in your listing location. You can review and change it before publishing.
+          {ui.location.geolocationDescription}
         </p>
 
         {error && (
@@ -103,14 +110,14 @@ export default function LocationGeolocation({
             disabled={loading}
             className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium text-sm transition-colors"
           >
-            {loading ? 'Getting Your Location...' : 'Use My Current Location'}
+            {loading ? ui.location.gettingLocation : ui.location.useCurrentLocation}
           </button>
 
           <button
             onClick={onSkip}
             className="w-full px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors"
           >
-            Select Manually Instead
+            {ui.location.selectManually}
           </button>
         </div>
       </div>

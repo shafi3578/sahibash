@@ -142,12 +142,56 @@ type WaitlistUi = {
   emailPlaceholder: string;
 };
 
+type CategoriesPageUi = {
+  title: string;
+  searchPlaceholder: string;
+  backHome: string;
+};
+
+type LocationUi = {
+  geolocationTitle: string;
+  geolocationDescription: string;
+  geolocationNotSupported: string;
+  geolocationUnavailable: string;
+  geolocationPermissionDenied: string;
+  geolocationTimedOut: string;
+  geolocationPositionUnavailable: string;
+  gettingLocation: string;
+  useCurrentLocation: string;
+  selectManually: string;
+  loadingMap: string;
+  invalidCoordinates: string;
+  mapDescription: string;
+  latitude: string;
+  longitude: string;
+  latitudePlaceholder: string;
+  longitudePlaceholder: string;
+  accuracyOptional: string;
+  accuracyPlaceholder: string;
+  saveLocation: string;
+  selectLocationFirst: string;
+  methodTitle: string;
+  methodCurrentTitle: string;
+  methodCurrentDescription: string;
+  methodManualTitle: string;
+  methodManualDescription: string;
+  methodMapTitle: string;
+  methodMapDescription: string;
+  methodSkipTitle: string;
+  methodSkipDescription: string;
+  back: string;
+  changeLocation: string;
+  continue: string;
+};
+
 export type UiTranslations = {
   dashboard: DashboardUi;
   admin: AdminUi;
   resetPassword: ResetPasswordUi;
   postAdLanding: PostAdLandingUi;
   waitlist: WaitlistUi;
+  categoriesPage: CategoriesPageUi;
+  location: LocationUi;
 };
 
 const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
@@ -289,6 +333,46 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       notifyWhenAvailable: "Notify Me When Available",
       emailPlaceholder: "you@example.com",
     },
+    categoriesPage: {
+      title: "Category Selection",
+      searchPlaceholder: "Keyword or listing no.",
+      backHome: "Back Home",
+    },
+    location: {
+      geolocationTitle: "Use Your Current Location",
+      geolocationDescription: "We'll use your device location to automatically fill in your listing location. You can review and change it before publishing.",
+      geolocationNotSupported: "Geolocation is not supported by your browser",
+      geolocationUnavailable: "Unable to retrieve location",
+      geolocationPermissionDenied: "Location permission denied. Please enable location access.",
+      geolocationTimedOut: "Location request timed out.",
+      geolocationPositionUnavailable: "Position information is unavailable.",
+      gettingLocation: "Getting Your Location...",
+      useCurrentLocation: "Use My Current Location",
+      selectManually: "Select Manually Instead",
+      loadingMap: "Loading map...",
+      invalidCoordinates: "Please enter valid coordinates",
+      mapDescription: "Enter or adjust coordinates for your listing location. Kabul center is approximately 34.52° N, 69.18° E.",
+      latitude: "Latitude",
+      longitude: "Longitude",
+      latitudePlaceholder: "Latitude",
+      longitudePlaceholder: "Longitude",
+      accuracyOptional: "Accuracy (meters, optional)",
+      accuracyPlaceholder: "Accuracy in meters",
+      saveLocation: "Save Location",
+      selectLocationFirst: "Please select a location first",
+      methodTitle: "How would you like to add the location?",
+      methodCurrentTitle: "Use My Current Location",
+      methodCurrentDescription: "Let Sahibash detect your location automatically (faster)",
+      methodManualTitle: "Select Manually",
+      methodManualDescription: "Choose province, district, and area from lists",
+      methodMapTitle: "Choose on Map",
+      methodMapDescription: "Enter or adjust coordinates on a map",
+      methodSkipTitle: "Skip for Now",
+      methodSkipDescription: "Add location details later",
+      back: "Back",
+      changeLocation: "Change Location",
+      continue: "Continue",
+    },
   },
   fa: {
     dashboard: {
@@ -428,6 +512,46 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       notifyWhenAvailable: "وقتی آماده شد خبرم کن",
       emailPlaceholder: "you@example.com",
     },
+    categoriesPage: {
+      title: "انتخاب دسته‌بندی",
+      searchPlaceholder: "کلیدواژه یا شماره اعلان",
+      backHome: "بازگشت به خانه",
+    },
+    location: {
+      geolocationTitle: "استفاده از موقعیت فعلی",
+      geolocationDescription: "از موقعیت دستگاه شما برای تکمیل خودکار موقعیت اعلان استفاده می‌کنیم. قبل از انتشار می‌توانید آن را بررسی و ویرایش کنید.",
+      geolocationNotSupported: "مرورگر شما از موقعیت‌یابی پشتیبانی نمی‌کند",
+      geolocationUnavailable: "دریافت موقعیت ممکن نشد",
+      geolocationPermissionDenied: "اجازه موقعیت رد شد. لطفا دسترسی موقعیت را فعال کنید.",
+      geolocationTimedOut: "درخواست موقعیت زمان‌بر شد.",
+      geolocationPositionUnavailable: "اطلاعات موقعیت در دسترس نیست.",
+      gettingLocation: "در حال دریافت موقعیت...",
+      useCurrentLocation: "استفاده از موقعیت فعلی من",
+      selectManually: "انتخاب دستی",
+      loadingMap: "در حال بارگذاری نقشه...",
+      invalidCoordinates: "لطفا مختصات معتبر وارد کنید",
+      mapDescription: "مختصات اعلان خود را وارد یا تنظیم کنید. مرکز کابل تقریبا 34.52° N و 69.18° E است.",
+      latitude: "عرض جغرافیایی",
+      longitude: "طول جغرافیایی",
+      latitudePlaceholder: "عرض جغرافیایی",
+      longitudePlaceholder: "طول جغرافیایی",
+      accuracyOptional: "دقت (متر، اختیاری)",
+      accuracyPlaceholder: "دقت به متر",
+      saveLocation: "ذخیره موقعیت",
+      selectLocationFirst: "لطفا ابتدا یک موقعیت انتخاب کنید",
+      methodTitle: "چگونه می‌خواهید موقعیت را اضافه کنید؟",
+      methodCurrentTitle: "استفاده از موقعیت فعلی من",
+      methodCurrentDescription: "اجازه دهید صاحباش موقعیت شما را خودکار تشخیص دهد (سریع‌تر)",
+      methodManualTitle: "انتخاب دستی",
+      methodManualDescription: "استان، ولسوالی و ناحیه را از فهرست‌ها انتخاب کنید",
+      methodMapTitle: "انتخاب روی نقشه",
+      methodMapDescription: "مختصات را روی نقشه وارد یا تنظیم کنید",
+      methodSkipTitle: "فعلا رد شود",
+      methodSkipDescription: "جزئیات موقعیت را بعدا اضافه کنید",
+      back: "بازگشت",
+      changeLocation: "تغییر موقعیت",
+      continue: "ادامه",
+    },
   },
   ps: {
     dashboard: {
@@ -566,6 +690,46 @@ const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       joining: "د یوځای کېدو په حال کې...",
       notifyWhenAvailable: "کله چې چمتو شي خبر راکړئ",
       emailPlaceholder: "you@example.com",
+    },
+    categoriesPage: {
+      title: "د کټګورۍ ټاکنه",
+      searchPlaceholder: "کلیدي کلمه یا اعلان شمېره",
+      backHome: "کور ته بېرته",
+    },
+    location: {
+      geolocationTitle: "اوسنی ځای وکاروئ",
+      geolocationDescription: "ستاسو د وسیلې ځای کاروو تر څو د اعلان ځای په اوتومات ډول ډک شي. د خپرولو مخکې یې بیا کتل او بدلولای شئ.",
+      geolocationNotSupported: "ستاسو براوزر جغرافیوي موقعیت نه ملاتړ کوي",
+      geolocationUnavailable: "ځای ترلاسه نشو",
+      geolocationPermissionDenied: "د ځای اجازه رد شوه. مهرباني وکړئ د ځای لاسرسی فعال کړئ.",
+      geolocationTimedOut: "د ځای غوښتنه وخت ته ورسیده.",
+      geolocationPositionUnavailable: "د ځای معلومات شتون نه لري.",
+      gettingLocation: "ستاسو ځای ترلاسه کېږي...",
+      useCurrentLocation: "زما اوسنی ځای وکاروئ",
+      selectManually: "پر ځای یې لاسي وټاکئ",
+      loadingMap: "نقشه بارېږي...",
+      invalidCoordinates: "مهرباني وکړئ سم مختصات دننه کړئ",
+      mapDescription: "د اعلان لپاره مختصات دننه یا اصلاح کړئ. د کابل مرکز نږدې 34.52° N او 69.18° E دی.",
+      latitude: "عرض البلد",
+      longitude: "طول البلد",
+      latitudePlaceholder: "عرض البلد",
+      longitudePlaceholder: "طول البلد",
+      accuracyOptional: "دقت (متر، اختیاري)",
+      accuracyPlaceholder: "دقت په متر",
+      saveLocation: "ځای خوندي کړئ",
+      selectLocationFirst: "مهرباني وکړئ لومړی یو ځای وټاکئ",
+      methodTitle: "تاسو څنګه غواړئ ځای اضافه کړئ؟",
+      methodCurrentTitle: "زما اوسنی ځای وکاروئ",
+      methodCurrentDescription: "پرېږدئ صاحباش ستاسو ځای په اوتومات ډول وپېژني (چټک)",
+      methodManualTitle: "لاسي ټاکنه",
+      methodManualDescription: "ولایت، ولسوالۍ او ساحه له لستونو وټاکئ",
+      methodMapTitle: "په نقشه کې وټاکئ",
+      methodMapDescription: "مختصات په نقشه کې دننه یا برابر کړئ",
+      methodSkipTitle: "اوس لپاره پرېږدئ",
+      methodSkipDescription: "د ځای جزئیات وروسته اضافه کړئ",
+      back: "بېرته",
+      changeLocation: "ځای بدل کړئ",
+      continue: "دوام",
     },
   },
 };
