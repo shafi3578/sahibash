@@ -22,7 +22,7 @@ export default async function PostAdCreatePage({
     getDictionary(),
   ]);
 
-  const initialListingType = posting === "wanted" ? "wanted" : "for_sale";
+  const initialListingType = "for_sale";
   const initialMode = posting === "quick" ? "quick" : "standard";
 
   return (

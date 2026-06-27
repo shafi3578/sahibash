@@ -751,10 +751,6 @@ export default function PostAdForm({
         dynamicValues: (details.dynamic_values as Record<string, string | boolean>) ?? {},
       });
 
-      const listingTypeFromDraft = String(category.listing_type ?? "");
-      if (listingTypeFromDraft === "wanted") {
-        setListingTypeChoice("wanted");
-      }
     };
 
     void loadServerDraft();
@@ -1245,10 +1241,6 @@ export default function PostAdForm({
   const applySmartSuggestion = useCallback(async () => {
     if (!smartSuggestion) return;
 
-    if (smartSuggestion.listingType === "wanted") {
-      setListingTypeChoice("wanted");
-    }
-
     if (smartSuggestion.categorySlug !== "other") {
       const suggestedRoot = activeCategories.find((item) => item.slug === smartSuggestion.categorySlug);
       if (suggestedRoot) {
@@ -1313,9 +1305,6 @@ export default function PostAdForm({
                 if (parsed.price && !core.price) {
                   updateCore("price", String(parsed.price));
                 }
-                if (parsed.listingType === "wanted") {
-                  setListingTypeChoice("wanted");
-                }
                 if (parsed.negotiable) {
                   updateCore("negotiable", true);
                 }
@@ -1340,7 +1329,7 @@ export default function PostAdForm({
                   Confidence: {Math.round(smartSuggestion.confidence * 100)}% {smartSuggestion.reasons.length > 0 ? `(${smartSuggestion.reasons.join(", ")})` : ""}
                 </p>
                 <p className="mt-1 text-xs text-[var(--ink-2)]">
-                  Detected listing type: {smartSuggestion.listingType === "wanted" ? "Wanted" : "For Sale"}
+                  Detected listing type: For Sale
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
@@ -1448,13 +1437,6 @@ export default function PostAdForm({
                 >
                   {t.postAd.forSale}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setListingTypeChoice("wanted")}
-                  className={`rounded-lg px-3 py-2 text-sm font-semibold ${listingTypeChoice === "wanted" ? "bg-[var(--ink-1)] text-white" : "border border-[var(--line)] bg-white"}`}
-                >
-                  {t.postAd.wanted}
-                </button>
               </div>
             </div>
 
@@ -1500,7 +1482,6 @@ export default function PostAdForm({
                       <option value="For Rent">For Rent</option>
                       <option value="Gerawy / Rahn">Gerawy / Rahn</option>
                       <option value="Exchange">Exchange</option>
-                      <option value="Wanted">Wanted</option>
                     </select>
                   </label>
                   <label className="text-sm font-semibold">Rooms

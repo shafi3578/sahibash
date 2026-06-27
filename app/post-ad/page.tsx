@@ -19,17 +19,6 @@ export default async function PostAdPage() {
             : "Create a normal for-sale listing.",
       href: localizePath("/post-ad/create?posting=sell", locale),
     },
-    {
-      key: "wanted",
-      title: locale === "fa" ? "نیازمندی / درخواست" : locale === "ps" ? "غوښتنه / Wanted" : "Request something / Wanted ad",
-      description:
-        locale === "fa"
-          ? "اعلان نیازمندی ثبت کنید تا فروشنده‌ها با شما تماس بگیرند."
-          : locale === "ps"
-            ? "Wanted اعلان ثبت کړئ تر څو پلورونکي له تاسو سره اړیکه ونیسي."
-            : "Post what you are looking for and let sellers contact you.",
-      href: localizePath("/post-ad/create?posting=wanted", locale),
-    },
   ];
 
   return (
@@ -45,7 +34,7 @@ export default async function PostAdPage() {
             : "Choose your posting flow. You can edit everything before publishing."}
       </p>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <div className="mt-6 grid gap-4 md:grid-cols-1">
         {optionCards.map((option) => (
           <Link
             key={option.key}
