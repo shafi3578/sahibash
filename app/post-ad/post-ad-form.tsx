@@ -1017,12 +1017,6 @@ export default function PostAdForm({
       }
     }
 
-    const isVehicle = rootSlug === "vehicles";
-    if (isVehicle) {
-      const year = String(dynamicValues.year ?? dynamicValues.vehicle_year ?? "").trim();
-      if (!year) return postAdCopy.vehicleYearRequired;
-    }
-
     return null;
   }
 
