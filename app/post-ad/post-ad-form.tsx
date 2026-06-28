@@ -64,6 +64,17 @@ type StoredLocation = {
   locationVisibility: "exact" | "approximate" | "province_district";
 };
 
+type PostingFieldInput = {
+  id: number | string;
+  field_key: string;
+  field_label: string;
+  field_type: "text" | "number" | "select" | "boolean" | "date";
+  is_required: boolean;
+  display_order?: number | null;
+  sort_order?: number | null;
+  options_json?: Record<string, unknown> | string[] | null;
+};
+
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
 const POSTING_ACTIVE_CATEGORY_SLUGS = ["vehicles", "real-estate", "phones-electronics", "second-hand-items"] as const;
@@ -173,6 +184,59 @@ function buildPostingSchemaContext(rootSlug: string, path: string): SchemaFieldC
 
 function getPostingSchema(rootSlug: string): ListingSchemaDefinition | null {
   return ACTIVE_LISTING_SCHEMAS.find((schema) => schema.rootSlugs.includes(rootSlug)) ?? null;
+}
+
+function inferSyntheticFieldType(fieldKey: string): PostingFieldInput["field_type"] {
+  if (["rooms", "bathrooms", "floors", "floor_number", "total_floors", "warehouse_size", "land_size", "building_size", "mileage", "year"].includes(fieldKey)) {
+    return "number";
+  }
+
+  if ([
+    "exchange_possible",
+    "exchange",
+    "box_available",
+    "box_carton",
+    "charger_available",
+    "charger",
+    "furnished",
+    "family_only",
+    "security",
+    "elevator",
+    "truck_access",
+    "loading_access",
+    "parking",
+    "yard",
+    "water",
+    "electricity",
+    "gas",
+    "boundary_wall",
+    "delivery_possible",
+  ].includes(fieldKey)) {
+    return "boolean";
+  }
+
+  if (["property_type", "document_type", "condition", "storage", "ram"].includes(fieldKey)) {
+    return "select";
+  }
+
+  return "text";
+}
+
+function inferSyntheticFieldOptions(fieldKey: string): string[] {
+  switch (fieldKey) {
+    case "property_type":
+      return ["House", "Apartment", "Land", "Shop", "Office", "Warehouse", "Room", "Dormitory", "Other"];
+    case "document_type":
+      return ["Qabala", "Title Deed", "Customary Document", "No Document"];
+    case "condition":
+      return ["New", "Like New", "Good", "Fair", "Used"];
+    case "storage":
+      return ["32GB", "64GB", "128GB", "256GB", "512GB"];
+    case "ram":
+      return ["2GB", "4GB", "6GB", "8GB", "12GB", "16GB"];
+    default:
+      return [];
+  }
 }
 
 export default function PostAdForm({
@@ -331,6 +395,30 @@ export default function PostAdForm({
     () => new Set((postingSchema?.requiredFields ?? []).filter((key) => !CORE_DYNAMIC_KEYS.has(key as never))),
     [postingSchema]
   );
+
+  const schemaSyntheticFields = useMemo<PostingFieldInput[]>(() => {
+    if (!postingSchema || !schemaVisibleKeys) return [];
+
+    const dbFieldKeys = new Set(dynamicFields.map((field) => field.field_key));
+
+    return postingSchema.fields
+      .filter((field) => schemaVisibleKeys.has(field.key))
+      .filter((field) => !dbFieldKeys.has(field.key))
+      .filter((field) => !CORE_DYNAMIC_KEYS.has(field.key as never))
+      .map((field) => {
+        const options = inferSyntheticFieldOptions(field.key);
+        return {
+          id: `schema-${field.key}`,
+          field_key: field.key,
+          field_label: field.label[locale],
+          field_type: inferSyntheticFieldType(field.key),
+          is_required: schemaRequiredKeys.has(field.key),
+          display_order: field.order,
+          sort_order: field.order,
+          options_json: options.length > 0 ? options : null,
+        };
+      });
+  }, [dynamicFields, locale, postingSchema, schemaRequiredKeys, schemaVisibleKeys]);
 
   const showPhotoStep = Boolean(resolvedImageConfig?.requires_images || images.length > 0);
   const locationStep = showPhotoStep ? 4 : 3;
@@ -632,6 +720,9 @@ export default function PostAdForm({
       return;
     }
     const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
+    for (const field of schemaSyntheticFields) {
+      allowedKeys.add(field.field_key);
+    }
     for (const locationKey of LOCATION_DYNAMIC_KEYS) {
       allowedKeys.add(locationKey);
     }
@@ -643,6 +734,9 @@ export default function PostAdForm({
 
   function updateDynamicPair(primaryKey: string, secondaryKey: string, value: string | boolean) {
     const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
+    for (const field of schemaSyntheticFields) {
+      allowedKeys.add(field.field_key);
+    }
     for (const locationKey of LOCATION_DYNAMIC_KEYS) {
       allowedKeys.add(locationKey);
     }
@@ -966,6 +1060,9 @@ export default function PostAdForm({
     }
     if (pendingDraft?.dynamicValues) {
       const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
+      for (const field of schemaSyntheticFields) {
+        allowedKeys.add(field.field_key);
+      }
       for (const key of LOCATION_DYNAMIC_KEYS) {
         allowedKeys.add(key);
       }
@@ -1055,7 +1152,7 @@ export default function PostAdForm({
       return schemaVisibleKeys.has(field.field_key);
     });
 
-    return filtered.sort((a, b) => {
+    return [...filtered, ...schemaSyntheticFields].sort((a, b) => {
       const orderA = schemaFieldOrder.get(a.field_key) ?? Number.MAX_SAFE_INTEGER;
       const orderB = schemaFieldOrder.get(b.field_key) ?? Number.MAX_SAFE_INTEGER;
       if (orderA !== orderB) {
@@ -1063,7 +1160,7 @@ export default function PostAdForm({
       }
       return (a.display_order ?? a.sort_order ?? 0) - (b.display_order ?? b.sort_order ?? 0);
     });
-  }, [dynamicFields, schemaFieldOrder, schemaVisibleKeys]);
+  }, [dynamicFields, schemaFieldOrder, schemaSyntheticFields, schemaVisibleKeys]);
 
   const requiredDynamicKeys = useMemo(() => {
     return new Set(
@@ -1378,7 +1475,7 @@ export default function PostAdForm({
     return t.postAd.additionalCategoryFields;
   }, [rootSlug, t.postAd]);
 
-  const renderDynamicFieldInput = (field: CategoryField) => {
+  const renderDynamicFieldInput = (field: PostingFieldInput) => {
     const value = dynamicValues[field.field_key];
 
     if (field.field_type === "boolean") {
@@ -1398,7 +1495,7 @@ export default function PostAdForm({
     }
 
     if (field.field_type === "select") {
-      const options = fieldOptions(field.options_json);
+      const options = fieldOptions(field.options_json ?? null);
       return (
         <label key={field.id} className="text-sm font-semibold">
           {field.field_label}

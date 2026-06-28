@@ -12,6 +12,7 @@ import {
   queueListingTranslationJobs,
   sourceHash,
 } from "@/lib/listings/translation-service";
+import { ACTIVE_LISTING_SCHEMAS } from "@/lib/listingSchemas";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -125,6 +126,14 @@ const VEHICLE_META_FIELDS: Record<string, { type: "text" | "number" | "boolean";
   vehicle_is_classic: { type: "boolean", label: "Classic Vehicle" },
   vehicle_is_custom: { type: "boolean", label: "Custom Vehicle" },
 };
+
+const SCHEMA_ATTRIBUTE_KEYS = new Set(
+  ACTIVE_LISTING_SCHEMAS.flatMap((schema) => [
+    ...schema.postingFields,
+    ...schema.requiredFields,
+    ...schema.optionalFields,
+  ])
+);
 
 function toFormValueText(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -542,9 +551,46 @@ async function persistListingAttributes(
 
   const fieldMap = new Map((fields ?? []).map((field) => [field.field_key, field]));
   const attributeRows = Array.from(formData.entries())
-    .filter(([key]) => !RESERVED_FORM_KEYS.has(key) && fieldMap.has(key))
-    .map(([key, value]) => toAttributePayload(fieldMap.get(key)!, value))
-    .filter((row) => Boolean(row.category_field_id));
+    .filter(([key]) => fieldMap.has(key) || (!RESERVED_FORM_KEYS.has(key) && SCHEMA_ATTRIBUTE_KEYS.has(key)))
+    .map(([key, value]) => {
+      const field = fieldMap.get(key);
+      if (field) {
+        return toAttributePayload(field, value);
+      }
+
+      const textValue = toFormValueText(value);
+      if (!textValue) {
+        return null;
+      }
+
+      const lowered = textValue.toLowerCase();
+      if (["true", "false", "1", "0", "on"].includes(lowered)) {
+        return {
+          category_field_id: null,
+          attribute_key: key,
+          attribute_value_boolean: lowered === "true" || lowered === "1" || lowered === "on",
+          unit: null,
+        };
+      }
+
+      const numericValue = Number(textValue);
+      if (Number.isFinite(numericValue) && /^-?\d+(\.\d+)?$/.test(textValue)) {
+        return {
+          category_field_id: null,
+          attribute_key: key,
+          attribute_value_number: numericValue,
+          unit: null,
+        };
+      }
+
+      return {
+        category_field_id: null,
+        attribute_key: key,
+        attribute_value_text: textValue,
+        unit: null,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
 
   if (replaceExisting) {
     await supabase.from("listing_attributes").delete().eq("listing_id", listingId);
