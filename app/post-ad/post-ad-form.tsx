@@ -12,6 +12,7 @@ import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/com
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
+import { POSTING_ACTIVE_CATEGORY_SLUGS } from "@/lib/categories/categoryTree";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
 
@@ -203,7 +204,7 @@ export default function PostAdForm({
 
   const activeCategories = useMemo(
     () => categories.filter((category) =>
-      ACTIVE_POSTING_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_POSTING_CATEGORY_SLUGS)[number])
+      POSTING_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof POSTING_ACTIVE_CATEGORY_SLUGS)[number])
       && !category.is_coming_soon
     ),
     [categories]
@@ -211,7 +212,7 @@ export default function PostAdForm({
 
   const comingSoonCategories = useMemo(
     () => categories.filter((category) =>
-      !ACTIVE_POSTING_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_POSTING_CATEGORY_SLUGS)[number])
+      !POSTING_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof POSTING_ACTIVE_CATEGORY_SLUGS)[number])
       || category.is_coming_soon
     ),
     [categories]
