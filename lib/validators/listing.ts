@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
+import { CURRENCIES } from "@/lib/constants/marketplace";
 
-const provinceEnum = z.enum(AFGHAN_PROVINCES as unknown as [string, ...string[]]);
 const currencyEnum = z.enum(CURRENCIES as unknown as ["AFN", "USD"]);
 
 const optionalText = z.string().trim().max(200).optional().or(z.literal(""));
@@ -16,7 +15,7 @@ export const listingSchema = z.object({
   price: z.coerce.number().positive("Price must be greater than 0"),
   currency: currencyEnum,
   city: optionalText,
-  province: provinceEnum.optional().or(z.literal("")),
+  province: z.string().trim().max(120).optional().or(z.literal("")),
   district: optionalText,
   province_id: z.coerce.number().int().positive().optional(),
   district_id: z.coerce.number().int().positive().optional(),

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
-import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
+import { CURRENCIES } from "@/lib/constants/marketplace";
 import type { Category, CategoryField, CategoryNode } from "@/types/database";
 import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
@@ -45,8 +45,16 @@ type CoreForm = {
   rulesAccepted: boolean;
 };
 
-type ProvinceOption = { id: number; name: string };
-type DistrictOption = { id: number; name: string; province_id: number };
+type LocationNameRow = {
+  id: number;
+  name: string | null;
+  name_en: string | null;
+  name_fa: string | null;
+  name_ps: string | null;
+  aliases: string[] | null;
+};
+type ProvinceOption = { id: number; label: string; candidates: string[] };
+type DistrictOption = { id: number; label: string; candidates: string[]; province_id: number };
 type LocationMethod = "device" | "manual" | null;
 type StoredLocation = {
   provinceId: number;
@@ -83,6 +91,26 @@ function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
 
 function renderFieldLabel(fieldKey: string) {
   return fieldKey.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function toLocationCandidates(row: LocationNameRow) {
+  const aliases = Array.isArray(row.aliases)
+    ? row.aliases.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    : [];
+
+  return [row.name_en, row.name_fa, row.name_ps, row.name, ...aliases]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim());
+}
+
+function getLocationLabel(row: LocationNameRow, locale: AppLocale) {
+  if (locale === "fa") {
+    return row.name_fa || row.name_en || row.name || "";
+  }
+  if (locale === "ps") {
+    return row.name_ps || row.name_en || row.name || "";
+  }
+  return row.name_en || row.name || row.name_fa || row.name_ps || "";
 }
 
 function toPostingType(mode: PostMode, listingType: "for_sale" | "wanted") {
@@ -578,26 +606,23 @@ export default function PostAdForm({
       const supabase = createSupabaseBrowserClient();
       const { data } = await supabase
         .from("provinces")
-        .select("id, name")
+        .select("id, name, name_en, name_fa, name_ps, aliases")
         .eq("is_active", true)
-        .order("name", { ascending: true });
+        .order("sort_order", { ascending: true });
 
       if (!active) return;
 
-      const normalizedRows = ((data ?? []) as Array<{ id: number; name: string }>)
-        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(String(row.name)) }));
-
-      const whitelist = AFGHAN_PROVINCES.map((name) => ({
-        name,
-        norm: normalizeLocationName(name),
-      }));
-
-      const mapped = whitelist.reduce<ProvinceOption[]>((acc, item) => {
-        const match = normalizedRows.find((row) => row.norm === item.norm);
-        if (!match) return acc;
-        acc.push({ id: match.id, name: item.name });
-        return acc;
-      }, []);
+      const mapped = ((data ?? []) as LocationNameRow[])
+        .map((row) => {
+          const label = getLocationLabel(row, locale);
+          if (!label) return null;
+          return {
+            id: row.id,
+            label,
+            candidates: toLocationCandidates(row),
+          } satisfies ProvinceOption;
+        })
+        .filter((row): row is ProvinceOption => Boolean(row));
 
       setProvinceOptions(mapped);
     };
@@ -606,7 +631,7 @@ export default function PostAdForm({
     return () => {
       active = false;
     };
-  }, [normalizeLocationName]);
+  }, [locale, normalizeLocationName]);
 
   useEffect(() => {
     let active = true;
@@ -621,16 +646,30 @@ export default function PostAdForm({
       const supabase = createSupabaseBrowserClient();
       const { data } = await supabase
         .from("districts")
-        .select("id, name, province_id")
+        .select("id, province_id, name, name_en, name_fa, name_ps, aliases")
         .eq("province_id", selectedProvinceId)
         .eq("is_active", true)
-        .order("name", { ascending: true });
+        .order("sort_order", { ascending: true });
 
       if (!active) return;
-      setDistrictOptions((data ?? []) as DistrictOption[]);
+
+      const mapped = ((data ?? []) as Array<LocationNameRow & { province_id: number }>)
+        .map((row) => {
+          const label = getLocationLabel(row, locale);
+          if (!label) return null;
+          return {
+            id: row.id,
+            province_id: row.province_id,
+            label,
+            candidates: toLocationCandidates(row),
+          } satisfies DistrictOption;
+        })
+        .filter((row): row is DistrictOption => Boolean(row));
+
+      setDistrictOptions(mapped);
       setSelectedDistrictId((prev) => {
         if (!prev) return null;
-        return (data ?? []).some((row) => Number((row as { id: number }).id) === prev) ? prev : null;
+        return mapped.some((row) => row.id === prev) ? prev : null;
       });
     };
 
@@ -638,7 +677,7 @@ export default function PostAdForm({
     return () => {
       active = false;
     };
-  }, [selectedProvinceId]);
+  }, [locale, selectedProvinceId]);
 
   async function attemptReverseGeocode(latitude: number, longitude: number) {
     try {
@@ -671,7 +710,7 @@ export default function PostAdForm({
 
       if (provinceHint) {
         const matchedProvince = provinceOptions.find(
-          (option) => normalizeLocationName(option.name) === normalizeLocationName(provinceHint)
+          (option) => option.candidates.some((name) => normalizeLocationName(name) === normalizeLocationName(provinceHint))
         );
         if (matchedProvince) {
           setSelectedProvinceId(matchedProvince.id);
@@ -680,13 +719,21 @@ export default function PostAdForm({
             const supabase = createSupabaseBrowserClient();
             const { data: districtsForProvince } = await supabase
               .from("districts")
-              .select("id, name, province_id")
+              .select("id, province_id, name, name_en, name_fa, name_ps, aliases")
               .eq("province_id", matchedProvince.id)
               .eq("is_active", true)
-              .order("name", { ascending: true });
+              .order("sort_order", { ascending: true });
 
-            const matchedDistrict = ((districtsForProvince ?? []) as DistrictOption[]).find(
-              (option) => normalizeLocationName(option.name) === normalizeLocationName(districtHint)
+            const districtRows = ((districtsForProvince ?? []) as Array<LocationNameRow & { province_id: number }>)
+              .map((row) => ({
+                id: row.id,
+                province_id: row.province_id,
+                label: getLocationLabel(row, locale),
+                candidates: toLocationCandidates(row),
+              }));
+
+            const matchedDistrict = districtRows.find((option) =>
+              option.candidates.some((name) => normalizeLocationName(name) === normalizeLocationName(districtHint))
             );
 
             if (matchedDistrict) {
@@ -1129,8 +1176,8 @@ export default function PostAdForm({
     form.set("price", core.price);
     form.set("listing_type", listingTypeChoice);
     form.set("currency", core.currency);
-    form.set("province", selectedProvince?.name ?? "");
-    form.set("district", selectedDistrict?.name ?? "");
+    form.set("province", selectedProvince?.label ?? "");
+    form.set("district", selectedDistrict?.label ?? "");
     form.set("province_id", String(selectedProvinceId ?? ""));
     form.set("district_id", String(selectedDistrictId ?? ""));
     form.set("area_text", areaText);
@@ -1636,7 +1683,7 @@ export default function PostAdForm({
                   >
                     <option value="">{t.postAd.select} {t.postAd.province}</option>
                     {provinceOptions.map((province) => (
-                      <option key={province.id} value={province.id}>{province.name}</option>
+                      <option key={province.id} value={province.id}>{province.label}</option>
                     ))}
                   </select>
                 </label>
@@ -1653,7 +1700,7 @@ export default function PostAdForm({
                   >
                     <option value="">{t.postAd.select} {t.postAd.district}</option>
                     {districtOptions.map((district) => (
-                      <option key={district.id} value={district.id}>{district.name}</option>
+                      <option key={district.id} value={district.id}>{district.label}</option>
                     ))}
                   </select>
                 </label>
@@ -1696,9 +1743,9 @@ export default function PostAdForm({
               <p><span className="font-semibold">{t.postAd.price}:</span> {core.price ? `${core.price} ${core.currency}` : "-"}</p>
               <p>
                 <span className="font-semibold">{t.postAd.provinceDistrict}:</span>{" "}
-                {provinceOptions.find((item) => item.id === selectedProvinceId)?.name ?? "-"}
+                {provinceOptions.find((item) => item.id === selectedProvinceId)?.label ?? "-"}
                 {" / "}
-                {districtOptions.find((item) => item.id === selectedDistrictId)?.name ?? "-"}
+                {districtOptions.find((item) => item.id === selectedDistrictId)?.label ?? "-"}
               </p>
               <p><span className="font-semibold">{t.postAd.photosLabel}:</span> {images.length}</p>
             </div>
