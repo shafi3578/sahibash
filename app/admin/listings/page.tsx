@@ -12,6 +12,15 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 
+type ListingTranslationItem = {
+  id: string;
+  language_code: string;
+  translation_status: "pending" | "completed" | "failed" | "stale" | "needs_review";
+  title: string;
+  description: string;
+  translation_quality: string | null;
+};
+
 export default async function AdminListingsPage() {
   await requireAdmin();
   const locale = await getCurrentLocale();
@@ -48,7 +57,7 @@ export default async function AdminListingsPage() {
               <p className="mt-1 text-xs text-[var(--ink-2)]">{ui.admin.original}: {listing.original_locale || "en"}</p>
               <p className="mt-1 text-xs text-[var(--ink-2)] line-clamp-2">{listing.original_title || listing.title}</p>
 
-              {(listing.listing_translations ?? []).map((translation: any) => (
+              {(listing.listing_translations ?? []).map((translation: ListingTranslationItem) => (
                 <form key={translation.id} action={adminUpdateListingTranslationAction} className="mt-3 space-y-2 rounded-lg border border-[var(--line)] bg-white p-2">
                   <input type="hidden" name="listingId" value={listing.id} />
                   <input type="hidden" name="languageCode" value={translation.language_code} />

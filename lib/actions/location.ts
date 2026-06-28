@@ -4,6 +4,26 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { type LocationVisibility } from '@/components/location/LocationPrivacy';
 
+type NearbyListingRow = {
+  id: string;
+  title: string;
+  price: number | null;
+  currency: string | null;
+  latitude: number;
+  longitude: number;
+  location_visibility: string | null;
+  location_accuracy: number | null;
+  province_id: number | null;
+  district_id: number | null;
+  area_id: number | null;
+  address_text: string | null;
+  created_at: string;
+  user_id: string;
+  category_id: number | null;
+};
+
+type NearbyListingWithDistance = NearbyListingRow & { distance: number };
+
 /**
  * Save location data to a listing
  */
@@ -138,8 +158,8 @@ export async function getNearbyListings(
   const deg2rad = (deg: number) => deg * (Math.PI / 180);
   const R = 6371; // Radius of earth in km
 
-  const filteredListings = data
-    .map((listing: any) => {
+  const filteredListings = (data as NearbyListingRow[])
+    .map((listing): NearbyListingWithDistance => {
       const dLat = deg2rad(listing.latitude - latitude);
       const dLon = deg2rad(listing.longitude - longitude);
       const a =
@@ -156,8 +176,8 @@ export async function getNearbyListings(
         distance,
       };
     })
-    .filter((listing: any) => listing.distance <= radiusKm)
-    .sort((a: any, b: any) => a.distance - b.distance);
+    .filter((listing) => listing.distance <= radiusKm)
+    .sort((a, b) => a.distance - b.distance);
 
   return { listings: filteredListings, count: filteredListings.length };
 }

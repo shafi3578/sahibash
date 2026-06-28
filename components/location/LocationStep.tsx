@@ -60,17 +60,17 @@ export default function LocationStep({
     initialLocation || {}
   );
 
-  const handleGeolocationDetected = (location: any) => {
+  const handleGeolocationDetected = (location: SelectedLocation) => {
     setSelectedLocation(location);
     setMethod('privacy');
   };
 
-  const handleManualLocationSelect = (location: any) => {
+  const handleManualLocationSelect = (location: SelectedLocation) => {
     setSelectedLocation({ ...selectedLocation, ...location });
     setMethod('privacy');
   };
 
-  const handleMapLocationSelected = (location: any) => {
+  const handleMapLocationSelected = (location: SelectedLocation) => {
     setSelectedLocation({ ...selectedLocation, ...location });
     setMethod('privacy');
   };

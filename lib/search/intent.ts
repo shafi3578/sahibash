@@ -392,7 +392,8 @@ function detectSpecificIntent(input: string): SearchIntentSignal | null {
     });
 
     if (matched) {
-      const { terms: _terms, ...signal } = intent;
+      const { terms, ...signal } = intent;
+      void terms;
       return signal;
     }
   }

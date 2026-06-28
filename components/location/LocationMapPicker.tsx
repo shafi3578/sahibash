@@ -1,28 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { getUiTranslations } from '@/lib/i18n/ui';
 import type { AppLocale } from '@/lib/i18n/translations';
-
-// Map component - will be loaded dynamically to avoid SSR issues
-const MapContainer = dynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
-  ssr: false,
-  loading: () => <div className="w-full h-96 bg-gray-100 flex items-center justify-center">Loading...</div>,
-});
-
-const TileLayer = dynamic(() => import('react-leaflet').then((m) => m.TileLayer), {
-  ssr: false,
-});
-
-const Marker = dynamic(() => import('react-leaflet').then((m) => m.Marker), {
-  ssr: false,
-});
-
-const Popup = dynamic(() => import('react-leaflet').then((m) => m.Popup), {
-  ssr: false,
-});
 
 interface MapLocation {
   latitude?: number;
@@ -141,23 +122,6 @@ export default function LocationMapPicker({
   onLocationSelected,
   initialLocation,
 }: LocationMapPickerProps) {
-  const [leafletAvailable, setLeafletAvailable] = useState(false);
-  const mapRef = useRef(null);
-
-  useEffect(() => {
-    // Check if leaflet is available
-    if (typeof window !== 'undefined') {
-      try {
-        require('leaflet');
-        setLeafletAvailable(true);
-      } catch (e) {
-        // Leaflet not installed, use fallback
-        setLeafletAvailable(false);
-      }
-    }
-  }, []);
-
-  // For now, always use the simple picker since leaflet requires additional setup
-  // In production, you could add: npm install leaflet react-leaflet
+  // Use the simple coordinate picker to avoid optional map runtime dependencies.
   return <SimpleMapPicker onLocationSelected={onLocationSelected} initialLocation={initialLocation} />;
 }

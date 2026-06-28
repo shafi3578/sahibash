@@ -641,7 +641,7 @@ async function ensureCategoryPostingAllowed(
     return { ok: false, message: "Must select a category" };
   }
 
-  if (!["vehicles", "real-estate", "mobile-phones-tablets", "second-hand-items"].includes(String(fallback.data.slug))) {
+  if (!["vehicles", "real-estate", "mobile-phones-tablets"].includes(String(fallback.data.slug))) {
     return { ok: false, message: "Posting in this category is not available yet." };
   }
 
@@ -689,7 +689,11 @@ async function buildListingPayload(
   input: ListingInput,
   formData: FormData
 ) {
-  const context = await resolveCategoryContext(supabase, input);
+  const context = await resolveCategoryContext(supabase, {
+    category_id: input.category_id,
+    category_node_id: input.category_node_id,
+    subcategory_id: input.subcategory_id,
+  });
   if (!context) {
     return null;
   }
@@ -702,8 +706,6 @@ async function buildListingPayload(
   if (!legacySubcategoryId) {
     return null;
   }
-
-  const province = input.province || null;
 
   const parseLocationId = (value: FormDataEntryValue | null): number | null => {
     const raw = toFormValueText(value);
@@ -919,6 +921,23 @@ function validatePostingLocationFormData(formData: FormData): { ok: true } | { o
   return { ok: true };
 }
 
+function formatListingValidationError(issues: Array<{ path: Array<PropertyKey>; message: string }>): string {
+  const first = issues[0];
+  if (!first) {
+    return "Invalid listing data";
+  }
+
+  const fieldPath = first.path
+    .filter((segment) => typeof segment === "string" || typeof segment === "number")
+    .join(".");
+
+  if (!fieldPath) {
+    return `Invalid listing data: ${first.message}`;
+  }
+
+  return `Invalid listing data (${fieldPath}): ${first.message}`;
+}
+
 export async function createListingFormAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -929,7 +948,11 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   }
 
   const input = parsed.data;
-  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, {
+    category_id: input.category_id,
+    category_node_id: input.category_node_id,
+    subcategory_id: input.subcategory_id,
+  });
   if (!postingGuard.ok) {
     return;
   }
@@ -999,11 +1022,15 @@ export async function createListingAction(formData: FormData): Promise<{
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
-    return { ok: false, message: "Invalid listing data" };
+    return { ok: false, message: formatListingValidationError(parsed.error.issues) };
   }
 
   const input = parsed.data;
-  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, {
+    category_id: input.category_id,
+    category_node_id: input.category_node_id,
+    subcategory_id: input.subcategory_id,
+  });
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
   }
@@ -1094,11 +1121,15 @@ export async function updateListingAction(
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
-    return { ok: false, message: "Invalid listing data" };
+    return { ok: false, message: formatListingValidationError(parsed.error.issues) };
   }
 
   const input = parsed.data;
-  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, {
+    category_id: input.category_id,
+    category_node_id: input.category_node_id,
+    subcategory_id: input.subcategory_id,
+  });
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
   }

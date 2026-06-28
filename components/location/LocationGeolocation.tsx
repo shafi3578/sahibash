@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
 import { getUiTranslations } from '@/lib/i18n/ui';
 import type { AppLocale } from '@/lib/i18n/translations';
 
@@ -33,11 +32,6 @@ export default function LocationGeolocation({
   const ui = getUiTranslations(locale);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   const requestLocation = () => {
     setLoading(true);

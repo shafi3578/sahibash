@@ -64,15 +64,6 @@ type Props = {
 
 type Step = "category" | "brandModel" | "details" | "photos" | "location" | "preview";
 
-const STEP_LABELS: Record<Step, string> = {
-  category: "Category",
-  brandModel: "Brand & Model",
-  details: "Details",
-  photos: "Photos",
-  location: "Location",
-  preview: "Preview",
-};
-
 const CONDITION_OPTIONS = ["New", "Like New", "Excellent", "Good", "Fair", "Damaged", "For Parts"];
 const WARRANTY_OPTIONS = ["No Warranty", "Shop Warranty", "Official Warranty", "International Warranty"];
 const REPAIR_HISTORY_OPTIONS = [
@@ -281,32 +272,6 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
       .replace("maidan wardak", "wardak");
   }
 
-  async function loadProvinces() {
-    const supabase = createSupabaseBrowserClient();
-    const { data } = await supabase
-      .from("provinces")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("name", { ascending: true });
-
-    const normalizedRows = ((data ?? []) as Array<{ id: number; name: string }>)
-      .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(String(row.name)) }));
-
-    const whitelist = AFGHAN_PROVINCES.map((name) => ({
-      name,
-      norm: normalizeLocationName(name),
-    }));
-
-    const mapped = whitelist.reduce<ProvinceOption[]>((acc, item) => {
-      const match = normalizedRows.find((row) => row.norm === item.norm);
-      if (!match) return acc;
-      acc.push({ id: match.id, name: item.name });
-      return acc;
-    }, []);
-
-    setProvinceOptions(mapped);
-  }
-
   async function loadDistricts(provinceId: number) {
     const supabase = createSupabaseBrowserClient();
     const { data } = await supabase
@@ -415,19 +380,41 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
   }
 
   useEffect(() => {
+    let active = true;
+
+    const loadProvinces = async () => {
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("provinces")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (!active) return;
+
+      const normalizedRows = ((data ?? []) as Array<{ id: number; name: string }>)
+        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(String(row.name)) }));
+
+      const whitelist = AFGHAN_PROVINCES.map((name) => ({
+        name,
+        norm: normalizeLocationName(name),
+      }));
+
+      const mapped = whitelist.reduce<ProvinceOption[]>((acc, item) => {
+        const match = normalizedRows.find((row) => row.norm === item.norm);
+        if (!match) return acc;
+        acc.push({ id: match.id, name: item.name });
+        return acc;
+      }, []);
+
+      setProvinceOptions(mapped);
+    };
+
     void loadProvinces();
+    return () => {
+      active = false;
+    };
   }, []);
-
-  useEffect(() => {
-    if (!selectedProvinceId) {
-      setDistrictOptions([]);
-      setSelectedDistrictId(null);
-      setDistrict("");
-      return;
-    }
-
-    void loadDistricts(selectedProvinceId);
-  }, [selectedProvinceId]);
 
   function gotoNext() {
     setStepError(null);

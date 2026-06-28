@@ -60,7 +60,6 @@ export default function LocationSelector({
   );
 
   const [loading, setLoading] = useState(true);
-  const [countriesLoaded, setCountriesLoaded] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -80,7 +79,6 @@ export default function LocationSelector({
         console.error('Error loading provinces:', error);
       } else if (data) {
         setProvinces(data as Province[]);
-        setCountriesLoaded(true);
       }
       setLoading(false);
     };

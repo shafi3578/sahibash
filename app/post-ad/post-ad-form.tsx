@@ -83,6 +83,24 @@ const LOCATION_DYNAMIC_KEYS = new Set([
   "location_accuracy",
 ]);
 
+const CORE_DYNAMIC_KEYS = new Set([
+  "title",
+  "description",
+  "price",
+  "currency",
+  "contact_phone",
+  "contact_name",
+  "contact_preferences",
+  "meeting_preference",
+  "address_optional",
+  "minimum_offer",
+  "negotiable",
+]);
+
+function isRenderableDynamicField(field: CategoryField) {
+  return !LOCATION_DYNAMIC_KEYS.has(field.field_key) && !CORE_DYNAMIC_KEYS.has(field.field_key);
+}
+
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
   if (!optionsJson) return [];
   if (Array.isArray(optionsJson)) return optionsJson.map((value) => String(value));
@@ -130,7 +148,11 @@ function inferImageConfig(rootSlug: string, path: string | undefined): PostingCo
     return { requires_images: true, min_images: 1, max_images: 15, recommended_images: "5-15", allow_video: true };
   }
 
-  if (rootSlug === "mobile-phones-tablets" || rootSlug === "electronics-computers") {
+  if (rootSlug === "mobile-phones-tablets" || rootSlug === "phones-electronics" || rootSlug === "electronics-computers") {
+    return { requires_images: true, min_images: 1, max_images: 12, recommended_images: "3-8", allow_video: false };
+  }
+
+  if (rootSlug === "second-hand-items") {
     return { requires_images: true, min_images: 1, max_images: 12, recommended_images: "3-8", allow_video: false };
   }
 
@@ -169,12 +191,13 @@ export default function PostAdForm({
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
   const [dynamicFields, setDynamicFields] = useState<CategoryField[]>([]);
   const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean>>({});
+  const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [loadingTree, setLoadingTree] = useState(false);
 
   const [postingConfig, setPostingConfig] = useState<PostingConfig | null>(null);
   const [listingTypeChoice, setListingTypeChoice] = useState<"for_sale" | "wanted">(initialListingType);
   const [postMode] = useState<PostMode>(initialMode);
-  const [smartRawInput, setSmartRawInput] = useState("");
+  const [smartRawInput] = useState("");
   const [smartSuggestion, setSmartSuggestion] = useState<SmartPostingParseResult | null>(null);
 
   const [images, setImages] = useState<StagedImage[]>([]);
@@ -216,7 +239,26 @@ export default function PostAdForm({
   const [locationConfirmed, setLocationConfirmed] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationHint, setLocationHint] = useState<string | null>(null);
-  const [previousLocation, setPreviousLocation] = useState<StoredLocation | null>(null);
+  const previousLocation = useMemo<StoredLocation | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    try {
+      const raw = globalThis.localStorage?.getItem(PREVIOUS_LOCATION_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw) as StoredLocation;
+      if (parsed?.provinceId && parsed?.districtId) {
+        return parsed;
+      }
+    } catch {
+      // ignore invalid previous location payload
+    }
+
+    return null;
+  }, []);
 
   const activeCategories = useMemo(
     () => categories.filter((category) =>
@@ -225,7 +267,6 @@ export default function PostAdForm({
     ),
     [categories]
   );
-
   const breadcrumb = useMemo(
     () =>
       pathNodes
@@ -544,14 +585,28 @@ export default function PostAdForm({
   }
 
   function updateDynamic(key: string, value: string | boolean) {
+    if (CORE_DYNAMIC_KEYS.has(key)) {
+      return;
+    }
+    const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
+    for (const locationKey of LOCATION_DYNAMIC_KEYS) {
+      allowedKeys.add(locationKey);
+    }
+    if (!allowedKeys.has(key)) {
+      return;
+    }
     setDynamicValues((prev) => ({ ...prev, [key]: value }));
   }
 
   function updateDynamicPair(primaryKey: string, secondaryKey: string, value: string | boolean) {
+    const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
+    for (const locationKey of LOCATION_DYNAMIC_KEYS) {
+      allowedKeys.add(locationKey);
+    }
     setDynamicValues((prev) => ({
       ...prev,
-      [primaryKey]: value,
-      [secondaryKey]: value,
+      ...(allowedKeys.has(primaryKey) && !CORE_DYNAMIC_KEYS.has(primaryKey) ? { [primaryKey]: value } : {}),
+      ...(allowedKeys.has(secondaryKey) && !CORE_DYNAMIC_KEYS.has(secondaryKey) ? { [secondaryKey]: value } : {}),
     }));
   }
 
@@ -566,38 +621,6 @@ export default function PostAdForm({
       .replace("sar e pol", "sar-e pol")
       .replace("maidan wardak", "wardak");
   }, []);
-
-  useEffect(() => {
-    try {
-      const raw = globalThis.localStorage?.getItem(PREVIOUS_LOCATION_KEY);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw) as StoredLocation;
-      if (parsed?.provinceId && parsed?.districtId) {
-        setPreviousLocation(parsed);
-      }
-    } catch {
-      // ignore invalid previous location payload
-    }
-  }, []);
-
-  useEffect(() => {
-    const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
-    for (const key of LOCATION_DYNAMIC_KEYS) {
-      allowedKeys.add(key);
-    }
-
-    setDynamicValues((prev) => {
-      const next: Record<string, string | boolean> = {};
-      for (const [key, value] of Object.entries(prev)) {
-        if (allowedKeys.has(key)) {
-          next[key] = value;
-        }
-      }
-      return next;
-    });
-  }, [dynamicFields]);
 
   useEffect(() => {
     let active = true;
@@ -866,7 +889,6 @@ export default function PostAdForm({
       }
 
       const details = (response.draft.details ?? {}) as Record<string, unknown>;
-      const category = (response.draft.category ?? {}) as Record<string, unknown>;
 
       setPendingDraft({
         core: {
@@ -895,27 +917,24 @@ export default function PostAdForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const raw = globalThis.localStorage?.getItem(draftStorageKey);
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw) as {
-        core?: CoreForm;
-        dynamicValues?: Record<string, string | boolean>;
-      };
-      setPendingDraft(parsed);
-    } catch {
-      // ignore broken draft
-    }
-  }, [draftStorageKey]);
-
   function continueDraft() {
     if (pendingDraft?.core) {
       setCore(pendingDraft.core);
     }
     if (pendingDraft?.dynamicValues) {
-      setDynamicValues(pendingDraft.dynamicValues);
+      const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
+      for (const key of LOCATION_DYNAMIC_KEYS) {
+        allowedKeys.add(key);
+      }
+
+      const filtered: Record<string, string | boolean> = {};
+      for (const [key, value] of Object.entries(pendingDraft.dynamicValues)) {
+        if (allowedKeys.has(key)) {
+          filtered[key] = value;
+        }
+      }
+
+      setDynamicValues(filtered);
     }
     setPendingDraft(null);
   }
@@ -989,7 +1008,7 @@ export default function PostAdForm({
   const requiredDynamicKeys = useMemo(() => {
     return new Set(
       dynamicFields
-        .filter((field) => field.is_required && !LOCATION_DYNAMIC_KEYS.has(field.field_key))
+        .filter((field) => field.is_required && isRenderableDynamicField(field))
         .map((field) => field.field_key)
     );
   }, [dynamicFields]);
@@ -1226,6 +1245,9 @@ export default function PostAdForm({
       if (LOCATION_DYNAMIC_KEYS.has(key)) {
         continue;
       }
+      if (CORE_DYNAMIC_KEYS.has(key)) {
+        continue;
+      }
       if (typeof value === "boolean") {
         if (value) form.set(key, "true");
       } else if (String(value).trim()) {
@@ -1272,7 +1294,73 @@ export default function PostAdForm({
     });
   }
 
-  const renderDynamicFields = dynamicFields.filter((field) => !LOCATION_DYNAMIC_KEYS.has(field.field_key));
+  const renderDynamicFields = dynamicFields.filter((field) => isRenderableDynamicField(field));
+  const requiredDynamicFields = renderDynamicFields.filter((field) => field.is_required);
+  const optionalDynamicFields = renderDynamicFields.filter((field) => !field.is_required);
+
+  const optionalDetailsLabel = locale === "fa"
+    ? "جزئیات بیشتر"
+    : locale === "ps"
+      ? "نور جزئیات"
+      : "More details";
+  const hideOptionalDetailsLabel = locale === "fa"
+    ? "پنهان کردن جزئیات بیشتر"
+    : locale === "ps"
+      ? "نور جزئیات پټ کړئ"
+      : "Hide more details";
+  const optionalCoreFieldCount = 2;
+  const totalOptionalFieldCount = optionalDynamicFields.length + optionalCoreFieldCount;
+
+  const renderDynamicFieldInput = (field: CategoryField) => {
+    const value = dynamicValues[field.field_key];
+
+    if (field.field_type === "boolean") {
+      return (
+        <label key={field.id} className="text-sm font-semibold">
+          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-3">
+            <input
+              type="checkbox"
+              checked={Boolean(value)}
+              onChange={(event) => updateDynamic(field.field_key, event.target.checked)}
+              className="h-4 w-4"
+            />
+            {field.field_label}
+          </span>
+        </label>
+      );
+    }
+
+    if (field.field_type === "select") {
+      const options = fieldOptions(field.options_json);
+      return (
+        <label key={field.id} className="text-sm font-semibold">
+          {field.field_label}
+          <select
+            value={String(value ?? "")}
+            onChange={(event) => updateDynamic(field.field_key, event.target.value)}
+            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+          >
+            <option value="">{t.postAd.select}</option>
+            {options.map((option) => (
+              <option key={`${field.id}-${option}`} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+
+    return (
+      <label key={field.id} className="text-sm font-semibold">
+        {field.field_label}
+        <input
+          type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
+          value={String(value ?? "")}
+          onChange={(event) => updateDynamic(field.field_key, event.target.value)}
+          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+        />
+      </label>
+    );
+  };
 
   const suggestedCategoryLabel = useMemo(() => {
     if (!smartSuggestion || smartSuggestion.categorySlug === "other") {
@@ -1494,12 +1582,6 @@ export default function PostAdForm({
               <label className="text-sm font-semibold">{t.postAd.contactPhone}
                 <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
-              <label className="text-sm font-semibold">{t.postAd.contactName}
-                <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
-              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
-                <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
               <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)] sm:col-span-2">
                 {t.postAd.locationMovedNote}
               </p>
@@ -1519,58 +1601,34 @@ export default function PostAdForm({
             {renderDynamicFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
                 <h3 className="text-sm font-bold">{t.postAd.additionalCategoryFields}</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  {renderDynamicFields.map((field) => {
-                    const value = dynamicValues[field.field_key];
+                {requiredDynamicFields.length > 0 ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {requiredDynamicFields.map((field) => renderDynamicFieldInput(field))}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
 
-                    if (field.field_type === "boolean") {
-                      return (
-                        <label key={field.id} className="text-sm font-semibold">
-                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-3">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(value)}
-                              onChange={(event) => updateDynamic(field.field_key, event.target.checked)}
-                              className="h-4 w-4"
-                            />
-                            {field.field_label}
-                          </span>
-                        </label>
-                      );
-                    }
-
-                    if (field.field_type === "select") {
-                      const options = fieldOptions(field.options_json);
-                      return (
-                        <label key={field.id} className="text-sm font-semibold">
-                          {field.field_label}
-                          <select
-                            value={String(value ?? "")}
-                            onChange={(event) => updateDynamic(field.field_key, event.target.value)}
-                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                          >
-                            <option value="">{t.postAd.select}</option>
-                            {options.map((option) => (
-                              <option key={`${field.id}-${option}`} value={option}>{option}</option>
-                            ))}
-                          </select>
-                        </label>
-                      );
-                    }
-
-                    return (
-                      <label key={field.id} className="text-sm font-semibold">
-                        {field.field_label}
-                        <input
-                          type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
-                          value={String(value ?? "")}
-                          onChange={(event) => updateDynamic(field.field_key, event.target.value)}
-                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
+            {totalOptionalFieldCount > 0 ? (
+              <section className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                <button
+                  type="button"
+                  onClick={() => setShowOptionalDetails((prev) => !prev)}
+                  className="inline-flex items-center rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold"
+                >
+                  {showOptionalDetails ? hideOptionalDetailsLabel : optionalDetailsLabel} ({totalOptionalFieldCount})
+                </button>
+                {showOptionalDetails ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="text-sm font-semibold">{t.postAd.contactName}
+                      <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2" />
+                    </label>
+                    <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
+                      <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2" />
+                    </label>
+                    {optionalDynamicFields.map((field) => renderDynamicFieldInput(field))}
+                  </div>
+                ) : null}
               </section>
             ) : null}
 

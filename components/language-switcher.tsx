@@ -49,10 +49,6 @@ export function LanguageSwitcher({ locale, label }: Props) {
     };
   }, []);
 
-  useEffect(() => {
-    setOpen(false);
-  }, [currentPath, locale]);
-
   return (
     <div ref={menuRef} className="relative">
       <div className="hidden items-center gap-1 rounded-full border border-black/20 bg-white px-2 py-1 text-xs font-semibold lg:flex">

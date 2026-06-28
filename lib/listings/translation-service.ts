@@ -43,6 +43,10 @@ type GlossaryEntry = {
   aliases?: string[];
 };
 
+export type TranslationServiceClient = {
+  from: (table: string) => any;
+};
+
 const AFGHAN_MARKETPLACE_GLOSSARY: GlossaryEntry[] = [
   { canonical: "phone", en: "phone", fa: "موبایل", ps: "تلیفون", aliases: ["مبایل", "mobile", "cellphone"] },
   { canonical: "negotiable", en: "negotiable", fa: "جور آمد", ps: "جوړ راشه", aliases: ["جورامد"] },
@@ -354,7 +358,7 @@ export function sourceHash(title: string, description: string) {
 }
 
 export async function queueListingTranslationJobs(
-  supabase: any,
+  supabase: TranslationServiceClient,
   args: {
     listingId: string;
     title: string;
@@ -393,7 +397,7 @@ export async function queueListingTranslationJobs(
 }
 
 export async function markListingTranslationsStale(
-  supabase: any,
+  supabase: TranslationServiceClient,
   listingId: string,
   sourceTitle: string,
   sourceDescription: string,
@@ -424,7 +428,7 @@ export async function markListingTranslationsStale(
 }
 
 export async function processPendingListingTranslationJobs(
-  supabase: any,
+  supabase: TranslationServiceClient,
   options?: { listingId?: string; limit?: number }
 ) {
   const limit = Math.max(1, Math.min(20, options?.limit ?? 5));
@@ -499,7 +503,7 @@ export async function processPendingListingTranslationJobs(
 }
 
 export async function getCompletedListingTranslations(
-  supabase: any,
+  supabase: TranslationServiceClient,
   listingIds: string[],
   languageCode: ListingLanguageCode
 ): Promise<Record<string, ListingTranslationRecord>> {

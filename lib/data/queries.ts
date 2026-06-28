@@ -24,6 +24,7 @@ import {
 import type { AppLocale } from "@/lib/i18n/translations";
 import { buildSearchKeywordIndex, normalizeSearchText } from "@/lib/search/multilingual";
 import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
+import type { SearchRewriteClient } from "@/lib/search/rewrite";
 
 type ListingFilters = {
   locale?: AppLocale;
@@ -254,7 +255,7 @@ export async function getApprovedListings(
       let attributeScopedListingIds: string[] | null = null;
       let translatedSearchListingIds: string[] = [];
       const rewriteContext = await resolveSearchRewriteContext({
-        supabase,
+        supabase: supabase as unknown as SearchRewriteClient,
         queryText: filters?.search?.trim() ?? "",
         categoryScope: null,
       });

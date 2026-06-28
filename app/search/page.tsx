@@ -11,6 +11,7 @@ import {
 } from "@/lib/data/queries";
 import { detectSearchIntent } from "@/lib/search/intent";
 import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
+import type { SearchRewriteClient } from "@/lib/search/rewrite";
 import { logSearchTelemetry } from "@/lib/search/telemetry";
 import { ListingCard } from "@/components/listing-card";
 import { getDictionary } from "@/lib/i18n/server";
@@ -356,7 +357,7 @@ export default async function SearchPage({
         try {
           const supabase = await createSupabaseServerClient();
           return resolveSearchRewriteContext({
-            supabase,
+            supabase: supabase as unknown as SearchRewriteClient,
             queryText: params.q,
             categoryScope: effectiveNode?.path ?? null,
           });

@@ -14,6 +14,22 @@ export type SearchRewriteContext = {
   rewrittenTerms: string[];
 };
 
+type SearchAliasSelectResult = {
+  data: SearchAliasDictionaryRow[] | null;
+  error: unknown;
+};
+
+type SearchAliasQueryBuilder = {
+  select: (columns: string) => SearchAliasQueryBuilder;
+  eq: (column: string, value: unknown) => SearchAliasQueryBuilder;
+  in: (column: string, values: unknown[]) => SearchAliasQueryBuilder;
+  limit: (value: number) => Promise<SearchAliasSelectResult>;
+};
+
+export type SearchRewriteClient = {
+  from: (table: string) => SearchAliasQueryBuilder;
+};
+
 function normalizeAliasList(values: string[] | null | undefined): string[] {
   return (values ?? [])
     .map((value) => normalizeSearchText(String(value ?? "")))
@@ -75,7 +91,7 @@ export function expandWithAdminDictionary(
 }
 
 export async function resolveSearchRewriteContext(args: {
-  supabase: any;
+  supabase: SearchRewriteClient;
   queryText?: string | null;
   categoryScope?: string | null;
 }): Promise<SearchRewriteContext> {
