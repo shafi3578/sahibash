@@ -13,7 +13,6 @@ import type {
 } from "@/types/database";
 import {
   ACTIVE_HOME_CATEGORY_SLUGS,
-  COMING_SOON_HOME_CATEGORY_SLUGS,
   LAUNCH_ACTIVE_CATEGORY_SLUGS,
 } from "@/lib/categories/categoryTree";
 import {
@@ -1208,7 +1207,7 @@ export const getPostingRootCategories = cache(async (): Promise<Category[]> => {
     const lifecycle = await supabase
       .from("categories")
       .select("*")
-      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS, ...COMING_SOON_HOME_CATEGORY_SLUGS])
+      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS])
       .order("display_order", { ascending: true });
 
     if (!lifecycle.error && lifecycle.data) {
@@ -1218,7 +1217,7 @@ export const getPostingRootCategories = cache(async (): Promise<Category[]> => {
     const fallback = await supabase
       .from("categories")
       .select("*")
-      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS, ...COMING_SOON_HOME_CATEGORY_SLUGS])
+      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS])
       .order("display_order", { ascending: true });
 
     if (fallback.error || !fallback.data) {
