@@ -1206,9 +1206,8 @@ export const getPostingRootCategories = cache(async (): Promise<Category[]> => {
   try {
     const supabase = await createSupabaseServerClient();
     const postingRootSlugs = [
-      ...ACTIVE_HOME_CATEGORY_SLUGS,
+      ...POSTING_ACTIVE_CATEGORY_SLUGS,
       ...COMING_SOON_HOME_CATEGORY_SLUGS,
-      "second-hand-items",
     ];
 
     const lifecycle = await supabase
