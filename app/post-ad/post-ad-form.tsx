@@ -75,6 +75,16 @@ type PostingFieldInput = {
   options_json?: Record<string, unknown> | string[] | null;
 };
 
+type AutoFilledSpec = {
+  key: string;
+  label: string;
+  value: string;
+  source: string;
+  confidence: number;
+  editable: boolean;
+  fieldKey?: string;
+};
+
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
 const POSTING_ACTIVE_CATEGORY_SLUGS = ["vehicles", "real-estate", "phones-electronics", "second-hand-items"] as const;
@@ -234,9 +244,19 @@ function inferSyntheticFieldOptions(fieldKey: string): string[] {
       return ["32GB", "64GB", "128GB", "256GB", "512GB"];
     case "ram":
       return ["2GB", "4GB", "6GB", "8GB", "12GB", "16GB"];
+    case "color":
+      return ["Black", "White", "Blue", "Red", "Green", "Silver", "Gold", "Gray", "Other"];
     default:
       return [];
   }
+}
+
+function humanizeSlug(slug: string) {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export default function PostAdForm({
@@ -291,6 +311,8 @@ export default function PostAdForm({
     specs: [],
   });
   const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultDamageParts());
+  const [autoFilledSpecs, setAutoFilledSpecs] = useState<AutoFilledSpec[]>([]);
+  const [catalogFieldOptions, setCatalogFieldOptions] = useState<Record<string, string[]>>({});
 
   const [core, setCore] = useState<CoreForm>({
     title: "",
@@ -396,6 +418,11 @@ export default function PostAdForm({
     [postingSchema]
   );
 
+  const lockedFieldKeys = useMemo(
+    () => new Set(autoFilledSpecs.filter((spec) => spec.fieldKey && !spec.editable).map((spec) => spec.fieldKey!)),
+    [autoFilledSpecs]
+  );
+
   const schemaSyntheticFields = useMemo<PostingFieldInput[]>(() => {
     if (!postingSchema || !schemaVisibleKeys) return [];
 
@@ -405,6 +432,7 @@ export default function PostAdForm({
       .filter((field) => schemaVisibleKeys.has(field.key))
       .filter((field) => !dbFieldKeys.has(field.key))
       .filter((field) => !CORE_DYNAMIC_KEYS.has(field.key as never))
+      .filter((field) => !lockedFieldKeys.has(field.key))
       .map((field) => {
         const options = inferSyntheticFieldOptions(field.key);
         return {
@@ -418,7 +446,175 @@ export default function PostAdForm({
           options_json: options.length > 0 ? options : null,
         };
       });
-  }, [dynamicFields, locale, postingSchema, schemaRequiredKeys, schemaVisibleKeys]);
+  }, [dynamicFields, locale, lockedFieldKeys, postingSchema, schemaRequiredKeys, schemaVisibleKeys]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resolveAutoFilledSpecs() {
+      if (!finalPath || !rootSlug) {
+        if (!cancelled) {
+          setAutoFilledSpecs([]);
+          setCatalogFieldOptions({});
+        }
+        return;
+      }
+
+      const segments = finalPath.split("/").filter(Boolean);
+      const resolvedSpecs: AutoFilledSpec[] = [];
+      const resolvedOptions: Record<string, string[]> = {};
+
+      if (rootSlug === "real-estate") {
+        const sectionSlug = segments[1] ?? "";
+        const propertyType = sectionSlug.includes("apartment")
+          ? "Apartment"
+          : sectionSlug.includes("land")
+            ? "Land"
+            : sectionSlug.includes("warehouse")
+              ? "Warehouse"
+              : sectionSlug.includes("office")
+                ? "Office"
+                : sectionSlug.includes("shop") || sectionSlug.includes("commercial")
+                  ? "Shop"
+                  : "House";
+        resolvedSpecs.push({ key: "property_type", label: "Property Type", value: propertyType, source: "category_path", confidence: 1, editable: false, fieldKey: "property_type" });
+      }
+
+      if (rootSlug === "second-hand-items") {
+        const leafName = pathNodes[pathNodes.length - 1]?.name ?? humanizeSlug(segments[segments.length - 1] ?? "");
+        resolvedSpecs.push({ key: "item_type", label: "Item Type", value: leafName, source: "category_path", confidence: 0.95, editable: false, fieldKey: "item_type" });
+      }
+
+      if (rootSlug === "vehicles") {
+        const vehicleType = pathNodes[1]?.name ?? humanizeSlug(segments[1] ?? "vehicle");
+        resolvedSpecs.push({ key: "vehicle_type", label: "Vehicle Type", value: vehicleType, source: "category_path", confidence: 0.95, editable: false });
+
+        if ((segments[1] ?? "") === "cars" && pathNodes[2]?.name) {
+          resolvedSpecs.push({ key: "make", label: "Make / Brand", value: pathNodes[2].name, source: "category_path", confidence: 1, editable: false, fieldKey: "make" });
+        }
+        if ((segments[1] ?? "") === "cars" && pathNodes[3]?.name) {
+          resolvedSpecs.push({ key: "model", label: "Model", value: pathNodes[3].name, source: "category_path", confidence: 1, editable: false, fieldKey: "model" });
+        }
+      }
+
+      if (rootSlug === "phones-electronics") {
+        const subcategorySlug = segments[1] ?? "";
+        const brandSlug = segments[2] ?? "";
+        const modelSlug = segments[3] ?? "";
+
+        const subcategoryName = pathNodes[1]?.name ?? humanizeSlug(subcategorySlug);
+        if (subcategoryName) {
+          resolvedSpecs.push({ key: "device_type", label: "Device Type", value: subcategoryName, source: "category_path", confidence: 0.95, editable: false });
+        }
+        if (pathNodes[2]?.name) {
+          resolvedSpecs.push({ key: "brand", label: "Brand", value: pathNodes[2].name, source: "category_path", confidence: 1, editable: false, fieldKey: "brand" });
+        }
+        if (pathNodes[3]?.name) {
+          resolvedSpecs.push({ key: "model", label: "Model", value: pathNodes[3].name, source: "category_path", confidence: 1, editable: false, fieldKey: "model" });
+        }
+
+        if (subcategorySlug && brandSlug && modelSlug) {
+          const supabase = createSupabaseBrowserClient();
+          const { data: category } = await supabase
+            .from("electronics_categories")
+            .select("id")
+            .eq("slug", subcategorySlug)
+            .eq("is_active", true)
+            .maybeSingle();
+
+          if (category?.id) {
+            const { data: brand } = await supabase
+              .from("electronics_brands")
+              .select("id")
+              .eq("category_id", category.id)
+              .eq("slug", brandSlug)
+              .eq("is_active", true)
+              .maybeSingle();
+
+            if (brand?.id) {
+              const { data: model } = await supabase
+                .from("electronics_models")
+                .select("id, release_year")
+                .eq("brand_id", brand.id)
+                .eq("slug", modelSlug)
+                .eq("is_active", true)
+                .maybeSingle();
+
+              if (model?.id) {
+                const [{ data: specs }, { data: options }] = await Promise.all([
+                  supabase
+                    .from("electronics_model_specs")
+                    .select("spec_key, spec_label, spec_value")
+                    .eq("model_id", model.id)
+                    .eq("is_public", true),
+                  supabase
+                    .from("electronics_model_options")
+                    .select("option_type, option_value")
+                    .eq("model_id", model.id)
+                    .order("option_type", { ascending: true })
+                    .order("sort_order", { ascending: true }),
+                ]);
+
+                if (model.release_year) {
+                  resolvedSpecs.push({ key: "release_year", label: "Release Year", value: String(model.release_year), source: "device_catalog", confidence: 0.98, editable: false });
+                }
+
+                for (const spec of specs ?? []) {
+                  const value = String(spec.spec_value ?? "").trim();
+                  if (!value) continue;
+                  resolvedSpecs.push({
+                    key: String(spec.spec_key),
+                    label: String(spec.spec_label ?? spec.spec_key),
+                    value,
+                    source: "device_catalog",
+                    confidence: 0.95,
+                    editable: false,
+                  });
+                }
+
+                for (const option of options ?? []) {
+                  const key = String(option.option_type ?? "").trim();
+                  const value = String(option.option_value ?? "").trim();
+                  if (!key || !value) continue;
+                  if (!resolvedOptions[key]) resolvedOptions[key] = [];
+                  if (!resolvedOptions[key].includes(value)) resolvedOptions[key].push(value);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (!cancelled) {
+        const deduped = new Map<string, AutoFilledSpec>();
+        for (const spec of resolvedSpecs) {
+          if (!spec.value || deduped.has(spec.key)) continue;
+          deduped.set(spec.key, spec);
+        }
+        setAutoFilledSpecs(Array.from(deduped.values()));
+        setCatalogFieldOptions(resolvedOptions);
+      }
+    }
+
+    void resolveAutoFilledSpecs();
+    return () => {
+      cancelled = true;
+    };
+  }, [finalPath, pathNodes, rootSlug]);
+
+  useEffect(() => {
+    if (autoFilledSpecs.length === 0) return;
+
+    setDynamicValues((prev) => {
+      const next = { ...prev };
+      for (const spec of autoFilledSpecs) {
+        if (spec.fieldKey) {
+          next[spec.fieldKey] = spec.value;
+        }
+      }
+      return next;
+    });
+  }, [autoFilledSpecs]);
 
   const showPhotoStep = Boolean(resolvedImageConfig?.requires_images || images.length > 0);
   const locationStep = showPhotoStep ? 4 : 3;
@@ -723,6 +919,9 @@ export default function PostAdForm({
     for (const field of schemaSyntheticFields) {
       allowedKeys.add(field.field_key);
     }
+    for (const fieldKey of lockedFieldKeys) {
+      allowedKeys.add(fieldKey);
+    }
     for (const locationKey of LOCATION_DYNAMIC_KEYS) {
       allowedKeys.add(locationKey);
     }
@@ -736,6 +935,9 @@ export default function PostAdForm({
     const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
     for (const field of schemaSyntheticFields) {
       allowedKeys.add(field.field_key);
+    }
+    for (const fieldKey of lockedFieldKeys) {
+      allowedKeys.add(fieldKey);
     }
     for (const locationKey of LOCATION_DYNAMIC_KEYS) {
       allowedKeys.add(locationKey);
@@ -1063,6 +1265,9 @@ export default function PostAdForm({
       for (const field of schemaSyntheticFields) {
         allowedKeys.add(field.field_key);
       }
+      for (const fieldKey of lockedFieldKeys) {
+        allowedKeys.add(fieldKey);
+      }
       for (const key of LOCATION_DYNAMIC_KEYS) {
         allowedKeys.add(key);
       }
@@ -1148,6 +1353,7 @@ export default function PostAdForm({
   const renderDynamicFields = useMemo(() => {
     const filtered = dynamicFields.filter((field) => {
       if (!isRenderableDynamicField(field)) return false;
+      if (lockedFieldKeys.has(field.field_key)) return false;
       if (!schemaVisibleKeys) return true;
       return schemaVisibleKeys.has(field.field_key);
     });
@@ -1160,7 +1366,7 @@ export default function PostAdForm({
       }
       return (a.display_order ?? a.sort_order ?? 0) - (b.display_order ?? b.sort_order ?? 0);
     });
-  }, [dynamicFields, schemaFieldOrder, schemaSyntheticFields, schemaVisibleKeys]);
+  }, [dynamicFields, lockedFieldKeys, schemaFieldOrder, schemaSyntheticFields, schemaVisibleKeys]);
 
   const requiredDynamicKeys = useMemo(() => {
     return new Set(
@@ -1495,7 +1701,7 @@ export default function PostAdForm({
     }
 
     if (field.field_type === "select") {
-      const options = fieldOptions(field.options_json ?? null);
+      const options = catalogFieldOptions[field.field_key] ?? fieldOptions(field.options_json ?? null);
       return (
         <label key={field.id} className="text-sm font-semibold">
           {field.field_label}
@@ -1727,6 +1933,19 @@ export default function PostAdForm({
             </div>
 
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
+
+            {autoFilledSpecs.length > 0 ? (
+              <section className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                <h3 className="text-sm font-bold">Auto-filled from selected category/model</h3>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  {autoFilledSpecs.map((spec) => (
+                    <span key={`${spec.key}-${spec.value}`} className="rounded-full border border-[var(--line)] bg-white px-3 py-1 font-semibold text-[var(--ink-1)]">
+                      {spec.label}: {spec.value}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold sm:col-span-2">{t.postAd.title}
