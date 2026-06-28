@@ -15,7 +15,6 @@ import {
   ACTIVE_HOME_CATEGORY_SLUGS,
   COMING_SOON_HOME_CATEGORY_SLUGS,
   LAUNCH_ACTIVE_CATEGORY_SLUGS,
-  POSTING_ACTIVE_CATEGORY_SLUGS,
 } from "@/lib/categories/categoryTree";
 import {
   appLocaleToListingLanguage,
@@ -1205,29 +1204,21 @@ export const getCategories = cache(async (): Promise<Category[]> => {
 export const getPostingRootCategories = cache(async (): Promise<Category[]> => {
   try {
     const supabase = await createSupabaseServerClient();
-    const postingRootSlugs = [
-      ...ACTIVE_HOME_CATEGORY_SLUGS,
-      ...COMING_SOON_HOME_CATEGORY_SLUGS,
-      "second-hand-items",
-    ];
 
     const lifecycle = await supabase
       .from("categories")
       .select("*")
-      .in("slug", postingRootSlugs)
+      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS, ...COMING_SOON_HOME_CATEGORY_SLUGS])
       .order("display_order", { ascending: true });
 
     if (!lifecycle.error && lifecycle.data) {
-      return (lifecycle.data as Category[]).map((category) => ({
-        ...category,
-        is_coming_soon: !POSTING_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof POSTING_ACTIVE_CATEGORY_SLUGS)[number]),
-      }));
+      return lifecycle.data as Category[];
     }
 
     const fallback = await supabase
       .from("categories")
       .select("*")
-      .in("slug", postingRootSlugs)
+      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS, ...COMING_SOON_HOME_CATEGORY_SLUGS])
       .order("display_order", { ascending: true });
 
     if (fallback.error || !fallback.data) {
@@ -1236,7 +1227,7 @@ export const getPostingRootCategories = cache(async (): Promise<Category[]> => {
 
     return (fallback.data as Category[]).map((category) => ({
       ...category,
-      is_coming_soon: !POSTING_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof POSTING_ACTIVE_CATEGORY_SLUGS)[number]),
+      is_coming_soon: !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
       launch_date: null,
     }));
   } catch {

@@ -11,13 +11,6 @@ export const LAUNCH_ACTIVE_CATEGORY_SLUGS = [
   "wanted-request-ads",
 ] as const;
 
-export const POSTING_ACTIVE_CATEGORY_SLUGS = [
-  "vehicles",
-  "real-estate",
-  "mobile-phones-tablets",
-  "second-hand-items",
-] as const;
-
 export const COMING_SOON_HOME_CATEGORY_SLUGS = [
   "business-industry",
   "education",
