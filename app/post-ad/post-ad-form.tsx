@@ -11,9 +11,10 @@ import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/com
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
-import { ACTIVE_HOME_CATEGORY_SLUGS } from "@/lib/categories/categoryTree";
+import { ACTIVE_LISTING_SCHEMAS } from "@/lib/listingSchemas";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
+import type { ListingSchemaDefinition, SchemaFieldContext } from "@/lib/listingSchemas/shared";
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -65,6 +66,7 @@ type StoredLocation = {
 
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
+const POSTING_ACTIVE_CATEGORY_SLUGS = ["vehicles", "real-estate", "phones-electronics", "second-hand-items"] as const;
 
 const LOCATION_DYNAMIC_KEYS = new Set([
   "city",
@@ -157,6 +159,29 @@ function inferImageConfig(rootSlug: string, path: string | undefined): PostingCo
   }
 
   return { requires_images: false, min_images: 0, max_images: 10, recommended_images: null, allow_video: false };
+}
+
+function buildPostingSchemaContext(rootSlug: string, path: string): SchemaFieldContext {
+  return {
+    listing: {} as never,
+    attributes: new Map(),
+    locale: "en",
+    path,
+    rootSlug,
+  };
+}
+
+function getPostingSchema(rootSlug: string, path: string | undefined): ListingSchemaDefinition | null {
+  if (!rootSlug) {
+    return null;
+  }
+
+  const schema = ACTIVE_LISTING_SCHEMAS.find((candidate) => candidate.rootSlugs.includes(rootSlug));
+  if (!schema) {
+    return null;
+  }
+
+  return schema;
 }
 
 export default function PostAdForm({
@@ -262,7 +287,7 @@ export default function PostAdForm({
 
   const activeCategories = useMemo(
     () => categories.filter((category) =>
-      ACTIVE_HOME_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_HOME_CATEGORY_SLUGS)[number])
+      POSTING_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof POSTING_ACTIVE_CATEGORY_SLUGS)[number])
       && !category.is_coming_soon
     ),
     [categories]
@@ -288,6 +313,33 @@ export default function PostAdForm({
     if (!finalNode) return null;
     return postingConfig ?? inferImageConfig(rootSlug, finalPath);
   }, [finalNode, finalPath, postingConfig, rootSlug]);
+
+  const postingSchema = useMemo(() => getPostingSchema(rootSlug, finalPath), [rootSlug, finalPath]);
+
+  const schemaContext = useMemo(
+    () => buildPostingSchemaContext(rootSlug, finalPath ?? rootSlug),
+    [rootSlug, finalPath]
+  );
+
+  const schemaVisibleKeys = useMemo(() => {
+    if (!postingSchema) {
+      return null;
+    }
+
+    return new Set(
+      postingSchema.fields
+        .filter((field) => (field.showIf ? field.showIf(schemaContext) : true))
+        .map((field) => field.key)
+    );
+  }, [postingSchema, schemaContext]);
+
+  const schemaFieldOrder = useMemo(() => {
+    if (!postingSchema) {
+      return new Map<string, number>();
+    }
+
+    return new Map(postingSchema.fields.map((field) => [field.key, field.order]));
+  }, [postingSchema]);
 
   const showPhotoStep = Boolean(resolvedImageConfig?.requires_images || images.length > 0);
   const locationStep = showPhotoStep ? 4 : 3;
@@ -1005,13 +1057,42 @@ export default function PostAdForm({
     listingTypeChoice,
   ]);
 
+  const renderDynamicFields = useMemo(() => {
+    const filtered = dynamicFields.filter((field) => {
+      if (!isRenderableDynamicField(field)) {
+        return false;
+      }
+      if (!schemaVisibleKeys) {
+        return true;
+      }
+      return schemaVisibleKeys.has(field.field_key);
+    });
+
+    return filtered.sort((a, b) => {
+      const orderA = schemaFieldOrder.get(a.field_key) ?? Number.MAX_SAFE_INTEGER;
+      const orderB = schemaFieldOrder.get(b.field_key) ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return (a.display_order ?? a.sort_order ?? 0) - (b.display_order ?? b.sort_order ?? 0);
+    });
+  }, [dynamicFields, schemaFieldOrder, schemaVisibleKeys]);
+
+  const schemaRequiredKeys = useMemo(() => {
+    return new Set((postingSchema?.requiredFields ?? []).filter((key) => !CORE_DYNAMIC_KEYS.has(key as never)));
+  }, [postingSchema]);
+
+  const schemaOptionalKeys = useMemo(() => {
+    return new Set((postingSchema?.optionalFields ?? []).filter((key) => !CORE_DYNAMIC_KEYS.has(key as never)));
+  }, [postingSchema]);
+
   const requiredDynamicKeys = useMemo(() => {
     return new Set(
-      dynamicFields
-        .filter((field) => field.is_required && isRenderableDynamicField(field))
+      renderDynamicFields
+        .filter((field) => field.is_required || schemaRequiredKeys.has(field.field_key))
         .map((field) => field.field_key)
     );
-  }, [dynamicFields]);
+  }, [renderDynamicFields, schemaRequiredKeys]);
 
   function validateCategoryStep() {
     if (!selectedRoot || !finalNode) {
@@ -1294,9 +1375,8 @@ export default function PostAdForm({
     });
   }
 
-  const renderDynamicFields = dynamicFields.filter((field) => isRenderableDynamicField(field));
-  const requiredDynamicFields = renderDynamicFields.filter((field) => field.is_required);
-  const optionalDynamicFields = renderDynamicFields.filter((field) => !field.is_required);
+  const requiredDynamicFields = renderDynamicFields.filter((field) => requiredDynamicKeys.has(field.field_key));
+  const optionalDynamicFields = renderDynamicFields.filter((field) => !requiredDynamicKeys.has(field.field_key));
 
   const optionalDetailsLabel = locale === "fa"
     ? "جزئیات بیشتر"
@@ -1310,6 +1390,21 @@ export default function PostAdForm({
       : "Hide more details";
   const optionalCoreFieldCount = 2;
   const totalOptionalFieldCount = optionalDynamicFields.length + optionalCoreFieldCount;
+
+  const detailSectionTitle = useMemo(() => {
+    if (rootSlug === "real-estate") return t.postAd.realEstateDetails;
+    if (rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets") return t.postAd.phonesElectronicsDetails;
+    if (rootSlug === "second-hand-items") return t.postAd.secondHandDetails;
+    if (rootSlug === "vehicles") return t.postAd.vehicleDetails;
+    return t.postAd.additionalCategoryFields;
+  }, [rootSlug, t.postAd]);
+
+  const optionalSectionTitle = useMemo(() => {
+    if (postingSchema && schemaOptionalKeys.size > 0) {
+      return `${optionalDetailsLabel} (${optionalDynamicFields.length + optionalCoreFieldCount})`;
+    }
+    return `${optionalDetailsLabel} (${totalOptionalFieldCount})`;
+  }, [optionalCoreFieldCount, optionalDetailsLabel, optionalDynamicFields.length, postingSchema, schemaOptionalKeys.size, totalOptionalFieldCount]);
 
   const renderDynamicFieldInput = (field: CategoryField) => {
     const value = dynamicValues[field.field_key];
@@ -1600,7 +1695,7 @@ export default function PostAdForm({
 
             {renderDynamicFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">{t.postAd.additionalCategoryFields}</h3>
+                <h3 className="text-sm font-bold">{detailSectionTitle}</h3>
                 {requiredDynamicFields.length > 0 ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     {requiredDynamicFields.map((field) => renderDynamicFieldInput(field))}
@@ -1616,7 +1711,7 @@ export default function PostAdForm({
                   onClick={() => setShowOptionalDetails((prev) => !prev)}
                   className="inline-flex items-center rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold"
                 >
-                  {showOptionalDetails ? hideOptionalDetailsLabel : optionalDetailsLabel} ({totalOptionalFieldCount})
+                  {showOptionalDetails ? hideOptionalDetailsLabel : optionalSectionTitle}
                 </button>
                 {showOptionalDetails ? (
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
