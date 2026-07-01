@@ -18,6 +18,7 @@ import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } f
 import type { ListingSchemaDefinition, SchemaFieldContext } from "@/lib/listingSchemas/shared";
 import type { CatalogModel } from "@/lib/catalog/types";
 import { generateAutoFill } from "@/lib/catalog/utils";
+import { getTemplateIdFromPath, getPropertyTemplate } from "@/lib/data/catalogs/realEstate";
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -469,19 +470,25 @@ export default function PostAdForm({
       const resolvedOptions: Record<string, string[]> = {};
 
       if (rootSlug === "real-estate") {
-        const sectionSlug = segments[1] ?? "";
-        const propertyType = sectionSlug.includes("apartment")
-          ? "Apartment"
-          : sectionSlug.includes("land")
-            ? "Land"
-            : sectionSlug.includes("warehouse")
-              ? "Warehouse"
-              : sectionSlug.includes("office")
-                ? "Office"
-                : sectionSlug.includes("shop") || sectionSlug.includes("commercial")
-                  ? "Shop"
-                  : "House";
-        resolvedSpecs.push({ key: "property_type", label: "Property Type", value: propertyType, source: "category_path", confidence: 1, editable: false, fieldKey: "property_type" });
+        // Use property template for auto-filled specs
+        const templateId = getTemplateIdFromPath(finalPath);
+        if (templateId) {
+          const template = getPropertyTemplate(templateId);
+          if (template) {
+            // Add template's stable specs
+            template.stableSpecs.forEach((spec) => {
+              resolvedSpecs.push({
+                key: spec.key,
+                label: spec.label[locale] || spec.label.en,
+                value: String(spec.value),
+                source: "property_template",
+                confidence: spec.confidence,
+                editable: spec.editable,
+                fieldKey: spec.key,
+              });
+            });
+          }
+        }
       }
 
       if (rootSlug === "second-hand-items") {
