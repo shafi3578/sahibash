@@ -25,6 +25,8 @@ export function BrandModelSelector({
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [loadingModels, setLoadingModels] = useState(false);
   const [activeBrand, setActiveBrand] = useState<string | null>(selectedBrandId || null);
+  const [brandSearch, setBrandSearch] = useState("");
+  const [modelSearch, setModelSearch] = useState("");
 
   // Load brands on mount
   useEffect(() => {
@@ -61,6 +63,18 @@ export function BrandModelSelector({
     return generateAutoFill(selectedModel);
   }, [selectedModel]);
 
+  // Filter brands by search
+  const filteredBrands = useMemo(
+    () => brands.filter(b => b.name.toLowerCase().includes(brandSearch.toLowerCase())),
+    [brands, brandSearch]
+  );
+
+  // Filter models by search
+  const filteredModels = useMemo(
+    () => models.filter(m => m.name.toLowerCase().includes(modelSearch.toLowerCase())),
+    [models, modelSearch]
+  );
+
   const handleBrandChange = (brandId: string) => {
     setActiveBrand(brandId);
   };
@@ -74,17 +88,25 @@ export function BrandModelSelector({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Brand Selection */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
           Brand {activeBrand && <span className="text-green-600">✓</span>}
         </label>
         {loadingBrands ? (
           <div className="text-sm text-gray-500">Loading brands...</div>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-            {brands.map((brand) => (
+          <>
+            <input
+              type="text"
+              placeholder="Search brands..."
+              value={brandSearch}
+              onChange={(e) => setBrandSearch(e.target.value)}
+              className="w-full px-3 py-2 mb-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {filteredBrands.map((brand) => (
               <button
                 key={brand.id}
                 onClick={() => handleBrandChange(brand.id)}
@@ -97,80 +119,44 @@ export function BrandModelSelector({
                 {brand.name}
               </button>
             ))}
-          </div>
+            </div>
+          </>
         )}
       </div>
 
       {/* Model Selection */}
       {activeBrand && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Model {selectedModel && <span className="text-green-600">✓</span>}
           </label>
           {loadingModels ? (
             <div className="text-sm text-gray-500">Loading models...</div>
           ) : models.length > 0 ? (
-            <select
-              value={selectedModelId || selectedModel?.id || ""}
-              onChange={(e) => handleModelChange(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select a model...</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
+            <>
+              <input
+                type="text"
+                placeholder="Search models..."
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+                className="w-full px-3 py-2 mb-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+              />
+              <select
+                value={selectedModelId || selectedModel?.id || ""}
+                onChange={(e) => handleModelChange(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select a model...</option>
+                {filteredModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </>
           ) : (
             <div className="text-sm text-gray-500 p-4 bg-yellow-50 rounded-lg">
               No models available for this brand yet. You can still post using manual details.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Auto-filled Specs */}
-      {selectedModel && autoFillData && (
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-3">Auto-filled from Selected Model</h3>
-            <div className="grid grid-cols-1 gap-2">
-              {autoFillData.autoFilledSpecs.map((spec) => (
-                <div key={spec.key} className="flex justify-between items-center py-2 px-3 bg-white rounded border border-blue-100">
-                  <span className="text-gray-700">{spec.label}:</span>
-                  <span className="font-medium text-gray-900">{formatSpecValue(spec.value)}</span>
-                </div>
-              ))}
-            </div>
-            <button className="mt-3 text-sm text-blue-600 hover:text-blue-700 underline">
-              Report wrong specification
-            </button>
-          </div>
-
-          {/* Seller Fields Required */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">You need to fill:</h3>
-            <div className="flex flex-wrap gap-2">
-              {autoFillData.requiredSellerFields.map((field) => (
-                <span key={field} className="px-3 py-1 bg-red-100 text-red-700 text-sm rounded-full">
-                  {field.replace(/_/g, " ")}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Optional Fields */}
-          {autoFillData.optionalSellerFields.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Optional details:</h3>
-              <div className="flex flex-wrap gap-2">
-                {autoFillData.optionalSellerFields.map((field) => (
-                  <span key={field} className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
-                    {field.replace(/_/g, " ")}
-                  </span>
-                ))}
-              </div>
             </div>
           )}
         </div>

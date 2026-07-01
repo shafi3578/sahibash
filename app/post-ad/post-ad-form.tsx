@@ -297,6 +297,7 @@ export default function PostAdForm({
   const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean>>({});
   const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [loadingTree, setLoadingTree] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
 
   const [postingConfig, setPostingConfig] = useState<PostingConfig | null>(null);
   const [listingTypeChoice, setListingTypeChoice] = useState<"for_sale" | "wanted">(initialListingType);
@@ -627,27 +628,20 @@ export default function PostAdForm({
     });
   }, [autoFilledSpecs]);
 
-  const showPhotoStep = Boolean(resolvedImageConfig?.requires_images || images.length > 0);
-  const locationStep = showPhotoStep ? 4 : 3;
-  const previewStep = showPhotoStep ? 5 : 4;
-  const publishStep = showPhotoStep ? 6 : 5;
+  const detailsStep = 2;
+  const photosStep = 3;
+  const locationStep = 4;
+  const contactStep = 5;
+  const reviewStep = 6;
+  const isDetailsStep = step === detailsStep;
+  const isPhotosStep = step === photosStep;
   const isLocationStep = step === locationStep;
-  const isPreviewStep = step === previewStep;
-  const isPublishStep = step === publishStep;
+  const isContactStep = step === contactStep;
+  const isReviewStep = step === reviewStep;
 
-  const visualSteps = showPhotoStep
-    ? [t.postAd.category, t.postAd.details, t.postAd.photos, t.postAd.location, t.postAd.preview, t.postAd.publish]
-    : [t.postAd.category, t.postAd.details, t.postAd.location, t.postAd.preview, t.postAd.publish];
+  const visualSteps = [t.postAd.category, t.postAd.details, t.postAd.photosStepTitle, t.postAd.whereLocated, "Contact", t.postAd.publish];
 
-  const currentVisualStep = (() => {
-    if (showPhotoStep) {
-      return step;
-    }
-    if (step <= 2) return step;
-    if (step === 3) return 3;
-    if (step === 4) return 4;
-    return 5;
-  })();
+  const currentVisualStep = step;
 
   const postAdCopy = useMemo(() => {
     if (locale === "fa") {
@@ -848,6 +842,7 @@ export default function PostAdForm({
     setDynamicFields([]);
     setDynamicValues({});
     setPostingConfig(null);
+    setCategorySearch("");
     setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
     setDamageParts(defaultDamageParts());
 
@@ -873,6 +868,7 @@ export default function PostAdForm({
 
   async function chooseNode(node: CategoryNode) {
     setLoadingTree(true);
+    setCategorySearch("");
 
     const nextPath = [...pathNodes, node];
     setPathNodes(nextPath);
@@ -902,6 +898,7 @@ export default function PostAdForm({
       setFinalNode(null);
       setDynamicFields([]);
       setPostingConfig(null);
+      setCategorySearch("");
       return;
     }
 
@@ -912,6 +909,7 @@ export default function PostAdForm({
     setFinalNode(null);
     setDynamicFields([]);
     setPostingConfig(null);
+    setCategorySearch("");
 
     setLoadingTree(true);
     setCurrentOptions(await fetchChildren(parent.id));
@@ -1477,27 +1475,27 @@ export default function PostAdForm({
         setStepError(err);
         return;
       }
-      setStep(2);
+      setStep(detailsStep);
       return;
     }
 
-    if (step === 2) {
+    if (step === detailsStep) {
       const err = validateDetailsStep();
       if (err) {
         setStepError(err);
         return;
       }
-      setStep(showPhotoStep ? 3 : 3);
+      setStep(photosStep);
       return;
     }
 
-    if (step === 3 && showPhotoStep) {
-      const err = validatePhotoStep();
-      if (err) {
-        setStepError(err);
+    if (step === photosStep) {
+      const photoErr = validatePhotoStep();
+      if (photoErr) {
+        setStepError(photoErr);
         return;
       }
-      setStep(4);
+      setStep(locationStep);
       return;
     }
 
@@ -1507,12 +1505,17 @@ export default function PostAdForm({
         setStepError(err);
         return;
       }
-      setStep(previewStep);
+      setStep(contactStep);
       return;
     }
 
-    if (step === previewStep) {
-      setStep(publishStep);
+    if (step === contactStep) {
+      setStep(reviewStep);
+      return;
+    }
+
+    if (step === reviewStep) {
+      // Proceed to publish
     }
   }
 
@@ -1520,27 +1523,27 @@ export default function PostAdForm({
     setError(null);
     setStepError(null);
 
-    if (step === publishStep) {
-      setStep(previewStep);
+    if (step === reviewStep) {
+      setStep(contactStep);
       return;
     }
 
-    if (step === previewStep) {
+    if (step === contactStep) {
       setStep(locationStep);
       return;
     }
 
     if (step === locationStep) {
-      setStep(showPhotoStep ? 3 : 2);
+      setStep(photosStep);
       return;
     }
 
-    if (step === 3 && showPhotoStep) {
-      setStep(2);
+    if (step === photosStep) {
+      setStep(detailsStep);
       return;
     }
 
-    if (step === 2) {
+    if (step === detailsStep) {
       setStep(1);
     }
   }
@@ -1551,11 +1554,10 @@ export default function PostAdForm({
 
     const categoryErr = validateCategoryStep();
     const detailErr = validateDetailsStep();
-    const photoErr = showPhotoStep ? validatePhotoStep() : null;
     const locationErr = validateLocationStep();
 
-    if (categoryErr || detailErr || photoErr || locationErr) {
-      setError(categoryErr || detailErr || photoErr || locationErr || postAdCopy.completeRequiredFields);
+    if (categoryErr || detailErr || locationErr) {
+      setError(categoryErr || detailErr || locationErr || postAdCopy.completeRequiredFields);
       return;
     }
 
@@ -1708,6 +1710,25 @@ export default function PostAdForm({
       : "Hide more details";
   const optionalCoreFieldCount = 2;
   const totalOptionalFieldCount = optionalDynamicFields.length + optionalCoreFieldCount;
+
+  // Filter categories and options by search
+  const filteredActiveCategories = useMemo(() => {
+    if (!categorySearch.trim()) return activeCategories;
+    const search = categorySearch.toLowerCase();
+    return activeCategories.filter(cat =>
+      cat.name.toLowerCase().includes(search) ||
+      (cat.slug === "mobile-phones-tablets" ? "phones & electronics".includes(search) : false)
+    );
+  }, [activeCategories, categorySearch]);
+
+  const filteredCurrentOptions = useMemo(() => {
+    if (!categorySearch.trim()) return currentOptions;
+    const search = categorySearch.toLowerCase();
+    return currentOptions.filter(node =>
+      node.name.toLowerCase().includes(search) ||
+      (node.slug?.toLowerCase() || "").includes(search)
+    );
+  }, [currentOptions, categorySearch]);
 
   const detailSectionTitle = useMemo(() => {
     if (rootSlug === "real-estate") return t.postAd.realEstateDetails;
@@ -1911,9 +1932,16 @@ export default function PostAdForm({
 
             {!selectedRoot ? (
               <>
+                <input
+                  type="text"
+                  placeholder="Search categories..."
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  className="w-full mt-3 px-4 py-2 border border-[var(--line)] rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
                 <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-                  {activeCategories.map((category) => (
-                    <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
+                  {filteredActiveCategories.map((category) => (
+                    <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]">
                       <span>
                         {localizeCategoryName({
                           locale,
@@ -1925,27 +1953,38 @@ export default function PostAdForm({
                     </button>
                   ))}
                 </div>
-
               </>
             ) : (
-              <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-                {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">{t.postAd.loading}</div> : null}
-                {!loadingTree && currentOptions.length === 0 && finalNode ? (
-                  <div className="px-4 py-3 text-sm font-semibold text-green-700">
-                    {t.postAd.finalCategorySelected}: {localizeCategoryName({ locale, fallbackName: finalNode.name, slug: finalNode.slug, path: finalNode.path })}
-                  </div>
-                ) : null}
-                {!loadingTree
-                  ? currentOptions.map((node) => (
-                      <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
-                        <span className="break-words">
-                          {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
-                        </span>
-                        <span aria-hidden>&gt;</span>
-                      </button>
-                    ))
-                  : null}
-              </div>
+              <>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  className="w-full mt-3 px-4 py-2 border border-[var(--line)] rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
+                  {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">{t.postAd.loading}</div> : null}
+                  {!loadingTree && filteredCurrentOptions.length === 0 && currentOptions.length > 0 ? (
+                    <div className="px-4 py-3 text-sm text-[var(--ink-2)]">No matching categories found</div>
+                  ) : null}
+                  {!loadingTree && filteredCurrentOptions.length === 0 && finalNode && currentOptions.length === 0 ? (
+                    <div className="px-4 py-3 text-sm font-semibold text-green-700">
+                      {t.postAd.finalCategorySelected}: {localizeCategoryName({ locale, fallbackName: finalNode.name, slug: finalNode.slug, path: finalNode.path })}
+                    </div>
+                  ) : null}
+                  {!loadingTree
+                    ? filteredCurrentOptions.map((node) => (
+                        <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]">
+                          <span className="break-words">
+                            {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
+                          </span>
+                          <span aria-hidden>&gt;</span>
+                        </button>
+                      ))
+                    : null}
+                </div>
+              </>
             )}
 
             {/* Brand/Model Selector in Step 1 for catalog categories */}
@@ -1988,24 +2027,6 @@ export default function PostAdForm({
             </div>
 
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
-
-            {/* Auto-filled locked specs displayed as read-only cards - ONLY UNCHANGEABLE SPECS */}
-            {(() => {
-              const lockedSpecs = autoFilledSpecs.filter((spec) => !spec.editable);
-              return lockedSpecs.length > 0 ? (
-                <section className="mt-4 rounded-xl border border-2 border-blue-300 bg-blue-50 p-3">
-                  <h3 className="text-sm font-bold text-blue-900 mb-3">✓ Auto-filled Specifications (locked - unchangeable)</h3>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {lockedSpecs.map((spec) => (
-                      <div key={spec.key} className="rounded-lg bg-white p-3 border border-blue-200">
-                        <p className="text-xs font-semibold text-[var(--ink-2)]">{spec.label}</p>
-                        <p className="text-sm font-bold text-blue-900 mt-1">{spec.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ) : null;
-            })()}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold sm:col-span-2">{t.postAd.title}
@@ -2075,19 +2096,15 @@ export default function PostAdForm({
               </section>
             ) : null}
 
-            <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
-              <input type="checkbox" checked={core.rulesAccepted} onChange={(event) => updateCore("rulesAccepted", event.target.checked)} className="h-4 w-4" />
-              {t.postAd.confirmRules}
-            </label>
+            {/* Photos moved to separate Step 3 */}
           </section>
         ) : null}
 
-        {step === 3 && showPhotoStep ? (
+        {isPhotosStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
             <h2 className="font-display text-lg font-bold">{t.postAd.photosStepTitle}</h2>
             <p className="mt-1 text-sm text-[var(--ink-2)]">
               {resolvedImageConfig?.requires_images ? t.postAd.photosRequired : t.postAd.photosOptional}
-              {resolvedImageConfig?.recommended_images ? ` ${t.postAd.recommended}: ${resolvedImageConfig.recommended_images}` : ""}
             </p>
 
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
@@ -2095,26 +2112,38 @@ export default function PostAdForm({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="mt-3 w-full rounded-2xl border-2 border-dashed border-[var(--line)] py-10 text-sm font-semibold"
+                className="mt-4 w-full rounded-xl border-2 border-dashed border-[var(--line)] bg-[var(--surface-2)] py-12 text-sm font-semibold hover:bg-blue-50 transition-colors"
               >
-                {t.postAd.addPhotos}
+                <div className="flex flex-col items-center gap-2">
+                  <span className="text-2xl">📸</span>
+                  <span>{t.postAd.addPhotos}</span>
+                </div>
               </button>
             ) : (
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 space-y-4">
                 <div className="grid grid-cols-3 gap-3">
                   {images.map((img, index) => (
-                    <div key={`${img.previewUrl}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--line)]">
+                    <div key={`${img.previewUrl}-${index}`} className="relative aspect-square overflow-hidden rounded-lg border border-[var(--line)]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={img.previewUrl} alt={`Upload ${index + 1}`} className="h-full w-full object-cover" />
+                      <div className="absolute inset-x-0 top-0 flex justify-end p-2">
+                        {img.isPrimary && (
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">Primary</span>
+                        )}
+                      </div>
                       <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-1 text-[10px] font-semibold text-white">
-                        <button type="button" onClick={() => setPrimary(index)}>{t.postAd.primary}</button>
-                        <button type="button" onClick={() => removeImage(index)}>{t.postAd.remove}</button>
+                        <button type="button" onClick={() => setPrimary(index)} className="hover:bg-black/70 px-1 py-1 rounded">
+                          {img.isPrimary ? "✓ Primary" : "Set Primary"}
+                        </button>
+                        <button type="button" onClick={() => removeImage(index)} className="hover:bg-black/70 px-1 py-1 rounded">
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">
-                  {t.postAd.addMore}
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-[var(--line)] bg-blue-50 text-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-100">
+                  + {t.postAd.addMore}
                 </button>
               </div>
             )}
@@ -2228,29 +2257,91 @@ export default function PostAdForm({
           </section>
         ) : null}
 
-        {isPreviewStep ? (
+        {isContactStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">{t.postAd.previewStepTitle}</h2>
-            <div className="mt-3 grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-              <p><span className="font-semibold">{t.postAd.categoryLabel}:</span> {breadcrumb || "-"}</p>
-              <p><span className="font-semibold">{t.postAd.title}:</span> {core.title || "-"}</p>
-              <p><span className="font-semibold">{t.postAd.description}:</span> {core.description || "-"}</p>
-              <p><span className="font-semibold">{t.postAd.price}:</span> {core.price ? `${core.price} ${core.currency}` : "-"}</p>
-              <p>
-                <span className="font-semibold">{t.postAd.provinceDistrict}:</span>{" "}
-                {provinceOptions.find((item) => item.id === selectedProvinceId)?.label ?? "-"}
-                {" / "}
-                {districtOptions.find((item) => item.id === selectedDistrictId)?.label ?? "-"}
-              </p>
-              <p><span className="font-semibold">{t.postAd.photosLabel}:</span> {images.length}</p>
+            <h2 className="font-display text-lg font-bold">Contact Information</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">How should buyers contact you?</p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPhone}
+                <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" placeholder="Your phone number" />
+              </label>
+              <label className="text-sm font-semibold">{t.postAd.contactName}
+                <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" placeholder="Your name (optional)" />
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
+                <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
             </div>
           </section>
         ) : null}
 
-        {isPublishStep ? (
+        {isReviewStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">{t.postAd.publishStepTitle}</h2>
-            <p className="mt-2 text-sm text-[var(--ink-2)]">{t.postAd.publishReady}</p>
+            <h2 className="font-display text-lg font-bold">Review Your Listing</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">Please review all details before publishing</p>
+
+            {/* Locked specs if applicable */}
+            {(() => {
+              const lockedSpecs = autoFilledSpecs.filter((spec) => !spec.editable);
+              return lockedSpecs.length > 0 ? (
+                <section className="mt-4 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">✓</span>
+                    <h3 className="text-sm font-bold text-blue-900">Item Specifications</h3>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {lockedSpecs.map((spec) => (
+                      <div key={spec.key} className="rounded-lg bg-white p-3 border border-blue-200">
+                        <p className="text-xs font-semibold text-[var(--ink-2)]">{spec.label}</p>
+                        <p className="text-sm font-bold text-blue-900 mt-1">{spec.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null;
+            })()}
+
+            {/* Complete listing summary */}
+            <section className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-4 space-y-3">
+              <h3 className="text-sm font-bold">Listing Summary</h3>
+              <div className="bg-white rounded-lg p-3 space-y-2 text-sm">
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-[var(--ink-2)]">Category:</span>
+                  <span className="font-semibold">{breadcrumb || "-"}</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-[var(--ink-2)]">Title:</span>
+                  <span className="font-semibold text-right">{core.title || "-"}</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-[var(--ink-2)]">Price:</span>
+                  <span className="font-semibold">{core.price ? `${core.price} ${core.currency}` : "-"}</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-[var(--ink-2)]">Photos:</span>
+                  <span className="font-semibold">{images.length} uploaded</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span className="text-[var(--ink-2)]">Location:</span>
+                  <span className="font-semibold text-right">
+                    {provinceOptions.find((p) => p.id === selectedProvinceId)?.label ?? "-"}
+                    {districtOptions.find((d) => d.id === selectedDistrictId) && (
+                      <> / {districtOptions.find((d) => d.id === selectedDistrictId)?.label}</>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--ink-2)]">Contact:</span>
+                  <span className="font-semibold">{core.contact_phone || "Not provided"}</span>
+                </div>
+              </div>
+            </section>
+
+            <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={core.rulesAccepted} onChange={(event) => updateCore("rulesAccepted", event.target.checked)} className="h-4 w-4" />
+              I agree to the terms and conditions
+            </label>
           </section>
         ) : null}
 
@@ -2266,7 +2357,7 @@ export default function PostAdForm({
             </button>
           ) : null}
 
-          {!isPublishStep ? (
+          {!isReviewStep ? (
             <button type="button" onClick={goNext} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white">
               {t.postAd.continue}
             </button>
