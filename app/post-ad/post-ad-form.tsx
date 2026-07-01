@@ -91,7 +91,7 @@ type AutoFilledSpec = {
 
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
-const POSTING_ACTIVE_CATEGORY_SLUGS = ["vehicles", "real-estate", "phones-electronics", "second-hand-items"] as const;
+const POSTING_ACTIVE_CATEGORY_SLUGS = ["vehicles", "real-estate", "mobile-phones-tablets", "phones-electronics", "second-hand-items"] as const;
 
 const LOCATION_DYNAMIC_KEYS = new Set([
   "city",
@@ -508,7 +508,7 @@ export default function PostAdForm({
         }
       }
 
-      if (rootSlug === "phones-electronics") {
+      if (rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets") {
         const subcategorySlug = segments[1] ?? "";
         const brandSlug = segments[2] ?? "";
         const modelSlug = segments[3] ?? "";
@@ -1971,13 +1971,13 @@ export default function PostAdForm({
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
 
             {/* Brand/Model Selector for applicable categories */}
-            {(rootSlug === "phones-electronics" || rootSlug === "vehicles" || rootSlug === "electronics-computers") && finalNode ? (
+            {(rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets" || rootSlug === "vehicles" || (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")) && finalNode ? (
               <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
                 <BrandModelSelector
                   category={
                     rootSlug === "vehicles"
                       ? "vehicles"
-                      : rootSlug === "electronics-computers"
+                      : (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")
                         ? "laptops"
                         : "phones"
                   }
