@@ -128,6 +128,151 @@ function isRenderableDynamicField(field: CategoryField) {
   return !LOCATION_DYNAMIC_KEYS.has(field.field_key) && !CORE_DYNAMIC_KEYS.has(field.field_key);
 }
 
+/**
+ * Determines which field keys are relevant for a specific category path.
+ * Filters out irrelevant fields based on category logic.
+ */
+function getCategoryRelevantFieldKeys(categoryPath: string | undefined, categorySlug: string | undefined): Set<string> {
+  if (!categoryPath && !categorySlug) return new Set();
+
+  const relevantFields = new Set<string>();
+  const path = categoryPath?.toLowerCase() ?? "";
+  const slug = categorySlug?.toLowerCase() ?? "";
+
+  // Phones & Electronics - only show tech specs
+  if (slug.includes("phone") || slug.includes("mobile") || slug.includes("tablet") || slug.includes("electronic")) {
+    relevantFields.add("screen_size");
+    relevantFields.add("storage_capacity");
+    relevantFields.add("ram");
+    relevantFields.add("processor");
+    relevantFields.add("camera");
+    relevantFields.add("rear_camera");
+    relevantFields.add("front_camera");
+    relevantFields.add("battery");
+    relevantFields.add("operating_system");
+    relevantFields.add("os");
+    relevantFields.add("color");
+    relevantFields.add("condition");
+    relevantFields.add("warranty");
+    relevantFields.add("purchased_from");
+    relevantFields.add("trade_in");
+    relevantFields.add("charger_included");
+    relevantFields.add("original_box");
+    relevantFields.add("from");
+    relevantFields.add("water_resistance");
+    relevantFields.add("display_type");
+    relevantFields.add("refresh_rate");
+    relevantFields.add("production_year");
+    return relevantFields;
+  }
+
+  // Vehicles - only show vehicle-specific specs
+  if (slug.includes("vehicle") || slug.includes("car") || slug.includes("motorcycle") || slug.includes("truck")) {
+    relevantFields.add("make");
+    relevantFields.add("model");
+    relevantFields.add("year");
+    relevantFields.add("mileage");
+    relevantFields.add("color");
+    relevantFields.add("body_type");
+    relevantFields.add("fuel_type");
+    relevantFields.add("transmission");
+    relevantFields.add("engine_type");
+    relevantFields.add("engine_capacity");
+    relevantFields.add("seats");
+    relevantFields.add("doors");
+    relevantFields.add("vin");
+    relevantFields.add("condition");
+    relevantFields.add("interior_color");
+    relevantFields.add("registration_year");
+    relevantFields.add("accident_history");
+    relevantFields.add("ownership");
+    relevantFields.add("service_history");
+    relevantFields.add("brake_type");
+    relevantFields.add("drive_type");
+    return relevantFields;
+  }
+
+  // Real Estate - property-specific fields only
+  if (slug.includes("real") || slug.includes("estate") || slug.includes("property") || slug.includes("land") || slug.includes("apartment") || slug.includes("house")) {
+    relevantFields.add("property_type");
+    relevantFields.add("bedrooms");
+    relevantFields.add("bathrooms");
+    relevantFields.add("area");
+    relevantFields.add("total_area");
+    relevantFields.add("built_area");
+    relevantFields.add("furnished");
+    relevantFields.add("purpose");
+    relevantFields.add("lease_term");
+    relevantFields.add("lease_terms");
+    relevantFields.add("floor");
+    relevantFields.add("building_age");
+    relevantFields.add("parking");
+    relevantFields.add("elevator");
+    relevantFields.add("garden");
+    relevantFields.add("balcony");
+    relevantFields.add("condition");
+    relevantFields.add("heating");
+    relevantFields.add("cooling");
+    relevantFields.add("utility");
+    relevantFields.add("amenities");
+    relevantFields.add("zoning");
+    relevantFields.add("legal_status");
+    return relevantFields;
+  }
+
+  // Laptops & Computers
+  if (slug.includes("laptop") || slug.includes("computer") || slug.includes("desktop")) {
+    relevantFields.add("brand");
+    relevantFields.add("model");
+    relevantFields.add("processor");
+    relevantFields.add("ram");
+    relevantFields.add("storage_capacity");
+    relevantFields.add("graphics");
+    relevantFields.add("screen_size");
+    relevantFields.add("display_type");
+    relevantFields.add("operating_system");
+    relevantFields.add("condition");
+    relevantFields.add("warranty");
+    relevantFields.add("battery_health");
+    relevantFields.add("keyboard_condition");
+    relevantFields.add("trackpad_condition");
+    relevantFields.add("color");
+    relevantFields.add("production_year");
+    return relevantFields;
+  }
+
+  // TVs & Displays
+  if (slug.includes("tv") || slug.includes("television") || slug.includes("monitor") || slug.includes("display")) {
+    relevantFields.add("screen_size");
+    relevantFields.add("resolution");
+    relevantFields.add("type");
+    relevantFields.add("display_technology");
+    relevantFields.add("refresh_rate");
+    relevantFields.add("hdr");
+    relevantFields.add("smart_tv");
+    relevantFields.add("operating_system");
+    relevantFields.add("color");
+    relevantFields.add("condition");
+    relevantFields.add("brand");
+    relevantFields.add("model");
+    relevantFields.add("warranty");
+    relevantFields.add("production_year");
+    return relevantFields;
+  }
+
+  // For general items, show only universal fields
+  relevantFields.add("condition");
+  relevantFields.add("color");
+  relevantFields.add("material");
+  relevantFields.add("size");
+  relevantFields.add("weight");
+  relevantFields.add("age");
+  relevantFields.add("brand");
+  relevantFields.add("model");
+
+  return relevantFields;
+}
+
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
   if (!optionsJson) return [];
   if (Array.isArray(optionsJson)) return optionsJson.map((value) => String(value));
@@ -1380,9 +1525,19 @@ export default function PostAdForm({
   ]);
 
   const renderDynamicFields = useMemo(() => {
+    // Get relevant field keys for the current category
+    const categoryRelevantKeys = getCategoryRelevantFieldKeys(finalPath, finalNode?.slug);
+    const hasRelevantFields = categoryRelevantKeys.size > 0;
+
     const filtered = dynamicFields.filter((field) => {
       if (!isRenderableDynamicField(field)) return false;
       if (lockedFieldKeys.has(field.field_key)) return false;
+      
+      // Filter by category relevance - only show relevant fields for this category
+      if (hasRelevantFields && !categoryRelevantKeys.has(field.field_key)) {
+        return false;
+      }
+      
       if (!schemaVisibleKeys) return true;
       return schemaVisibleKeys.has(field.field_key);
     });
@@ -1395,7 +1550,7 @@ export default function PostAdForm({
       }
       return (a.display_order ?? a.sort_order ?? 0) - (b.display_order ?? b.sort_order ?? 0);
     });
-  }, [dynamicFields, lockedFieldKeys, schemaFieldOrder, schemaSyntheticFields, schemaVisibleKeys]);
+  }, [dynamicFields, lockedFieldKeys, schemaFieldOrder, schemaSyntheticFields, schemaVisibleKeys, finalPath, finalNode]);
 
   const requiredDynamicKeys = useMemo(() => {
     return new Set(
