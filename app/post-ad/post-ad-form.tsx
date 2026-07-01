@@ -1989,20 +1989,23 @@ export default function PostAdForm({
 
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
 
-            {/* Auto-filled locked specs displayed as read-only cards */}
-            {autoFilledSpecs.length > 0 ? (
-              <section className="mt-4 rounded-xl border border-2 border-blue-300 bg-blue-50 p-3">
-                <h3 className="text-sm font-bold text-blue-900 mb-3">✓ Auto-filled Specifications (locked)</h3>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {autoFilledSpecs.map((spec) => (
-                    <div key={spec.key} className="rounded-lg bg-white p-3 border border-blue-200">
-                      <p className="text-xs font-semibold text-[var(--ink-2)]">{spec.label}</p>
-                      <p className="text-sm font-bold text-blue-900 mt-1">{spec.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : null}
+            {/* Auto-filled locked specs displayed as read-only cards - ONLY UNCHANGEABLE SPECS */}
+            {(() => {
+              const lockedSpecs = autoFilledSpecs.filter((spec) => !spec.editable);
+              return lockedSpecs.length > 0 ? (
+                <section className="mt-4 rounded-xl border border-2 border-blue-300 bg-blue-50 p-3">
+                  <h3 className="text-sm font-bold text-blue-900 mb-3">✓ Auto-filled Specifications (locked - unchangeable)</h3>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {lockedSpecs.map((spec) => (
+                      <div key={spec.key} className="rounded-lg bg-white p-3 border border-blue-200">
+                        <p className="text-xs font-semibold text-[var(--ink-2)]">{spec.label}</p>
+                        <p className="text-sm font-bold text-blue-900 mt-1">{spec.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null;
+            })()}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold sm:col-span-2">{t.postAd.title}
