@@ -1932,12 +1932,14 @@ export default function PostAdForm({
 
             {!selectedRoot ? (
               <>
+                {/* Search input for filtering root categories */}
                 <input
                   type="text"
                   placeholder="Search categories..."
                   value={categorySearch}
                   onChange={(e) => setCategorySearch(e.target.value)}
                   className="w-full mt-3 px-4 py-2 border border-[var(--line)] rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Search categories"
                 />
                 <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
                   {filteredActiveCategories.map((category) => (
