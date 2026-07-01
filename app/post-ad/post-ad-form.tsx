@@ -8,6 +8,7 @@ import { CURRENCIES } from "@/lib/constants/marketplace";
 import type { Category, CategoryField, CategoryNode } from "@/types/database";
 import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
+import { BrandModelSelector } from "@/components/posting/BrandModelSelector";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
@@ -15,6 +16,8 @@ import { ACTIVE_LISTING_SCHEMAS } from "@/lib/listingSchemas";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
 import type { ListingSchemaDefinition, SchemaFieldContext } from "@/lib/listingSchemas/shared";
+import type { CatalogModel } from "@/lib/catalog/types";
+import { generateAutoFill } from "@/lib/catalog/utils";
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -313,6 +316,7 @@ export default function PostAdForm({
   const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultDamageParts());
   const [autoFilledSpecs, setAutoFilledSpecs] = useState<AutoFilledSpec[]>([]);
   const [catalogFieldOptions, setCatalogFieldOptions] = useState<Record<string, string[]>>({});
+  const [selectedCatalogModel, setSelectedCatalogModel] = useState<CatalogModel | null>(null);
 
   const [core, setCore] = useState<CoreForm>({
     title: "",
@@ -947,6 +951,31 @@ export default function PostAdForm({
       ...(allowedKeys.has(primaryKey) && !CORE_DYNAMIC_KEYS.has(primaryKey) ? { [primaryKey]: value } : {}),
       ...(allowedKeys.has(secondaryKey) && !CORE_DYNAMIC_KEYS.has(secondaryKey) ? { [secondaryKey]: value } : {}),
     }));
+  }
+
+  function handleCatalogModelSelected(model: CatalogModel) {
+    setSelectedCatalogModel(model);
+    const autoFill = generateAutoFill(model);
+    
+    // Create auto-filled specs
+    const newAutoFilledSpecs = autoFill.autoFilledSpecs.map((spec) => ({
+      key: spec.key,
+      label: spec.label,
+      value: Array.isArray(spec.value) ? spec.value.join(", ") : String(spec.value),
+      source: spec.source,
+      confidence: spec.confidence,
+      editable: spec.editable,
+      fieldKey: spec.key,
+    }));
+
+    setAutoFilledSpecs(newAutoFilledSpecs);
+
+    // Auto-populate dynamic values for auto-filled specs
+    const newDynamicValues = { ...dynamicValues };
+    autoFill.autoFilledSpecs.forEach((spec) => {
+      newDynamicValues[spec.key] = Array.isArray(spec.value) ? spec.value[0] : String(spec.value);
+    });
+    setDynamicValues(newDynamicValues);
   }
 
   const normalizeLocationName = useCallback((value: string) => {
@@ -1933,6 +1962,24 @@ export default function PostAdForm({
             </div>
 
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
+
+            {/* Brand/Model Selector for applicable categories */}
+            {(rootSlug === "phones-electronics" || rootSlug === "vehicles" || rootSlug === "electronics-computers") && finalNode ? (
+              <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                <BrandModelSelector
+                  category={
+                    rootSlug === "vehicles"
+                      ? "vehicles"
+                      : rootSlug === "electronics-computers"
+                        ? "laptops"
+                        : "phones"
+                  }
+                  subcategory={finalNode?.slug}
+                  onModelSelected={handleCatalogModelSelected}
+                  selectedModelId={selectedCatalogModel?.id}
+                />
+              </div>
+            ) : null}
 
             {autoFilledSpecs.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
