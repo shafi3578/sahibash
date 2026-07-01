@@ -297,7 +297,6 @@ export default function PostAdForm({
   const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean>>({});
   const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [loadingTree, setLoadingTree] = useState(false);
-  const [categorySearch, setCategorySearch] = useState("");
 
   const [postingConfig, setPostingConfig] = useState<PostingConfig | null>(null);
   const [listingTypeChoice, setListingTypeChoice] = useState<"for_sale" | "wanted">(initialListingType);
@@ -842,7 +841,6 @@ export default function PostAdForm({
     setDynamicFields([]);
     setDynamicValues({});
     setPostingConfig(null);
-    setCategorySearch("");
     setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
     setDamageParts(defaultDamageParts());
 
@@ -868,7 +866,6 @@ export default function PostAdForm({
 
   async function chooseNode(node: CategoryNode) {
     setLoadingTree(true);
-    setCategorySearch("");
 
     const nextPath = [...pathNodes, node];
     setPathNodes(nextPath);
@@ -898,7 +895,6 @@ export default function PostAdForm({
       setFinalNode(null);
       setDynamicFields([]);
       setPostingConfig(null);
-      setCategorySearch("");
       return;
     }
 
@@ -909,7 +905,6 @@ export default function PostAdForm({
     setFinalNode(null);
     setDynamicFields([]);
     setPostingConfig(null);
-    setCategorySearch("");
 
     setLoadingTree(true);
     setCurrentOptions(await fetchChildren(parent.id));
@@ -1711,25 +1706,6 @@ export default function PostAdForm({
   const optionalCoreFieldCount = 2;
   const totalOptionalFieldCount = optionalDynamicFields.length + optionalCoreFieldCount;
 
-  // Filter categories and options by search
-  const filteredActiveCategories = useMemo(() => {
-    if (!categorySearch.trim()) return activeCategories;
-    const search = categorySearch.toLowerCase();
-    return activeCategories.filter(cat =>
-      cat.name.toLowerCase().includes(search) ||
-      (cat.slug === "mobile-phones-tablets" ? "phones & electronics".includes(search) : false)
-    );
-  }, [activeCategories, categorySearch]);
-
-  const filteredCurrentOptions = useMemo(() => {
-    if (!categorySearch.trim()) return currentOptions;
-    const search = categorySearch.toLowerCase();
-    return currentOptions.filter(node =>
-      node.name.toLowerCase().includes(search) ||
-      (node.slug?.toLowerCase() || "").includes(search)
-    );
-  }, [currentOptions, categorySearch]);
-
   const detailSectionTitle = useMemo(() => {
     if (rootSlug === "real-estate") return t.postAd.realEstateDetails;
     if (rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets") return t.postAd.phonesElectronicsDetails;
@@ -1932,17 +1908,8 @@ export default function PostAdForm({
 
             {!selectedRoot ? (
               <>
-                {/* Search input for filtering root categories */}
-                <input
-                  type="text"
-                  placeholder="Search categories..."
-                  value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
-                  className="w-full mt-3 px-4 py-2 border border-[var(--line)] rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  aria-label="Search categories"
-                />
                 <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-                  {filteredActiveCategories.map((category) => (
+                  {activeCategories.map((category) => (
                     <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]">
                       <span>
                         {localizeCategoryName({
@@ -1958,25 +1925,15 @@ export default function PostAdForm({
               </>
             ) : (
               <>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
-                  className="w-full mt-3 px-4 py-2 border border-[var(--line)] rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
                 <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
                   {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">{t.postAd.loading}</div> : null}
-                  {!loadingTree && filteredCurrentOptions.length === 0 && currentOptions.length > 0 ? (
-                    <div className="px-4 py-3 text-sm text-[var(--ink-2)]">No matching categories found</div>
-                  ) : null}
-                  {!loadingTree && filteredCurrentOptions.length === 0 && finalNode && currentOptions.length === 0 ? (
+                  {!loadingTree && currentOptions.length === 0 && finalNode ? (
                     <div className="px-4 py-3 text-sm font-semibold text-green-700">
                       {t.postAd.finalCategorySelected}: {localizeCategoryName({ locale, fallbackName: finalNode.name, slug: finalNode.slug, path: finalNode.path })}
                     </div>
                   ) : null}
                   {!loadingTree
-                    ? filteredCurrentOptions.map((node) => (
+                    ? currentOptions.map((node) => (
                         <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]">
                           <span className="break-words">
                             {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}

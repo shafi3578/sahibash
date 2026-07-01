@@ -25,8 +25,6 @@ export function BrandModelSelector({
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [loadingModels, setLoadingModels] = useState(false);
   const [activeBrand, setActiveBrand] = useState<string | null>(selectedBrandId || null);
-  const [brandSearch, setBrandSearch] = useState("");
-  const [modelSearch, setModelSearch] = useState("");
 
   // Load brands on mount
   useEffect(() => {
@@ -63,18 +61,6 @@ export function BrandModelSelector({
     return generateAutoFill(selectedModel);
   }, [selectedModel]);
 
-  // Filter brands by search
-  const filteredBrands = useMemo(
-    () => brands.filter(b => b.name.toLowerCase().includes(brandSearch.toLowerCase())),
-    [brands, brandSearch]
-  );
-
-  // Filter models by search
-  const filteredModels = useMemo(
-    () => models.filter(m => m.name.toLowerCase().includes(modelSearch.toLowerCase())),
-    [models, modelSearch]
-  );
-
   const handleBrandChange = (brandId: string) => {
     setActiveBrand(brandId);
   };
@@ -98,15 +84,8 @@ export function BrandModelSelector({
           <div className="text-sm text-gray-500">Loading brands...</div>
         ) : (
           <>
-            <input
-              type="text"
-              placeholder="Search brands..."
-              value={brandSearch}
-              onChange={(e) => setBrandSearch(e.target.value)}
-              className="w-full px-3 py-2 mb-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-            />
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-              {filteredBrands.map((brand) => (
+              {brands.map((brand) => (
               <button
                 key={brand.id}
                 onClick={() => handleBrandChange(brand.id)}
@@ -134,20 +113,13 @@ export function BrandModelSelector({
             <div className="text-sm text-gray-500">Loading models...</div>
           ) : models.length > 0 ? (
             <>
-              <input
-                type="text"
-                placeholder="Search models..."
-                value={modelSearch}
-                onChange={(e) => setModelSearch(e.target.value)}
-                className="w-full px-3 py-2 mb-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-              />
               <select
                 value={selectedModelId || selectedModel?.id || ""}
                 onChange={(e) => handleModelChange(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select a model...</option>
-                {filteredModels.map((model) => (
+                {models.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>
