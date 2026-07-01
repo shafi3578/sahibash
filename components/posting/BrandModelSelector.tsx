@@ -74,58 +74,57 @@ export function BrandModelSelector({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Brand Selection */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Brand {activeBrand && <span className="text-green-600">✓</span>}
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Brand {activeBrand && <span className="text-green-600 font-bold ml-2">✓ Selected</span>}
         </label>
         {loadingBrands ? (
-          <div className="text-sm text-gray-500">Loading brands...</div>
+          <div className="text-sm text-gray-500 p-4">Loading brands...</div>
         ) : (
-          <>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-              {brands.map((brand) => (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+            {brands.map((brand) => (
               <button
                 key={brand.id}
                 onClick={() => handleBrandChange(brand.id)}
-                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                className={`px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
                   activeBrand === brand.id
                     ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                    : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
                 }`}
               >
                 {brand.name}
               </button>
             ))}
-            </div>
-          </>
+          </div>
         )}
       </div>
 
-      {/* Model Selection */}
+      {/* Model Selection - Show as full list/grid when brand selected */}
       {activeBrand && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Model {selectedModel && <span className="text-green-600">✓</span>}
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Model {selectedModel && <span className="text-green-600 font-bold ml-2">✓ Selected</span>}
           </label>
           {loadingModels ? (
-            <div className="text-sm text-gray-500">Loading models...</div>
+            <div className="text-sm text-gray-500 p-4">Loading models...</div>
           ) : models.length > 0 ? (
-            <>
-              <select
-                value={selectedModelId || selectedModel?.id || ""}
-                onChange={(e) => handleModelChange(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select a model...</option>
-                {models.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
-            </>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+              {models.map((model) => (
+                <button
+                  key={model.id}
+                  onClick={() => handleModelChange(model.id)}
+                  className={`px-4 py-3 rounded-lg border-2 text-sm font-medium text-left transition-all ${
+                    selectedModel?.id === model.id
+                      ? "border-green-500 bg-green-50 text-green-700"
+                      : "border-gray-300 bg-white text-gray-700 hover:border-green-300"
+                  }`}
+                >
+                  <div className="font-semibold">{model.name}</div>
+                </button>
+              ))}
+            </div>
           ) : (
             <div className="text-sm text-gray-500 p-4 bg-yellow-50 rounded-lg">
               No models available for this brand yet. You can still post using manual details.
