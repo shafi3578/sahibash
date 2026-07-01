@@ -1947,6 +1947,25 @@ export default function PostAdForm({
                   : null}
               </div>
             )}
+
+            {/* Brand/Model Selector in Step 1 for catalog categories */}
+            {(rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets" || rootSlug === "vehicles" || (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")) && finalNode && currentOptions.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                <p className="text-sm font-semibold mb-3">Select Brand and Model:</p>
+                <BrandModelSelector
+                  category={
+                    rootSlug === "vehicles"
+                      ? "vehicles"
+                      : (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")
+                        ? "laptops"
+                        : "phones"
+                  }
+                  subcategory={finalNode?.slug}
+                  onModelSelected={handleCatalogModelSelected}
+                  selectedModelId={selectedCatalogModel?.id}
+                />
+              </div>
+            ) : null}
           </section>
         ) : null}
 
@@ -1970,32 +1989,16 @@ export default function PostAdForm({
 
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
 
-            {/* Brand/Model Selector for applicable categories */}
-            {(rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets" || rootSlug === "vehicles" || (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")) && finalNode ? (
-              <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                <BrandModelSelector
-                  category={
-                    rootSlug === "vehicles"
-                      ? "vehicles"
-                      : (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")
-                        ? "laptops"
-                        : "phones"
-                  }
-                  subcategory={finalNode?.slug}
-                  onModelSelected={handleCatalogModelSelected}
-                  selectedModelId={selectedCatalogModel?.id}
-                />
-              </div>
-            ) : null}
-
+            {/* Auto-filled locked specs displayed as read-only cards */}
             {autoFilledSpecs.length > 0 ? (
-              <section className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                <h3 className="text-sm font-bold">Auto-filled from selected category/model</h3>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <section className="mt-4 rounded-xl border border-2 border-blue-300 bg-blue-50 p-3">
+                <h3 className="text-sm font-bold text-blue-900 mb-3">✓ Auto-filled Specifications (locked)</h3>
+                <div className="grid gap-2 sm:grid-cols-2">
                   {autoFilledSpecs.map((spec) => (
-                    <span key={`${spec.key}-${spec.value}`} className="rounded-full border border-[var(--line)] bg-white px-3 py-1 font-semibold text-[var(--ink-1)]">
-                      {spec.label}: {spec.value}
-                    </span>
+                    <div key={spec.key} className="rounded-lg bg-white p-3 border border-blue-200">
+                      <p className="text-xs font-semibold text-[var(--ink-2)]">{spec.label}</p>
+                      <p className="text-sm font-bold text-blue-900 mt-1">{spec.value}</p>
+                    </div>
                   ))}
                 </div>
               </section>
