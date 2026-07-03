@@ -32,7 +32,7 @@ export interface CatalogModel {
   releaseYear?: number;
   type: "smartphone" | "tablet" | "laptop" | "tv" | "car" | "motorcycle" | "property" | string;
   stableSpecs: StableSpec[];
-  variantOptions?: VariantOption[];
+  variantOptions?: VariantOption[] | Record<string, string[]>;
   requiredSellerFields: string[];
   optionalSellerFields: string[];
   buyerDetailFields: string[];

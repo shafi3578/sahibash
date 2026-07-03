@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Province, LocaleType } from '../location/types';
-import { getLocalizedName, searchProvinces } from '../location/utils';
+import { Province, LocaleType } from '@/lib/location/types';
+import { getLocalizedName, searchProvinces } from '@/lib/location/utils';
 
 interface ProvinceSelectorProps {
   provinces: Province[];

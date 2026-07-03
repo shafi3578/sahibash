@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
 
 interface PhoneModel {
   id: string;
@@ -32,7 +31,6 @@ export function PhoneModelSelector({
   onModelSelect,
   onBack,
 }: PhoneModelSelectorProps) {
-  const t = useTranslations();
   const [models, setModels] = useState<PhoneModel[]>([]);
   const [filteredModels, setFilteredModels] = useState<PhoneModel[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,7 +100,7 @@ export function PhoneModelSelector({
           onClick={onBack}
           className="text-blue-600 hover:text-blue-800 font-medium"
         >
-          ← {t("common.back", "Back")}
+          ← Back
         </button>
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
           {error}
@@ -118,7 +116,7 @@ export function PhoneModelSelector({
           onClick={onBack}
           className="text-blue-600 hover:text-blue-800 font-medium"
         >
-          ← {t("common.back", "Back")}
+          ← Back
         </button>
         <h3 className="font-semibold text-gray-800">{brandName}</h3>
       </div>
@@ -127,7 +125,7 @@ export function PhoneModelSelector({
       <div>
         <input
           type="text"
-          placeholder={t("common.search", "Search")}
+          placeholder="Search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
@@ -143,7 +141,7 @@ export function PhoneModelSelector({
         </div>
       ) : filteredModels.length === 0 ? (
         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
-          {t("common.no_results", "No models found")}
+          No models found
         </div>
       ) : (
         <div className="space-y-2 max-h-96 overflow-y-auto">

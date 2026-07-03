@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
 
 interface PhoneBrand {
   id: string;
@@ -21,7 +20,6 @@ export function PhoneBrandSelector({
   onBrandSelect,
   isLoading = false,
 }: PhoneBrandSelectorProps) {
-  const t = useTranslations();
   const [brands, setBrands] = useState<PhoneBrand[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
@@ -78,7 +76,7 @@ export function PhoneBrandSelector({
   return (
     <div className="space-y-2">
       <h3 className="font-semibold text-gray-800 mb-4">
-        {t("mobile_phones.select_brand", "Select a Brand")}
+        {"Select a Brand"}
       </h3>
       <div className="grid grid-cols-1 gap-2">
         {brands.map((brand) => (

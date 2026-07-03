@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { District, LocaleType } from '../location/types';
-import { getLocalizedName, searchDistricts } from '../location/utils';
+import { District, LocaleType } from '@/lib/location/types';
+import { getLocalizedName, searchDistricts } from '@/lib/location/utils';
 
 interface DistrictSelectorProps {
   districts: District[];

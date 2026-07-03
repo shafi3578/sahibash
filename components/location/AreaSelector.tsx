@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Area, LocaleType } from '../location/types';
-import { getLocalizedName, searchAreas } from '../location/utils';
+import { Area, LocaleType } from '@/lib/location/types';
+import { getLocalizedName, searchAreas } from '@/lib/location/utils';
 
 interface AreaSelectorProps {
   areas: Area[];

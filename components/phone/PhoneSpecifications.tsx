@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
 
 interface SpecField {
   label: string;
@@ -35,7 +34,6 @@ export function PhoneSpecifications({
   onFieldsChange,
   onBack,
 }: PhoneSpecificationsProps) {
-  const t = useTranslations();
   const [selectableFields, setSelectableFields] = useState<SelectableField[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +79,7 @@ export function PhoneSpecifications({
           onClick={onBack}
           className="text-blue-600 hover:text-blue-800 font-medium"
         >
-          ← {t("common.back", "Back")}
+          ← Back
         </button>
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
           {error}
@@ -97,7 +95,7 @@ export function PhoneSpecifications({
           onClick={onBack}
           className="text-blue-600 hover:text-blue-800 font-medium"
         >
-          ← {t("common.back", "Back")}
+          ← Back
         </button>
         <h3 className="font-semibold text-gray-800">{modelName}</h3>
       </div>
@@ -105,7 +103,7 @@ export function PhoneSpecifications({
       {/* Locked Specifications Section */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <h4 className="font-semibold text-gray-800 mb-3">
-          {t("phone_specs.locked_specs", "Device Specifications (Auto-Filled)")}
+          Device Specifications (Auto-Filled)
         </h4>
         <div className="grid grid-cols-2 gap-3">
           {Object.entries(lockedSpecs).map(([key, value]) => (
@@ -118,10 +116,7 @@ export function PhoneSpecifications({
           ))}
         </div>
         <p className="text-xs text-gray-500 mt-3">
-          {t(
-            "phone_specs.locked_note",
-            "These specifications are automatically filled from the database and cannot be changed."
-          )}
+        These specifications are automatically filled from the database and cannot be changed.
         </p>
       </div>
 
@@ -134,12 +129,12 @@ export function PhoneSpecifications({
         </div>
       ) : selectableFields.length === 0 ? (
         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-600">
-          {t("phone_specs.no_fields", "No additional specifications needed")}
+          No additional specifications needed
         </div>
       ) : (
         <div className="space-y-4">
           <h4 className="font-semibold text-gray-800">
-            {t("phone_specs.seller_fields", "Phone Details")}
+            Phone Details
           </h4>
           {selectableFields.map((field) => (
             <div key={field.id}>
@@ -158,7 +153,7 @@ export function PhoneSpecifications({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                   required={field.is_required}
                 >
-                  <option value="">{t("common.select", "Select...")}</option>
+                  <option value="">Select...</option>
                   {field.options_json.options.map((opt: string) => (
                     <option key={opt} value={opt}>
                       {opt}
@@ -186,7 +181,7 @@ export function PhoneSpecifications({
                       checked={fieldValues[field.field_key] === "yes"}
                       onChange={() => handleFieldChange(field.field_key, "yes")}
                     />
-                    <span>{t("common.yes", "Yes")}</span>
+                    <span>Yes</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -196,7 +191,7 @@ export function PhoneSpecifications({
                       checked={fieldValues[field.field_key] === "no"}
                       onChange={() => handleFieldChange(field.field_key, "no")}
                     />
-                    <span>{t("common.no", "No")}</span>
+                    <span>No</span>
                   </label>
                 </div>
               ) : (

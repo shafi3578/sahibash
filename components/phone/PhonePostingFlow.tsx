@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
 import { PhoneBrandSelector } from "./PhoneBrandSelector";
 import { PhoneModelSelector } from "./PhoneModelSelector";
 import { PhoneSpecifications } from "./PhoneSpecifications";
@@ -28,7 +27,6 @@ export function PhonePostingFlow({
   onComplete,
   onCancel,
 }: PhonePostingFlowProps) {
-  const t = useTranslations();
   const [step, setStep] = useState<PhoneFlowStep>("brand-selection");
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
   const [selectedBrandName, setSelectedBrandName] = useState<string | null>(null);
@@ -86,13 +84,13 @@ export function PhonePostingFlow({
       {/* Progress Indicator */}
       <div className="flex items-center justify-between text-sm text-gray-600">
         <div className={`${step === "brand-selection" ? "font-semibold text-blue-600" : ""}`}>
-          {t("phone_flow.step1", "1. Brand")}
+          1. Brand
         </div>
         <div className={`${step === "model-selection" ? "font-semibold text-blue-600" : ""}`}>
-          {t("phone_flow.step2", "2. Model")}
+          2. Model
         </div>
         <div className={`${step === "specifications" ? "font-semibold text-blue-600" : ""}`}>
-          {t("phone_flow.step3", "3. Specifications")}
+          3. Specifications
         </div>
       </div>
 
@@ -126,13 +124,13 @@ export function PhonePostingFlow({
                 onClick={onCancel}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
-                {t("common.cancel", "Cancel")}
+                Cancel
               </button>
               <button
                 onClick={handleComplete}
                 className="flex-1 px-4 py-2 bg-blue-600 rounded-lg text-white hover:bg-blue-700 transition-colors font-medium"
               >
-                {t("phone_flow.continue", "Continue to Photos")}
+                Continue to Photos
               </button>
             </div>
           </>

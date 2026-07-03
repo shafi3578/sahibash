@@ -1034,7 +1034,7 @@ export default function PostAdForm({
 
   async function goBackCategoryLevel() {
     // If we're going back from a model selection, just clear the model
-    if (selectedCatalogModel && finalNode?.type === "model") {
+    if (selectedCatalogModel && (finalNode as any)?.type === "model") {
       setSelectedCatalogModel(null);
       setAutoFilledSpecs([]);
       const next = pathNodes.slice(0, -1);
@@ -1134,18 +1134,19 @@ export default function PostAdForm({
 
     // Create a synthetic CategoryNode from the selected model to make it the final category
     const modelNode: CategoryNode = {
-      id: `model_${model.id}`,
-      parentId: finalNode?.id,
+      id: 0 as unknown as number,
+      parent_id: (finalNode?.id ?? null) as number | null,
+      category_id: (finalNode?.category_id ?? 0) as number,
       name: model.name,
       slug: model.name.toLowerCase().replace(/\s+/g, "-"),
-      labelKey: "",
-      type: "model",
-      active: true,
-      sortOrder: 0,
-      finalNode: true,
-      category_id: finalNode?.category_id,
+      level: (finalNode ? ((finalNode as any).level ?? 0) + 1 : 1),
+      is_leaf: true,
+      is_active: true,
+      display_order: 0,
       path: `${finalNode?.path || ""}/${model.name}`,
-    };
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as unknown as CategoryNode & { type: string; finalNode: boolean };
 
     // Update pathNodes to include the model
     setPathNodes([...pathNodes, modelNode]);
@@ -2161,7 +2162,7 @@ export default function PostAdForm({
                       }
                       subcategory={finalNode?.slug}
                       onModelSelected={handleCatalogModelSelected}
-                      selectedModelId={selectedCatalogModel?.id}
+                      selectedModelId={(selectedCatalogModel as any)?.id}
                       forceSelectedBrand={forceBrand}
                     />
                   );
