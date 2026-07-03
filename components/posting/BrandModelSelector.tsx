@@ -10,6 +10,7 @@ interface BrandModelSelectorProps {
   onModelSelected: (model: CatalogModel) => void;
   selectedBrandId?: string;
   selectedModelId?: string;
+  forceSelectedBrand?: string; // When a series/subcategory pre-selects a brand (e.g., "Apple" for "apple-iphone")
 }
 
 export function BrandModelSelector({
@@ -18,13 +19,14 @@ export function BrandModelSelector({
   onModelSelected,
   selectedBrandId,
   selectedModelId,
+  forceSelectedBrand,
 }: BrandModelSelectorProps) {
   const [brands, setBrands] = useState<CatalogBrand[]>([]);
   const [models, setModels] = useState<CatalogModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<CatalogModel | null>(null);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [activeBrand, setActiveBrand] = useState<string | null>(selectedBrandId || null);
+  const [activeBrand, setActiveBrand] = useState<string | null>(forceSelectedBrand || selectedBrandId || null);
 
   // Load brands on mount
   useEffect(() => {
@@ -75,31 +77,33 @@ export function BrandModelSelector({
 
   return (
     <div className="space-y-6">
-      {/* Brand Selection */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Brand {activeBrand && <span className="text-green-600 font-bold ml-2">✓ Selected</span>}
-        </label>
-        {loadingBrands ? (
-          <div className="text-sm text-gray-500 p-4">Loading brands...</div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-            {brands.map((brand) => (
-              <button
-                key={brand.id}
-                onClick={() => handleBrandChange(brand.id)}
-                className={`px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                  activeBrand === brand.id
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
-                }`}
-              >
-                {brand.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Brand Selection - Hidden if brand is pre-selected */}
+      {!forceSelectedBrand && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Brand {activeBrand && <span className="text-green-600 font-bold ml-2">✓ Selected</span>}
+          </label>
+          {loadingBrands ? (
+            <div className="text-sm text-gray-500 p-4">Loading brands...</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {brands.map((brand) => (
+                <button
+                  key={brand.id}
+                  onClick={() => handleBrandChange(brand.id)}
+                  className={`px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                    activeBrand === brand.id
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+                  }`}
+                >
+                  {brand.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Model Selection - Show as full list/grid when brand selected */}
       {activeBrand && (

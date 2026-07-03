@@ -1033,6 +1033,16 @@ export default function PostAdForm({
   }
 
   async function goBackCategoryLevel() {
+    // If we're going back from a model selection, just clear the model
+    if (selectedCatalogModel && finalNode?.type === "model") {
+      setSelectedCatalogModel(null);
+      setAutoFilledSpecs([]);
+      const next = pathNodes.slice(0, -1);
+      setPathNodes(next);
+      setFinalNode(next[next.length - 1] || null);
+      return;
+    }
+
     if (pathNodes.length <= 1) {
       setSelectedRoot(null);
       setPathNodes([]);
@@ -1121,6 +1131,27 @@ export default function PostAdForm({
       newDynamicValues[spec.key] = Array.isArray(spec.value) ? spec.value[0] : String(spec.value);
     });
     setDynamicValues(newDynamicValues);
+
+    // Create a synthetic CategoryNode from the selected model to make it the final category
+    const modelNode: CategoryNode = {
+      id: `model_${model.id}`,
+      parentId: finalNode?.id,
+      name: model.name,
+      slug: model.name.toLowerCase().replace(/\s+/g, "-"),
+      labelKey: "",
+      type: "model",
+      active: true,
+      sortOrder: 0,
+      finalNode: true,
+      category_id: finalNode?.category_id,
+      path: `${finalNode?.path || ""}/${model.name}`,
+    };
+
+    // Update pathNodes to include the model
+    setPathNodes([...pathNodes, modelNode]);
+    
+    // Set the model as the final node
+    setFinalNode(modelNode);
   }
 
   const normalizeLocationName = useCallback((value: string) => {
@@ -2102,21 +2133,39 @@ export default function PostAdForm({
             )}
 
             {/* Brand/Model Selector in Step 1 for catalog categories */}
-            {(rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets" || rootSlug === "vehicles" || (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")) && finalNode && currentOptions.length === 0 ? (
+            {(rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets" || rootSlug === "vehicles" || (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")) && finalNode && currentOptions.length === 0 && !selectedCatalogModel ? (
               <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
                 <p className="text-sm font-semibold mb-3">Select Brand and Model:</p>
-                <BrandModelSelector
-                  category={
-                    rootSlug === "vehicles"
-                      ? "vehicles"
-                      : (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")
-                        ? "laptops"
-                        : "phones"
+                {(() => {
+                  // For phones category, detect if finalNode is a series/brand like "Apple iPhone", "Samsung Galaxy S24"
+                  // Extract brand from the node name
+                  const BRAND_NAMES = ["apple", "samsung", "xiaomi", "huawei", "oppo", "vivo", "oneplus", "nokia", "honor", "realme", "google", "sony"];
+                  let forceBrand: string | undefined;
+                  
+                  if (rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets") {
+                    const nodeName = finalNode?.name?.toLowerCase() || "";
+                    const matchedBrand = BRAND_NAMES.find(brand => nodeName.includes(brand));
+                    if (matchedBrand) {
+                      forceBrand = matchedBrand;
+                    }
                   }
-                  subcategory={finalNode?.slug}
-                  onModelSelected={handleCatalogModelSelected}
-                  selectedModelId={selectedCatalogModel?.id}
-                />
+                  
+                  return (
+                    <BrandModelSelector
+                      category={
+                        rootSlug === "vehicles"
+                          ? "vehicles"
+                          : (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")
+                            ? "laptops"
+                            : "phones"
+                      }
+                      subcategory={finalNode?.slug}
+                      onModelSelected={handleCatalogModelSelected}
+                      selectedModelId={selectedCatalogModel?.id}
+                      forceSelectedBrand={forceBrand}
+                    />
+                  );
+                })()}
               </div>
             ) : null}
           </section>

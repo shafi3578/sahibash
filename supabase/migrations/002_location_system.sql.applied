@@ -1,0 +1,70 @@
+-- Afghanistan Location System Tables
+
+-- Provinces Table
+CREATE TABLE provinces (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT UNIQUE NOT NULL,
+  name_en TEXT NOT NULL,
+  name_fa TEXT NOT NULL,
+  name_ps TEXT NOT NULL,
+  aliases TEXT[], -- JSON array of alternative names
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- Districts Table
+CREATE TABLE districts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  province_id UUID NOT NULL REFERENCES provinces(id) ON DELETE CASCADE,
+  slug TEXT NOT NULL,
+  name_en TEXT NOT NULL,
+  name_fa TEXT NOT NULL,
+  name_ps TEXT NOT NULL,
+  aliases TEXT[], -- JSON array of alternative names
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  UNIQUE(province_id, slug)
+);
+
+-- Areas/Neighborhoods Table
+CREATE TABLE areas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  province_id UUID NOT NULL REFERENCES provinces(id) ON DELETE CASCADE,
+  district_id UUID REFERENCES districts(id) ON DELETE CASCADE,
+  slug TEXT,
+  name_en TEXT NOT NULL,
+  name_fa TEXT NOT NULL,
+  name_ps TEXT NOT NULL,
+  aliases TEXT[], -- JSON array of alternative names
+  is_popular BOOLEAN DEFAULT false,
+  is_approved BOOLEAN DEFAULT false, -- Admin approval for user-submitted areas
+  submitted_by_user_id UUID, -- User who submitted custom area
+  submitted_at TIMESTAMP,
+  approved_at TIMESTAMP,
+  approved_by_user_id UUID, -- Admin who approved
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  UNIQUE(province_id, district_id, slug)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_districts_province_id ON districts(province_id, is_active);
+CREATE INDEX idx_areas_province_id ON areas(province_id, is_active);
+CREATE INDEX idx_areas_district_id ON areas(district_id, is_active);
+CREATE INDEX idx_areas_popular ON areas(is_popular, is_active);
+
+-- Add location fields to listings table
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS province_id UUID REFERENCES provinces(id);
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS district_id UUID REFERENCES districts(id);
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS area_id UUID REFERENCES areas(id);
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS area_custom TEXT; -- For user-typed custom areas
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS location_latitude DOUBLE PRECISION;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS location_longitude DOUBLE PRECISION;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS location_gps_private BOOLEAN DEFAULT true;
+
+CREATE INDEX idx_listings_province_district ON listings(province_id, district_id);
