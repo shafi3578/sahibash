@@ -7,13 +7,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { sendListingMessageAction } from "@/lib/actions/messages";
 import { createOfferAction } from "@/lib/actions/offers";
 import { reportListingTranslationIssueAction } from "@/lib/actions/translations";
-import { localizeCategoryName } from "@/lib/i18n/category-labels";
-import { buildActiveListingSchemaView } from "@/lib/listingSchemas";
+import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
+import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
 import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
 import LocationCard from "@/components/location/LocationCard";
 import type { LocationVisibility } from "@/components/location/LocationCard";
-import { CategorySpecificDetails, ListingQuickFacts, SafetyTips } from "@/components/listings/listing-schema-sections";
 import { getDictionary } from "@/lib/i18n/server";
 import { appLocaleToListingLanguage } from "@/lib/listings/translation-service";
 import { recordSearchTelemetryClick } from "@/lib/search/telemetry";
@@ -36,11 +35,7 @@ function readAttributeValue(value: unknown, locale: "en" | "fa" | "ps") {
   return "";
 }
 
-function isMeaningfulValue(value: string | string[] | null | undefined): boolean {
-  if (Array.isArray(value)) {
-    return value.some((item) => isMeaningfulValue(item));
-  }
-
+function isMeaningfulValue(value: string | null | undefined) {
   const normalized = String(value ?? "").trim();
   return (
     normalized.length > 0
@@ -76,33 +71,16 @@ export default async function ListingDetailPage({
   const currentUser = await getCurrentUser();
   const isOwner = currentUser?.id === listing.user_id;
   const callHref = `tel:${listing.contact_phone.replace(/[^\d+]/g, "")}`;
-  const originalLanguageCode = String(listing.original_locale || listing.original_language || "").toLowerCase();
-  const englishLabel = locale === "fa" ? "انگلیسی" : locale === "ps" ? "انګلیسي" : "English";
-  const dariLabel = locale === "ps" ? "دري" : "دری";
-  const pashtoLabel = locale === "fa" ? "پشتو" : "پښتو";
-  const translationLanguageLabel = originalLanguageCode.startsWith("fa")
-    ? dariLabel
-    : originalLanguageCode.startsWith("ps")
-      ? pashtoLabel
-      : englishLabel;
-  const translationNote = locale === "en"
-    ? (listing.translation_note || `${t.listing.originalLanguage}: ${translationLanguageLabel}`)
-    : `${t.listing.originalLanguage}: ${translationLanguageLabel}`;
-  const schemaView = buildActiveListingSchemaView(listing, locale);
+  const fields = await getCategoryFieldsWithOptions(listing.category_node_id);
+  const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
+  const specView = buildListingSpecView(listing, fields, attrs, locale);
   const attributeMap = new Map(
-    (listing.listing_attributes ?? [])
-      .filter((item) => Boolean(item.attribute_key))
-      .map((item) => {
-        const value = item.attribute_value_text ?? item.attribute_value_number ?? item.attribute_value_boolean ?? "";
-        return [item.attribute_key, readAttributeValue(value, locale)];
-      })
+    attrs.map((item) => {
+      const value = item.attribute_value_text ?? item.attribute_value_number ?? item.attribute_value_boolean ?? "";
+      return [item.attribute_key, readAttributeValue(value, locale)];
+    })
   );
-  const categoryLabel = [
-    localizeCategoryName({ locale, fallbackName: listing.category?.name ?? t.listing.category, slug: listing.category?.slug, path: listing.category?.slug }),
-    localizeCategoryName({ locale, fallbackName: listing.category_node?.name ?? "", slug: listing.category_node?.slug, path: listing.category_node?.path }),
-  ]
-    .filter((value) => Boolean(value) && value.trim().length > 0)
-    .join(" > ");
+  const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
   const locationParts = listing.location_visibility === "exact"
     ? [listing.province, listing.district, listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean)
     : [listing.province, listing.district].filter(Boolean);
@@ -127,20 +105,286 @@ export default async function ListingDetailPage({
         month: "short",
       })
     : null;
+  const groupedSpecs = Object.entries(specView.grouped)
+    .map(([group, rows]) => [group, rows.filter((row) => isMeaningfulValue(row.value))] as const)
+    .filter(([, rows]) => rows.length > 0)
+    .sort(([a], [b]) => {
+      const order = ["locked_specs", "property_details", "category_specific", "interior_features", "exterior_features", "location_nearby", "transportation", "view", "utilities"];
+      const aIndex = order.indexOf(a);
+      const bIndex = order.indexOf(b);
+      if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+
   const safeSellerName = listing.contact_name || listing.profile?.full_name || t.listing.sellerFallback;
   const safeSellerPhone = listing.contact_phone || listing.profile?.phone || t.listing.notProvided;
-  const categorySpecificSections = schemaView.sections;
-  const quickFacts = schemaView.quickFacts;
-  const quickFactKeys = new Set(quickFacts.map((item) => item.key));
-  const autoFilledSpecifications = schemaView.autoFilled.filter(
-    (item) => isMeaningfulValue(item.value) && !quickFactKeys.has(item.key)
-  );
-  const categoryDetailsEmptyText = locale === "fa"
-    ? "فروشنده هنوز مشخصات ساختاری این دسته را وارد نکرده است."
-    : locale === "ps"
-      ? "پلورونکي لا د دې کټګورۍ جوړښتي مشخصات نه دي داخل کړي."
-      : "The seller has not provided structured specifications for this category yet.";
-  const safetyTips = schemaView.safetyTips.length > 0 ? schemaView.safetyTips : [t.listing.safety1, t.listing.safety2, t.listing.safety3, t.listing.safety4];
+
+  const overviewRows = specView.basicRows.filter((row) => isMeaningfulValue(row.value));
+  const displaySectionLabel = (group: string) => {
+    if (group === "location_nearby") return t.listing.location;
+    if (group === "category_specific" || group === "property_details") return t.listing.condition;
+    return t.listing.specifications;
+  };
+
+  const dedupedSections = groupedSpecs.reduce<Array<{ label: string; rows: Array<{ key: string; label: string; value: string; group: string }> }>>((acc, [group, rows]) => {
+    const sectionLabel = displaySectionLabel(group);
+    const existing = acc.find((item) => item.label === sectionLabel);
+    const existingKeys = new Set((existing?.rows ?? []).map((row) => `${row.label.toLowerCase()}::${row.value.toLowerCase()}`));
+    const nextRows = rows.filter((row) => {
+      const sig = `${row.label.toLowerCase()}::${row.value.toLowerCase()}`;
+      if (existingKeys.has(sig)) return false;
+      existingKeys.add(sig);
+      return true;
+    });
+    if (nextRows.length === 0) return acc;
+    if (existing) {
+      existing.rows.push(...nextRows);
+      return acc;
+    }
+    acc.push({ label: sectionLabel, rows: [...nextRows] });
+    return acc;
+  }, []);
+  const vehicleVariant = listing.vehicle_variant as ({
+    name: string;
+    fuel_type?: string | null;
+    transmission?: string | null;
+    body_type?: string | null;
+    engine_power?: string | null;
+    engine_capacity?: string | null;
+    engine_size?: string | null;
+    wheel_drive?: string | null;
+    drive_type?: string | null;
+    doors?: number | null;
+    seats?: number | null;
+    generation?: {
+      name: string;
+      model?: {
+        name: string;
+        series?: { name: string } | null;
+        brand?: { name: string } | null;
+      } | null;
+    } | null;
+  }) | null;
+  const isVehicleListing = listing.category?.slug === "vehicles" || Boolean(listing.vehicle_variant_id);
+  const selectedFeatures = (listing.vehicle_features ?? [])
+    .map((item) => item.vehicle_feature)
+    .filter(Boolean)
+    .sort((a, b) => {
+      const groupA = a?.group?.sort_order ?? 0;
+      const groupB = b?.group?.sort_order ?? 0;
+      if (groupA !== groupB) return groupA - groupB;
+      return (a?.sort_order ?? 0) - (b?.sort_order ?? 0);
+    });
+  const featuresByGroup = selectedFeatures.reduce<Record<string, { groupName: string; items: string[] }>>((acc, feature) => {
+    if (!feature?.group) return acc;
+    if (!acc[feature.group.slug]) {
+      acc[feature.group.slug] = { groupName: feature.group.name, items: [] };
+    }
+    acc[feature.group.slug].items.push(feature.name);
+    return acc;
+  }, {});
+  const vehicleMakeValue = attributeMap.get("locked__make")
+    || attributeMap.get("locked__brand")
+    || listing.vehicle_brand
+    || vehicleVariant?.generation?.model?.brand?.name
+    || "-";
+  const vehicleModelValue = attributeMap.get("locked__model")
+    || listing.vehicle_model
+    || vehicleVariant?.generation?.model?.name
+    || "-";
+  const vehicleFuelValue = attributeMap.get("locked__fuel_type") || vehicleVariant?.fuel_type || "-";
+  const vehicleTransmissionValue = attributeMap.get("locked__gear")
+    || attributeMap.get("locked__transmission")
+    || vehicleVariant?.transmission
+    || "-";
+  const vehicleBodyTypeValue = attributeMap.get("locked__body_type")
+    || listing.vehicle_subtype
+    || vehicleVariant?.body_type
+    || listing.vehicle_type
+    || "-";
+  const vehicleMileageValue = attributeMap.get("mileage") || "-";
+  const vehicleYearValue = attributeMap.get("year") || "-";
+  const vehiclePlateNumberValue = attributeMap.get("plate_number")
+    || attributeMap.get("license_plate")
+    || attributeMap.get("vehicle_plate_number")
+    || "-";
+  const vehiclePlateTypeValue = attributeMap.get("license_plate_type")
+    || attributeMap.get("plate_type")
+    || attributeMap.get("negative_plate_type")
+    || attributeMap.get("plate_status")
+    || "-";
+  const vehicleFirstRegistrationValue = attributeMap.get("first_registration")
+    || attributeMap.get("registration_date")
+    || attributeMap.get("first_registered_at")
+    || "-";
+  const vehicleEngineSizeValue = attributeMap.get("engine_size")
+    || attributeMap.get("locked__engine_size")
+    || attributeMap.get("locked__engine_capacity")
+    || vehicleVariant?.engine_size
+    || vehicleVariant?.engine_capacity
+    || "-";
+  const vehicleLocationValue = locationParts.length > 0 ? locationParts.join(", ") : "-";
+  const vehicleMetricRows = isVehicleListing
+    ? [
+        { label: t.listing.vehicleKm, value: vehicleMileageValue },
+        { label: t.listing.vehicleFirstRegistration, value: vehicleFirstRegistrationValue },
+        { label: t.listing.vehicleGear, value: vehicleTransmissionValue },
+        { label: t.listing.vehicleFuelType, value: vehicleFuelValue },
+      ]
+    : [];
+  const vehicleDetailRows = isVehicleListing
+    ? [
+        { key: "color", label: t.listing.vehicleColor, value: attributeMap.get("color") || "-" },
+        { key: "plate_number", label: t.listing.vehiclePlateNumber, value: vehiclePlateNumberValue },
+        { key: "plate_type", label: t.listing.vehiclePlateType, value: vehiclePlateTypeValue },
+        { key: "engine_size", label: t.listing.vehicleEngineSize, value: vehicleEngineSizeValue },
+        { key: "fuel_type", label: t.listing.vehicleFuelType, value: vehicleFuelValue },
+        { key: "body_type", label: t.listing.vehicleBodyType, value: vehicleBodyTypeValue },
+        { key: "make", label: t.listing.vehicleMake, value: vehicleMakeValue },
+        { key: "model", label: t.listing.vehicleModel, value: vehicleModelValue },
+        { key: "transmission", label: t.listing.vehicleGear, value: vehicleTransmissionValue },
+        { key: "year", label: t.listing.vehicleYear, value: vehicleYearValue },
+        { key: "location", label: t.listing.location, value: vehicleLocationValue },
+      ]
+    : [];
+  const seenVehicleLabels = new Set<string>();
+  const cleanedVehicleMetricRows = vehicleMetricRows.filter((row) => isMeaningfulValue(row.value));
+  const cleanedVehicleDetailRows = vehicleDetailRows.filter((row) => {
+    if (!isMeaningfulValue(row.value)) return false;
+    const key = row.label.toLowerCase();
+    if (seenVehicleLabels.has(key)) return false;
+    seenVehicleLabels.add(key);
+    return true;
+  });
+  const vehicleDisplayedKeys = new Set([
+    "make",
+    "brand",
+    "model",
+    "body_type",
+    "vehicle_type",
+    "vehicle_subtype",
+    "fuel_type",
+    "transmission",
+    "gear",
+    "year",
+    "mileage",
+    "color",
+    "engine_size",
+    "engine_capacity",
+    "plate_status",
+    "plate_number",
+    "license_plate",
+    "vehicle_plate_number",
+    "plate_type",
+    "license_plate_type",
+    "negative_plate_type",
+    "registration_date",
+    "first_registration",
+    "first_registered_at",
+  ]);
+  const filteredOverviewRows = isVehicleListing ? [] : overviewRows;
+  const filteredDedupedSections = isVehicleListing
+    ? dedupedSections
+        .map((section) => ({
+          ...section,
+          rows: section.rows.filter((row) => !vehicleDisplayedKeys.has(row.key)),
+        }))
+        .filter((section) => section.rows.length > 0)
+    : dedupedSections;
+
+  const categorySlug = listing.category?.slug ?? "";
+  const safetyTips = (() => {
+    const tipsByLocale = {
+      en: {
+        vehicles: [
+          "Do not send advance payment before seeing the vehicle.",
+          "Check vehicle documents.",
+          "Verify ownership before payment.",
+          "Meet in a safe public place.",
+        ],
+        realEstate: [
+          "Visit the property before payment.",
+          "Verify ownership documents.",
+          "Do not pay deposit before confirming the property.",
+          "Use written agreement when possible.",
+        ],
+        phones: [
+          "Test phone before payment.",
+          "Check IMEI and registration status.",
+          "Check battery, screen, camera, and biometric features.",
+          "Avoid advance payment.",
+        ],
+        general: [
+          "Meet in a safe public place.",
+          "Check item before payment.",
+          "Do not send money before seeing the item.",
+        ],
+      },
+      fa: {
+        vehicles: [
+          "قبل از دیدن واسطه، پیش پرداخت نفرستید.",
+          "اسناد واسطه را بررسی کنید.",
+          "مالکیت را پیش از پرداخت تایید کنید.",
+          "در محل عمومی امن ملاقات کنید.",
+        ],
+        realEstate: [
+          "قبل از پرداخت از ملک بازدید کنید.",
+          "اسناد مالکیت را بررسی کنید.",
+          "قبل از تایید ملک، بیعانه نپردازید.",
+          "در صورت امکان قرارداد کتبی داشته باشید.",
+        ],
+        phones: [
+          "قبل از پرداخت گوشی را تست کنید.",
+          "IMEI و وضعیت راجستر را بررسی کنید.",
+          "باتری، صفحه، کمره و سنسورها را بررسی کنید.",
+          "از پیش پرداخت خودداری کنید.",
+        ],
+        general: [
+          "در محل عمومی امن ملاقات کنید.",
+          "قبل از پرداخت جنس را بررسی کنید.",
+          "قبل از دیدن جنس پول نفرستید.",
+        ],
+      },
+      ps: {
+        vehicles: [
+          "موټر له لیدلو مخکې مخکې پیسې مه لېږئ.",
+          "د موټر اسناد وګورئ.",
+          "له پیسو مخکې مالکیت تایید کړئ.",
+          "په خوندي عامه ځای کې ووینئ.",
+        ],
+        realEstate: [
+          "له پیسو مخکې ملکیت وګورئ.",
+          "د مالکیت اسناد تایید کړئ.",
+          "له تایید مخکې بیعانه مه ورکوئ.",
+          "که ممکن وي لیکلی تړون وکړئ.",
+        ],
+        phones: [
+          "له پیسو مخکې تلیفون وازمویئ.",
+          "IMEI او راجستر حالت وګورئ.",
+          "بیټرۍ، سکرین، کامره او بایومیټریک وګورئ.",
+          "مخکې له مخکې پیسې مه ورکوئ.",
+        ],
+        general: [
+          "په خوندي عامه ځای کې ووینئ.",
+          "له پیسو مخکې توکی وګورئ.",
+          "توکی له لیدلو مخکې پیسې مه لېږئ.",
+        ],
+      },
+    } as const;
+    const localeTips = tipsByLocale[locale] ?? tipsByLocale.en;
+    if (categorySlug === "vehicles") {
+      return localeTips.vehicles;
+    }
+    if (categorySlug === "real-estate") {
+      return localeTips.realEstate;
+    }
+    if (categorySlug === "mobile-phones-tablets") {
+      return localeTips.phones;
+    }
+    return localeTips.general;
+  })();
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -187,7 +431,7 @@ export default async function ListingDetailPage({
           <h1 className="mt-1 font-display text-2xl font-bold leading-tight sm:text-3xl">{displayTitle}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1 text-[var(--ink-2)]">
-              {translationNote}
+              {listing.translation_note || t.listing.originalLanguage}
             </span>
             {showOriginal ? (
               <Link href={`/listings/${listing.id}`} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
@@ -210,6 +454,30 @@ export default async function ListingDetailPage({
             <p className="sm:text-right">{t.listing.posted}: {postedDate}</p>
           </div>
         </section>
+
+        {isVehicleListing ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+            <h2 className="text-base font-bold">{t.postAd.vehicleDetails}</h2>
+            {cleanedVehicleMetricRows.length > 0 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {cleanedVehicleMetricRows.map((row) => (
+                  <div key={`metric-${row.label}`} className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 text-sm">
+                    <p className="text-[var(--ink-2)]">{row.label}</p>
+                    <p className="mt-1 font-semibold text-[var(--ink-1)]">{row.value}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-3 grid overflow-hidden rounded-xl border border-[var(--line)] md:grid-cols-2">
+              {cleanedVehicleDetailRows.map((row) => (
+                <div key={row.label} className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0 md:nth-[2n]:border-l">
+                  <span className="text-[var(--ink-2)]">{row.label}</span>
+                  <span className="text-right font-semibold text-[var(--ink-1)]">{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.sellerInformation}</h2>
@@ -236,8 +504,6 @@ export default async function ListingDetailPage({
           </div>
         </section>
 
-        <ListingQuickFacts rows={quickFacts} autoFilledLabel={t.listing.autoFilledSpecifications} />
-
         {listing.province_id && listing.district_id && (
           <LocationCard
             location={{
@@ -254,7 +520,6 @@ export default async function ListingDetailPage({
               accuracy: listing.location_accuracy,
               visibility: listing.location_visibility as LocationVisibility,
             }}
-            locale={locale}
           />
         )}
 
@@ -267,22 +532,6 @@ export default async function ListingDetailPage({
               condition: p.condition,
             }))}
           />
-        ) : null}
-
-        <CategorySpecificDetails sections={categorySpecificSections} emptyStateText={categoryDetailsEmptyText} />
-
-        {autoFilledSpecifications.length > 0 ? (
-          <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-            <h2 className="text-base font-bold">{t.listing.autoFilledSpecifications}</h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {autoFilledSpecifications.map((row) => (
-                <div key={row.key} className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-2)]">{row.label}</p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--ink-1)]">{Array.isArray(row.value) ? row.value.join(", ") : row.value}</p>
-                </div>
-              ))}
-            </div>
-          </section>
         ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
@@ -298,7 +547,76 @@ export default async function ListingDetailPage({
           ) : null}
         </section>
 
-        <SafetyTips title={t.listing.buyerSafetyWarning} tips={safetyTips} />
+        {selectedFeatures.length > 0 ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+            <h2 className="text-base font-bold">{t.listing.featureChecklist}</h2>
+            <div className="mt-3 space-y-4">
+              {Object.entries(featuresByGroup).map(([groupKey, group]) => (
+                <section key={groupKey} className="rounded-xl border border-[var(--line)] p-3">
+                  <h3 className="text-sm font-bold">{group.groupName}</h3>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {group.items.map((item) => (
+                      <div key={`${groupKey}-${item}`} className="rounded-lg border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+          <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : t.listing.specifications}</h2>
+
+          {filteredOverviewRows.length > 0 ? (
+            <section className="mt-3 overflow-hidden rounded-xl border border-[var(--line)]">
+              <header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2">
+                <h3 className="text-sm font-semibold">{t.listing.overview}</h3>
+              </header>
+              <div className="grid divide-y divide-[var(--line)] md:grid-cols-2 md:divide-x md:divide-y-0">
+                {filteredOverviewRows.map((row) => (
+                  <div key={`overview-${row.label}`} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                    <span className="text-[var(--ink-2)]">{row.label}</span>
+                    <span className="text-right font-semibold text-[var(--ink-1)]">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {filteredDedupedSections.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--ink-2)]">{t.listing.noAdditionalDetails}</p>
+          ) : (
+            <div className="mt-3 space-y-4">
+              {filteredDedupedSections.map((section) => (
+                <section key={section.label} className="overflow-hidden rounded-xl border border-[var(--line)]">
+                  <header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2">
+                    <h3 className="text-sm font-semibold">{section.label}</h3>
+                  </header>
+                  <div className="grid divide-y divide-[var(--line)] md:grid-cols-2 md:divide-x md:divide-y-0">
+                    {section.rows.map((row) => (
+                      <div key={`${section.label}-${row.key}-${row.value}`} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                        <span className="text-[var(--ink-2)]">{row.label}</span>
+                        <span className="text-right font-semibold text-[var(--ink-1)]">{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+          <h2 className="text-base font-bold text-amber-900">{t.listing.buyerSafetyWarning}</h2>
+          <ul className="mt-3 space-y-2 text-sm text-amber-900">
+            {safetyTips.map((tip) => (
+              <li key={tip}>{tip}</li>
+            ))}
+          </ul>
+        </section>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3">

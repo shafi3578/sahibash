@@ -190,11 +190,29 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
     selectedVariant?.name,
   ].filter(Boolean) as string[];
 
+  const selectedBrandIsOther = selectedBrand?.slug === "other-brand";
+  const selectedModelIsOther = selectedModel?.slug === "other-model";
+
   const showSubtypeChooser = branch.subtypeMode !== "none" && !selectedSubtype && (branch.subtypeOptions?.length ?? 0) > 0;
   const showBrandChooser = !showSubtypeChooser && branch.brandMode !== "none" && brands.length > 0 && !selectedBrand && !resolvedBrandName;
-  const showManualBrandInput = !showSubtypeChooser && branch.brandMode !== "none" && brands.length === 0;
-  const showModelChooser = !showSubtypeChooser && !showBrandChooser && branch.modelMode !== "none" && Boolean(selectedBrand) && models.length > 0 && !selectedModel && !resolvedModelName;
-  const showManualModelInput = !showSubtypeChooser && !showBrandChooser && branch.modelMode !== "none" && ((Boolean(selectedBrand) && models.length === 0) || isOtherSlug(selectedBrand?.slug));
+  const showManualBrandInput =
+    !showSubtypeChooser
+    && branch.brandMode !== "none"
+    && (brands.length === 0 || selectedBrandIsOther);
+  const showModelChooser =
+    !showSubtypeChooser
+    && !showBrandChooser
+    && branch.modelMode !== "none"
+    && Boolean(selectedBrand)
+    && !selectedBrandIsOther
+    && models.length > 0
+    && !selectedModel
+    && !resolvedModelName;
+  const showManualModelInput =
+    !showSubtypeChooser
+    && !showBrandChooser
+    && branch.modelMode !== "none"
+    && (selectedBrandIsOther || selectedModelIsOther || (Boolean(selectedBrand) && models.length === 0));
   const showVariantChooser = !showSubtypeChooser && !showBrandChooser && !showModelChooser && variants.length > 0 && !selectedVariant;
 
   function reset() {
