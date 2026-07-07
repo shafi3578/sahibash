@@ -126,6 +126,17 @@ export const vehicleSchema: ListingSchemaDefinition = {
       },
     },
     {
+      key: "drivetrain",
+      label: localized("Drivetrain / Drive", "سیستم حرکت", "د حرکت سیستم"),
+      sectionKey: "technical",
+      order: 2,
+      consumes: ["drivetrain", "drive_type", "wheel_drive"],
+      resolve: (context) => {
+        const value = firstMeaningfulText(readAttributeValue(context.attributes, "drivetrain", "drive_type", "wheel_drive"));
+        return value ? { key: "drivetrain", label: localized("Drivetrain / Drive", "سیستم حرکت", "د حرکت سیستم")[context.locale], value, sectionKey: "technical" } : null;
+      },
+    },
+    {
       key: "engine_size",
       label: localized("Engine Size", "حجم انجن", "د انجن اندازه"),
       sectionKey: "technical",
@@ -138,6 +149,18 @@ export const vehicleSchema: ListingSchemaDefinition = {
           (context.listing.vehicle_variant as { engine_size?: string } | null)?.engine_size ?? null
         );
         return value ? { key: "engine_size", label: localized("Engine Size", "حجم انجن", "د انجن اندازه")[context.locale], value, sectionKey: "technical", autoFilled: Boolean(context.attributes.get("locked__engine_capacity") || context.listing.vehicle_variant_id) } : null;
+      },
+    },
+    {
+      key: "engine_power",
+      label: localized("Engine Power", "قدرت انجن", "د انجن ځواک"),
+      sectionKey: "technical",
+      order: 4,
+      consumes: ["engine_power", "hp", "horsepower"],
+      showIf: (context) => carMatch(context.path) || motorcycleMatch(context.path),
+      resolve: (context) => {
+        const value = firstMeaningfulText(readAttributeValue(context.attributes, "engine_power", "hp", "horsepower"));
+        return value ? { key: "engine_power", label: localized("Engine Power", "قدرت انجن", "د انجن ځواک")[context.locale], value, sectionKey: "technical" } : null;
       },
     },
     {
@@ -211,6 +234,17 @@ export const vehicleSchema: ListingSchemaDefinition = {
       },
     },
     {
+      key: "registration_status",
+      label: localized("Registration Status", "وضعیت ثبت", "د ثبت حالت"),
+      sectionKey: "registration",
+      order: 1,
+      consumes: ["registration_status"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "registration_status");
+        return value ? { key: "registration_status", label: localized("Registration Status", "وضعیت ثبت", "د ثبت حالت")[context.locale], value, sectionKey: "registration" } : null;
+      },
+    },
+    {
       key: "plate_status",
       label: localized("Plate / Registration", "پلیت / ثبت", "پلېټ / ثبت"),
       sectionKey: "registration",
@@ -222,6 +256,17 @@ export const vehicleSchema: ListingSchemaDefinition = {
       },
     },
     {
+      key: "imported_from",
+      label: localized("Imported From", "وارد شده از", "وارد شوي له"),
+      sectionKey: "registration",
+      order: 3,
+      consumes: ["imported_from"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "imported_from");
+        return value ? { key: "imported_from", label: localized("Imported From", "وارد شده از", "وارد شوي له")[context.locale], value, sectionKey: "registration" } : null;
+      },
+    },
+    {
       key: "seller_type",
       label: localized("Seller Type", "نوع فروشنده", "د پلورونکي ډول"),
       sectionKey: "registration",
@@ -230,6 +275,17 @@ export const vehicleSchema: ListingSchemaDefinition = {
       resolve: (context) => {
         const value = readAttributeValue(context.attributes, "seller_type");
         return value ? { key: "seller_type", label: localized("Seller Type", "نوع فروشنده", "د پلورونکي ډول")[context.locale], value, sectionKey: "registration" } : null;
+      },
+    },
+    {
+      key: "previous_owners",
+      label: localized("Previous Owners", "مالکین قبلی", "مخکني مالکان"),
+      sectionKey: "condition",
+      order: 2,
+      consumes: ["previous_owners"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "previous_owners");
+        return value ? { key: "previous_owners", label: localized("Previous Owners", "مالکین قبلی", "مخکني مالکان")[context.locale], value, sectionKey: "condition" } : null;
       },
     },
     {
@@ -252,6 +308,42 @@ export const vehicleSchema: ListingSchemaDefinition = {
       resolve: (context) => {
         const value = readAttributeValue(context.attributes, "accident_status", "salvage_record");
         return value ? { key: "accident_status", label: localized("Accident Status", "وضعیت حادثه", "د حادثې حالت")[context.locale], value, sectionKey: "condition" } : null;
+      },
+    },
+    {
+      key: "spare_parts_availability",
+      label: localized("Spare Parts Availability", "دسترس بودن پرزه جات", "د پرزو شتون"),
+      sectionKey: "condition",
+      order: 4,
+      consumes: ["spare_parts_availability"],
+      showIf: (context) => carMatch(context.path) || motorcycleMatch(context.path),
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "spare_parts_availability");
+        return value ? { key: "spare_parts_availability", label: localized("Spare Parts Availability", "دسترس بودن پرزه جات", "د پرزو شتون")[context.locale], value, sectionKey: "condition" } : null;
+      },
+    },
+    {
+      key: "maintenance_cost",
+      label: localized("Maintenance Cost", "هزینه نگهداری", "د ساتنې لګښت"),
+      sectionKey: "condition",
+      order: 5,
+      consumes: ["maintenance_cost", "maintenance_cost_afn"],
+      showIf: (context) => carMatch(context.path) || motorcycleMatch(context.path),
+      resolve: (context) => {
+        const value = firstMeaningfulText(readAttributeValue(context.attributes, "maintenance_cost", "maintenance_cost_afn"));
+        return value ? { key: "maintenance_cost", label: localized("Maintenance Cost", "هزینه نگهداری", "د ساتنې لګښت")[context.locale], value, sectionKey: "condition" } : null;
+      },
+    },
+    {
+      key: "common_use",
+      label: localized("Common Use", "کاربرد رایج", "عام استعمال"),
+      sectionKey: "condition",
+      order: 6,
+      consumes: ["common_use"],
+      showIf: (context) => carMatch(context.path) || motorcycleMatch(context.path),
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "common_use");
+        return value ? { key: "common_use", label: localized("Common Use", "کاربرد رایج", "عام استعمال")[context.locale], value, sectionKey: "condition" } : null;
       },
     },
     {
@@ -352,9 +444,9 @@ export const vehicleSchema: ListingSchemaDefinition = {
   ],
   sections: [
     { key: "summary", title: vehicleSections.summary, order: 10, fieldKeys: ["make", "model", "series_trim", "year", "mileage"], hideIfEmpty: true },
-    { key: "technical", title: vehicleSections.technical, order: 20, fieldKeys: ["fuel_type", "transmission", "engine_size", "body_type", "doors", "seats", "color", "engine_cc"], hideIfEmpty: true },
-    { key: "registration", title: vehicleSections.registration, order: 30, fieldKeys: ["customs_status", "plate_status", "seller_type", "documents"], hideIfEmpty: true },
-    { key: "condition", title: vehicleSections.condition, order: 40, fieldKeys: ["condition", "exchange", "accident_status", "warranty"], hideIfEmpty: true },
+    { key: "technical", title: vehicleSections.technical, order: 20, fieldKeys: ["fuel_type", "transmission", "drivetrain", "engine_size", "engine_power", "body_type", "doors", "seats", "color", "engine_cc"], hideIfEmpty: true },
+    { key: "registration", title: vehicleSections.registration, order: 30, fieldKeys: ["customs_status", "registration_status", "plate_status", "imported_from", "seller_type", "documents"], hideIfEmpty: true },
+    { key: "condition", title: vehicleSections.condition, order: 40, fieldKeys: ["condition", "previous_owners", "exchange", "accident_status", "spare_parts_availability", "maintenance_cost", "common_use", "warranty"], hideIfEmpty: true },
     { key: "paint", title: vehicleSections.paint, order: 50, fieldKeys: ["paint_parts"], hideIfEmpty: true },
     { key: "features", title: vehicleSections.features, order: 60, fieldKeys: ["features"], hideIfEmpty: true },
   ],
@@ -366,20 +458,28 @@ export const vehicleSchema: ListingSchemaDefinition = {
     "mileage",
     "fuel_type",
     "transmission",
+    "drivetrain",
     "engine_size",
+    "engine_power",
     "body_type",
     "color",
     "condition",
     "customs_status",
+    "registration_status",
     "plate_status",
+    "imported_from",
     "seller_type",
+    "previous_owners",
     "exchange",
     "accident_status",
+    "spare_parts_availability",
+    "maintenance_cost",
+    "common_use",
     "warranty",
   ],
   requiredFields: ["title", "price", "province", "district", "make", "model", "year", "mileage", "fuel_type", "transmission", "condition", "photos"],
-  optionalFields: ["series_trim", "engine_size", "body_type", "color", "customs_status", "plate_status", "seller_type", "exchange", "accident_status", "warranty"],
-  filterFields: ["make", "model", "year", "mileage", "fuel_type", "transmission", "body_type", "color", "condition", "seller_type", "exchange"],
+  optionalFields: ["series_trim", "drivetrain", "engine_size", "engine_power", "body_type", "color", "customs_status", "registration_status", "plate_status", "imported_from", "seller_type", "previous_owners", "exchange", "accident_status", "spare_parts_availability", "maintenance_cost", "common_use", "warranty"],
+  filterFields: ["make", "model", "year", "mileage", "fuel_type", "transmission", "drivetrain", "body_type", "color", "condition", "seller_type", "exchange", "registration_status", "imported_from"],
   autoFillRules: [
     { when: localized("When make, model, and year are selected", "وقتی برند، مدل و سال انتخاب شد", "کله چې برنډ، ماډل او کال وټاکل شي"), suggest: [localized("Suggest body type", "نوع بدنه را پیشنهاد کن", "د موټر ډول وړاندیز کړه"), localized("Suggest fuel type", "نوع سوخت را پیشنهاد کن", "د تېلو ډول وړاندیز کړه"), localized("Suggest transmission", "گیربکس را پیشنهاد کن", "ګیربکس وړاندیز کړه"), localized("Suggest engine size", "حجم انجن را پیشنهاد کن", "د انجن اندازه وړاندیز کړه"), localized("Suggest common series / trim", "سری / تریم رایج را پیشنهاد کن", "عامه سری / ټریم وړاندیز کړه")] },
   ],
