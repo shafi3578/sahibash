@@ -1,24 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
-import { CURRENCIES } from "@/lib/constants/marketplace";
+import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
 import type { Category, CategoryField, CategoryNode } from "@/types/database";
-import { VehicleSmartSelector, type VehicleSelection } from "@/components/vehicles/VehicleSmartSelector";
+import {
+  EMPTY_VEHICLE_SELECTION,
+  VehicleSmartSelector,
+  type VehicleSelection,
+} from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
-import { BrandModelSelector } from "@/components/posting/BrandModelSelector";
+import { getVehicleBranchFromPath } from "@/data/catalog/vehicles";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
-import { ACTIVE_LISTING_SCHEMAS } from "@/lib/listingSchemas";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
-import type { ListingSchemaDefinition, SchemaFieldContext } from "@/lib/listingSchemas/shared";
-import type { CatalogModel } from "@/lib/catalog/types";
-import { generateAutoFill } from "@/lib/catalog/utils";
-import { getTemplateIdFromPath, getPropertyTemplate } from "@/lib/data/catalogs/realEstate";
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -50,16 +50,8 @@ type CoreForm = {
   rulesAccepted: boolean;
 };
 
-type LocationNameRow = {
-  id: number;
-  name: string | null;
-  name_en: string | null;
-  name_fa: string | null;
-  name_ps: string | null;
-  aliases: string[] | null;
-};
-type ProvinceOption = { id: number; label: string; candidates: string[] };
-type DistrictOption = { id: number; label: string; candidates: string[]; province_id: number };
+type ProvinceOption = { id: number; name: string };
+type DistrictOption = { id: number; name: string; province_id: number };
 type LocationMethod = "device" | "manual" | null;
 type StoredLocation = {
   provinceId: number;
@@ -68,30 +60,21 @@ type StoredLocation = {
   locationVisibility: "exact" | "approximate" | "province_district";
 };
 
-type PostingFieldInput = {
-  id: number | string;
-  field_key: string;
-  field_label: string;
-  field_type: "text" | "number" | "select" | "boolean" | "date";
-  is_required: boolean;
-  display_order?: number | null;
-  sort_order?: number | null;
-  options_json?: Record<string, unknown> | string[] | null;
-};
-
-type AutoFilledSpec = {
-  key: string;
-  label: string;
-  value: string;
-  source: string;
-  confidence: number;
-  editable: boolean;
-  fieldKey?: string;
-};
-
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
-const POSTING_ACTIVE_CATEGORY_SLUGS = ["vehicles", "real-estate", "mobile-phones-tablets", "phones-electronics", "second-hand-items"] as const;
+const ACTIVE_POSTING_CATEGORY_SLUGS = [
+  "vehicles",
+  "real-estate",
+  "mobile-phones-tablets",
+  "electronics-computers",
+  "second-hand-items",
+  "clothing-personal-items",
+  "jobs",
+  "services",
+  "home-furniture-appliances",
+  "farm-animals",
+  "wanted-request-ads",
+] as const;
 
 const LOCATION_DYNAMIC_KEYS = new Set([
   "city",
@@ -110,169 +93,6 @@ const LOCATION_DYNAMIC_KEYS = new Set([
   "location_accuracy",
 ]);
 
-const CORE_DYNAMIC_KEYS = new Set([
-  "title",
-  "description",
-  "price",
-  "currency",
-  "contact_phone",
-  "contact_name",
-  "contact_preferences",
-  "meeting_preference",
-  "address_optional",
-  "minimum_offer",
-  "negotiable",
-]);
-
-function isRenderableDynamicField(field: CategoryField) {
-  return !LOCATION_DYNAMIC_KEYS.has(field.field_key) && !CORE_DYNAMIC_KEYS.has(field.field_key);
-}
-
-/**
- * Determines which field keys are relevant for a specific category path.
- * Filters out irrelevant fields based on category logic.
- */
-function getCategoryRelevantFieldKeys(categoryPath: string | undefined, categorySlug: string | undefined): Set<string> {
-  if (!categoryPath && !categorySlug) return new Set();
-
-  const relevantFields = new Set<string>();
-  const path = categoryPath?.toLowerCase() ?? "";
-  const slug = categorySlug?.toLowerCase() ?? "";
-
-  // Phones & Electronics - only show tech specs
-  if (slug.includes("phone") || slug.includes("mobile") || slug.includes("tablet") || slug.includes("electronic")) {
-    relevantFields.add("screen_size");
-    relevantFields.add("storage_capacity");
-    relevantFields.add("ram");
-    relevantFields.add("processor");
-    relevantFields.add("camera");
-    relevantFields.add("rear_camera");
-    relevantFields.add("front_camera");
-    relevantFields.add("battery");
-    relevantFields.add("operating_system");
-    relevantFields.add("os");
-    relevantFields.add("color");
-    relevantFields.add("condition");
-    relevantFields.add("warranty");
-    relevantFields.add("purchased_from");
-    relevantFields.add("trade_in");
-    relevantFields.add("charger_included");
-    relevantFields.add("original_box");
-    relevantFields.add("from");
-    relevantFields.add("water_resistance");
-    relevantFields.add("display_type");
-    relevantFields.add("refresh_rate");
-    relevantFields.add("production_year");
-    return relevantFields;
-  }
-
-  // Vehicles - only show vehicle-specific specs
-  if (slug.includes("vehicle") || slug.includes("car") || slug.includes("motorcycle") || slug.includes("truck")) {
-    relevantFields.add("make");
-    relevantFields.add("model");
-    relevantFields.add("year");
-    relevantFields.add("mileage");
-    relevantFields.add("color");
-    relevantFields.add("body_type");
-    relevantFields.add("fuel_type");
-    relevantFields.add("transmission");
-    relevantFields.add("engine_type");
-    relevantFields.add("engine_capacity");
-    relevantFields.add("seats");
-    relevantFields.add("doors");
-    relevantFields.add("vin");
-    relevantFields.add("condition");
-    relevantFields.add("interior_color");
-    relevantFields.add("registration_year");
-    relevantFields.add("accident_history");
-    relevantFields.add("ownership");
-    relevantFields.add("service_history");
-    relevantFields.add("brake_type");
-    relevantFields.add("drive_type");
-    return relevantFields;
-  }
-
-  // Real Estate - property-specific fields only
-  if (slug.includes("real") || slug.includes("estate") || slug.includes("property") || slug.includes("land") || slug.includes("apartment") || slug.includes("house")) {
-    relevantFields.add("property_type");
-    relevantFields.add("bedrooms");
-    relevantFields.add("bathrooms");
-    relevantFields.add("area");
-    relevantFields.add("total_area");
-    relevantFields.add("built_area");
-    relevantFields.add("furnished");
-    relevantFields.add("purpose");
-    relevantFields.add("lease_term");
-    relevantFields.add("lease_terms");
-    relevantFields.add("floor");
-    relevantFields.add("building_age");
-    relevantFields.add("parking");
-    relevantFields.add("elevator");
-    relevantFields.add("garden");
-    relevantFields.add("balcony");
-    relevantFields.add("condition");
-    relevantFields.add("heating");
-    relevantFields.add("cooling");
-    relevantFields.add("utility");
-    relevantFields.add("amenities");
-    relevantFields.add("zoning");
-    relevantFields.add("legal_status");
-    return relevantFields;
-  }
-
-  // Laptops & Computers
-  if (slug.includes("laptop") || slug.includes("computer") || slug.includes("desktop")) {
-    relevantFields.add("brand");
-    relevantFields.add("model");
-    relevantFields.add("processor");
-    relevantFields.add("ram");
-    relevantFields.add("storage_capacity");
-    relevantFields.add("graphics");
-    relevantFields.add("screen_size");
-    relevantFields.add("display_type");
-    relevantFields.add("operating_system");
-    relevantFields.add("condition");
-    relevantFields.add("warranty");
-    relevantFields.add("battery_health");
-    relevantFields.add("keyboard_condition");
-    relevantFields.add("trackpad_condition");
-    relevantFields.add("color");
-    relevantFields.add("production_year");
-    return relevantFields;
-  }
-
-  // TVs & Displays
-  if (slug.includes("tv") || slug.includes("television") || slug.includes("monitor") || slug.includes("display")) {
-    relevantFields.add("screen_size");
-    relevantFields.add("resolution");
-    relevantFields.add("type");
-    relevantFields.add("display_technology");
-    relevantFields.add("refresh_rate");
-    relevantFields.add("hdr");
-    relevantFields.add("smart_tv");
-    relevantFields.add("operating_system");
-    relevantFields.add("color");
-    relevantFields.add("condition");
-    relevantFields.add("brand");
-    relevantFields.add("model");
-    relevantFields.add("warranty");
-    relevantFields.add("production_year");
-    return relevantFields;
-  }
-
-  // For general items, show only universal fields
-  relevantFields.add("condition");
-  relevantFields.add("color");
-  relevantFields.add("material");
-  relevantFields.add("size");
-  relevantFields.add("weight");
-  relevantFields.add("age");
-  relevantFields.add("brand");
-  relevantFields.add("model");
-
-  return relevantFields;
-}
-
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
   if (!optionsJson) return [];
   if (Array.isArray(optionsJson)) return optionsJson.map((value) => String(value));
@@ -281,26 +101,6 @@ function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
 
 function renderFieldLabel(fieldKey: string) {
   return fieldKey.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function toLocationCandidates(row: LocationNameRow) {
-  const aliases = Array.isArray(row.aliases)
-    ? row.aliases.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-    : [];
-
-  return [row.name_en, row.name_fa, row.name_ps, row.name, ...aliases]
-    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-    .map((value) => value.trim());
-}
-
-function getLocationLabel(row: LocationNameRow, locale: AppLocale) {
-  if (locale === "fa") {
-    return row.name_fa || row.name_en || row.name || "";
-  }
-  if (locale === "ps") {
-    return row.name_ps || row.name_en || row.name || "";
-  }
-  return row.name_en || row.name || row.name_fa || row.name_ps || "";
 }
 
 function toPostingType(mode: PostMode, listingType: "for_sale" | "wanted") {
@@ -320,92 +120,11 @@ function inferImageConfig(rootSlug: string, path: string | undefined): PostingCo
     return { requires_images: true, min_images: 1, max_images: 15, recommended_images: "5-15", allow_video: true };
   }
 
-  if (rootSlug === "mobile-phones-tablets" || rootSlug === "phones-electronics" || rootSlug === "electronics-computers") {
-    return { requires_images: true, min_images: 1, max_images: 12, recommended_images: "3-8", allow_video: false };
-  }
-
-  if (rootSlug === "second-hand-items") {
+  if (rootSlug === "mobile-phones-tablets" || rootSlug === "electronics-computers") {
     return { requires_images: true, min_images: 1, max_images: 12, recommended_images: "3-8", allow_video: false };
   }
 
   return { requires_images: false, min_images: 0, max_images: 10, recommended_images: null, allow_video: false };
-}
-
-function buildPostingSchemaContext(rootSlug: string, path: string): SchemaFieldContext {
-  return {
-    listing: {} as never,
-    attributes: new Map(),
-    locale: "en",
-    path,
-    rootSlug,
-  };
-}
-
-function getPostingSchema(rootSlug: string): ListingSchemaDefinition | null {
-  return ACTIVE_LISTING_SCHEMAS.find((schema) => schema.rootSlugs.includes(rootSlug)) ?? null;
-}
-
-function inferSyntheticFieldType(fieldKey: string): PostingFieldInput["field_type"] {
-  if (["rooms", "bathrooms", "floors", "floor_number", "total_floors", "warehouse_size", "land_size", "building_size", "mileage", "year"].includes(fieldKey)) {
-    return "number";
-  }
-
-  if ([
-    "exchange_possible",
-    "exchange",
-    "box_available",
-    "box_carton",
-    "charger_available",
-    "charger",
-    "furnished",
-    "family_only",
-    "security",
-    "elevator",
-    "truck_access",
-    "loading_access",
-    "parking",
-    "yard",
-    "water",
-    "electricity",
-    "gas",
-    "boundary_wall",
-    "delivery_possible",
-  ].includes(fieldKey)) {
-    return "boolean";
-  }
-
-  if (["property_type", "document_type", "condition", "storage", "ram"].includes(fieldKey)) {
-    return "select";
-  }
-
-  return "text";
-}
-
-function inferSyntheticFieldOptions(fieldKey: string): string[] {
-  switch (fieldKey) {
-    case "property_type":
-      return ["House", "Apartment", "Land", "Shop", "Office", "Warehouse", "Room", "Dormitory", "Other"];
-    case "document_type":
-      return ["Qabala", "Title Deed", "Customary Document", "No Document"];
-    case "condition":
-      return ["New", "Like New", "Good", "Fair", "Used"];
-    case "storage":
-      return ["32GB", "64GB", "128GB", "256GB", "512GB"];
-    case "ram":
-      return ["2GB", "4GB", "6GB", "8GB", "12GB", "16GB"];
-    case "color":
-      return ["Black", "White", "Blue", "Red", "Green", "Silver", "Gold", "Gray", "Other"];
-    default:
-      return [];
-  }
-}
-
-function humanizeSlug(slug: string) {
-  return slug
-    .split("-")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 export default function PostAdForm({
@@ -440,7 +159,6 @@ export default function PostAdForm({
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
   const [dynamicFields, setDynamicFields] = useState<CategoryField[]>([]);
   const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean>>({});
-  const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [loadingTree, setLoadingTree] = useState(false);
 
   const [postingConfig, setPostingConfig] = useState<PostingConfig | null>(null);
@@ -451,18 +169,8 @@ export default function PostAdForm({
 
   const [images, setImages] = useState<StagedImage[]>([]);
 
-  const [vehicleSelection, setVehicleSelection] = useState<VehicleSelection>({
-    brand: null,
-    series: null,
-    model: null,
-    generation: null,
-    variant: null,
-    specs: [],
-  });
+  const [vehicleSelection, setVehicleSelection] = useState<VehicleSelection>(EMPTY_VEHICLE_SELECTION);
   const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultDamageParts());
-  const [autoFilledSpecs, setAutoFilledSpecs] = useState<AutoFilledSpec[]>([]);
-  const [catalogFieldOptions, setCatalogFieldOptions] = useState<Record<string, string[]>>({});
-  const [selectedCatalogModel, setSelectedCatalogModel] = useState<CatalogModel | null>(null);
 
   const [core, setCore] = useState<CoreForm>({
     title: "",
@@ -514,11 +222,20 @@ export default function PostAdForm({
 
   const activeCategories = useMemo(
     () => categories.filter((category) =>
-      POSTING_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof POSTING_ACTIVE_CATEGORY_SLUGS)[number])
+      ACTIVE_POSTING_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_POSTING_CATEGORY_SLUGS)[number])
       && !category.is_coming_soon
     ),
     [categories]
   );
+
+  const comingSoonCategories = useMemo(
+    () => categories.filter((category) =>
+      !ACTIVE_POSTING_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_POSTING_CATEGORY_SLUGS)[number])
+      || category.is_coming_soon
+    ),
+    [categories]
+  );
+
   const breadcrumb = useMemo(
     () =>
       pathNodes
@@ -535,257 +252,34 @@ export default function PostAdForm({
   );
   const rootSlug = selectedRoot?.slug ?? "";
   const finalPath = finalNode?.path;
+  const vehicleBranch = useMemo(() => getVehicleBranchFromPath(finalPath), [finalPath]);
 
   const resolvedImageConfig = useMemo(() => {
     if (!finalNode) return null;
     return postingConfig ?? inferImageConfig(rootSlug, finalPath);
   }, [finalNode, finalPath, postingConfig, rootSlug]);
 
-  const postingSchema = useMemo(() => getPostingSchema(rootSlug), [rootSlug]);
-
-  const schemaContext = useMemo(
-    () => buildPostingSchemaContext(rootSlug, finalPath ?? rootSlug),
-    [finalPath, rootSlug]
-  );
-
-  const schemaVisibleKeys = useMemo(() => {
-    if (!postingSchema) return null;
-
-    return new Set(
-      postingSchema.fields
-        .filter((field) => (field.showIf ? field.showIf(schemaContext) : true))
-        .map((field) => field.key)
-    );
-  }, [postingSchema, schemaContext]);
-
-  const schemaFieldOrder = useMemo(() => {
-    if (!postingSchema) return new Map<string, number>();
-    return new Map(postingSchema.fields.map((field) => [field.key, field.order]));
-  }, [postingSchema]);
-
-  const schemaRequiredKeys = useMemo(
-    () => new Set((postingSchema?.requiredFields ?? []).filter((key) => !CORE_DYNAMIC_KEYS.has(key as never))),
-    [postingSchema]
-  );
-
-  const lockedFieldKeys = useMemo(
-    () => new Set(autoFilledSpecs.filter((spec) => spec.fieldKey && !spec.editable).map((spec) => spec.fieldKey!)),
-    [autoFilledSpecs]
-  );
-
-  const schemaSyntheticFields = useMemo<PostingFieldInput[]>(() => {
-    if (!postingSchema || !schemaVisibleKeys) return [];
-
-    const dbFieldKeys = new Set(dynamicFields.map((field) => field.field_key));
-
-    return postingSchema.fields
-      .filter((field) => schemaVisibleKeys.has(field.key))
-      .filter((field) => !dbFieldKeys.has(field.key))
-      .filter((field) => !CORE_DYNAMIC_KEYS.has(field.key as never))
-      .filter((field) => !lockedFieldKeys.has(field.key))
-      .map((field) => {
-        const options = inferSyntheticFieldOptions(field.key);
-        return {
-          id: `schema-${field.key}`,
-          field_key: field.key,
-          field_label: field.label[locale],
-          field_type: inferSyntheticFieldType(field.key),
-          is_required: schemaRequiredKeys.has(field.key),
-          display_order: field.order,
-          sort_order: field.order,
-          options_json: options.length > 0 ? options : null,
-        };
-      });
-  }, [dynamicFields, locale, lockedFieldKeys, postingSchema, schemaRequiredKeys, schemaVisibleKeys]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function resolveAutoFilledSpecs() {
-      if (!finalPath || !rootSlug) {
-        if (!cancelled) {
-          setAutoFilledSpecs([]);
-          setCatalogFieldOptions({});
-        }
-        return;
-      }
-
-      const segments = finalPath.split("/").filter(Boolean);
-      const resolvedSpecs: AutoFilledSpec[] = [];
-      const resolvedOptions: Record<string, string[]> = {};
-
-      if (rootSlug === "real-estate") {
-        // Use property template for auto-filled specs
-        const templateId = getTemplateIdFromPath(finalPath);
-        if (templateId) {
-          const template = getPropertyTemplate(templateId);
-          if (template) {
-            // Add template's stable specs
-            template.stableSpecs.forEach((spec) => {
-              resolvedSpecs.push({
-                key: spec.key,
-                label: spec.label[locale] || spec.label.en,
-                value: String(spec.value),
-                source: "property_template",
-                confidence: spec.confidence,
-                editable: spec.editable,
-                fieldKey: spec.key,
-              });
-            });
-          }
-        }
-      }
-
-      if (rootSlug === "second-hand-items") {
-        const leafName = pathNodes[pathNodes.length - 1]?.name ?? humanizeSlug(segments[segments.length - 1] ?? "");
-        resolvedSpecs.push({ key: "item_type", label: "Item Type", value: leafName, source: "category_path", confidence: 0.95, editable: false, fieldKey: "item_type" });
-      }
-
-      if (rootSlug === "vehicles") {
-        const vehicleType = pathNodes[1]?.name ?? humanizeSlug(segments[1] ?? "vehicle");
-        resolvedSpecs.push({ key: "vehicle_type", label: "Vehicle Type", value: vehicleType, source: "category_path", confidence: 0.95, editable: false });
-
-        if ((segments[1] ?? "") === "cars" && pathNodes[2]?.name) {
-          resolvedSpecs.push({ key: "make", label: "Make / Brand", value: pathNodes[2].name, source: "category_path", confidence: 1, editable: false, fieldKey: "make" });
-        }
-        if ((segments[1] ?? "") === "cars" && pathNodes[3]?.name) {
-          resolvedSpecs.push({ key: "model", label: "Model", value: pathNodes[3].name, source: "category_path", confidence: 1, editable: false, fieldKey: "model" });
-        }
-      }
-
-      if (rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets") {
-        const subcategorySlug = segments[1] ?? "";
-        const brandSlug = segments[2] ?? "";
-        const modelSlug = segments[3] ?? "";
-
-        const subcategoryName = pathNodes[1]?.name ?? humanizeSlug(subcategorySlug);
-        if (subcategoryName) {
-          resolvedSpecs.push({ key: "device_type", label: "Device Type", value: subcategoryName, source: "category_path", confidence: 0.95, editable: false });
-        }
-        if (pathNodes[2]?.name) {
-          resolvedSpecs.push({ key: "brand", label: "Brand", value: pathNodes[2].name, source: "category_path", confidence: 1, editable: false, fieldKey: "brand" });
-        }
-        if (pathNodes[3]?.name) {
-          resolvedSpecs.push({ key: "model", label: "Model", value: pathNodes[3].name, source: "category_path", confidence: 1, editable: false, fieldKey: "model" });
-        }
-
-        if (subcategorySlug && brandSlug && modelSlug) {
-          const supabase = createSupabaseBrowserClient();
-          const { data: category } = await supabase
-            .from("electronics_categories")
-            .select("id")
-            .eq("slug", subcategorySlug)
-            .eq("is_active", true)
-            .maybeSingle();
-
-          if (category?.id) {
-            const { data: brand } = await supabase
-              .from("electronics_brands")
-              .select("id")
-              .eq("category_id", category.id)
-              .eq("slug", brandSlug)
-              .eq("is_active", true)
-              .maybeSingle();
-
-            if (brand?.id) {
-              const { data: model } = await supabase
-                .from("electronics_models")
-                .select("id, release_year")
-                .eq("brand_id", brand.id)
-                .eq("slug", modelSlug)
-                .eq("is_active", true)
-                .maybeSingle();
-
-              if (model?.id) {
-                const [{ data: specs }, { data: options }] = await Promise.all([
-                  supabase
-                    .from("electronics_model_specs")
-                    .select("spec_key, spec_label, spec_value")
-                    .eq("model_id", model.id)
-                    .eq("is_public", true),
-                  supabase
-                    .from("electronics_model_options")
-                    .select("option_type, option_value")
-                    .eq("model_id", model.id)
-                    .order("option_type", { ascending: true })
-                    .order("sort_order", { ascending: true }),
-                ]);
-
-                if (model.release_year) {
-                  resolvedSpecs.push({ key: "release_year", label: "Release Year", value: String(model.release_year), source: "device_catalog", confidence: 0.98, editable: false });
-                }
-
-                for (const spec of specs ?? []) {
-                  const value = String(spec.spec_value ?? "").trim();
-                  if (!value) continue;
-                  resolvedSpecs.push({
-                    key: String(spec.spec_key),
-                    label: String(spec.spec_label ?? spec.spec_key),
-                    value,
-                    source: "device_catalog",
-                    confidence: 0.95,
-                    editable: false,
-                  });
-                }
-
-                for (const option of options ?? []) {
-                  const key = String(option.option_type ?? "").trim();
-                  const value = String(option.option_value ?? "").trim();
-                  if (!key || !value) continue;
-                  if (!resolvedOptions[key]) resolvedOptions[key] = [];
-                  if (!resolvedOptions[key].includes(value)) resolvedOptions[key].push(value);
-                }
-              }
-            }
-          }
-        }
-      }
-
-      if (!cancelled) {
-        const deduped = new Map<string, AutoFilledSpec>();
-        for (const spec of resolvedSpecs) {
-          if (!spec.value || deduped.has(spec.key)) continue;
-          deduped.set(spec.key, spec);
-        }
-        setAutoFilledSpecs(Array.from(deduped.values()));
-        setCatalogFieldOptions(resolvedOptions);
-      }
-    }
-
-    void resolveAutoFilledSpecs();
-    return () => {
-      cancelled = true;
-    };
-  }, [finalPath, pathNodes, rootSlug]);
-
-  useEffect(() => {
-    if (autoFilledSpecs.length === 0) return;
-
-    setDynamicValues((prev) => {
-      const next = { ...prev };
-      for (const spec of autoFilledSpecs) {
-        if (spec.fieldKey) {
-          next[spec.fieldKey] = spec.value;
-        }
-      }
-      return next;
-    });
-  }, [autoFilledSpecs]);
-
-  const detailsStep = 2;
-  const photosStep = 3;
-  const locationStep = 4;
-  const contactStep = 5;
-  const reviewStep = 6;
-  const isDetailsStep = step === detailsStep;
-  const isPhotosStep = step === photosStep;
+  const showPhotoStep = Boolean(resolvedImageConfig?.requires_images || images.length > 0);
+  const locationStep = showPhotoStep ? 4 : 3;
+  const previewStep = showPhotoStep ? 5 : 4;
+  const publishStep = showPhotoStep ? 6 : 5;
   const isLocationStep = step === locationStep;
-  const isContactStep = step === contactStep;
-  const isReviewStep = step === reviewStep;
+  const isPreviewStep = step === previewStep;
+  const isPublishStep = step === publishStep;
 
-  const visualSteps = [t.postAd.category, t.postAd.details, t.postAd.photosStepTitle, t.postAd.whereLocated, "Contact", t.postAd.publish];
+  const visualSteps = showPhotoStep
+    ? [t.postAd.category, t.postAd.details, t.postAd.photos, t.postAd.location, t.postAd.preview, t.postAd.publish]
+    : [t.postAd.category, t.postAd.details, t.postAd.location, t.postAd.preview, t.postAd.publish];
 
-  const currentVisualStep = step;
+  const currentVisualStep = (() => {
+    if (showPhotoStep) {
+      return step;
+    }
+    if (step <= 2) return step;
+    if (step === 3) return 3;
+    if (step === 4) return 4;
+    return 5;
+  })();
 
   const postAdCopy = useMemo(() => {
     if (locale === "fa") {
@@ -818,6 +312,11 @@ export default function PostAdForm({
         acceptRulesRequired: "برای ادامه باید قوانین ثبت اعلان را بپذیرید.",
         fieldRequiredSuffix: "الزامی است.",
         vehicleYearRequired: "سال وسیله نقلیه الزامی است.",
+        vehicleSubtypeRequired: "نوع وسیله نقلیه الزامی است.",
+        vehicleBrandRequired: "برند وسیله نقلیه الزامی است.",
+        vehicleModelRequired: "مدل وسیله نقلیه الزامی است.",
+        partTypeRequired: "نوع پرزه الزامی است.",
+        damageTypeRequired: "نوع خسارت الزامی است.",
         addLocationBeforePublish: "لطفا قبل از انتشار موقعیت را اضافه کنید.",
         detectOrChooseManual: "لطفا موقعیت دستگاه را تشخیص دهید یا روش دستی را انتخاب کنید.",
         completeRequiredFields: "لطفا فیلدهای الزامی را تکمیل کنید.",
@@ -855,6 +354,11 @@ export default function PostAdForm({
         acceptRulesRequired: "د دوام لپاره باید د اعلان قوانین ومنئ.",
         fieldRequiredSuffix: "اړین دی.",
         vehicleYearRequired: "د موټر کال اړین دی.",
+        vehicleSubtypeRequired: "د وسیلې ډول اړین دی.",
+        vehicleBrandRequired: "د وسیلې برانډ اړین دی.",
+        vehicleModelRequired: "د وسیلې ماډل اړین دی.",
+        partTypeRequired: "د پرزې ډول اړین دی.",
+        damageTypeRequired: "د زیان ډول اړین دی.",
         addLocationBeforePublish: "مهرباني وکړئ د خپرولو مخکې ځای اضافه کړئ.",
         detectOrChooseManual: "مهرباني وکړئ د وسیلې ځای ومومئ یا لاسي طریقه وټاکئ.",
         completeRequiredFields: "مهرباني وکړئ اړین فیلډونه بشپړ کړئ.",
@@ -891,6 +395,11 @@ export default function PostAdForm({
       acceptRulesRequired: "You must accept the posting rules to continue.",
       fieldRequiredSuffix: "is required.",
       vehicleYearRequired: "Vehicle year is required.",
+      vehicleSubtypeRequired: "Vehicle type is required.",
+      vehicleBrandRequired: "Vehicle brand is required.",
+      vehicleModelRequired: "Vehicle model is required.",
+      partTypeRequired: "Part type is required.",
+      damageTypeRequired: "Damage type is required.",
       addLocationBeforePublish: "Please add a location before publishing your ad.",
       detectOrChooseManual: "Please detect your device location or choose manual location.",
       completeRequiredFields: "Please complete required fields.",
@@ -986,7 +495,7 @@ export default function PostAdForm({
     setDynamicFields([]);
     setDynamicValues({});
     setPostingConfig(null);
-    setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
+    setVehicleSelection(EMPTY_VEHICLE_SELECTION);
     setDamageParts(defaultDamageParts());
 
     const root = await fetchRootNode(category.id);
@@ -1020,7 +529,7 @@ export default function PostAdForm({
 
     if (children.length === 0) {
       setFinalNode(node);
-      setVehicleSelection({ brand: null, series: null, model: null, generation: null, variant: null, specs: [] });
+      setVehicleSelection(EMPTY_VEHICLE_SELECTION);
       setDamageParts(defaultDamageParts());
       await Promise.all([fetchFields(node.id), fetchPostingConfig(node.category_id)]);
     } else {
@@ -1033,16 +542,6 @@ export default function PostAdForm({
   }
 
   async function goBackCategoryLevel() {
-    // If we're going back from a model selection, just clear the model
-    if (selectedCatalogModel && (finalNode as any)?.type === "model") {
-      setSelectedCatalogModel(null);
-      setAutoFilledSpecs([]);
-      const next = pathNodes.slice(0, -1);
-      setPathNodes(next);
-      setFinalNode(next[next.length - 1] || null);
-      return;
-    }
-
     if (pathNodes.length <= 1) {
       setSelectedRoot(null);
       setPathNodes([]);
@@ -1071,16 +570,7 @@ export default function PostAdForm({
   }
 
   function updateDynamic(key: string, value: string | boolean) {
-    if (CORE_DYNAMIC_KEYS.has(key)) {
-      return;
-    }
     const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
-    for (const field of schemaSyntheticFields) {
-      allowedKeys.add(field.field_key);
-    }
-    for (const fieldKey of lockedFieldKeys) {
-      allowedKeys.add(fieldKey);
-    }
     for (const locationKey of LOCATION_DYNAMIC_KEYS) {
       allowedKeys.add(locationKey);
     }
@@ -1092,67 +582,14 @@ export default function PostAdForm({
 
   function updateDynamicPair(primaryKey: string, secondaryKey: string, value: string | boolean) {
     const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
-    for (const field of schemaSyntheticFields) {
-      allowedKeys.add(field.field_key);
-    }
-    for (const fieldKey of lockedFieldKeys) {
-      allowedKeys.add(fieldKey);
-    }
     for (const locationKey of LOCATION_DYNAMIC_KEYS) {
       allowedKeys.add(locationKey);
     }
     setDynamicValues((prev) => ({
       ...prev,
-      ...(allowedKeys.has(primaryKey) && !CORE_DYNAMIC_KEYS.has(primaryKey) ? { [primaryKey]: value } : {}),
-      ...(allowedKeys.has(secondaryKey) && !CORE_DYNAMIC_KEYS.has(secondaryKey) ? { [secondaryKey]: value } : {}),
+      ...(allowedKeys.has(primaryKey) ? { [primaryKey]: value } : {}),
+      ...(allowedKeys.has(secondaryKey) ? { [secondaryKey]: value } : {}),
     }));
-  }
-
-  function handleCatalogModelSelected(model: CatalogModel) {
-    setSelectedCatalogModel(model);
-    const autoFill = generateAutoFill(model);
-    
-    // Create auto-filled specs
-    const newAutoFilledSpecs = autoFill.autoFilledSpecs.map((spec) => ({
-      key: spec.key,
-      label: spec.label,
-      value: Array.isArray(spec.value) ? spec.value.join(", ") : String(spec.value),
-      source: spec.source,
-      confidence: spec.confidence,
-      editable: spec.editable,
-      fieldKey: spec.key,
-    }));
-
-    setAutoFilledSpecs(newAutoFilledSpecs);
-
-    // Auto-populate dynamic values for auto-filled specs
-    const newDynamicValues = { ...dynamicValues };
-    autoFill.autoFilledSpecs.forEach((spec) => {
-      newDynamicValues[spec.key] = Array.isArray(spec.value) ? spec.value[0] : String(spec.value);
-    });
-    setDynamicValues(newDynamicValues);
-
-    // Create a synthetic CategoryNode from the selected model to make it the final category
-    const modelNode: CategoryNode = {
-      id: 0 as unknown as number,
-      parent_id: (finalNode?.id ?? null) as number | null,
-      category_id: (finalNode?.category_id ?? 0) as number,
-      name: model.name,
-      slug: model.name.toLowerCase().replace(/\s+/g, "-"),
-      level: (finalNode ? ((finalNode as any).level ?? 0) + 1 : 1),
-      is_leaf: true,
-      is_active: true,
-      display_order: 0,
-      path: `${finalNode?.path || ""}/${model.name}`,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    } as unknown as CategoryNode & { type: string; finalNode: boolean };
-
-    // Update pathNodes to include the model
-    setPathNodes([...pathNodes, modelNode]);
-    
-    // Set the model as the final node
-    setFinalNode(modelNode);
   }
 
   const normalizeLocationName = useCallback((value: string) => {
@@ -1174,23 +611,26 @@ export default function PostAdForm({
       const supabase = createSupabaseBrowserClient();
       const { data } = await supabase
         .from("provinces")
-        .select("id, name, name_en, name_fa, name_ps, aliases")
+        .select("id, name")
         .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+        .order("name", { ascending: true });
 
       if (!active) return;
 
-      const mapped = ((data ?? []) as LocationNameRow[])
-        .map((row) => {
-          const label = getLocationLabel(row, locale);
-          if (!label) return null;
-          return {
-            id: row.id,
-            label,
-            candidates: toLocationCandidates(row),
-          } satisfies ProvinceOption;
-        })
-        .filter((row): row is ProvinceOption => Boolean(row));
+      const normalizedRows = ((data ?? []) as Array<{ id: number; name: string }>)
+        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(String(row.name)) }));
+
+      const whitelist = AFGHAN_PROVINCES.map((name) => ({
+        name,
+        norm: normalizeLocationName(name),
+      }));
+
+      const mapped = whitelist.reduce<ProvinceOption[]>((acc, item) => {
+        const match = normalizedRows.find((row) => row.norm === item.norm);
+        if (!match) return acc;
+        acc.push({ id: match.id, name: item.name });
+        return acc;
+      }, []);
 
       setProvinceOptions(mapped);
     };
@@ -1199,7 +639,7 @@ export default function PostAdForm({
     return () => {
       active = false;
     };
-  }, [locale, normalizeLocationName]);
+  }, [normalizeLocationName]);
 
   useEffect(() => {
     let active = true;
@@ -1214,30 +654,16 @@ export default function PostAdForm({
       const supabase = createSupabaseBrowserClient();
       const { data } = await supabase
         .from("districts")
-        .select("id, province_id, name, name_en, name_fa, name_ps, aliases")
+        .select("id, name, province_id")
         .eq("province_id", selectedProvinceId)
         .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+        .order("name", { ascending: true });
 
       if (!active) return;
-
-      const mapped = ((data ?? []) as Array<LocationNameRow & { province_id: number }>)
-        .map((row) => {
-          const label = getLocationLabel(row, locale);
-          if (!label) return null;
-          return {
-            id: row.id,
-            province_id: row.province_id,
-            label,
-            candidates: toLocationCandidates(row),
-          } satisfies DistrictOption;
-        })
-        .filter((row): row is DistrictOption => Boolean(row));
-
-      setDistrictOptions(mapped);
+      setDistrictOptions((data ?? []) as DistrictOption[]);
       setSelectedDistrictId((prev) => {
         if (!prev) return null;
-        return mapped.some((row) => row.id === prev) ? prev : null;
+        return (data ?? []).some((row) => Number((row as { id: number }).id) === prev) ? prev : null;
       });
     };
 
@@ -1245,7 +671,7 @@ export default function PostAdForm({
     return () => {
       active = false;
     };
-  }, [locale, selectedProvinceId]);
+  }, [selectedProvinceId]);
 
   async function attemptReverseGeocode(latitude: number, longitude: number) {
     try {
@@ -1278,7 +704,7 @@ export default function PostAdForm({
 
       if (provinceHint) {
         const matchedProvince = provinceOptions.find(
-          (option) => option.candidates.some((name) => normalizeLocationName(name) === normalizeLocationName(provinceHint))
+          (option) => normalizeLocationName(option.name) === normalizeLocationName(provinceHint)
         );
         if (matchedProvince) {
           setSelectedProvinceId(matchedProvince.id);
@@ -1287,21 +713,13 @@ export default function PostAdForm({
             const supabase = createSupabaseBrowserClient();
             const { data: districtsForProvince } = await supabase
               .from("districts")
-              .select("id, province_id, name, name_en, name_fa, name_ps, aliases")
+              .select("id, name, province_id")
               .eq("province_id", matchedProvince.id)
               .eq("is_active", true)
-              .order("sort_order", { ascending: true });
+              .order("name", { ascending: true });
 
-            const districtRows = ((districtsForProvince ?? []) as Array<LocationNameRow & { province_id: number }>)
-              .map((row) => ({
-                id: row.id,
-                province_id: row.province_id,
-                label: getLocationLabel(row, locale),
-                candidates: toLocationCandidates(row),
-              }));
-
-            const matchedDistrict = districtRows.find((option) =>
-              option.candidates.some((name) => normalizeLocationName(name) === normalizeLocationName(districtHint))
+            const matchedDistrict = ((districtsForProvince ?? []) as DistrictOption[]).find(
+              (option) => normalizeLocationName(option.name) === normalizeLocationName(districtHint)
             );
 
             if (matchedDistrict) {
@@ -1468,12 +886,6 @@ export default function PostAdForm({
     }
     if (pendingDraft?.dynamicValues) {
       const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
-      for (const field of schemaSyntheticFields) {
-        allowedKeys.add(field.field_key);
-      }
-      for (const fieldKey of lockedFieldKeys) {
-        allowedKeys.add(fieldKey);
-      }
       for (const key of LOCATION_DYNAMIC_KEYS) {
         allowedKeys.add(key);
       }
@@ -1556,41 +968,13 @@ export default function PostAdForm({
     listingTypeChoice,
   ]);
 
-  const renderDynamicFields = useMemo(() => {
-    // Get relevant field keys for the current category
-    const categoryRelevantKeys = getCategoryRelevantFieldKeys(finalPath, finalNode?.slug);
-    const hasRelevantFields = categoryRelevantKeys.size > 0;
-
-    const filtered = dynamicFields.filter((field) => {
-      if (!isRenderableDynamicField(field)) return false;
-      if (lockedFieldKeys.has(field.field_key)) return false;
-      
-      // Filter by category relevance - only show relevant fields for this category
-      if (hasRelevantFields && !categoryRelevantKeys.has(field.field_key)) {
-        return false;
-      }
-      
-      if (!schemaVisibleKeys) return true;
-      return schemaVisibleKeys.has(field.field_key);
-    });
-
-    return [...filtered, ...schemaSyntheticFields].sort((a, b) => {
-      const orderA = schemaFieldOrder.get(a.field_key) ?? Number.MAX_SAFE_INTEGER;
-      const orderB = schemaFieldOrder.get(b.field_key) ?? Number.MAX_SAFE_INTEGER;
-      if (orderA !== orderB) {
-        return orderA - orderB;
-      }
-      return (a.display_order ?? a.sort_order ?? 0) - (b.display_order ?? b.sort_order ?? 0);
-    });
-  }, [dynamicFields, lockedFieldKeys, schemaFieldOrder, schemaSyntheticFields, schemaVisibleKeys, finalPath, finalNode]);
-
   const requiredDynamicKeys = useMemo(() => {
     return new Set(
-      renderDynamicFields
-        .filter((field) => field.is_required || schemaRequiredKeys.has(field.field_key))
+      dynamicFields
+        .filter((field) => field.is_required && !LOCATION_DYNAMIC_KEYS.has(field.field_key))
         .map((field) => field.field_key)
     );
-  }, [renderDynamicFields, schemaRequiredKeys]);
+  }, [dynamicFields]);
 
   function validateCategoryStep() {
     if (!selectedRoot || !finalNode) {
@@ -1613,6 +997,27 @@ export default function PostAdForm({
       if (!String(dynamicValues[key] ?? "").trim()) {
         return `${renderFieldLabel(key)} ${postAdCopy.fieldRequiredSuffix}`;
       }
+    }
+
+    const isVehicle = rootSlug === "vehicles";
+    if (isVehicle) {
+      const selectedSubtype = vehicleSelection.subtype?.name?.trim() ?? "";
+      const selectedBrand = vehicleSelection.brand?.slug && vehicleSelection.brand.slug !== "other-brand"
+        ? vehicleSelection.brand.name.trim()
+        : vehicleSelection.otherBrand.trim();
+      const selectedModel = vehicleSelection.model?.slug && vehicleSelection.model.slug !== "other-model"
+        ? vehicleSelection.model.name.trim()
+        : vehicleSelection.otherModel.trim();
+
+      if (vehicleBranch?.key === "parts" && !selectedSubtype) return postAdCopy.partTypeRequired;
+      if (vehicleBranch?.key === "damaged" && !selectedSubtype) return postAdCopy.damageTypeRequired;
+      if (vehicleBranch?.subtypeMode === "required" && !selectedSubtype) return postAdCopy.vehicleSubtypeRequired;
+      if (vehicleBranch?.brandMode === "required" && !selectedBrand) return postAdCopy.vehicleBrandRequired;
+      if (vehicleBranch?.modelMode === "required" && !selectedModel) return postAdCopy.vehicleModelRequired;
+
+      const year = String(dynamicValues.year ?? dynamicValues.vehicle_year ?? "").trim();
+      const requiresVehicleYear = vehicleBranch ? !["parts", "bicycles"].includes(vehicleBranch.key) : true;
+      if (requiresVehicleYear && !year) return postAdCopy.vehicleYearRequired;
     }
 
     return null;
@@ -1657,27 +1062,27 @@ export default function PostAdForm({
         setStepError(err);
         return;
       }
-      setStep(detailsStep);
+      setStep(2);
       return;
     }
 
-    if (step === detailsStep) {
+    if (step === 2) {
       const err = validateDetailsStep();
       if (err) {
         setStepError(err);
         return;
       }
-      setStep(photosStep);
+      setStep(showPhotoStep ? 3 : 3);
       return;
     }
 
-    if (step === photosStep) {
-      const photoErr = validatePhotoStep();
-      if (photoErr) {
-        setStepError(photoErr);
+    if (step === 3 && showPhotoStep) {
+      const err = validatePhotoStep();
+      if (err) {
+        setStepError(err);
         return;
       }
-      setStep(locationStep);
+      setStep(4);
       return;
     }
 
@@ -1687,17 +1092,12 @@ export default function PostAdForm({
         setStepError(err);
         return;
       }
-      setStep(contactStep);
+      setStep(previewStep);
       return;
     }
 
-    if (step === contactStep) {
-      setStep(reviewStep);
-      return;
-    }
-
-    if (step === reviewStep) {
-      // Proceed to publish
+    if (step === previewStep) {
+      setStep(publishStep);
     }
   }
 
@@ -1705,27 +1105,27 @@ export default function PostAdForm({
     setError(null);
     setStepError(null);
 
-    if (step === reviewStep) {
-      setStep(contactStep);
+    if (step === publishStep) {
+      setStep(previewStep);
       return;
     }
 
-    if (step === contactStep) {
+    if (step === previewStep) {
       setStep(locationStep);
       return;
     }
 
     if (step === locationStep) {
-      setStep(photosStep);
+      setStep(showPhotoStep ? 3 : 2);
       return;
     }
 
-    if (step === photosStep) {
-      setStep(detailsStep);
+    if (step === 3 && showPhotoStep) {
+      setStep(2);
       return;
     }
 
-    if (step === detailsStep) {
+    if (step === 2) {
       setStep(1);
     }
   }
@@ -1736,10 +1136,11 @@ export default function PostAdForm({
 
     const categoryErr = validateCategoryStep();
     const detailErr = validateDetailsStep();
+    const photoErr = showPhotoStep ? validatePhotoStep() : null;
     const locationErr = validateLocationStep();
 
-    if (categoryErr || detailErr || locationErr) {
-      setError(categoryErr || detailErr || locationErr || postAdCopy.completeRequiredFields);
+    if (categoryErr || detailErr || photoErr || locationErr) {
+      setError(categoryErr || detailErr || photoErr || locationErr || postAdCopy.completeRequiredFields);
       return;
     }
 
@@ -1772,8 +1173,8 @@ export default function PostAdForm({
     form.set("price", core.price);
     form.set("listing_type", listingTypeChoice);
     form.set("currency", core.currency);
-    form.set("province", selectedProvince?.label ?? "");
-    form.set("district", selectedDistrict?.label ?? "");
+    form.set("province", selectedProvince?.name ?? "");
+    form.set("district", selectedDistrict?.name ?? "");
     form.set("province_id", String(selectedProvinceId ?? ""));
     form.set("district_id", String(selectedDistrictId ?? ""));
     form.set("area_text", areaText);
@@ -1795,20 +1196,9 @@ export default function PostAdForm({
     form.set("subcategory_id", String(pathNodes[1]?.id ?? finalNode.id));
     form.set("child_category_id", String(finalNode.id));
 
-    const asAny = vehicleSelection as unknown as {
-      brand?: { id?: number | null } | null;
-      model?: { id?: number | null } | null;
-      variant?: { id?: number | null } | null;
-      specs?: Array<{ spec_key: string; spec_value: string; is_locked?: boolean }>;
-    };
-
-    if (asAny.brand?.id) form.set("brand_id", String(asAny.brand.id));
-    if (asAny.model?.id) form.set("model_id", String(asAny.model.id));
-    if (asAny.variant?.id) form.set("vehicle_variant_id", String(asAny.variant.id));
-
-    if (asAny.specs && asAny.specs.length > 0) {
+    if (vehicleSelection.specs.length > 0) {
       const lockedSpecs: Record<string, string> = {};
-      for (const spec of asAny.specs) {
+      for (const spec of vehicleSelection.specs) {
         if (spec.is_locked) {
           lockedSpecs[spec.spec_key] = spec.spec_value;
         }
@@ -1819,6 +1209,19 @@ export default function PostAdForm({
     }
 
     if (rootSlug === "vehicles") {
+      const resolvedBrand = vehicleSelection.brand?.slug && vehicleSelection.brand.slug !== "other-brand"
+        ? vehicleSelection.brand.name
+        : vehicleSelection.otherBrand.trim();
+      const resolvedModel = vehicleSelection.model?.slug && vehicleSelection.model.slug !== "other-model"
+        ? vehicleSelection.model.name
+        : vehicleSelection.otherModel.trim();
+
+      if (vehicleSelection.branchLabel) form.set("vehicle_type", vehicleSelection.branchLabel);
+      if (vehicleSelection.subtype?.name) form.set("vehicle_subtype", vehicleSelection.subtype.name);
+      if (resolvedBrand) form.set("vehicle_brand", resolvedBrand);
+      if (resolvedModel) form.set("vehicle_model", resolvedModel);
+      form.set("vehicle_is_manual", "true");
+
       form.set("damage_parts_json", JSON.stringify(damageParts));
       const nonOriginal = damageParts.filter((part) => part.condition !== "original");
       form.set("damage_all_original", nonOriginal.length === 0 ? "true" : "false");
@@ -1826,9 +1229,6 @@ export default function PostAdForm({
 
     for (const [key, value] of Object.entries(dynamicValues)) {
       if (LOCATION_DYNAMIC_KEYS.has(key)) {
-        continue;
-      }
-      if (CORE_DYNAMIC_KEYS.has(key)) {
         continue;
       }
       if (typeof value === "boolean") {
@@ -1877,80 +1277,7 @@ export default function PostAdForm({
     });
   }
 
-  const requiredDynamicFields = renderDynamicFields.filter((field) => requiredDynamicKeys.has(field.field_key));
-  const optionalDynamicFields = renderDynamicFields.filter((field) => !requiredDynamicKeys.has(field.field_key));
-
-  const optionalDetailsLabel = locale === "fa"
-    ? "جزئیات بیشتر"
-    : locale === "ps"
-      ? "نور جزئیات"
-      : "More details";
-  const hideOptionalDetailsLabel = locale === "fa"
-    ? "پنهان کردن جزئیات بیشتر"
-    : locale === "ps"
-      ? "نور جزئیات پټ کړئ"
-      : "Hide more details";
-  const optionalCoreFieldCount = 2;
-  const totalOptionalFieldCount = optionalDynamicFields.length + optionalCoreFieldCount;
-
-  const detailSectionTitle = useMemo(() => {
-    if (rootSlug === "real-estate") return t.postAd.realEstateDetails;
-    if (rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets") return t.postAd.phonesElectronicsDetails;
-    if (rootSlug === "second-hand-items") return t.postAd.secondHandDetails;
-    if (rootSlug === "vehicles") return t.postAd.vehicleDetails;
-    return t.postAd.additionalCategoryFields;
-  }, [rootSlug, t.postAd]);
-
-  const renderDynamicFieldInput = (field: PostingFieldInput) => {
-    const value = dynamicValues[field.field_key];
-
-    if (field.field_type === "boolean") {
-      return (
-        <label key={field.id} className="text-sm font-semibold">
-          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-3">
-            <input
-              type="checkbox"
-              checked={Boolean(value)}
-              onChange={(event) => updateDynamic(field.field_key, event.target.checked)}
-              className="h-4 w-4"
-            />
-            {field.field_label}
-          </span>
-        </label>
-      );
-    }
-
-    if (field.field_type === "select") {
-      const options = catalogFieldOptions[field.field_key] ?? fieldOptions(field.options_json ?? null);
-      return (
-        <label key={field.id} className="text-sm font-semibold">
-          {field.field_label}
-          <select
-            value={String(value ?? "")}
-            onChange={(event) => updateDynamic(field.field_key, event.target.value)}
-            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-          >
-            <option value="">{t.postAd.select}</option>
-            {options.map((option) => (
-              <option key={`${field.id}-${option}`} value={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-      );
-    }
-
-    return (
-      <label key={field.id} className="text-sm font-semibold">
-        {field.field_label}
-        <input
-          type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
-          value={String(value ?? "")}
-          onChange={(event) => updateDynamic(field.field_key, event.target.value)}
-          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-        />
-      </label>
-    );
-  };
+  const renderDynamicFields = dynamicFields.filter((field) => !LOCATION_DYNAMIC_KEYS.has(field.field_key));
 
   const suggestedCategoryLabel = useMemo(() => {
     if (!smartSuggestion || smartSuggestion.categorySlug === "other") {
@@ -2097,7 +1424,7 @@ export default function PostAdForm({
               <>
                 <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
                   {activeCategories.map((category) => (
-                    <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]">
+                    <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
                       <span>
                         {localizeCategoryName({
                           locale,
@@ -2109,66 +1436,45 @@ export default function PostAdForm({
                     </button>
                   ))}
                 </div>
+
+                {comingSoonCategories.length > 0 ? (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{t.postAd.comingSoon}</p>
+                    <div className="mt-2 space-y-2">
+                      {comingSoonCategories.map((category) => (
+                        <div key={category.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
+                          <p className="text-sm font-semibold text-slate-700">
+                            {localizeCategoryName({ locale, fallbackName: category.name, slug: category.slug })}
+                          </p>
+                          <Link href={`/categories/${category.slug}`} className="rounded-lg border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-700">
+                            {t.postAd.notifyMe}
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </>
             ) : (
-              <>
-                <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-                  {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">{t.postAd.loading}</div> : null}
-                  {!loadingTree && currentOptions.length === 0 && finalNode ? (
-                    <div className="px-4 py-3 text-sm font-semibold text-green-700">
-                      {t.postAd.finalCategorySelected}: {localizeCategoryName({ locale, fallbackName: finalNode.name, slug: finalNode.slug, path: finalNode.path })}
-                    </div>
-                  ) : null}
-                  {!loadingTree
-                    ? currentOptions.map((node) => (
-                        <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold hover:bg-[var(--surface-2)]">
-                          <span className="break-words">
-                            {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
-                          </span>
-                          <span aria-hidden>&gt;</span>
-                        </button>
-                      ))
-                    : null}
-                </div>
-              </>
-            )}
-
-            {/* Brand/Model Selector in Step 1 for catalog categories */}
-            {(rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets" || rootSlug === "vehicles" || (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")) && finalNode && currentOptions.length === 0 && !selectedCatalogModel ? (
-              <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                <p className="text-sm font-semibold mb-3">Select Brand and Model:</p>
-                {(() => {
-                  // For phones category, detect if finalNode is a series/brand like "Apple iPhone", "Samsung Galaxy S24"
-                  // Extract brand from the node name
-                  const BRAND_NAMES = ["apple", "samsung", "xiaomi", "huawei", "oppo", "vivo", "oneplus", "nokia", "honor", "realme", "google", "sony"];
-                  let forceBrand: string | undefined;
-                  
-                  if (rootSlug === "phones-electronics" || rootSlug === "mobile-phones-tablets") {
-                    const nodeName = finalNode?.name?.toLowerCase() || "";
-                    const matchedBrand = BRAND_NAMES.find(brand => nodeName.includes(brand));
-                    if (matchedBrand) {
-                      forceBrand = matchedBrand;
-                    }
-                  }
-                  
-                  return (
-                    <BrandModelSelector
-                      category={
-                        rootSlug === "vehicles"
-                          ? "vehicles"
-                          : (rootSlug === "second-hand-items" && finalNode?.slug === "laptops")
-                            ? "laptops"
-                            : "phones"
-                      }
-                      subcategory={finalNode?.slug}
-                      onModelSelected={handleCatalogModelSelected}
-                      selectedModelId={(selectedCatalogModel as any)?.id}
-                      forceSelectedBrand={forceBrand}
-                    />
-                  );
-                })()}
+              <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
+                {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">{t.postAd.loading}</div> : null}
+                {!loadingTree && currentOptions.length === 0 && finalNode ? (
+                  <div className="px-4 py-3 text-sm font-semibold text-green-700">
+                    {t.postAd.finalCategorySelected}: {localizeCategoryName({ locale, fallbackName: finalNode.name, slug: finalNode.slug, path: finalNode.path })}
+                  </div>
+                ) : null}
+                {!loadingTree
+                  ? currentOptions.map((node) => (
+                      <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
+                        <span className="break-words">
+                          {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
+                        </span>
+                        <span aria-hidden>&gt;</span>
+                      </button>
+                    ))
+                  : null}
               </div>
-            ) : null}
+            )}
           </section>
         ) : null}
 
@@ -2210,6 +1516,12 @@ export default function PostAdForm({
               <label className="text-sm font-semibold">{t.postAd.contactPhone}
                 <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
+              <label className="text-sm font-semibold">{t.postAd.contactName}
+                <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
+                <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
               <p className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)] sm:col-span-2">
                 {t.postAd.locationMovedNote}
               </p>
@@ -2218,7 +1530,7 @@ export default function PostAdForm({
             {rootSlug === "vehicles" ? (
               <section className="mt-4 space-y-4 rounded-xl border border-[var(--line)] p-3">
                 <h3 className="text-sm font-bold">{t.postAd.vehicleDetails}</h3>
-                <VehicleSmartSelector categoryNodeId={finalNode?.id ?? 0} onChange={setVehicleSelection} />
+                <VehicleSmartSelector categoryPath={finalNode?.path ?? null} onChange={setVehicleSelection} />
                 <div>
                   <p className="mb-2 text-sm font-semibold">{t.postAd.damagePaintReport}</p>
                   <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} />
@@ -2228,47 +1540,75 @@ export default function PostAdForm({
 
             {renderDynamicFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">{detailSectionTitle}</h3>
-                {requiredDynamicFields.length > 0 ? (
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {requiredDynamicFields.map((field) => renderDynamicFieldInput(field))}
-                  </div>
-                ) : null}
+                <h3 className="text-sm font-bold">{t.postAd.additionalCategoryFields}</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {renderDynamicFields.map((field) => {
+                    const value = dynamicValues[field.field_key];
+
+                    if (field.field_type === "boolean") {
+                      return (
+                        <label key={field.id} className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(value)}
+                              onChange={(event) => updateDynamic(field.field_key, event.target.checked)}
+                              className="h-4 w-4"
+                            />
+                            {field.field_label}
+                          </span>
+                        </label>
+                      );
+                    }
+
+                    if (field.field_type === "select") {
+                      const options = fieldOptions(field.options_json);
+                      return (
+                        <label key={field.id} className="text-sm font-semibold">
+                          {field.field_label}
+                          <select
+                            value={String(value ?? "")}
+                            onChange={(event) => updateDynamic(field.field_key, event.target.value)}
+                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                          >
+                            <option value="">{t.postAd.select}</option>
+                            {options.map((option) => (
+                              <option key={`${field.id}-${option}`} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    }
+
+                    return (
+                      <label key={field.id} className="text-sm font-semibold">
+                        {field.field_label}
+                        <input
+                          type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
+                          value={String(value ?? "")}
+                          onChange={(event) => updateDynamic(field.field_key, event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
               </section>
             ) : null}
 
-            {totalOptionalFieldCount > 0 ? (
-              <section className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-                <button
-                  type="button"
-                  onClick={() => setShowOptionalDetails((prev) => !prev)}
-                  className="inline-flex items-center rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold"
-                >
-                  {showOptionalDetails ? hideOptionalDetailsLabel : optionalDetailsLabel} ({totalOptionalFieldCount})
-                </button>
-                {showOptionalDetails ? (
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <label className="text-sm font-semibold">{t.postAd.contactName}
-                      <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2" />
-                    </label>
-                    <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
-                      <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2" />
-                    </label>
-                    {optionalDynamicFields.map((field) => renderDynamicFieldInput(field))}
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
-
-            {/* Photos moved to separate Step 3 */}
+            <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
+              <input type="checkbox" checked={core.rulesAccepted} onChange={(event) => updateCore("rulesAccepted", event.target.checked)} className="h-4 w-4" />
+              {t.postAd.confirmRules}
+            </label>
           </section>
         ) : null}
 
-        {isPhotosStep ? (
+        {step === 3 && showPhotoStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
             <h2 className="font-display text-lg font-bold">{t.postAd.photosStepTitle}</h2>
             <p className="mt-1 text-sm text-[var(--ink-2)]">
               {resolvedImageConfig?.requires_images ? t.postAd.photosRequired : t.postAd.photosOptional}
+              {resolvedImageConfig?.recommended_images ? ` ${t.postAd.recommended}: ${resolvedImageConfig.recommended_images}` : ""}
             </p>
 
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
@@ -2276,38 +1616,26 @@ export default function PostAdForm({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="mt-4 w-full rounded-xl border-2 border-dashed border-[var(--line)] bg-[var(--surface-2)] py-12 text-sm font-semibold hover:bg-blue-50 transition-colors"
+                className="mt-3 w-full rounded-2xl border-2 border-dashed border-[var(--line)] py-10 text-sm font-semibold"
               >
-                <div className="flex flex-col items-center gap-2">
-                  <span className="text-2xl">📸</span>
-                  <span>{t.postAd.addPhotos}</span>
-                </div>
+                {t.postAd.addPhotos}
               </button>
             ) : (
-              <div className="mt-4 space-y-4">
+              <div className="mt-3 space-y-3">
                 <div className="grid grid-cols-3 gap-3">
                   {images.map((img, index) => (
-                    <div key={`${img.previewUrl}-${index}`} className="relative aspect-square overflow-hidden rounded-lg border border-[var(--line)]">
+                    <div key={`${img.previewUrl}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--line)]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={img.previewUrl} alt={`Upload ${index + 1}`} className="h-full w-full object-cover" />
-                      <div className="absolute inset-x-0 top-0 flex justify-end p-2">
-                        {img.isPrimary && (
-                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">Primary</span>
-                        )}
-                      </div>
                       <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-1 text-[10px] font-semibold text-white">
-                        <button type="button" onClick={() => setPrimary(index)} className="hover:bg-black/70 px-1 py-1 rounded">
-                          {img.isPrimary ? "✓ Primary" : "Set Primary"}
-                        </button>
-                        <button type="button" onClick={() => removeImage(index)} className="hover:bg-black/70 px-1 py-1 rounded">
-                          Delete
-                        </button>
+                        <button type="button" onClick={() => setPrimary(index)}>{t.postAd.primary}</button>
+                        <button type="button" onClick={() => removeImage(index)}>{t.postAd.remove}</button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-[var(--line)] bg-blue-50 text-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-100">
-                  + {t.postAd.addMore}
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">
+                  {t.postAd.addMore}
                 </button>
               </div>
             )}
@@ -2371,7 +1699,7 @@ export default function PostAdForm({
                   >
                     <option value="">{t.postAd.select} {t.postAd.province}</option>
                     {provinceOptions.map((province) => (
-                      <option key={province.id} value={province.id}>{province.label}</option>
+                      <option key={province.id} value={province.id}>{province.name}</option>
                     ))}
                   </select>
                 </label>
@@ -2388,7 +1716,7 @@ export default function PostAdForm({
                   >
                     <option value="">{t.postAd.select} {t.postAd.district}</option>
                     {districtOptions.map((district) => (
-                      <option key={district.id} value={district.id}>{district.label}</option>
+                      <option key={district.id} value={district.id}>{district.name}</option>
                     ))}
                   </select>
                 </label>
@@ -2421,91 +1749,29 @@ export default function PostAdForm({
           </section>
         ) : null}
 
-        {isContactStep ? (
+        {isPreviewStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Contact Information</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">How should buyers contact you?</p>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPhone}
-                <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" placeholder="Your phone number" />
-              </label>
-              <label className="text-sm font-semibold">{t.postAd.contactName}
-                <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" placeholder="Your name (optional)" />
-              </label>
-              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
-                <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
+            <h2 className="font-display text-lg font-bold">{t.postAd.previewStepTitle}</h2>
+            <div className="mt-3 grid gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
+              <p><span className="font-semibold">{t.postAd.categoryLabel}:</span> {breadcrumb || "-"}</p>
+              <p><span className="font-semibold">{t.postAd.title}:</span> {core.title || "-"}</p>
+              <p><span className="font-semibold">{t.postAd.description}:</span> {core.description || "-"}</p>
+              <p><span className="font-semibold">{t.postAd.price}:</span> {core.price ? `${core.price} ${core.currency}` : "-"}</p>
+              <p>
+                <span className="font-semibold">{t.postAd.provinceDistrict}:</span>{" "}
+                {provinceOptions.find((item) => item.id === selectedProvinceId)?.name ?? "-"}
+                {" / "}
+                {districtOptions.find((item) => item.id === selectedDistrictId)?.name ?? "-"}
+              </p>
+              <p><span className="font-semibold">{t.postAd.photosLabel}:</span> {images.length}</p>
             </div>
           </section>
         ) : null}
 
-        {isReviewStep ? (
+        {isPublishStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-            <h2 className="font-display text-lg font-bold">Review Your Listing</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">Please review all details before publishing</p>
-
-            {/* Locked specs if applicable */}
-            {(() => {
-              const lockedSpecs = autoFilledSpecs.filter((spec) => !spec.editable);
-              return lockedSpecs.length > 0 ? (
-                <section className="mt-4 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">✓</span>
-                    <h3 className="text-sm font-bold text-blue-900">Item Specifications</h3>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {lockedSpecs.map((spec) => (
-                      <div key={spec.key} className="rounded-lg bg-white p-3 border border-blue-200">
-                        <p className="text-xs font-semibold text-[var(--ink-2)]">{spec.label}</p>
-                        <p className="text-sm font-bold text-blue-900 mt-1">{spec.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ) : null;
-            })()}
-
-            {/* Complete listing summary */}
-            <section className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-4 space-y-3">
-              <h3 className="text-sm font-bold">Listing Summary</h3>
-              <div className="bg-white rounded-lg p-3 space-y-2 text-sm">
-                <div className="flex justify-between border-b pb-2">
-                  <span className="text-[var(--ink-2)]">Category:</span>
-                  <span className="font-semibold">{breadcrumb || "-"}</span>
-                </div>
-                <div className="flex justify-between border-b pb-2">
-                  <span className="text-[var(--ink-2)]">Title:</span>
-                  <span className="font-semibold text-right">{core.title || "-"}</span>
-                </div>
-                <div className="flex justify-between border-b pb-2">
-                  <span className="text-[var(--ink-2)]">Price:</span>
-                  <span className="font-semibold">{core.price ? `${core.price} ${core.currency}` : "-"}</span>
-                </div>
-                <div className="flex justify-between border-b pb-2">
-                  <span className="text-[var(--ink-2)]">Photos:</span>
-                  <span className="font-semibold">{images.length} uploaded</span>
-                </div>
-                <div className="flex justify-between border-b pb-2">
-                  <span className="text-[var(--ink-2)]">Location:</span>
-                  <span className="font-semibold text-right">
-                    {provinceOptions.find((p) => p.id === selectedProvinceId)?.label ?? "-"}
-                    {districtOptions.find((d) => d.id === selectedDistrictId) && (
-                      <> / {districtOptions.find((d) => d.id === selectedDistrictId)?.label}</>
-                    )}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--ink-2)]">Contact:</span>
-                  <span className="font-semibold">{core.contact_phone || "Not provided"}</span>
-                </div>
-              </div>
-            </section>
-
-            <label className="mt-4 flex items-center gap-2 text-sm font-semibold">
-              <input type="checkbox" checked={core.rulesAccepted} onChange={(event) => updateCore("rulesAccepted", event.target.checked)} className="h-4 w-4" />
-              I agree to the terms and conditions
-            </label>
+            <h2 className="font-display text-lg font-bold">{t.postAd.publishStepTitle}</h2>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">{t.postAd.publishReady}</p>
           </section>
         ) : null}
 
@@ -2521,7 +1787,7 @@ export default function PostAdForm({
             </button>
           ) : null}
 
-          {!isReviewStep ? (
+          {!isPublishStep ? (
             <button type="button" onClick={goNext} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white">
               {t.postAd.continue}
             </button>

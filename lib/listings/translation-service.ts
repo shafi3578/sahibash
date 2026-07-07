@@ -1,5 +1,6 @@
 import type { AppLocale } from "@/lib/i18n/translations";
 import { buildSearchKeywordIndex, normalizeSearchText } from "@/lib/search/multilingual";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const LISTING_LANGUAGE_CODES = ["en", "fa-AF", "ps-AF"] as const;
 export type ListingLanguageCode = (typeof LISTING_LANGUAGE_CODES)[number];
@@ -43,9 +44,7 @@ type GlossaryEntry = {
   aliases?: string[];
 };
 
-export type TranslationServiceClient = {
-  from: (table: string) => any;
-};
+type TranslationServiceClient = Pick<SupabaseClient<any>, "from">;
 
 const AFGHAN_MARKETPLACE_GLOSSARY: GlossaryEntry[] = [
   { canonical: "phone", en: "phone", fa: "موبایل", ps: "تلیفون", aliases: ["مبایل", "mobile", "cellphone"] },

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, requireAdmin, requireUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSelectedCategoryNodeId, listingSchema, type ListingInput } from "@/lib/validators/listing";
+import { getVehicleBranchFromPath } from "@/data/catalog/vehicles";
 import {
   detectOriginalListingLanguage,
   markListingTranslationsStale,
@@ -12,7 +13,6 @@ import {
   queueListingTranslationJobs,
   sourceHash,
 } from "@/lib/listings/translation-service";
-import { ACTIVE_LISTING_SCHEMAS } from "@/lib/listingSchemas";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -126,14 +126,6 @@ const VEHICLE_META_FIELDS: Record<string, { type: "text" | "number" | "boolean";
   vehicle_is_classic: { type: "boolean", label: "Classic Vehicle" },
   vehicle_is_custom: { type: "boolean", label: "Custom Vehicle" },
 };
-
-const SCHEMA_ATTRIBUTE_KEYS = new Set(
-  ACTIVE_LISTING_SCHEMAS.flatMap((schema) => [
-    ...schema.postingFields,
-    ...schema.requiredFields,
-    ...schema.optionalFields,
-  ])
-);
 
 function toFormValueText(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -551,46 +543,9 @@ async function persistListingAttributes(
 
   const fieldMap = new Map((fields ?? []).map((field) => [field.field_key, field]));
   const attributeRows = Array.from(formData.entries())
-    .filter(([key]) => fieldMap.has(key) || (!RESERVED_FORM_KEYS.has(key) && SCHEMA_ATTRIBUTE_KEYS.has(key)))
-    .map(([key, value]) => {
-      const field = fieldMap.get(key);
-      if (field) {
-        return toAttributePayload(field, value);
-      }
-
-      const textValue = toFormValueText(value);
-      if (!textValue) {
-        return null;
-      }
-
-      const lowered = textValue.toLowerCase();
-      if (["true", "false", "1", "0", "on"].includes(lowered)) {
-        return {
-          category_field_id: null,
-          attribute_key: key,
-          attribute_value_boolean: lowered === "true" || lowered === "1" || lowered === "on",
-          unit: null,
-        };
-      }
-
-      const numericValue = Number(textValue);
-      if (Number.isFinite(numericValue) && /^-?\d+(\.\d+)?$/.test(textValue)) {
-        return {
-          category_field_id: null,
-          attribute_key: key,
-          attribute_value_number: numericValue,
-          unit: null,
-        };
-      }
-
-      return {
-        category_field_id: null,
-        attribute_key: key,
-        attribute_value_text: textValue,
-        unit: null,
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+    .filter(([key]) => !RESERVED_FORM_KEYS.has(key) && fieldMap.has(key))
+    .map(([key, value]) => toAttributePayload(fieldMap.get(key)!, value))
+    .filter((row) => Boolean(row.category_field_id));
 
   if (replaceExisting) {
     await supabase.from("listing_attributes").delete().eq("listing_id", listingId);
@@ -639,6 +594,48 @@ async function resolveCategoryContext(
     categoryId: categoryNode.category_id,
     categoryPath: categoryNode.path,
   };
+}
+
+async function validateVehicleSelectionForCategory(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  input: { category_id?: number | null; category_node_id?: number | null; subcategory_id?: number | null },
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const context = await resolveCategoryContext(supabase, input);
+  if (!context || !context.categoryPath.startsWith("vehicles")) {
+    return { ok: true };
+  }
+
+  const branch = getVehicleBranchFromPath(context.categoryPath);
+  if (!branch) {
+    return { ok: true };
+  }
+
+  const subtype = toFormValueText(formData.get("vehicle_subtype"));
+  const brand = toFormValueText(formData.get("vehicle_brand"));
+  const model = toFormValueText(formData.get("vehicle_model"));
+
+  if (branch.key === "parts" && !subtype) {
+    return { ok: false, message: "Part type is required." };
+  }
+
+  if (branch.key === "damaged" && !subtype) {
+    return { ok: false, message: "Damage type is required." };
+  }
+
+  if (branch.subtypeMode === "required" && !subtype) {
+    return { ok: false, message: "Vehicle type is required." };
+  }
+
+  if (branch.brandMode === "required" && !brand) {
+    return { ok: false, message: "Vehicle brand is required." };
+  }
+
+  if (branch.modelMode === "required" && !model) {
+    return { ok: false, message: "Vehicle model is required." };
+  }
+
+  return { ok: true };
 }
 
 async function ensureCategoryPostingAllowed(
@@ -735,11 +732,7 @@ async function buildListingPayload(
   input: ListingInput,
   formData: FormData
 ) {
-  const context = await resolveCategoryContext(supabase, {
-    category_id: input.category_id,
-    category_node_id: input.category_node_id,
-    subcategory_id: input.subcategory_id,
-  });
+  const context = await resolveCategoryContext(supabase, input);
   if (!context) {
     return null;
   }
@@ -967,23 +960,6 @@ function validatePostingLocationFormData(formData: FormData): { ok: true } | { o
   return { ok: true };
 }
 
-function formatListingValidationError(issues: Array<{ path: Array<PropertyKey>; message: string }>): string {
-  const first = issues[0];
-  if (!first) {
-    return "Invalid listing data";
-  }
-
-  const fieldPath = first.path
-    .filter((segment) => typeof segment === "string" || typeof segment === "number")
-    .join(".");
-
-  if (!fieldPath) {
-    return `Invalid listing data: ${first.message}`;
-  }
-
-  return `Invalid listing data (${fieldPath}): ${first.message}`;
-}
-
 export async function createListingFormAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -994,12 +970,13 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   }
 
   const input = parsed.data;
-  const postingGuard = await ensureCategoryPostingAllowed(supabase, {
-    category_id: input.category_id,
-    category_node_id: input.category_node_id,
-    subcategory_id: input.subcategory_id,
-  });
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
   if (!postingGuard.ok) {
+    return;
+  }
+
+  const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
+  if (!vehicleGuard.ok) {
     return;
   }
 
@@ -1068,17 +1045,18 @@ export async function createListingAction(formData: FormData): Promise<{
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
-    return { ok: false, message: formatListingValidationError(parsed.error.issues) };
+    return { ok: false, message: "Invalid listing data" };
   }
 
   const input = parsed.data;
-  const postingGuard = await ensureCategoryPostingAllowed(supabase, {
-    category_id: input.category_id,
-    category_node_id: input.category_node_id,
-    subcategory_id: input.subcategory_id,
-  });
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
+  }
+
+  const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
+  if (!vehicleGuard.ok) {
+    return { ok: false, message: vehicleGuard.message };
   }
 
   const locationGuard = validatePostingLocationFormData(formData);
@@ -1167,17 +1145,18 @@ export async function updateListingAction(
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
-    return { ok: false, message: formatListingValidationError(parsed.error.issues) };
+    return { ok: false, message: "Invalid listing data" };
   }
 
   const input = parsed.data;
-  const postingGuard = await ensureCategoryPostingAllowed(supabase, {
-    category_id: input.category_id,
-    category_node_id: input.category_node_id,
-    subcategory_id: input.subcategory_id,
-  });
+  const postingGuard = await ensureCategoryPostingAllowed(supabase, input);
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
+  }
+
+  const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
+  if (!vehicleGuard.ok) {
+    return { ok: false, message: vehicleGuard.message };
   }
 
   const createdListing = await buildListingPayload(supabase, user.id, input, formData);

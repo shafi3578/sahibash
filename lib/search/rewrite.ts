@@ -1,4 +1,5 @@
 import { expandSearchVariants, normalizeSearchText } from "@/lib/search/multilingual";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type SearchAliasDictionaryRow = {
   canonical_term: string;
@@ -14,21 +15,7 @@ export type SearchRewriteContext = {
   rewrittenTerms: string[];
 };
 
-type SearchAliasSelectResult = {
-  data: SearchAliasDictionaryRow[] | null;
-  error: unknown;
-};
-
-type SearchAliasQueryBuilder = {
-  select: (columns: string) => SearchAliasQueryBuilder;
-  eq: (column: string, value: unknown) => SearchAliasQueryBuilder;
-  in: (column: string, values: unknown[]) => SearchAliasQueryBuilder;
-  limit: (value: number) => Promise<SearchAliasSelectResult>;
-};
-
-export type SearchRewriteClient = {
-  from: (table: string) => SearchAliasQueryBuilder;
-};
+export type SearchRewriteClient = Pick<SupabaseClient<any>, "from">;
 
 function normalizeAliasList(values: string[] | null | undefined): string[] {
   return (values ?? [])

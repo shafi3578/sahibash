@@ -71,6 +71,22 @@ const SPECIFIC_INTENTS: SpecificIntent[] = [
     model: "Corolla",
   },
   {
+    terms: ["prius", "پریوس", "تویوتا پریوس", "پریوس هایبرید"],
+    categoryPath: "vehicles/cars/toyota/prius",
+    confidence: "high",
+    matchedRule: "prius",
+    brand: "Toyota",
+    model: "Prius",
+  },
+  {
+    terms: ["aqua", "اکوا", "آکوا"],
+    categoryPath: "vehicles/cars/toyota/aqua",
+    confidence: "high",
+    matchedRule: "aqua",
+    brand: "Toyota",
+    model: "Aqua",
+  },
+  {
     terms: ["fielder"],
     categoryPath: "vehicles/cars/toyota/fielder",
     confidence: "high",
@@ -115,6 +131,14 @@ const SPECIFIC_INTENTS: SpecificIntent[] = [
     categoryPath: "vehicles/cars/toyota/hilux",
     confidence: "high",
     matchedRule: "hilux",
+    brand: "Toyota",
+    model: "Hilux",
+  },
+  {
+    terms: ["hilux pickup", "pickup hilux", "هایلکس", "هیلکس", "تویوتا هایلکس"],
+    categoryPath: "vehicles/pickup-trucks",
+    confidence: "high",
+    matchedRule: "hilux-pickup",
     brand: "Toyota",
     model: "Hilux",
   },
@@ -199,6 +223,14 @@ const SPECIFIC_INTENTS: SpecificIntent[] = [
     model: "CG125 / Honda 125",
   },
   {
+    terms: ["ybr", "ybr125", "yamaha ybr", "یاماها وای بی آر", "یاماها ۱۲۵"],
+    categoryPath: "vehicles/motorcycles",
+    confidence: "high",
+    matchedRule: "yamaha-ybr",
+    brand: "Yamaha",
+    model: "YBR 125",
+  },
+  {
     terms: ["pamir"],
     categoryPath: "vehicles/motorcycles/pamir-motorcycle",
     confidence: "high",
@@ -213,6 +245,14 @@ const SPECIFIC_INTENTS: SpecificIntent[] = [
     matchedRule: "zaranj-motorcycle",
     brand: "Zaranj",
     model: "Zaranj Motorcycle",
+  },
+  {
+    terms: ["mazda titan", "titan truck", "titan"],
+    categoryPath: "vehicles/trucks-heavy-vehicles",
+    confidence: "high",
+    matchedRule: "mazda-titan",
+    brand: "Mazda",
+    model: "Titan",
   },
   {
     terms: ["rickshaw", "tuk tuk", "three wheeler", "three-wheeler", "auto rickshaw"],
@@ -362,10 +402,16 @@ const SPECIFIC_INTENTS: SpecificIntent[] = [
 
 const VEHICLE_MODEL_ALIASES: Array<{ token: string; brand: string; model: string }> = [
   { token: "corolla", brand: "Toyota", model: "Corolla" },
+  { token: "prius", brand: "Toyota", model: "Prius" },
+  { token: "پریوس", brand: "Toyota", model: "Prius" },
+  { token: "aqua", brand: "Toyota", model: "Aqua" },
+  { token: "اکوا", brand: "Toyota", model: "Aqua" },
   { token: "fielder", brand: "Toyota", model: "Fielder" },
   { token: "prado", brand: "Toyota", model: "Land Cruiser Prado" },
   { token: "land cruiser", brand: "Toyota", model: "Land Cruiser" },
   { token: "4runner", brand: "Toyota", model: "4Runner" },
+  { token: "hilux", brand: "Toyota", model: "Hilux" },
+  { token: "هایلکس", brand: "Toyota", model: "Hilux" },
   { token: "saracha", brand: "Toyota", model: "TownAce / Saracha" },
   { token: "seraacha", brand: "Toyota", model: "TownAce / Saracha" },
   { token: "camry", brand: "Toyota", model: "Camry" },
@@ -375,6 +421,9 @@ const VEHICLE_MODEL_ALIASES: Array<{ token: string; brand: string; model: string
   { token: "elantra", brand: "Hyundai", model: "Elantra" },
   { token: "sportage", brand: "Kia", model: "Sportage" },
   { token: "sunny", brand: "Nissan", model: "Sunny" },
+  { token: "cg125", brand: "Honda", model: "CG125 / Honda 125" },
+  { token: "ybr", brand: "Yamaha", model: "YBR 125" },
+  { token: "titan", brand: "Mazda", model: "Titan" },
 ];
 
 function hasWholeWord(input: string, term: string): boolean {
