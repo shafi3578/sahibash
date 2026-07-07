@@ -199,6 +199,15 @@ export default async function ListingDetailPage({
     || attributeMap.get("locked__transmission")
     || vehicleVariant?.transmission
     || "-";
+  const vehicleTypeValue = attributeMap.get("locked__vehicle_type")
+    || listing.vehicle_type
+    || "-";
+  const vehicleSubtypeValue = attributeMap.get("locked__vehicle_subtype")
+    || listing.vehicle_subtype
+    || "-";
+  const vehicleSeriesValue = attributeMap.get("locked__series")
+    || vehicleVariant?.generation?.model?.series?.name
+    || "-";
   const vehicleBodyTypeValue = attributeMap.get("locked__body_type")
     || listing.vehicle_subtype
     || vehicleVariant?.body_type
@@ -225,6 +234,29 @@ export default async function ListingDetailPage({
     || vehicleVariant?.engine_size
     || vehicleVariant?.engine_capacity
     || "-";
+  const vehicleEnginePowerValue = attributeMap.get("engine_power")
+    || attributeMap.get("locked__engine_power")
+    || vehicleVariant?.engine_power
+    || "-";
+  const vehicleEngineCapacityValue = attributeMap.get("engine_capacity")
+    || attributeMap.get("locked__engine_capacity")
+    || vehicleVariant?.engine_capacity
+    || "-";
+  const vehicleWheelDriveValue = attributeMap.get("wheel_drive")
+    || attributeMap.get("drive_type")
+    || vehicleVariant?.wheel_drive
+    || vehicleVariant?.drive_type
+    || "-";
+  const vehicleStatusValue = attributeMap.get("condition")
+    || attributeMap.get("status")
+    || "-";
+  const vehicleWarrantyValue = attributeMap.get("warranty") || "-";
+  const vehicleSellerTypeValue = attributeMap.get("seller_type") || "-";
+  const vehicleExchangeValue = attributeMap.get("exchange") || "-";
+  const vehicleManualEntryValue = attributeMap.get("manual_entry") || "-";
+  const vehicleClassicValue = attributeMap.get("classic_vehicle") || "-";
+  const vehicleCustomValue = attributeMap.get("custom_vehicle") || "-";
+  const vehicleSalvageRecordValue = attributeMap.get("salvage_record") || "-";
   const vehicleLocationValue = locationParts.length > 0 ? locationParts.join(", ") : "-";
   const vehicleMetricRows = isVehicleListing
     ? [
@@ -239,13 +271,28 @@ export default async function ListingDetailPage({
         { key: "color", label: t.listing.vehicleColor, value: attributeMap.get("color") || "-" },
         { key: "plate_number", label: t.listing.vehiclePlateNumber, value: vehiclePlateNumberValue },
         { key: "plate_type", label: t.listing.vehiclePlateType, value: vehiclePlateTypeValue },
+        { key: "vehicle_type", label: t.listing.vehicleType, value: vehicleTypeValue },
+        { key: "vehicle_subtype", label: t.listing.vehicleSubtype, value: vehicleSubtypeValue },
         { key: "engine_size", label: t.listing.vehicleEngineSize, value: vehicleEngineSizeValue },
+        { key: "engine_capacity", label: t.listing.vehicleEngineCapacity, value: vehicleEngineCapacityValue },
+        { key: "engine_power", label: t.listing.vehicleEnginePower, value: vehicleEnginePowerValue },
+        { key: "wheel_drive", label: t.listing.vehicleWheelDrive, value: vehicleWheelDriveValue },
         { key: "fuel_type", label: t.listing.vehicleFuelType, value: vehicleFuelValue },
+        { key: "status", label: t.listing.vehicleStatus, value: vehicleStatusValue },
         { key: "body_type", label: t.listing.vehicleBodyType, value: vehicleBodyTypeValue },
         { key: "make", label: t.listing.vehicleMake, value: vehicleMakeValue },
+        { key: "series", label: t.listing.vehicleSeries, value: vehicleSeriesValue },
         { key: "model", label: t.listing.vehicleModel, value: vehicleModelValue },
         { key: "transmission", label: t.listing.vehicleGear, value: vehicleTransmissionValue },
         { key: "year", label: t.listing.vehicleYear, value: vehicleYearValue },
+        { key: "warranty", label: t.listing.vehicleWarranty, value: vehicleWarrantyValue },
+        { key: "salvage_record", label: t.listing.vehicleSalvageRecord, value: vehicleSalvageRecordValue },
+        { key: "plate_status", label: t.listing.vehiclePlateStatus, value: attributeMap.get("plate_status") || "-" },
+        { key: "seller_type", label: t.listing.vehicleSellerType, value: vehicleSellerTypeValue },
+        { key: "exchange", label: t.listing.vehicleExchange, value: vehicleExchangeValue },
+        { key: "manual_entry", label: t.listing.vehicleManualEntry, value: vehicleManualEntryValue },
+        { key: "classic_vehicle", label: t.listing.vehicleClassic, value: vehicleClassicValue },
+        { key: "custom_vehicle", label: t.listing.vehicleCustom, value: vehicleCustomValue },
         { key: "location", label: t.listing.location, value: vehicleLocationValue },
       ]
     : [];
@@ -262,9 +309,11 @@ export default async function ListingDetailPage({
     "make",
     "brand",
     "model",
+    "series",
     "body_type",
     "vehicle_type",
     "vehicle_subtype",
+    "status",
     "fuel_type",
     "transmission",
     "gear",
@@ -280,6 +329,16 @@ export default async function ListingDetailPage({
     "plate_type",
     "license_plate_type",
     "negative_plate_type",
+    "wheel_drive",
+    "drive_type",
+    "engine_power",
+    "seller_type",
+    "exchange",
+    "manual_entry",
+    "classic_vehicle",
+    "custom_vehicle",
+    "salvage_record",
+    "warranty",
     "registration_date",
     "first_registration",
     "first_registered_at",
