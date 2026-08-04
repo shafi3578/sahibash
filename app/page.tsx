@@ -13,6 +13,41 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
   const { t, locale } = await getDictionary();
+  const afghanistanCopy = {
+    en: {
+      eyebrow: "Afghanistan's local marketplace",
+      coverage: "Built for every province",
+      provinces: "Provinces",
+      districts: "Districts",
+      categories: "Categories",
+      languages: "Local languages",
+      trustTitle: "Trade locally, with better information",
+      trustBody: "Explore structured categories, compare the details that matter, and connect across Afghanistan in your language.",
+      discover: "Discover the marketplace",
+    },
+    fa: {
+      eyebrow: "بازار محلی افغانستان",
+      coverage: "ساخته شده برای تمام ولایات",
+      provinces: "ولایت",
+      districts: "ولسوالی",
+      categories: "دسته‌بندی",
+      languages: "زبان محلی",
+      trustTitle: "خرید و فروش محلی با معلومات بهتر",
+      trustBody: "دسته‌بندی‌های منظم را ببینید، جزئیات مهم را مقایسه کنید و به زبان خود در سراسر افغانستان ارتباط بگیرید.",
+      discover: "بازار را کاوش کنید",
+    },
+    ps: {
+      eyebrow: "د افغانستان سیمه‌ییز بازار",
+      coverage: "د ټولو ولایتونو لپاره جوړ شوی",
+      provinces: "ولایتونه",
+      districts: "ولسوالۍ",
+      categories: "کټګورۍ",
+      languages: "سیمه‌ییزې ژبې",
+      trustTitle: "په غوره معلوماتو سره سیمه‌ییزه راکړه ورکړه",
+      trustBody: "منظمې کټګورۍ وپلټئ، مهم جزیات پرتله کړئ او په خپله ژبه د افغانستان له خلکو سره اړیکه ونیسئ.",
+      discover: "بازار وپلټئ",
+    },
+  }[locale];
   const href = (path: string) => localizePath(path, locale);
   const postAdCreatePath = "/post-ad/create?posting=sell";
   const siteSettings = await getSiteSettings();
@@ -40,19 +75,23 @@ export default async function HomePage() {
   const featuredRow = featured.length ? featured : latest.slice(0, 6);
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-4 px-0 pb-28 pt-4 sm:px-4 sm:pb-16 lg:px-6">
-      <section className="overflow-hidden border-y border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_100%)] text-white sm:rounded-2xl sm:border sm:shadow-sm">
-        <div className="grid gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.3fr_0.9fr] lg:px-8 lg:py-10">
+    <main className="mx-auto w-full max-w-7xl space-y-5 px-0 pb-28 pt-4 sm:px-4 sm:pb-16 lg:px-6">
+      <section className="relative overflow-hidden border-y border-emerald-950/10 bg-[#103b32] text-white sm:rounded-[2rem] sm:border sm:shadow-[0_24px_80px_-36px_rgba(15,59,50,0.8)]">
+        <div aria-hidden="true" className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_20%,#e6b85c_0_1px,transparent_1.5px),linear-gradient(135deg,transparent_0_48%,rgba(255,255,255,.08)_49%_51%,transparent_52%)] [background-size:24px_24px,72px_72px]" />
+        <div className="relative grid gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[1.35fr_0.65fr] lg:px-12 lg:py-14">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">{siteSettings.site_tagline}</p>
-            <h1 className="mt-3 max-w-2xl font-display text-4xl font-bold leading-tight sm:text-5xl">
+            <div className="inline-flex rounded-full border border-[#e6b85c]/40 bg-[#e6b85c]/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-[#f4d99c]">
+              {afghanistanCopy.eyebrow}
+            </div>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.28em] text-white/60">{siteSettings.site_tagline}</p>
+            <h1 className="mt-3 max-w-3xl font-display text-4xl font-bold leading-[1.08] sm:text-6xl">
               {siteSettings.home_hero_title}
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
               {siteSettings.home_hero_subtitle}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href={href(siteSettings.home_primary_cta_path ?? "/listings")} className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900">
+              <Link href={href(siteSettings.home_primary_cta_path ?? "/listings")} className="rounded-xl bg-[#e6b85c] px-5 py-3 text-sm font-bold text-[#18352f] shadow-lg shadow-black/10 transition hover:bg-[#f2cb7a]">
                 {siteSettings.home_primary_cta_label}
               </Link>
               {siteSettings.home_secondary_cta_label && siteSettings.home_secondary_cta_path ? (
@@ -62,13 +101,42 @@ export default async function HomePage() {
               ) : null}
             </div>
           </div>
-          <div className="grid gap-3 self-center sm:grid-cols-3 lg:grid-cols-1">
+          <div className="self-center rounded-[1.75rem] border border-white/15 bg-white/[0.08] p-4 backdrop-blur-sm">
+            <p className="px-2 pb-3 text-sm font-semibold text-[#f4d99c]">{afghanistanCopy.coverage}</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                ["34", afghanistanCopy.provinces],
+                ["419", afghanistanCopy.districts],
+                ["597", afghanistanCopy.categories],
+                ["3", afghanistanCopy.languages],
+              ].map(([value, label]) => (
+                <div key={label} className="rounded-2xl border border-white/10 bg-black/10 p-4">
+                  <p className="font-display text-3xl font-bold text-white">{value}</p>
+                  <p className="mt-1 text-xs text-white/65">{label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 grid gap-2">
             {(siteSettings.navigation_links ?? []).slice(0, 3).map((link) => (
-              <Link key={`${link.label}-${link.path}`} href={href(link.path)} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/15">
+              <Link key={`${link.label}-${link.path}`} href={href(link.path)} className="rounded-xl px-3 py-2 text-sm font-semibold text-white/85 transition hover:bg-white/10 hover:text-white">
                 {link.label}
               </Link>
             ))}
+            </div>
           </div>
+        </div>
+      </section>
+
+      <section className="mx-4 grid gap-4 rounded-[1.75rem] border border-amber-900/10 bg-[#fbf7ed] p-5 sm:mx-0 sm:grid-cols-[1fr_auto] sm:items-center sm:p-7">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#9a5b30]">{afghanistanCopy.discover}</p>
+          <h2 className="mt-2 font-display text-2xl font-semibold text-[#173c32]">{afghanistanCopy.trustTitle}</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5d665f]">{afghanistanCopy.trustBody}</p>
+        </div>
+        <div className="flex gap-2" aria-label="English, Dari and Pashto">
+          {["EN", "دری", "پښتو"].map((language) => (
+            <span key={language} className="rounded-full border border-[#d7c8a8] bg-white px-3 py-1.5 text-xs font-bold text-[#31584d]">{language}</span>
+          ))}
         </div>
       </section>
 
@@ -89,7 +157,7 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      <section className="border-y border-slate-200 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
+      <section className="border-y border-emerald-950/10 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
         <form action={href("/search")} className="grid grid-cols-[1fr_auto] gap-2 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-4">
           <input
             name="q"
@@ -98,7 +166,7 @@ export default async function HomePage() {
           />
           <button
             type="submit"
-            className="rounded-xl bg-[var(--ink-1)] px-4 py-2.5 text-sm font-semibold text-white"
+            className="rounded-xl bg-[#a7442f] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8d3524]"
           >
             {t.home.searchButton}
           </button>
