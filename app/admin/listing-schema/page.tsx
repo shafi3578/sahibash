@@ -17,11 +17,11 @@ export default async function ListingSchemaAdminPage({ searchParams }: { searchP
   await requireSuperAdministrator();
   const params = await searchParams;
   const supabase = await createSupabaseServerClient();
-  const { data: nodes } = await supabase.from("category_nodes").select("id, name, name_en, name_fa, name_ps, path, level, parent_id, is_active").eq("is_active", true).order("path");
-  const parentIds = new Set((nodes ?? []).map((node) => node.parent_id).filter(Boolean));
-  const leaves = (nodes ?? []).filter((node) => !parentIds.has(node.id));
-  const selectedId = Number(params.node) || Number(leaves[0]?.id || 0);
-  const selected = leaves.find((node) => Number(node.id) === selectedId);
+  const { data: nodes, error: nodesError } = await supabase.from("category_nodes").select("id, name, path, level, parent_id, is_active").order("path");
+  if (nodesError) throw new Error(`Unable to load categories: ${nodesError.message}`);
+  const allNodes = nodes ?? [];
+  const selectedId = Number(params.node) || Number(allNodes[0]?.id || 0);
+  const selected = allNodes.find((node) => Number(node.id) === selectedId);
   const history = selectedId ? await getListingSchemaHistory(selectedId) : [];
   const published = history.find((item) => item.status === "published") ?? null;
 
@@ -37,10 +37,10 @@ export default async function ListingSchemaAdminPage({ searchParams }: { searchP
   }
 
   return <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-3xl font-bold">Listing Schema Builder</h1><p className="mt-1 text-[var(--ink-2)]">Configure posting, search, cards and detail pages per leaf subcategory.</p></div><Link href="/admin/categories" className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm font-semibold">Back to categories</Link></div>
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-3xl font-bold">Listing Schema Builder</h1><p className="mt-1 text-[var(--ink-2)]">Configure posting, search, cards and detail pages for every category and subcategory.</p></div><Link href="/admin/categories" className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm font-semibold">Back to categories</Link></div>
     {params.saved ? <p className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Version published successfully.</p> : null}
-    <form className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-4"><label className="text-sm font-bold">Subcategory<select name="node" defaultValue={selectedId} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" onChange={undefined}>{leaves.map((node) => <option key={node.id} value={node.id}>{node.path} — {node.name}</option>)}</select></label><button className="mt-3 rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">Load schema</button></form>
+    <form className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-4"><label className="text-sm font-bold">Category or subcategory<select name="node" defaultValue={selectedId} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">{allNodes.map((node) => <option key={node.id} value={node.id}>{`${"— ".repeat(Math.max(0, Number(node.level) - 1))}${node.path} — ${node.name}${node.is_active ? "" : " (inactive)"}`}</option>)}</select></label><button className="mt-3 rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">Load schema</button><p className="mt-2 text-xs text-[var(--ink-2)]">{allNodes.length} categories and subcategories available.</p></form>
     <div className="mt-4 flex flex-wrap gap-3 text-sm text-[var(--ink-2)]"><span>Selected: <strong>{selected?.path ?? "None"}</strong></span><span>Published version: <strong>{published?.version ?? 0}</strong></span><span>History retained: <strong>{history.length}</strong></span></div>
-    {selected && config ? <div className="mt-6"><SchemaBuilder initial={config} categoryNodeId={selectedId} version={published?.version ?? 0} /></div> : <p className="mt-6">No configurable fields were found for this subcategory.</p>}
+    {selected && config ? <div className="mt-6"><SchemaBuilder initial={config} categoryNodeId={selectedId} version={published?.version ?? 0} /></div> : <p className="mt-6">Select a category to begin.</p>}
   </main>;
 }
