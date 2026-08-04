@@ -13,6 +13,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
   const { t, locale } = await getDictionary();
+  const siteSettings = await getSiteSettings();
   const afghanistanCopy = {
     en: {
       eyebrow: "Afghanistan's local marketplace",
@@ -24,6 +25,8 @@ export default async function HomePage() {
       trustTitle: "Trade locally, with better information",
       trustBody: "Explore structured categories, compare the details that matter, and connect across Afghanistan in your language.",
       discover: "Discover the marketplace",
+      heroTitle: siteSettings.home_hero_title,
+      heroSubtitle: siteSettings.home_hero_subtitle,
     },
     fa: {
       eyebrow: "بازار محلی افغانستان",
@@ -35,6 +38,8 @@ export default async function HomePage() {
       trustTitle: "خرید و فروش محلی با معلومات بهتر",
       trustBody: "دسته‌بندی‌های منظم را ببینید، جزئیات مهم را مقایسه کنید و به زبان خود در سراسر افغانستان ارتباط بگیرید.",
       discover: "بازار را کاوش کنید",
+      heroTitle: "آگهی‌های معتبر را در سراسر افغانستان پیدا کنید",
+      heroSubtitle: "با جستجوی چندزبانه و ابزارهای محلی، خرید کنید، بفروشید و آگهی‌ها را آسان‌تر بررسی کنید.",
     },
     ps: {
       eyebrow: "د افغانستان سیمه‌ییز بازار",
@@ -46,11 +51,12 @@ export default async function HomePage() {
       trustTitle: "په غوره معلوماتو سره سیمه‌ییزه راکړه ورکړه",
       trustBody: "منظمې کټګورۍ وپلټئ، مهم جزیات پرتله کړئ او په خپله ژبه د افغانستان له خلکو سره اړیکه ونیسئ.",
       discover: "بازار وپلټئ",
+      heroTitle: "په ټول افغانستان کې باوري اعلانونه ومومئ",
+      heroSubtitle: "د څو ژبو لټون او سیمه‌ییزو اسانتیاوو په مرسته توکي واخلئ، وپلورئ او اعلانونه وپلټئ.",
     },
   }[locale];
   const href = (path: string) => localizePath(path, locale);
   const postAdCreatePath = "/post-ad/create?posting=sell";
-  const siteSettings = await getSiteSettings();
   const homepageSections = resolveHomepageSections(await getHomepageSections());
   const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent(postAdCreatePath)}&reason=post`;
   let postAdHref = guestPostAdHref;
@@ -85,10 +91,10 @@ export default async function HomePage() {
             </div>
             <p className="mt-5 text-xs font-semibold uppercase tracking-[0.28em] text-white/60">{siteSettings.site_tagline}</p>
             <h1 className="mt-3 max-w-3xl font-display text-4xl font-bold leading-[1.08] sm:text-6xl">
-              {siteSettings.home_hero_title}
+              {afghanistanCopy.heroTitle}
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
-              {siteSettings.home_hero_subtitle}
+              {afghanistanCopy.heroSubtitle}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href={href(siteSettings.home_primary_cta_path ?? "/listings")} className="rounded-xl bg-[#e6b85c] px-5 py-3 text-sm font-bold text-[#18352f] shadow-lg shadow-black/10 transition hover:bg-[#f2cb7a]">
