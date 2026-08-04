@@ -10,7 +10,8 @@
     "test:i18n-parity": "node --import tsx --test tests/i18n-key-parity.test.ts",
     "test:search-parity": "node --import tsx --test tests/multilingual-search-parity.test.ts",
     "test:posting-access": "node --import tsx --test tests/posting-access-control.test.ts",
-    "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts"
+    "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts",
+    "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts"
   },
   "dependencies": {
     "@huggingface/inference": "^4.13.19",

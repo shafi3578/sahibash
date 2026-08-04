@@ -177,8 +177,8 @@ const PHONE_FORM_FIELDS = [
 
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
   if (!optionsJson) return [];
-  if (Array.isArray(optionsJson)) return optionsJson.map((value) => String(value));
-  return Object.values(optionsJson).map((value) => String(value));
+  if (Array.isArray(optionsJson)) return optionsJson.map((value) => ({ value: String(value), label: String(value) }));
+  return Object.entries(optionsJson).map(([value, label]) => ({ value, label: String(label) }));
 }
 
 function buildFallbackFields(categoryNodeId: number, path: string | undefined, rootSlug: string) {
@@ -262,6 +262,7 @@ export default function PostAdForm({
   const [currentOptions, setCurrentOptions] = useState<CategoryNode[]>([]);
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
   const [dynamicFields, setDynamicFields] = useState<CategoryField[]>([]);
+  const [usesPublishedSchema, setUsesPublishedSchema] = useState(false);
   const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean | string[]>>({});
   const [loadingTree, setLoadingTree] = useState(false);
 
@@ -635,13 +636,34 @@ export default function PostAdForm({
   }
 
   async function fetchFields(categoryNodeId: number, path: string | undefined, rootSlugName: string) {
+    const supabase = createSupabaseBrowserClient();
+    const { data: schemaRow } = await supabase.from("listing_schema_versions").select("config")
+      .eq("category_node_id", categoryNodeId).eq("status", "published").maybeSingle();
+    const schemaConfig = schemaRow?.config as { fields?: Array<Record<string, unknown>> } | undefined;
+    if (Array.isArray(schemaConfig?.fields)) {
+      const configured = schemaConfig.fields.filter((field) => field.active !== false && field.posting !== false).map((field, index) => {
+        const localizedLabels = field.labels as Record<string, unknown> | undefined;
+        const options = Array.isArray(field.options) ? field.options as Array<{ value?: unknown; labels?: Record<string, unknown> }> : [];
+        return {
+          id: -(categoryNodeId * 1000 + index + 1), category_node_id: categoryNodeId,
+          field_key: String(field.key ?? ""), field_label: String(localizedLabels?.[locale] ?? localizedLabels?.en ?? field.key ?? ""),
+          field_type: field.type, is_required: field.required === true,
+          options_json: Object.fromEntries(options.map((option) => [String(option.value ?? ""), String(option.labels?.[locale] ?? option.labels?.en ?? option.value ?? "")])),
+          unit: field.unit ?? null, display_order: Number(field.order ?? index), sort_order: Number(field.order ?? index),
+          is_active: true, created_at: "", updated_at: "",
+        } as CategoryField;
+      }).filter((field) => field.field_key);
+      setUsesPublishedSchema(true);
+      setDynamicFields(configured);
+      return;
+    }
+    setUsesPublishedSchema(false);
     const simpleKind = getSimpleCategoryKind(path, rootSlugName);
     if (simpleKind) {
       setDynamicFields([]);
       return;
     }
 
-    const supabase = createSupabaseBrowserClient();
     const orderedBySort = await supabase
       .from("category_fields")
       .select("*")
@@ -1531,10 +1553,10 @@ export default function PostAdForm({
   }
 
   const renderDynamicFields = dynamicFields.filter((field) => !LOCATION_DYNAMIC_KEYS.has(field.field_key));
-  const extraPhoneFields = !simpleCategoryConfig && rootSlug === "mobile-phones-tablets"
+  const extraPhoneFields = !usesPublishedSchema && !simpleCategoryConfig && rootSlug === "mobile-phones-tablets"
     ? PHONE_FORM_FIELDS.filter((field) => !dynamicFields.some((dynamicField) => dynamicField.field_key === field.key))
     : [];
-  const extraRealEstateFields = !simpleCategoryConfig && rootSlug === "real-estate"
+  const extraRealEstateFields = !usesPublishedSchema && !simpleCategoryConfig && rootSlug === "real-estate"
     ? REAL_ESTATE_FORM_FIELDS.filter((field) => !dynamicFields.some((dynamicField) => dynamicField.field_key === field.key))
     : [];
 
@@ -1634,7 +1656,7 @@ export default function PostAdForm({
     ? renderVehicleDetailsSection(vehicleBranch)
     : null;
 
-  const simpleCategoryFieldsSection = simpleCategoryConfig ? (
+  const simpleCategoryFieldsSection = simpleCategoryConfig && !usesPublishedSchema ? (
     <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
       <h3 className="text-sm font-bold">{labelFor(locale, simpleCategoryConfig.title)}</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2048,7 +2070,7 @@ export default function PostAdForm({
 
             {simpleCategoryFieldsSection}
 
-            {!simpleCategoryConfig && renderDynamicFields.length > 0 ? (
+            {(!simpleCategoryConfig || usesPublishedSchema) && renderDynamicFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
                 <h3 className="text-sm font-bold">{t.postAd.additionalCategoryFields}</h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2083,7 +2105,7 @@ export default function PostAdForm({
                           >
                             <option value="">{t.postAd.select}</option>
                             {options.map((option) => (
-                              <option key={`${field.id}-${option}`} value={option}>{option}</option>
+                              <option key={`${field.id}-${option.value}`} value={option.value}>{option.label}</option>
                             ))}
                           </select>
                         </label>

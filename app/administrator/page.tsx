@@ -28,6 +28,10 @@ export default async function AdministratorPage() {
           <p className="text-sm font-semibold">Categories & schemas</p>
           <p className="mt-1 text-sm text-[var(--ink-2)]">Create categories, manage aliases, and define schema profiles for posting flows.</p>
         </Link>
+        <Link href={href("/admin/listing-schema")} className="rounded-2xl border border-[var(--line)] bg-white p-4 shadow-sm">
+          <p className="text-sm font-semibold">Listing Schema Builder</p>
+          <p className="mt-1 text-sm text-[var(--ink-2)]">Configure multilingual posting fields, filters, cards, and detail sections for every leaf subcategory.</p>
+        </Link>
         <Link href={href("/admin/pages")} className="rounded-2xl border border-[var(--line)] bg-white p-4 shadow-sm">
           <p className="text-sm font-semibold">Static pages</p>
           <p className="mt-1 text-sm text-[var(--ink-2)]">Create and publish CMS content for policy, help, and informational routes.</p>

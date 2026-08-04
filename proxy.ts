@@ -89,11 +89,11 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+  const isUnlocalizedAdminRoute = strippedPath === "/admin" || strippedPath.startsWith("/admin/")
+    || strippedPath === "/administrator" || strippedPath.startsWith("/administrator/");
+  const response = isUnlocalizedAdminRoute
+    ? NextResponse.rewrite(new URL(`${strippedPath}${search}`, request.url), { request: { headers: requestHeaders } })
+    : NextResponse.next({ request: { headers: requestHeaders } });
 
   response.headers.set("x-sahibash-locale", activeLocale);
 

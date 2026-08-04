@@ -20,6 +20,8 @@ import { buildActiveListingSchemaView } from "@/lib/listingSchemas";
 import { getSimpleCategoryConfig, getSimpleCategoryKind, labelFor } from "@/lib/posting/simple-category-details";
 import DynamicDetailSection from "@/data/componentsDynamicDetailSection";
 import { ELECTRONICS_DYNAMIC_LEAF_KEY } from "@/lib/posting/electronics-dynamic";
+import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
+import { labelForLocale } from "@/lib/listing-schema-config";
 
 type NamedLocationRelation = { name?: string | null } | null;
 type VehicleDamagePart = { part_key: string; part_label: string; condition: string };
@@ -76,6 +78,7 @@ export default async function ListingDetailPage({
   const isOwner = currentUser?.id === listing.user_id;
   const callHref = `tel:${listing.contact_phone.replace(/[^\d+]/g, "")}`;
   const fields = await getCategoryFieldsWithOptions(listing.category_node_id);
+  const configuredSchema = await getPublishedListingSchema(listing.category_node_id);
   const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
   const dynamicLeafId = attrs.find((item) => item.attribute_key === ELECTRONICS_DYNAMIC_LEAF_KEY)?.attribute_value_text ?? null;
   const dynamicAttributes = attrs.reduce<Record<string, unknown>>((acc, item) => {
@@ -98,6 +101,18 @@ export default async function ListingDetailPage({
       return [item.attribute_key, readAttributeValue(value, locale)];
     })
   );
+  const configuredSections = (configuredSchema?.config.sections ?? []).filter((section) => section.visible).sort((a, b) => a.order - b.order).map((section) => ({
+    key: section.key,
+    title: labelForLocale(section.titles, locale),
+    rows: configuredSchema!.config.fields.filter((field) => field.active && field.detail && field.sectionKey === section.key).sort((a, b) => a.order - b.order).flatMap((field) => {
+      const direct = (listing as unknown as Record<string, unknown>)[field.key];
+      const raw = direct ?? attributeMap.get(field.key);
+      if (raw === null || raw === undefined || raw === "") return [];
+      const option = field.options.find((item) => item.value === String(raw));
+      return [{ key: field.key, label: labelForLocale(field.labels, locale), value: option ? labelForLocale(option.labels, locale) : String(raw) }];
+    }),
+  })).filter((section) => section.rows.length > 0);
+  const hasConfiguredView = configuredSections.length > 0;
   const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
   const simpleCategoryKind = getSimpleCategoryKind(listing.category_node?.path ?? undefined, listing.category?.slug ?? null);
   const simpleCategoryConfig = getSimpleCategoryConfig(simpleCategoryKind);
@@ -599,7 +614,12 @@ export default async function ListingDetailPage({
           </section>
         ) : null}
 
-        {hasSimpleLeafView ? (
+        {hasConfiguredView ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+            <h2 className="text-base font-bold">{t.listing.specifications}</h2>
+            <div className="mt-3 space-y-3">{configuredSections.map((section) => <section key={section.key} className="overflow-hidden rounded-xl border border-[var(--line)]"><header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2"><h3 className="text-sm font-semibold">{section.title}</h3></header><div className="grid divide-y divide-[var(--line)] md:grid-cols-2">{section.rows.map((row) => <div key={row.key} className="flex items-start justify-between gap-3 px-3 py-2 text-sm"><span className="text-[var(--ink-2)]">{row.label}</span><span className="text-right font-semibold">{row.value}</span></div>)}</div></section>)}</div>
+          </section>
+        ) : hasSimpleLeafView ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
             <h2 className="text-base font-bold">{labelFor(locale, simpleCategoryConfig!.title)}</h2>
 
@@ -691,7 +711,7 @@ export default async function ListingDetailPage({
           </section>
         ) : null}
 
-        {!hasSimpleLeafView && !hasLeafSchemaView && isVehicleListing ? (
+        {!hasConfiguredView && !hasSimpleLeafView && !hasLeafSchemaView && isVehicleListing ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
             <h2 className="text-base font-bold">{t.postAd.vehicleDetails}</h2>
             {cleanedVehicleMetricRows.length > 0 ? (
@@ -803,7 +823,7 @@ export default async function ListingDetailPage({
           </section>
         ) : null}
 
-        {!hasSimpleLeafView ? (
+        {!hasConfiguredView && !hasSimpleLeafView ? (
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : t.listing.specifications}</h2>
 

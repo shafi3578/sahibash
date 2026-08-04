@@ -457,7 +457,8 @@ export async function getApprovedListings(
                 *,
                 category:category_id(*),
                 category_node:category_node_id(*),
-                listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at)
+                listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
+                listing_attributes(*)
               `
               )
               .eq("status", "approved")
@@ -555,7 +556,8 @@ export async function getApprovedListings(
                   *,
                   category:category_id(*),
                   category_node:category_node_id(*),
-                  listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at)
+                  listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
+                  listing_attributes(*)
                 `
                 )
                 .eq("status", "approved")
@@ -613,7 +615,8 @@ export async function getApprovedListings(
           *,
           category:category_id(*),
           category_node:category_node_id(*),
-          listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at)
+          listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
+          listing_attributes(*)
         `
         )
         .eq("status", "approved")
@@ -1111,7 +1114,8 @@ export async function getCategoryNodeByPath(path: string): Promise<CategoryNode 
 }
 
 export async function getFilterDefinitionsForNode(
-  categoryNodeId?: number | null
+  categoryNodeId?: number | null,
+  locale: AppLocale = "en"
 ): Promise<FilterDefinition[]> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -1187,6 +1191,28 @@ export async function getFilterDefinitionsForNode(
       }
     }
 
+    const { data: schemaRow } = await supabase.from("listing_schema_versions").select("config")
+      .eq("category_node_id", categoryNodeId).eq("status", "published").maybeSingle();
+    const configuredFields = ((schemaRow?.config as { fields?: Array<Record<string, unknown>> } | null)?.fields ?? []);
+    if (configuredFields.length > 0) {
+      const configuredKeys = new Set(configuredFields.map((field) => String(field.key ?? "")));
+      for (const key of configuredKeys) byKey.delete(key);
+      configuredFields.filter((field) => field.active !== false && field.filter === true).forEach((field, index) => {
+        const fieldLabels = field.labels as Record<string, unknown> | undefined;
+        const options = Array.isArray(field.options) ? field.options as Array<{ value?: unknown }> : [];
+        const fieldType = String(field.type ?? "text");
+        const key = String(field.key ?? "");
+        if (!key) return;
+        byKey.set(key, {
+          id: -(10000 + index), category_node_id: categoryNodeId, filter_key: key,
+          filter_label: String(fieldLabels?.[locale] ?? fieldLabels?.en ?? key),
+          filter_type: fieldType === "number" ? "range" : fieldType === "boolean" ? "boolean" : fieldType === "select" ? "select" : "text",
+          options: options.map((option) => String(option.value ?? "")).filter(Boolean), source_table: null, source_column: null,
+          sort_order: Number(field.order ?? index), is_active: true,
+        });
+      });
+    }
+
     return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
   } catch {
     return [];
@@ -1202,7 +1228,9 @@ export async function getUserListings(userId: string): Promise<ListingWithRelati
       .select(
         `
         *,
-        listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order)
+        category_node:category_node_id(*),
+        listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order),
+        listing_attributes(*)
       `
       )
       .eq("user_id", userId)
@@ -1400,6 +1428,7 @@ export async function getListingWithOwnerStats(listingId: string, userId: string
       category:category_id(*),
       category_node:category_node_id(*),
       listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order),
+      listing_attributes(*),
       listing_notes(note, updated_at)
     `
     )

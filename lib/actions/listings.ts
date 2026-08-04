@@ -152,7 +152,7 @@ function toFormValueBoolean(value: FormDataEntryValue | null) {
 }
 
 function toAttributePayload(field: {
-  id: number;
+  id: number | null;
   field_key: string;
   field_type: string;
   unit: string | null;
@@ -618,7 +618,30 @@ async function persistListingAttributes(
   const simpleConfig = getSimpleCategoryConfig(simpleKind);
   const allSimpleFieldKeys = getAllSimpleCategoryFieldKeys();
 
-  const { data: fields } = simpleKind
+  const { data: publishedSchema } = await supabase.from("listing_schema_versions").select("config")
+    .eq("category_node_id", categoryNodeId).eq("status", "published").maybeSingle();
+  const configuredFields = ((publishedSchema?.config as { fields?: Array<Record<string, unknown>> } | null)?.fields ?? [])
+    .filter((field) => field.active !== false && field.posting !== false)
+    .map((field) => ({
+      id: null,
+      field_key: String(field.key ?? ""),
+      field_type: String(field.type ?? "text"),
+      unit: field.unit ? String(field.unit) : null,
+      required: field.required === true,
+      options: Array.isArray(field.options) ? (field.options as Array<{ value?: unknown }>).map((option) => String(option.value ?? "")) : [],
+    })).filter((field) => field.field_key);
+  const usesConfiguredSchema = configuredFields.length > 0;
+
+  for (const field of configuredFields) {
+    const value = toFormValueText(formData.get(field.field_key));
+    if (field.required && !value) throw new Error(`Missing required field: ${field.field_key}`);
+    if (value && field.field_type === "number" && !Number.isFinite(Number(value))) throw new Error(`Invalid number for ${field.field_key}`);
+    if (value && field.field_type === "select" && field.options.length > 0 && !field.options.includes(value)) throw new Error(`Invalid option for ${field.field_key}`);
+  }
+
+  const { data: fields } = usesConfiguredSchema
+    ? { data: configuredFields }
+    : simpleKind
     ? { data: [] as Array<{ id: number; field_key: string; field_type: string; unit: string | null }> }
     : await supabase
         .from("category_fields")
@@ -627,7 +650,7 @@ async function persistListingAttributes(
         .eq("is_active", true);
 
   const fieldMap = new Map((fields ?? []).map((field) => [field.field_key, field]));
-  const attributeRows: ListingAttributeDraft[] = simpleKind && simpleConfig
+  const attributeRows: ListingAttributeDraft[] = !usesConfiguredSchema && simpleKind && simpleConfig
     ? simpleConfig.fields.flatMap<ListingAttributeDraft>((field) => {
         const values = formData.getAll(field.key).map((value) => toFormValueText(value)).filter(Boolean);
         const customKey = `${field.key}Custom`;
@@ -730,7 +753,7 @@ async function persistListingAttributes(
         .filter((row) => Boolean(row));
 
   if (replaceExisting) {
-    if (simpleKind) {
+    if (simpleKind && !usesConfiguredSchema) {
       const keys = Array.from(new Set([...allSimpleFieldKeys, ...simpleFieldKeys]));
       if (keys.length > 0) {
         await supabase.from("listing_attributes").delete().eq("listing_id", listingId).in("attribute_key", keys);

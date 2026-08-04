@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/auth";
+import { requireSuperAdministrator } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeCategorySchemaProfileFromFormData } from "@/lib/data/category-schema";
 
 export async function saveCategorySchemaProfileAction(formData: FormData) {
-  await requirePermission("categories.update");
+  await requireSuperAdministrator();
   const supabase = await createSupabaseServerClient();
   const draft = normalizeCategorySchemaProfileFromFormData(formData);
 
@@ -29,7 +29,7 @@ export async function saveCategorySchemaProfileAction(formData: FormData) {
 }
 
 export async function deleteCategorySchemaProfileAction(formData: FormData) {
-  await requirePermission("categories.update");
+  await requireSuperAdministrator();
   const supabase = await createSupabaseServerClient();
 
   const categorySlug = String(formData.get("category_slug") || "").trim();

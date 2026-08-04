@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { ListingWithImages } from "@/types/database";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
+import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
+import { labelForLocale } from "@/lib/listing-schema-config";
 
 export async function ListingCard({
   listing,
@@ -22,6 +24,16 @@ export async function ListingCard({
   const isDormitory = listing.category_node?.path === "real-estate/dormitory" || listing.category_node?.slug === "dormitory";
   const isStudentSuitable = Boolean(listing.suitable_for_students);
   const fallbackProvince = listing.province ?? listing.district ?? "-";
+  const schemaVersion = listing.category_node?.id ? await getPublishedListingSchema(Number(listing.category_node.id)) : null;
+  const attributes = new Map(((listing as ListingWithImages & { listing_attributes?: Array<Record<string, unknown>> }).listing_attributes ?? []).map((attribute) => [String(attribute.attribute_key), attribute]));
+  const cardFields = (schemaVersion?.config.fields ?? []).filter((field) => field.active && field.card).sort((a, b) => a.order - b.order).slice(0, 4).flatMap((field) => {
+    const attribute = attributes.get(field.key);
+    const direct = (listing as unknown as Record<string, unknown>)[field.key];
+    const raw = direct ?? attribute?.attribute_value_text ?? attribute?.attribute_value_number ?? attribute?.attribute_value_boolean;
+    if (raw === null || raw === undefined || raw === "") return [];
+    const option = field.options.find((item) => item.value === String(raw));
+    return [{ key: field.key, label: labelForLocale(field.labels, locale), value: option ? labelForLocale(option.labels, locale) : typeof raw === "boolean" ? (raw ? "Yes" : "No") : String(raw) }];
+  });
   return (
     <article className="overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <Link href={listingHref}>
@@ -50,6 +62,7 @@ export async function ListingCard({
         <Link href={listingHref}><h3 className="line-clamp-2 text-base font-semibold text-[var(--ink-1)]">{displayTitle}</h3></Link>
         <p className="text-lg font-bold text-[var(--accent)]">{new Intl.NumberFormat("en-US").format(listing.price)} {listing.currency}</p>
         <p className="line-clamp-1 text-sm text-[var(--ink-2)]">{fallbackProvince}{listing.district ? ` - ${listing.district}` : ""}</p>
+        {cardFields.length > 0 ? <div className="flex flex-wrap gap-1.5">{cardFields.map((field) => <span key={field.key} className="rounded-full bg-[var(--surface-2)] px-2 py-1 text-[11px] text-[var(--ink-2)]"><strong>{field.label}:</strong> {field.value}</span>)}</div> : null}
         {showStatus ? <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">{listing.status}</p> : null}
       </div>
     </article>
