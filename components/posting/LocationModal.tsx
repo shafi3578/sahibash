@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/client";
 import type { LocationData } from "@/lib/posting/types";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { AFGHAN_PROVINCES, getProvinceLabel } from "@/lib/constants/marketplace";
 
 type LocationModalProps = {
   isOpen: boolean;
@@ -31,16 +33,30 @@ export function LocationModal({
   const [districts, setDistricts] = useState<Array<{ id: number; name: string }>>([]);
 
   useEffect(() => {
-    // Load provinces
     const loadProvinces = async () => {
       try {
-        // TODO: fetch provinces from API
-        // For now, use placeholder
-        setProvinces([
-          { id: 1, name: "Kabul" },
-          { id: 2, name: "Herat" },
-          { id: 3, name: "Kandahar" },
-        ]);
+        const supabase = createSupabaseBrowserClient();
+        const { data } = await supabase
+          .from("provinces")
+          .select("id, name")
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+
+        const dbRows = (data ?? []) as Array<{ id: number; name: string }>;
+        const normalizedRows = dbRows.map((row) => ({
+          ...row,
+          normalized: row.name.trim().toLowerCase(),
+        }));
+
+        const ordered = AFGHAN_PROVINCES
+          .map((province) => {
+            const provinceName = String(province);
+            const matched = normalizedRows.find((row) => row.normalized === provinceName.trim().toLowerCase());
+            return matched ? { id: matched.id, name: provinceName } : null;
+          })
+          .filter((value): value is { id: number; name: string } => value !== null);
+
+        setProvinces(ordered);
       } catch (error) {
         console.error("Failed to load provinces:", error);
       }
@@ -49,21 +65,29 @@ export function LocationModal({
   }, []);
 
   useEffect(() => {
-    // Load districts when province changes
-    if (provinceId) {
-      const loadDistricts = async () => {
-        try {
-          // TODO: fetch districts from API based on provinceId
-          setDistricts([
-            { id: 1, name: "District 1" },
-            { id: 2, name: "District 2" },
-          ]);
-        } catch (error) {
-          console.error("Failed to load districts:", error);
-        }
-      };
-      loadDistricts();
-    }
+    const loadDistricts = async () => {
+      if (!provinceId) {
+        setDistricts([]);
+        return;
+      }
+
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { data } = await supabase
+          .from("districts")
+          .select("id, name")
+          .eq("province_id", Number(provinceId))
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+
+        setDistricts((data ?? []) as Array<{ id: number; name: string }>);
+      } catch (error) {
+        console.error("Failed to load districts:", error);
+        setDistricts([]);
+      }
+    };
+
+    void loadDistricts();
   }, [provinceId]);
 
   const handleUseDeviceLocation = async () => {
@@ -169,7 +193,7 @@ export function LocationModal({
                 <option value="">{t("location.selectProvince") || "Select..."}</option>
                 {provinces.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name}
+                    {getProvinceLabel(p.name, locale as any)}
                   </option>
                 ))}
               </select>

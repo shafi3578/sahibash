@@ -258,6 +258,74 @@ export const MODELS: CatalogModel[] = [
     active: true,
   },
 
+  // iPhone 11 Series (2019)
+  {
+    id: "iphone-11-pro-max",
+    brandId: "apple",
+    name: "iPhone 11 Pro Max",
+    releaseYear: 2019,
+    type: "smartphone",
+    stableSpecs: [
+      { key: "brand", label: { en: "Brand", fa: "برند", ps: "برانډ" }, value: "Apple", confidence: 1.0, editable: false },
+      { key: "exactModel", label: { en: "Model", fa: "نموذج", ps: "ماډل" }, value: "iPhone 11 Pro Max", confidence: 1.0, editable: false },
+      { key: "os", label: { en: "Operating System", fa: "نظام التشغيل", ps: "آپریٹنګ سسٹم" }, value: "iOS", confidence: 1.0, editable: false },
+      { key: "screenSize", label: { en: "Screen Size", fa: "حجم الشاشة", ps: "د سکرین سائز" }, value: "6.5 inches", confidence: 1.0, editable: false },
+    ],
+    requiredSellerFields: ["storage", "condition", "price", "location"],
+    optionalSellerFields: ["color", "batteryHealthPercentage", "screenCondition", "bodyCondition", "repairHistory", "warranty", "purchasePlace", "boxIncluded", "chargerIncluded"],
+    buyerDetailFields: ["brand", "exactModel", "storage", "color", "condition"],
+    searchAliases: ["iPhone 11 Pro Max", "iPhone 11 Pro"],
+    variantOptions: {
+      storage: ["64GB", "256GB", "512GB"],
+      color: IPHONE_COLORS,
+    },
+    active: true,
+  },
+  {
+    id: "iphone-11",
+    brandId: "apple",
+    name: "iPhone 11",
+    releaseYear: 2019,
+    type: "smartphone",
+    stableSpecs: [
+      { key: "brand", label: { en: "Brand", fa: "برند", ps: "برانډ" }, value: "Apple", confidence: 1.0, editable: false },
+      { key: "exactModel", label: { en: "Model", fa: "نموذج", ps: "ماډل" }, value: "iPhone 11", confidence: 1.0, editable: false },
+      { key: "os", label: { en: "Operating System", fa: "نظام التشغيل", ps: "آپریٹنګ سسٹم" }, value: "iOS", confidence: 1.0, editable: false },
+      { key: "screenSize", label: { en: "Screen Size", fa: "حجم الشاشة", ps: "د سکرین سائز" }, value: "6.1 inches", confidence: 1.0, editable: false },
+    ],
+    requiredSellerFields: ["storage", "condition", "price", "location"],
+    optionalSellerFields: ["color", "batteryHealthPercentage", "screenCondition", "bodyCondition", "repairHistory", "warranty", "purchasePlace", "boxIncluded", "chargerIncluded"],
+    buyerDetailFields: ["brand", "exactModel", "storage", "color", "condition"],
+    searchAliases: ["iPhone 11"],
+    variantOptions: {
+      storage: ["64GB", "128GB", "256GB"],
+      color: IPHONE_COLORS,
+    },
+    active: true,
+  },
+  {
+    id: "iphone-se-3",
+    brandId: "apple",
+    name: "iPhone SE (3rd generation)",
+    releaseYear: 2022,
+    type: "smartphone",
+    stableSpecs: [
+      { key: "brand", label: { en: "Brand", fa: "برند", ps: "برانډ" }, value: "Apple", confidence: 1.0, editable: false },
+      { key: "exactModel", label: { en: "Model", fa: "نموذج", ps: "ماډل" }, value: "iPhone SE (3rd generation)", confidence: 1.0, editable: false },
+      { key: "os", label: { en: "Operating System", fa: "نظام التشغيل", ps: "آپریٹنګ سسٹم" }, value: "iOS", confidence: 1.0, editable: false },
+      { key: "screenSize", label: { en: "Screen Size", fa: "حجم الشاشة", ps: "د سکرین سائز" }, value: "4.7 inches", confidence: 1.0, editable: false },
+    ],
+    requiredSellerFields: ["storage", "condition", "price", "location"],
+    optionalSellerFields: ["color", "batteryHealthPercentage", "screenCondition", "bodyCondition", "repairHistory", "warranty", "purchasePlace", "boxIncluded", "chargerIncluded"],
+    buyerDetailFields: ["brand", "exactModel", "storage", "color", "condition"],
+    searchAliases: ["iPhone SE 3", "iPhone SE 2022", "SE 3rd gen"],
+    variantOptions: {
+      storage: ["64GB", "128GB", "256GB"],
+      color: ["Midnight", "Starlight", "Red"],
+    },
+    active: true,
+  },
+
   // iPhone 14 Series (2022)
   {
     id: "iphone-14-pro-max",

@@ -42,7 +42,11 @@ export function localizePath(pathWithOptionalQuery: string, locale: AppLocale): 
     : `/${pathWithOptionalQuery}`;
 
   const [pathname, query] = normalized.split("?");
-  const { strippedPath } = splitLocaleFromPath(pathname || "/");
+  const { locale: existingLocale, strippedPath } = splitLocaleFromPath(pathname || "/");
+
+  if (existingLocale) {
+    return query ? `${pathname}?${query}` : pathname;
+  }
 
   const localizedPathname = strippedPath === "/"
     ? `/${locale}`

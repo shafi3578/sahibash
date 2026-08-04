@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentUser, requireAdmin } from "@/lib/auth";
+import { getCurrentUser, requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function asText(value: FormDataEntryValue | null) {
@@ -28,7 +28,7 @@ function asBoolean(value: FormDataEntryValue | null) {
 }
 
 export async function adminCreateSearchAliasAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("search.manage");
   const supabase = await createSupabaseServerClient();
 
   const canonical = asText(formData.get("canonical_term"));
@@ -48,7 +48,7 @@ export async function adminCreateSearchAliasAction(formData: FormData) {
 }
 
 export async function adminUpdateSearchAliasAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("search.manage");
   const supabase = await createSupabaseServerClient();
 
   const id = asText(formData.get("id"));
@@ -76,7 +76,7 @@ export async function adminUpdateSearchAliasAction(formData: FormData) {
 }
 
 export async function adminApproveSearchAliasAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("search.manage");
   const user = await getCurrentUser();
   const supabase = await createSupabaseServerClient();
 
@@ -97,7 +97,7 @@ export async function adminApproveSearchAliasAction(formData: FormData) {
 }
 
 export async function adminToggleSearchAliasAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("search.manage");
   const supabase = await createSupabaseServerClient();
 
   const id = asText(formData.get("id"));
@@ -115,7 +115,7 @@ export async function adminToggleSearchAliasAction(formData: FormData) {
 }
 
 export async function adminDeleteSearchAliasAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("search.manage");
   const supabase = await createSupabaseServerClient();
 
   const id = asText(formData.get("id"));

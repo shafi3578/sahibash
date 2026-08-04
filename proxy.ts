@@ -15,30 +15,42 @@ function isExcludedPath(pathname: string) {
   return /\.[a-z0-9]+$/i.test(pathname);
 }
 
-export async function proxy(request: NextRequest) {
-  const { pathname, search } = request.nextUrl;
+export function resolveProxyPath(requestUrl: string, nextPathname: string) {
+  const originalPathname = new URL(requestUrl).pathname;
+  const { locale: pathLocale, strippedPath } = splitLocaleFromPath(originalPathname);
+  const effectivePathname = pathLocale ? strippedPath : nextPathname;
 
-  if (isExcludedPath(pathname)) {
+  return {
+    originalPathname,
+    effectivePathname,
+    pathLocale,
+    strippedPath,
+  };
+}
+
+export async function proxy(request: NextRequest) {
+  const { search } = request.nextUrl;
+  const { originalPathname, effectivePathname, pathLocale, strippedPath } = resolveProxyPath(request.url, request.nextUrl.pathname);
+
+  if (isExcludedPath(effectivePathname)) {
     return updateSession(request);
   }
-
-  const { locale: pathLocale, strippedPath } = splitLocaleFromPath(pathname);
 
   if (!pathLocale) {
     const cookieLocale = normalizeLocaleInput(request.cookies.get(LOCALE_COOKIE)?.value);
     const preferredLocale = cookieLocale ?? "fa";
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = localizePath(pathname, preferredLocale);
+    redirectUrl.pathname = localizePath(originalPathname, preferredLocale);
     redirectUrl.search = search;
     return NextResponse.redirect(redirectUrl);
   }
 
-  const rewriteUrl = request.nextUrl.clone();
-  rewriteUrl.pathname = strippedPath;
-  rewriteUrl.search = search;
+  const cookieLocale = normalizeLocaleInput(request.cookies.get(LOCALE_COOKIE)?.value);
+  const activeLocale = pathLocale ?? cookieLocale ?? "fa";
 
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-sahibash-locale", pathLocale);
+  requestHeaders.set("x-sahibash-locale", activeLocale);
+  requestHeaders.set("x-sahibash-path", `${originalPathname}${search}`);
 
   if (isProtectedPostingPath(strippedPath) && hasSupabaseEnv()) {
     const authResponse = NextResponse.next({
@@ -68,8 +80,8 @@ export async function proxy(request: NextRequest) {
 
     if (!user) {
       const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = localizePath("/login", pathLocale);
-      loginUrl.searchParams.set("redirect", `${strippedPath}${search || ""}`);
+      loginUrl.pathname = localizePath("/login", activeLocale);
+      loginUrl.searchParams.set("redirect", localizePath(`${strippedPath}${search || ""}`, activeLocale));
       if (isPostAdPath(strippedPath)) {
         loginUrl.searchParams.set("reason", "post");
       }
@@ -77,11 +89,13 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.rewrite(rewriteUrl, {
+  const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
+
+  response.headers.set("x-sahibash-locale", activeLocale);
 
   response.cookies.set({
     name: LOCALE_COOKIE,

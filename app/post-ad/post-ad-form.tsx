@@ -13,12 +13,21 @@ import {
   type VehicleSelection,
 } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
-import { getVehicleBranchFromPath } from "@/data/catalog/vehicles";
+import { getVehicleBranchFromPath, type VehicleBranchDefinition, type VehicleBranchKey } from "@/data/catalog/vehicles";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
+import { getSchemaForCategoryPath } from "@/lib/posting/schemas";
+import {
+  getSimpleCategoryConfig,
+  getSimpleCategoryFieldKeys,
+  getSimpleCategoryKind,
+  getSimpleCategoryModelOptions,
+  labelFor,
+  optionLabel,
+} from "@/lib/posting/simple-category-details";
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -93,18 +102,113 @@ const LOCATION_DYNAMIC_KEYS = new Set([
   "location_accuracy",
 ]);
 
+const PHONE_DYNAMIC_KEYS = new Set([
+  "release_year",
+  "battery_health",
+  "pta_status",
+  "sim_type",
+  "charging_port",
+  "dual_sim",
+  "face_unlock",
+  "originality_status",
+  "purchase_source",
+  "screen_condition",
+  "body_condition",
+  "camera",
+  "refresh_rate",
+]);
+
+const REAL_ESTATE_DYNAMIC_KEYS = new Set([
+  "year_built",
+  "construction_status",
+  "ownership_type",
+  "rent_period",
+  "road_width",
+  "facing",
+  "solar_power",
+  "kitchen",
+  "balcony",
+]);
+
+const REAL_ESTATE_FIELD_OPTIONS = {
+  construction_status: ["New", "Used", "Under Construction"],
+  ownership_type: ["Owner", "Agent", "Tenant", "Heirs"],
+  rent_period: ["Monthly", "Quarterly", "Yearly"],
+  facing: ["North", "South", "East", "West", "Corner"],
+} as const;
+
+const REAL_ESTATE_FORM_FIELDS = [
+  { key: "year_built", label: "Year built", type: "number" as const },
+  { key: "construction_status", label: "Construction status", type: "select" as const },
+  { key: "ownership_type", label: "Ownership type", type: "select" as const },
+  { key: "rent_period", label: "Rent period", type: "select" as const },
+  { key: "road_width", label: "Road width", type: "text" as const },
+  { key: "facing", label: "Facing", type: "select" as const },
+  { key: "solar_power", label: "Solar / backup power", type: "boolean" as const },
+  { key: "kitchen", label: "Kitchen", type: "boolean" as const },
+  { key: "balcony", label: "Balcony", type: "boolean" as const },
+] as const;
+
+const PHONE_FIELD_OPTIONS = {
+  pta_status: ["Verified", "Unverified", "Unknown"],
+  sim_type: ["Single SIM", "Dual SIM", "eSIM", "Dual SIM + eSIM"],
+  charging_port: ["USB-C", "Lightning", "Micro-USB"],
+  originality_status: ["Original", "Copy", "Unknown"],
+  screen_condition: ["Excellent", "Good", "Fair", "Cracked"],
+  body_condition: ["Excellent", "Good", "Fair", "Damaged"],
+  refresh_rate: ["60Hz", "90Hz", "120Hz", "144Hz"],
+} as const;
+
+const PHONE_FORM_FIELDS = [
+  { key: "release_year", label: "Release year", type: "number" as const },
+  { key: "battery_health", label: "Battery health %", type: "number" as const },
+  { key: "pta_status", label: "PTA / registration", type: "select" as const },
+  { key: "sim_type", label: "SIM type", type: "select" as const },
+  { key: "charging_port", label: "Charging port", type: "select" as const },
+  { key: "dual_sim", label: "Dual SIM", type: "boolean" as const },
+  { key: "face_unlock", label: "Face unlock", type: "boolean" as const },
+  { key: "originality_status", label: "Originality / IMEI", type: "select" as const },
+  { key: "purchase_source", label: "Purchase source", type: "text" as const },
+  { key: "screen_condition", label: "Screen condition", type: "select" as const },
+  { key: "body_condition", label: "Body condition", type: "select" as const },
+  { key: "camera", label: "Camera", type: "text" as const },
+  { key: "refresh_rate", label: "Refresh rate", type: "select" as const },
+] as const;
+
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
   if (!optionsJson) return [];
   if (Array.isArray(optionsJson)) return optionsJson.map((value) => String(value));
   return Object.values(optionsJson).map((value) => String(value));
 }
 
+function buildFallbackFields(categoryNodeId: number, path: string | undefined, rootSlug: string) {
+  return getSchemaForCategoryPath(path ?? "", rootSlug).map((schemaField, index) => ({
+    id: -(categoryNodeId * 100 + index + 1),
+    category_node_id: categoryNodeId,
+    field_key: schemaField.id,
+    field_label: renderFieldLabel(schemaField.id),
+    field_type: schemaField.type === "checkbox" ? "boolean" : schemaField.type,
+    is_required: schemaField.required,
+    options_json: schemaField.options?.map((option) => String(option.value)) ?? null,
+    unit: schemaField.unit ?? null,
+    display_order: index + 1,
+    is_active: true,
+    created_at: "",
+    updated_at: "",
+  }));
+}
+
 function renderFieldLabel(fieldKey: string) {
   return fieldKey.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function toPostingType(mode: PostMode, listingType: "for_sale" | "wanted") {
+function isOtherChoice(value: unknown) {
+  return String(value ?? "").trim().toLowerCase() === "other";
+}
+
+function toPostingType(mode: PostMode, listingType: "for_sale" | "for_rent" | "wanted") {
   if (mode === "quick") return "quick" as const;
+  if (listingType === "for_rent") return "rent" as const;
   return listingType === "wanted" ? ("wanted" as const) : ("sell" as const);
 }
 
@@ -136,7 +240,7 @@ export default function PostAdForm({
   }: Props & {
     t: Dictionary;
     locale: AppLocale;
-    initialListingType?: "for_sale" | "wanted";
+    initialListingType?: "for_sale" | "for_rent" | "wanted";
     initialMode?: PostMode;
   }) {
   const router = useRouter();
@@ -145,7 +249,7 @@ export default function PostAdForm({
   const [draftStorageKey, setDraftStorageKey] = useState(DRAFT_KEY);
   const [pendingDraft, setPendingDraft] = useState<{
     core?: CoreForm;
-    dynamicValues?: Record<string, string | boolean>;
+    dynamicValues?: Record<string, string | boolean | string[]>;
   } | null>(null);
 
   const [step, setStep] = useState<Step>(1);
@@ -158,11 +262,11 @@ export default function PostAdForm({
   const [currentOptions, setCurrentOptions] = useState<CategoryNode[]>([]);
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
   const [dynamicFields, setDynamicFields] = useState<CategoryField[]>([]);
-  const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean>>({});
+  const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean | string[]>>({});
   const [loadingTree, setLoadingTree] = useState(false);
 
   const [postingConfig, setPostingConfig] = useState<PostingConfig | null>(null);
-  const [listingTypeChoice, setListingTypeChoice] = useState<"for_sale" | "wanted">(initialListingType);
+  const [listingTypeChoice, setListingTypeChoice] = useState<"for_sale" | "for_rent" | "wanted">(initialListingType);
   const [postMode] = useState<PostMode>(initialMode);
   const [smartRawInput] = useState("");
   const [smartSuggestion, setSmartSuggestion] = useState<SmartPostingParseResult | null>(null);
@@ -252,7 +356,101 @@ export default function PostAdForm({
   );
   const rootSlug = selectedRoot?.slug ?? "";
   const finalPath = finalNode?.path;
+  const simpleCategoryKind = useMemo(() => getSimpleCategoryKind(finalPath, rootSlug), [finalPath, rootSlug]);
+  const simpleCategoryConfig = useMemo(() => getSimpleCategoryConfig(simpleCategoryKind), [simpleCategoryKind]);
   const vehicleBranch = useMemo(() => getVehicleBranchFromPath(finalPath), [finalPath]);
+
+  type VehicleBranchDetailField = {
+    key: string;
+    label: string;
+    type: "text" | "number" | "select" | "boolean";
+    options?: string[];
+    required?: boolean;
+  };
+
+  const VEHICLE_BRANCH_DETAIL_FIELDS: Record<VehicleBranchKey, VehicleBranchDetailField[]> = {
+    cars: [
+      { key: "vehicle_year", label: "Year", type: "number", required: true },
+      { key: "vehicle_mileage", label: "Mileage", type: "text" },
+      { key: "vehicle_transmission", label: "Transmission", type: "select", options: ["Automatic", "Manual", "CVT", "Other"] },
+    ],
+    motorcycles: [
+      { key: "vehicle_year", label: "Year", type: "number", required: true },
+      { key: "engine_capacity", label: "Engine capacity", type: "text" },
+      { key: "vehicle_color", label: "Color", type: "text" },
+    ],
+    rickshaw: [
+      { key: "vehicle_year", label: "Year", type: "number", required: true },
+      { key: "vehicle_mileage", label: "Mileage", type: "text" },
+      { key: "vehicle_load_capacity", label: "Load capacity", type: "text" },
+    ],
+    bicycles: [
+      { key: "bicycle_type", label: "Bicycle type", type: "text", required: true },
+      { key: "frame_size", label: "Frame size", type: "text" },
+      { key: "bicycle_condition", label: "Condition", type: "select", options: ["New", "Used", "Excellent", "Good", "Fair", "Damaged"] },
+    ],
+    pickup: [
+      { key: "vehicle_year", label: "Year", type: "number", required: true },
+      { key: "vehicle_mileage", label: "Mileage", type: "text" },
+      { key: "load_capacity", label: "Load capacity", type: "text" },
+    ],
+    vansMinibuses: [
+      { key: "vehicle_year", label: "Year", type: "number", required: true },
+      { key: "vehicle_mileage", label: "Mileage", type: "text" },
+      { key: "seating_capacity", label: "Seating capacity", type: "text" },
+    ],
+    heavyTrucks: [
+      { key: "vehicle_year", label: "Year", type: "number", required: true },
+      { key: "vehicle_mileage", label: "Mileage", type: "text" },
+      { key: "truck_body_type", label: "Body type", type: "text" },
+    ],
+    agricultural: [
+      { key: "vehicle_year", label: "Year", type: "number", required: true },
+      { key: "agricultural_type", label: "Agricultural vehicle type", type: "text" },
+      { key: "vehicle_condition", label: "Condition", type: "select", options: ["New", "Used", "Excellent", "Good", "Fair"] },
+    ],
+    parts: [
+      { key: "part_type", label: "Part type", type: "text", required: true },
+      { key: "compatible_with", label: "Compatible with", type: "text" },
+      { key: "part_condition", label: "Condition", type: "select", options: ["New", "Used", "Refurbished", "Damaged"] },
+    ],
+    damaged: [
+      { key: "damage_type", label: "Damage type", type: "text", required: true },
+      { key: "damage_description", label: "Damage description", type: "text" },
+      { key: "vehicle_year", label: "Year", type: "number" },
+    ],
+    otherVehicles: [
+      { key: "vehicle_year", label: "Year", type: "number" },
+      { key: "vehicle_mileage", label: "Mileage", type: "text" },
+      { key: "vehicle_description", label: "Description", type: "text" },
+    ],
+  };
+
+  const allowedVehicleDynamicKeys = useMemo(() => {
+    const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
+    for (const locationKey of LOCATION_DYNAMIC_KEYS) {
+      allowedKeys.add(locationKey);
+    }
+    if (rootSlug === "mobile-phones-tablets") {
+      for (const phoneKey of PHONE_DYNAMIC_KEYS) {
+        allowedKeys.add(phoneKey);
+      }
+    }
+    if (rootSlug === "real-estate") {
+      for (const realEstateKey of REAL_ESTATE_DYNAMIC_KEYS) {
+        allowedKeys.add(realEstateKey);
+      }
+    }
+    for (const simpleKey of getSimpleCategoryFieldKeys(simpleCategoryKind)) {
+      allowedKeys.add(simpleKey);
+    }
+    if (rootSlug === "vehicles" && vehicleBranch) {
+      for (const field of VEHICLE_BRANCH_DETAIL_FIELDS[vehicleBranch.key] ?? []) {
+        allowedKeys.add(field.key);
+      }
+    }
+    return allowedKeys;
+  }, [dynamicFields, rootSlug, simpleCategoryKind, vehicleBranch]);
 
   const resolvedImageConfig = useMemo(() => {
     if (!finalNode) return null;
@@ -436,7 +634,13 @@ export default function PostAdForm({
     return parsed;
   }
 
-  async function fetchFields(categoryNodeId: number) {
+  async function fetchFields(categoryNodeId: number, path: string | undefined, rootSlugName: string) {
+    const simpleKind = getSimpleCategoryKind(path, rootSlugName);
+    if (simpleKind) {
+      setDynamicFields([]);
+      return;
+    }
+
     const supabase = createSupabaseBrowserClient();
     const orderedBySort = await supabase
       .from("category_fields")
@@ -446,7 +650,7 @@ export default function PostAdForm({
       .order("sort_order", { ascending: true })
       .order("display_order", { ascending: true });
 
-    if (!orderedBySort.error && orderedBySort.data) {
+    if (!orderedBySort.error && orderedBySort.data && orderedBySort.data.length > 0) {
       setDynamicFields(orderedBySort.data as CategoryField[]);
       return;
     }
@@ -458,7 +662,13 @@ export default function PostAdForm({
       .eq("is_active", true)
       .order("display_order", { ascending: true });
 
-    setDynamicFields((fallback.data as CategoryField[]) ?? []);
+    const fallbackFields = (fallback.data as CategoryField[]) ?? [];
+    if (fallbackFields.length > 0) {
+      setDynamicFields(fallbackFields);
+      return;
+    }
+
+    setDynamicFields(buildFallbackFields(categoryNodeId, path, rootSlugName) as CategoryField[]);
   }
 
   async function fetchPostingConfig(categoryId: number) {
@@ -512,7 +722,7 @@ export default function PostAdForm({
 
     if (children.length === 0) {
       setFinalNode(root);
-      await Promise.all([fetchFields(root.id), fetchPostingConfig(category.id)]);
+      await Promise.all([fetchFields(root.id, root.path, category.slug), fetchPostingConfig(category.id)]);
     }
 
     setLoadingTree(false);
@@ -531,7 +741,7 @@ export default function PostAdForm({
       setFinalNode(node);
       setVehicleSelection(EMPTY_VEHICLE_SELECTION);
       setDamageParts(defaultDamageParts());
-      await Promise.all([fetchFields(node.id), fetchPostingConfig(node.category_id)]);
+      await Promise.all([fetchFields(node.id, node.path, rootSlug), fetchPostingConfig(node.category_id)]);
     } else {
       setFinalNode(null);
       setDynamicFields([]);
@@ -569,28 +779,43 @@ export default function PostAdForm({
     setCore((prev) => ({ ...prev, [key]: value }));
   }
 
-  function updateDynamic(key: string, value: string | boolean) {
-    const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
-    for (const locationKey of LOCATION_DYNAMIC_KEYS) {
-      allowedKeys.add(locationKey);
-    }
-    if (!allowedKeys.has(key)) {
+  function updateDynamic(key: string, value: string | boolean | string[]) {
+    if (!allowedVehicleDynamicKeys.has(key)) {
       return;
     }
     setDynamicValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  function updateDynamicPair(primaryKey: string, secondaryKey: string, value: string | boolean) {
-    const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
-    for (const locationKey of LOCATION_DYNAMIC_KEYS) {
-      allowedKeys.add(locationKey);
+  function updateDynamicAndResetDependents(key: string, value: string | boolean | string[]) {
+    updateDynamic(key, value);
+    if (!simpleCategoryConfig) return;
+
+    const dependentFields = simpleCategoryConfig.fields.filter((field) => field.dependsOn === key);
+    for (const dependent of dependentFields) {
+      updateDynamic(dependent.key, "");
+      updateDynamic(`${dependent.key}Custom`, "");
     }
+  }
+
+  function updateDynamicPair(primaryKey: string, secondaryKey: string, value: string | boolean | string[]) {
     setDynamicValues((prev) => ({
       ...prev,
-      ...(allowedKeys.has(primaryKey) ? { [primaryKey]: value } : {}),
-      ...(allowedKeys.has(secondaryKey) ? { [secondaryKey]: value } : {}),
+      ...(allowedVehicleDynamicKeys.has(primaryKey) ? { [primaryKey]: value } : {}),
+      ...(allowedVehicleDynamicKeys.has(secondaryKey) ? { [secondaryKey]: value } : {}),
     }));
   }
+
+  useEffect(() => {
+    const allowedKeys = allowedVehicleDynamicKeys;
+
+    setDynamicValues((prev) => {
+      const entries = Object.entries(prev).filter(([key]) => allowedKeys.has(key));
+      if (entries.length === Object.keys(prev).length) {
+        return prev;
+      }
+      return Object.fromEntries(entries);
+    });
+  }, [dynamicFields, rootSlug, simpleCategoryKind]);
 
   const normalizeLocationName = useCallback((value: string) => {
     return value
@@ -868,7 +1093,7 @@ export default function PostAdForm({
           minimum_offer: String(details.minimum_offer ?? ""),
           rulesAccepted: true,
         },
-        dynamicValues: (details.dynamic_values as Record<string, string | boolean>) ?? {},
+        dynamicValues: (details.dynamic_values as Record<string, string | boolean | string[]>) ?? {},
       });
 
     };
@@ -885,14 +1110,9 @@ export default function PostAdForm({
       setCore(pendingDraft.core);
     }
     if (pendingDraft?.dynamicValues) {
-      const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
-      for (const key of LOCATION_DYNAMIC_KEYS) {
-        allowedKeys.add(key);
-      }
-
-      const filtered: Record<string, string | boolean> = {};
+        const filtered: Record<string, string | boolean | string[]> = {};
       for (const [key, value] of Object.entries(pendingDraft.dynamicValues)) {
-        if (allowedKeys.has(key)) {
+        if (allowedVehicleDynamicKeys.has(key)) {
           filtered[key] = value;
         }
       }
@@ -993,6 +1213,29 @@ export default function PostAdForm({
     if (!core.contact_phone) return postAdCopy.contactPhoneRequired;
     if (!core.rulesAccepted) return postAdCopy.acceptRulesRequired;
 
+    if (simpleCategoryConfig) {
+      for (const field of simpleCategoryConfig.fields.filter((item) => item.required)) {
+        const value = dynamicValues[field.key];
+        if (field.type === "multiselect") {
+          if (!Array.isArray(value) || value.length === 0) {
+            return `${labelFor(locale, field.label)} ${postAdCopy.fieldRequiredSuffix}`;
+          }
+          continue;
+        }
+
+        if (field.allowCustom && isOtherChoice(value)) {
+          const customValue = String(dynamicValues[`${field.key}Custom`] ?? "").trim();
+          if (!customValue) {
+            return `${labelFor(locale, field.label)} ${postAdCopy.fieldRequiredSuffix}`;
+          }
+        }
+
+        if (!String(value ?? "").trim()) {
+          return `${labelFor(locale, field.label)} ${postAdCopy.fieldRequiredSuffix}`;
+        }
+      }
+    }
+
     for (const key of requiredDynamicKeys) {
       if (!String(dynamicValues[key] ?? "").trim()) {
         return `${renderFieldLabel(key)} ${postAdCopy.fieldRequiredSuffix}`;
@@ -1000,7 +1243,7 @@ export default function PostAdForm({
     }
 
     const isVehicle = rootSlug === "vehicles";
-    if (isVehicle) {
+    if (isVehicle && !simpleCategoryConfig) {
       const selectedSubtype = vehicleSelection.subtype?.name?.trim() ?? "";
       const selectedBrand = vehicleSelection.brand?.slug && vehicleSelection.brand.slug !== "other-brand"
         ? vehicleSelection.brand.name.trim()
@@ -1015,26 +1258,19 @@ export default function PostAdForm({
       if (vehicleBranch?.brandMode === "required" && !selectedBrand) return postAdCopy.vehicleBrandRequired;
       if (vehicleBranch?.modelMode === "required" && !selectedModel) return postAdCopy.vehicleModelRequired;
 
-      const year = String(dynamicValues.year ?? dynamicValues.vehicle_year ?? "").trim();
-      const requiresVehicleYear = vehicleBranch ? !["parts", "bicycles"].includes(vehicleBranch.key) : true;
-      if (requiresVehicleYear && !year) return postAdCopy.vehicleYearRequired;
+      const branchFields = vehicleBranch ? VEHICLE_BRANCH_DETAIL_FIELDS[vehicleBranch.key] ?? [] : [];
+      for (const field of branchFields) {
+        if (field.required) {
+          const value = dynamicValues[field.key];
+          if (!String(value ?? "").trim()) {
+            return `${field.label} ${postAdCopy.fieldRequiredSuffix}`;
+          }
+        }
+      }
     }
 
-    return null;
-  }
-
-  function validateLocationStep() {
-    if (!selectedProvinceId || !selectedDistrictId) {
-      return postAdCopy.addLocationBeforePublish;
-    }
-
-    if (locationMethod === "device") {
-      if (deviceLatitude === null || deviceLongitude === null) {
-        return postAdCopy.detectOrChooseManual;
-      }
-      if (!locationConfirmed) {
-        return postAdCopy.detectedLocationNeedsConfirmation;
-      }
+    if (!locationConfirmed) {
+      return postAdCopy.detectedLocationNeedsConfirmation;
     }
 
     if (!locationMethod) {
@@ -1048,6 +1284,19 @@ export default function PostAdForm({
     if (!resolvedImageConfig) return null;
     if (resolvedImageConfig.requires_images && images.length < Math.max(1, resolvedImageConfig.min_images)) {
       return `Please upload at least ${Math.max(1, resolvedImageConfig.min_images)} photo(s).`;
+    }
+    return null;
+  }
+
+  function validateLocationStep() {
+    if (!selectedProvinceId || !selectedDistrictId) {
+      return postAdCopy.addLocationBeforePublish;
+    }
+    if (!locationMethod) {
+      return postAdCopy.addLocationBeforePublish;
+    }
+    if (locationMethod === "device" && !locationConfirmed) {
+      return postAdCopy.detectedLocationNeedsConfirmation;
     }
     return null;
   }
@@ -1231,7 +1480,11 @@ export default function PostAdForm({
       if (LOCATION_DYNAMIC_KEYS.has(key)) {
         continue;
       }
-      if (typeof value === "boolean") {
+      if (Array.isArray(value)) {
+        if (value.length > 0) {
+          form.set(key, JSON.stringify(value));
+        }
+      } else if (typeof value === "boolean") {
         if (value) form.set(key, "true");
       } else if (String(value).trim()) {
         form.set(key, String(value));
@@ -1278,6 +1531,261 @@ export default function PostAdForm({
   }
 
   const renderDynamicFields = dynamicFields.filter((field) => !LOCATION_DYNAMIC_KEYS.has(field.field_key));
+  const extraPhoneFields = !simpleCategoryConfig && rootSlug === "mobile-phones-tablets"
+    ? PHONE_FORM_FIELDS.filter((field) => !dynamicFields.some((dynamicField) => dynamicField.field_key === field.key))
+    : [];
+  const extraRealEstateFields = !simpleCategoryConfig && rootSlug === "real-estate"
+    ? REAL_ESTATE_FORM_FIELDS.filter((field) => !dynamicFields.some((dynamicField) => dynamicField.field_key === field.key))
+    : [];
+
+  function renderVehicleField(field: VehicleBranchDetailField) {
+    const value = dynamicValues[field.key];
+
+    if (field.type === "boolean") {
+      return (
+        <label key={field.key} className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-3 text-sm font-semibold">
+          <input
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateDynamic(field.key, event.target.checked)}
+            className="h-4 w-4"
+          />
+          {field.label}
+        </label>
+      );
+    }
+
+    const commonProps = {
+      value: String(value ?? ""),
+      onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => updateDynamic(field.key, event.target.value),
+      className: "mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2",
+    };
+
+    if (field.type === "select") {
+      return (
+        <label key={field.key} className="text-sm font-semibold">
+          {field.label}
+          <select
+            value={String(value ?? "")}
+            onChange={(event) => updateDynamic(field.key, event.target.value)}
+            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+          >
+            <option value="">Select</option>
+            {(field.options ?? []).map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+
+    return (
+      <label key={field.key} className="text-sm font-semibold">
+        {field.label}
+        <input
+          type={field.type === "number" ? "number" : "text"}
+          {...commonProps}
+        />
+      </label>
+    );
+  }
+
+  function renderVehicleDetailsSection(branch: VehicleBranchDefinition) {
+    const showDamageDiagram = branch.key !== "parts" && branch.key !== "bicycles";
+    const branchFields = VEHICLE_BRANCH_DETAIL_FIELDS[branch.key] ?? [];
+    const branchSpecificHint = (() => {
+      switch (branch.key) {
+        case "parts":
+          return "Enter the part type, compatibility, and condition for this listing.";
+        case "damaged":
+          return "Select the damage type and describe the condition of the vehicle.";
+        case "bicycles":
+          return "Choose bicycle-specific details and condition to improve matching.";
+        case "rickshaw":
+          return "Select the rickshaw type and provide key vehicle details.";
+        case "otherVehicles":
+          return "Provide details for this less common vehicle type.";
+        default:
+          return "Choose the vehicle type, brand, model and other details that match your listing.";
+      }
+    })();
+
+    return (
+      <section className="mt-4 space-y-4 rounded-xl border border-[var(--line)] p-3">
+        <h3 className="text-sm font-bold">{t.postAd.vehicleDetails}</h3>
+        <p className="text-sm text-[var(--ink-2)]">{branchSpecificHint}</p>
+        <VehicleSmartSelector categoryPath={finalNode?.path ?? null} onChange={setVehicleSelection} />
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {branchFields.map((field) => renderVehicleField(field))}
+        </div>
+
+        {showDamageDiagram ? (
+          <div>
+            <p className="mb-2 text-sm font-semibold">{t.postAd.damagePaintReport}</p>
+            <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} />
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  const vehicleDetailsSection = rootSlug === "vehicles" && !simpleCategoryConfig && vehicleBranch
+    ? renderVehicleDetailsSection(vehicleBranch)
+    : null;
+
+  const simpleCategoryFieldsSection = simpleCategoryConfig ? (
+    <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+      <h3 className="text-sm font-bold">{labelFor(locale, simpleCategoryConfig.title)}</h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {simpleCategoryConfig.fields.map((field) => {
+          const value = dynamicValues[field.key];
+          const customKey = `${field.key}Custom`;
+          const customValue = String(dynamicValues[customKey] ?? "");
+
+          if (field.key === "model" && field.dependsOn && simpleCategoryKind) {
+            const selectedParent = String(dynamicValues[field.dependsOn] ?? "");
+            const modelOptions = getSimpleCategoryModelOptions(simpleCategoryKind, selectedParent);
+            if (modelOptions.length === 0 || isOtherChoice(selectedParent)) {
+              return (
+                <label key={field.key} className="text-sm font-semibold">
+                  {labelFor(locale, field.label)}
+                  <input
+                    type="text"
+                    value={String(value ?? "")}
+                    onChange={(event) => updateDynamic(field.key, event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                  />
+                </label>
+              );
+            }
+
+            return (
+              <label key={field.key} className="text-sm font-semibold">
+                {labelFor(locale, field.label)}
+                <select
+                  value={String(value ?? "")}
+                  onChange={(event) => {
+                    const selected = event.target.value;
+                    updateDynamicAndResetDependents(field.key, selected);
+                    if (!isOtherChoice(selected)) {
+                      updateDynamic(customKey, "");
+                    }
+                  }}
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                >
+                  <option value="">{t.postAd.select}</option>
+                  {modelOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                  <option value="Other">Other</option>
+                </select>
+                {field.allowCustom && isOtherChoice(value) ? (
+                  <input
+                    type="text"
+                    value={customValue}
+                    onChange={(event) => updateDynamic(customKey, event.target.value)}
+                    placeholder="Please specify"
+                    className="mt-2 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                  />
+                ) : null}
+              </label>
+            );
+          }
+
+          if (field.type === "multiselect") {
+            const selected = Array.isArray(value) ? value : [];
+            return (
+              <div key={field.key} className="sm:col-span-2 text-sm font-semibold">
+                <p>{labelFor(locale, field.label)}</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {(field.options ?? []).map((option) => {
+                    const checked = selected.includes(option.value);
+                    return (
+                      <label key={option.value} className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                              ? [...selected, option.value]
+                              : selected.filter((item) => item !== option.value);
+                            updateDynamic(field.key, next);
+                          }}
+                          className="h-4 w-4"
+                        />
+                        {optionLabel(locale, option)}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+
+          if (field.type === "textarea") {
+            return (
+              <label key={field.key} className="text-sm font-semibold sm:col-span-2">
+                {labelFor(locale, field.label)}
+                <textarea
+                  value={String(value ?? "")}
+                  onChange={(event) => updateDynamic(field.key, event.target.value)}
+                  className="mt-1 min-h-28 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                />
+              </label>
+            );
+          }
+
+          if (field.type === "select") {
+            return (
+              <label key={field.key} className="text-sm font-semibold">
+                {labelFor(locale, field.label)}
+                <select
+                  value={String(value ?? "")}
+                  onChange={(event) => {
+                    const selected = event.target.value;
+                    updateDynamicAndResetDependents(field.key, selected);
+                    if (!isOtherChoice(selected)) {
+                      updateDynamic(customKey, "");
+                    }
+                  }}
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                >
+                  <option value="">{t.postAd.select}</option>
+                  {(field.options ?? []).map((option) => (
+                    <option key={option.value} value={option.value}>{optionLabel(locale, option)}</option>
+                  ))}
+                </select>
+                {field.allowCustom && isOtherChoice(value) ? (
+                  <input
+                    type="text"
+                    value={customValue}
+                    onChange={(event) => updateDynamic(customKey, event.target.value)}
+                    placeholder="Please specify"
+                    className="mt-2 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                  />
+                ) : null}
+              </label>
+            );
+          }
+
+          return (
+            <label key={field.key} className="text-sm font-semibold">
+              {labelFor(locale, field.label)}
+              <input
+                type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+                min={field.min}
+                max={field.max}
+                value={String(value ?? "")}
+                onChange={(event) => updateDynamic(field.key, event.target.value)}
+                className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+              />
+            </label>
+          );
+        })}
+      </div>
+    </section>
+  ) : null;
 
   const suggestedCategoryLabel = useMemo(() => {
     if (!smartSuggestion || smartSuggestion.categorySlug === "other") {
@@ -1493,6 +2001,15 @@ export default function PostAdForm({
                 >
                   {t.postAd.forSale}
                 </button>
+                {rootSlug === "real-estate" ? (
+                  <button
+                    type="button"
+                    onClick={() => setListingTypeChoice("for_rent")}
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold ${listingTypeChoice === "for_rent" ? "bg-[var(--ink-1)] text-white" : "border border-[var(--line)] bg-white"}`}
+                  >
+                    {t.postAd.forRent}
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -1527,18 +2044,11 @@ export default function PostAdForm({
               </p>
             </div>
 
-            {rootSlug === "vehicles" ? (
-              <section className="mt-4 space-y-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">{t.postAd.vehicleDetails}</h3>
-                <VehicleSmartSelector categoryPath={finalNode?.path ?? null} onChange={setVehicleSelection} />
-                <div>
-                  <p className="mb-2 text-sm font-semibold">{t.postAd.damagePaintReport}</p>
-                  <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} />
-                </div>
-              </section>
-            ) : null}
+            {vehicleDetailsSection}
 
-            {renderDynamicFields.length > 0 ? (
+            {simpleCategoryFieldsSection}
+
+            {!simpleCategoryConfig && renderDynamicFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
                 <h3 className="text-sm font-bold">{t.postAd.additionalCategoryFields}</h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -1587,6 +2097,120 @@ export default function PostAdForm({
                           type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
                           value={String(value ?? "")}
                           onChange={(event) => updateDynamic(field.field_key, event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
+            {!simpleCategoryConfig && extraPhoneFields.length > 0 ? (
+              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+                <h3 className="text-sm font-bold">Phone details</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {extraPhoneFields.map((field) => {
+                    const value = dynamicValues[field.key];
+
+                    if (field.type === "boolean") {
+                      return (
+                        <label key={field.key} className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(value)}
+                              onChange={(event) => updateDynamic(field.key, event.target.checked)}
+                              className="h-4 w-4"
+                            />
+                            {field.label}
+                          </span>
+                        </label>
+                      );
+                    }
+
+                    if (field.type === "select") {
+                      return (
+                        <label key={field.key} className="text-sm font-semibold">
+                          {field.label}
+                          <select
+                            value={String(value ?? "")}
+                            onChange={(event) => updateDynamic(field.key, event.target.value)}
+                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                          >
+                            <option value="">Select</option>
+                            {(PHONE_FIELD_OPTIONS[field.key as keyof typeof PHONE_FIELD_OPTIONS] ?? []).map((option) => (
+                              <option key={`${field.key}-${option}`} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    }
+
+                    return (
+                      <label key={field.key} className="text-sm font-semibold">
+                        {field.label}
+                        <input
+                          type={field.type === "number" ? "number" : "text"}
+                          value={String(value ?? "")}
+                          onChange={(event) => updateDynamic(field.key, event.target.value)}
+                          className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
+
+            {!simpleCategoryConfig && extraRealEstateFields.length > 0 ? (
+              <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+                <h3 className="text-sm font-bold">{t.postAd.realEstateDetails}</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {extraRealEstateFields.map((field) => {
+                    const value = dynamicValues[field.key];
+
+                    if (field.type === "boolean") {
+                      return (
+                        <label key={field.key} className="text-sm font-semibold">
+                          <span className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-3">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(value)}
+                              onChange={(event) => updateDynamic(field.key, event.target.checked)}
+                              className="h-4 w-4"
+                            />
+                            {field.label}
+                          </span>
+                        </label>
+                      );
+                    }
+
+                    if (field.type === "select") {
+                      return (
+                        <label key={field.key} className="text-sm font-semibold">
+                          {field.label}
+                          <select
+                            value={String(value ?? "")}
+                            onChange={(event) => updateDynamic(field.key, event.target.value)}
+                            className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
+                          >
+                            <option value="">Select</option>
+                            {(REAL_ESTATE_FIELD_OPTIONS[field.key as keyof typeof REAL_ESTATE_FIELD_OPTIONS] ?? []).map((option) => (
+                              <option key={`${field.key}-${option}`} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    }
+
+                    return (
+                      <label key={field.key} className="text-sm font-semibold">
+                        {field.label}
+                        <input
+                          type={field.type === "number" ? "number" : "text"}
+                          value={String(value ?? "")}
+                          onChange={(event) => updateDynamic(field.key, event.target.value)}
                           className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
                         />
                       </label>

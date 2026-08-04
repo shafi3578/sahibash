@@ -1,9 +1,13 @@
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { ListingCard } from "@/components/listing-card";
 import {
   deleteListingAction,
   updateListingStatusAction,
 } from "@/lib/actions/listings";
+import {
+  getModerationEntries,
+  saveModerationEntryAction,
+} from "@/lib/actions/moderation-workflow";
 import {
   adminFlagListingTranslationAction,
   adminUpdateListingTranslationAction,
@@ -22,9 +26,10 @@ type ListingTranslationItem = {
 };
 
 export default async function AdminListingsPage() {
-  await requireAdmin();
+  await requirePermission("listings.view");
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
+  const moderationEntries = await getModerationEntries();
   const supabase = await createSupabaseServerClient();
   const { data: listings } = await supabase
     .from("listings")
@@ -36,6 +41,47 @@ export default async function AdminListingsPage() {
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="font-display text-3xl font-bold">{ui.admin.listingApprovalQueue}</h1>
       <p className="mt-1 text-[var(--ink-2)]">{ui.admin.approveRejectDelete}</p>
+
+      <section className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-4">
+        <h2 className="font-display text-xl font-bold">Moderation workflow</h2>
+        <p className="mt-1 text-sm text-[var(--ink-2)]">Track review notes and moderation state for listings and other content.</p>
+
+        <form action={saveModerationEntryAction} className="mt-4 grid gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-4 md:grid-cols-2">
+          <label className="text-sm font-semibold">
+            Entity type
+            <input name="entity_type" defaultValue="listing" className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          </label>
+          <label className="text-sm font-semibold">
+            Entity id
+            <input name="entity_id" type="number" className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          </label>
+          <label className="text-sm font-semibold">
+            Status
+            <select name="status" defaultValue="pending" className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+              <option value="pending">pending</option>
+              <option value="approved">approved</option>
+              <option value="rejected">rejected</option>
+            </select>
+          </label>
+          <label className="text-sm font-semibold md:col-span-2">
+            Summary
+            <textarea name="summary" className="mt-1 min-h-20 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          </label>
+          <div className="md:col-span-2">
+            <button type="submit" className="rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">Save entry</button>
+          </div>
+        </form>
+
+        <div className="mt-5 space-y-3">
+          {moderationEntries.map((entry) => (
+            <div key={entry.id} className="rounded-xl border border-[var(--line)] bg-white p-3">
+              <p className="text-sm font-semibold">{entry.entity_type} #{entry.entity_id}</p>
+              <p className="text-xs text-[var(--ink-2)]">{entry.status} · {entry.summary}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         {(listings ?? []).map((listing) => (
           <div key={listing.id} className="space-y-3 rounded-2xl border border-[var(--line)] bg-white p-4">
@@ -75,8 +121,11 @@ export default async function AdminListingsPage() {
                   <textarea name="description" defaultValue={translation.description} className="min-h-20 w-full rounded border border-[var(--line)] px-2 py-1 text-xs" />
                   <input name="translationQuality" defaultValue={translation.translation_quality || "manual"} className="w-full rounded border border-[var(--line)] px-2 py-1 text-xs" />
                   <div className="flex gap-2">
-                    <button className="rounded bg-[var(--ink-1)] px-2 py-1 text-xs font-semibold text-white">{ui.admin.save}</button>
+                    <button type="submit" className="rounded bg-[var(--ink-1)] px-2 py-1 text-xs font-semibold text-white">
+                      {ui.admin.save}
+                    </button>
                     <button
+                      type="submit"
                       formAction={adminFlagListingTranslationAction}
                       name="status"
                       value="needs_review"

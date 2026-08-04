@@ -1,8 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CategoryHomeList } from "@/components/categories/CategoryHomeList";
+import { getHomepageSections } from "@/lib/actions/homepage-sections";
+import { getSiteSettings } from "@/lib/actions/site-settings";
 import { getHomeCategoryNodes } from "@/lib/categories/getCategories";
 import { getCategoriesWithStats } from "@/lib/data/listings";
+import { resolveHomepageSections } from "@/lib/data/homepage-sections";
 import { getApprovedListings } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
@@ -12,6 +15,8 @@ export default async function HomePage() {
   const { t, locale } = await getDictionary();
   const href = (path: string) => localizePath(path, locale);
   const postAdCreatePath = "/post-ad/create?posting=sell";
+  const siteSettings = await getSiteSettings();
+  const homepageSections = resolveHomepageSections(await getHomepageSections());
   const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent(postAdCreatePath)}&reason=post`;
   let postAdHref = guestPostAdHref;
   try {
@@ -36,6 +41,54 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-4 px-0 pb-28 pt-4 sm:px-4 sm:pb-16 lg:px-6">
+      <section className="overflow-hidden border-y border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_100%)] text-white sm:rounded-2xl sm:border sm:shadow-sm">
+        <div className="grid gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.3fr_0.9fr] lg:px-8 lg:py-10">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">{siteSettings.site_tagline}</p>
+            <h1 className="mt-3 max-w-2xl font-display text-4xl font-bold leading-tight sm:text-5xl">
+              {siteSettings.home_hero_title}
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
+              {siteSettings.home_hero_subtitle}
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href={href(siteSettings.home_primary_cta_path ?? "/listings")} className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900">
+                {siteSettings.home_primary_cta_label}
+              </Link>
+              {siteSettings.home_secondary_cta_label && siteSettings.home_secondary_cta_path ? (
+                <Link href={href(siteSettings.home_secondary_cta_path)} className="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur">
+                  {siteSettings.home_secondary_cta_label}
+                </Link>
+              ) : null}
+            </div>
+          </div>
+          <div className="grid gap-3 self-center sm:grid-cols-3 lg:grid-cols-1">
+            {(siteSettings.navigation_links ?? []).slice(0, 3).map((link) => (
+              <Link key={`${link.label}-${link.path}`} href={href(link.path)} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/15">
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {homepageSections.length > 0 ? (
+        <section className="space-y-3 px-4 sm:px-0">
+          {homepageSections.map((section) => (
+            <div key={section.slug} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">{section.section_type}</p>
+              <h2 className="mt-2 font-display text-2xl font-semibold text-slate-900">{section.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{section.body}</p>
+              {section.cta_label && section.cta_path ? (
+                <Link href={href(section.cta_path)} className="mt-4 inline-flex rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">
+                  {section.cta_label}
+                </Link>
+              ) : null}
+            </div>
+          ))}
+        </section>
+      ) : null}
+
       <section className="border-y border-slate-200 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
         <form action={href("/search")} className="grid grid-cols-[1fr_auto] gap-2 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-4">
           <input

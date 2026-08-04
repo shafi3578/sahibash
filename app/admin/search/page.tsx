@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import {
   adminApproveSearchAliasAction,
   adminCreateSearchAliasAction,
@@ -14,7 +14,7 @@ import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 
 export default async function AdminSearchPage() {
-  await requireAdmin();
+  await requirePermission("search.view");
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
   const [aliases, telemetry] = await Promise.all([

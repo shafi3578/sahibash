@@ -8,6 +8,14 @@ import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { CITIES, CURRENCIES } from "@/lib/constants/marketplace";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
+import {
+  getSimpleCategoryConfig,
+  getSimpleCategoryFieldKeys,
+  getSimpleCategoryKind,
+  getSimpleCategoryModelOptions,
+  labelFor,
+  optionLabel,
+} from "@/lib/posting/simple-category-details";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -62,10 +70,28 @@ export default async function EditListingPage({ params }: PageProps) {
   // Fetch category fields
   const categoryFields = await getCategoryFieldsWithOptions(listing.category_node_id ?? listing.subcategory_id);
 
-  // Build attributes map for quick lookup
-  const attributesMap = new Map(
-    ((listing.listing_attributes || []) as Array<{ key: string; value: string }>).map((attr) => [attr.key, attr.value])
+  const simpleCategoryKind = getSimpleCategoryKind(
+    [listing.category?.slug, listing.subcategory?.slug].filter(Boolean).join("/"),
+    listing.category?.slug ?? null
   );
+  const simpleCategoryConfig = getSimpleCategoryConfig(simpleCategoryKind);
+
+  const attributesMap = new Map(
+    ((listing.listing_attributes || []) as Array<Record<string, unknown>>).map((attr) => [
+      String(attr.attribute_key ?? attr.key ?? ""),
+      String(attr.attribute_value_text ?? attr.attribute_value_number ?? attr.attribute_value_boolean ?? attr.value ?? ""),
+    ])
+  );
+  const simpleArrayValue = (key: string) => {
+    const raw = String(attributesMap.get(key) ?? "");
+    if (!raw.trim()) return [] as string[];
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? parsed.map((value) => String(value)) : [];
+    } catch {
+      return raw.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+  };
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -230,7 +256,153 @@ export default async function EditListingPage({ params }: PageProps) {
         </div>
 
         {/* Dynamic Fields by Category */}
-        {categoryFields.length > 0 && (
+        {simpleCategoryConfig ? (
+          <div className="rounded-lg border border-[var(--line)] bg-white p-6">
+            <h2 className="mb-4 font-display text-lg font-bold">{labelFor(locale, simpleCategoryConfig.title)}</h2>
+            <div className="space-y-4">
+              {simpleCategoryConfig.fields.map((field) => {
+                const currentValue = attributesMap.get(field.key) || "";
+                const customKey = `${field.key}Custom`;
+                const storedCustomValue = attributesMap.get(customKey) || "";
+                if (field.key === "model" && (simpleCategoryKind === "car" || simpleCategoryKind === "motorcycle")) {
+                  const makeValue = String(attributesMap.get("make") || "");
+                  const modelOptions = getSimpleCategoryModelOptions(simpleCategoryKind, makeValue);
+                  if (modelOptions.length === 0 || makeValue === "Other") {
+                    return (
+                      <div key={field.key}>
+                        <label className="block text-sm font-semibold text-[var(--ink-1)]">{labelFor(locale, field.label)}</label>
+                        <input
+                          type="text"
+                          name={field.key}
+                          defaultValue={currentValue}
+                          required={field.required}
+                          className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                        />
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={field.key}>
+                      <label className="block text-sm font-semibold text-[var(--ink-1)]">{labelFor(locale, field.label)}</label>
+                      <select
+                        name={field.key}
+                        defaultValue={storedCustomValue ? "Other" : currentValue}
+                        required={field.required}
+                        className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                      >
+                        <option value="">{ui.listingEdit.selectField.replace("{field}", labelFor(locale, field.label))}</option>
+                        {modelOptions.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                        <option value="Other">Other</option>
+                      </select>
+                      {field.allowCustom ? (
+                        <input
+                          type="text"
+                          name={customKey}
+                          defaultValue={storedCustomValue}
+                          placeholder="If Other, specify"
+                          className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                        />
+                      ) : null}
+                    </div>
+                  );
+                }
+
+                if (field.type === "multiselect") {
+                  const selected = new Set(simpleArrayValue(field.key));
+                  return (
+                    <div key={field.key}>
+                      <label className="block text-sm font-semibold text-[var(--ink-1)]">{labelFor(locale, field.label)}</label>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {(field.options ?? []).map((option) => (
+                          <label key={option.value} className="flex items-center gap-2 rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
+                            <input
+                              type="checkbox"
+                              name={field.key}
+                              value={option.value}
+                              defaultChecked={selected.has(option.value)}
+                              className="rounded"
+                            />
+                            {optionLabel(locale, option)}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (field.type === "textarea") {
+                  return (
+                    <div key={field.key}>
+                      <label className="block text-sm font-semibold text-[var(--ink-1)]">{labelFor(locale, field.label)}</label>
+                      <textarea
+                        name={field.key}
+                        defaultValue={currentValue}
+                        rows={5}
+                        className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                      />
+                    </div>
+                  );
+                }
+
+                if (field.type === "select") {
+                  const optionValues = new Set((field.options ?? []).map((option) => option.value));
+                  const selectValue = field.allowCustom
+                    ? storedCustomValue
+                      ? "Other"
+                      : optionValues.has(String(currentValue))
+                        ? currentValue
+                        : ""
+                    : currentValue;
+                  return (
+                    <div key={field.key}>
+                      <label className="block text-sm font-semibold text-[var(--ink-1)]">{labelFor(locale, field.label)}</label>
+                      <select
+                        name={field.key}
+                        defaultValue={selectValue}
+                        required={field.required}
+                        className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                      >
+                        <option value="">{ui.listingEdit.selectField.replace("{field}", labelFor(locale, field.label))}</option>
+                        {(field.options ?? []).map((option) => (
+                          <option key={option.value} value={option.value}>{optionLabel(locale, option)}</option>
+                        ))}
+                        {field.allowCustom ? <option value="Other">Other</option> : null}
+                      </select>
+                      {field.allowCustom ? (
+                        <input
+                          type="text"
+                          name={customKey}
+                          defaultValue={storedCustomValue}
+                          placeholder="If Other, specify"
+                          className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                        />
+                      ) : null}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={field.key}>
+                    <label className="block text-sm font-semibold text-[var(--ink-1)]">{labelFor(locale, field.label)}</label>
+                    <input
+                      type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+                      name={field.key}
+                      defaultValue={currentValue}
+                      required={field.required}
+                      min={field.min}
+                      max={field.max}
+                      step="1"
+                      className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : categoryFields.length > 0 ? (
           <div className="rounded-lg border border-[var(--line)] bg-white p-6">
             <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.additionalDetails}</h2>
             <div className="space-y-4">
@@ -294,7 +466,7 @@ export default async function EditListingPage({ params }: PageProps) {
               ))}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Photos */}
         <div className="rounded-lg border border-[var(--line)] bg-white p-6">
@@ -327,22 +499,21 @@ export default async function EditListingPage({ params }: PageProps) {
           {/* Upload New */}
           <div>
             <p className="mb-2 text-sm font-semibold">{ui.listingEdit.uploadNewPhotos}</p>
-            <form action={uploadListingImageFormAction}>
-              <input type="hidden" name="listing_id" value={listingId} />
-              <input
-                type="file"
-                name="image"
-                accept="image/*"
-                multiple
-                className="block w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
-              />
-              <button
-                type="submit"
-                className="mt-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                {ui.listingEdit.upload}
-              </button>
-            </form>
+            <input type="hidden" name="listing_id" value={listingId} />
+            <input
+              type="file"
+              name="image"
+              accept="image/*"
+              multiple
+              className="block w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              formAction={uploadListingImageFormAction}
+              className="mt-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              {ui.listingEdit.upload}
+            </button>
           </div>
         </div>
 

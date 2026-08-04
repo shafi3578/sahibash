@@ -294,6 +294,77 @@ export const MODELS: CatalogModel[] = [
     active: true,
   },
 
+  // Galaxy A Series additions
+  {
+    id: "galaxy-a25",
+    brandId: "samsung",
+    name: "Galaxy A25 5G",
+    releaseYear: 2024,
+    type: "smartphone",
+    stableSpecs: [
+      { key: "brand", label: { en: "Brand", fa: "برند", ps: "برانډ" }, value: "Samsung", confidence: 1.0, editable: false },
+      { key: "exactModel", label: { en: "Model", fa: "نموذج", ps: "ماډل" }, value: "Galaxy A25 5G", confidence: 1.0, editable: false },
+      { key: "os", label: { en: "Operating System", fa: "نظام التشغيل", ps: "آپریٹنګ سسٹم" }, value: "Android", confidence: 1.0, editable: false },
+      { key: "screenSize", label: { en: "Screen Size", fa: "حجم الشاشة", ps: "د سکرین سائز" }, value: "6.5 inches", confidence: 1.0, editable: false },
+    ],
+    requiredSellerFields: ["storage", "ram", "condition", "price", "location"],
+    optionalSellerFields: ["color", "screenCondition", "bodyCondition", "repairHistory", "warranty", "purchasePlace", "boxIncluded", "chargerIncluded"],
+    buyerDetailFields: ["brand", "exactModel", "storage", "ram", "color", "condition"],
+    searchAliases: ["Galaxy A25", "A25 5G"],
+    variantOptions: {
+      storage: ["128GB", "256GB"],
+      ram: ["6GB", "8GB"],
+      color: SAMSUNG_COLORS,
+    },
+    active: true,
+  },
+  {
+    id: "galaxy-a15",
+    brandId: "samsung",
+    name: "Galaxy A15 5G",
+    releaseYear: 2024,
+    type: "smartphone",
+    stableSpecs: [
+      { key: "brand", label: { en: "Brand", fa: "برند", ps: "برانډ" }, value: "Samsung", confidence: 1.0, editable: false },
+      { key: "exactModel", label: { en: "Model", fa: "نموذج", ps: "ماډل" }, value: "Galaxy A15 5G", confidence: 1.0, editable: false },
+      { key: "os", label: { en: "Operating System", fa: "نظام التشغيل", ps: "آپریٹنګ سسٹم" }, value: "Android", confidence: 1.0, editable: false },
+      { key: "screenSize", label: { en: "Screen Size", fa: "حجم الشاشة", ps: "د سکرین سائز" }, value: "6.5 inches", confidence: 1.0, editable: false },
+    ],
+    requiredSellerFields: ["storage", "ram", "condition", "price", "location"],
+    optionalSellerFields: ["color", "screenCondition", "bodyCondition", "repairHistory", "warranty", "purchasePlace", "boxIncluded", "chargerIncluded"],
+    buyerDetailFields: ["brand", "exactModel", "storage", "ram", "color", "condition"],
+    searchAliases: ["Galaxy A15", "A15 5G"],
+    variantOptions: {
+      storage: ["128GB", "256GB"],
+      ram: ["4GB", "6GB"],
+      color: SAMSUNG_COLORS,
+    },
+    active: true,
+  },
+  {
+    id: "galaxy-s22-ultra",
+    brandId: "samsung",
+    name: "Galaxy S22 Ultra",
+    releaseYear: 2022,
+    type: "smartphone",
+    stableSpecs: [
+      { key: "brand", label: { en: "Brand", fa: "برند", ps: "برانډ" }, value: "Samsung", confidence: 1.0, editable: false },
+      { key: "exactModel", label: { en: "Model", fa: "نموذج", ps: "ماډل" }, value: "Galaxy S22 Ultra", confidence: 1.0, editable: false },
+      { key: "os", label: { en: "Operating System", fa: "نظام التشغيل", ps: "آپریٹنګ سسٹم" }, value: "Android", confidence: 1.0, editable: false },
+      { key: "screenSize", label: { en: "Screen Size", fa: "حجم الشاشة", ps: "د سکرین سائز" }, value: "6.8 inches", confidence: 1.0, editable: false },
+    ],
+    requiredSellerFields: ["storage", "ram", "condition", "price", "location"],
+    optionalSellerFields: ["color", "screenCondition", "bodyCondition", "repairHistory", "warranty", "purchasePlace", "boxIncluded", "chargerIncluded"],
+    buyerDetailFields: ["brand", "exactModel", "storage", "ram", "color", "condition"],
+    searchAliases: ["Galaxy S22 Ultra", "S22 Ultra"],
+    variantOptions: {
+      storage: ["128GB", "256GB", "512GB", "1TB"],
+      ram: ["8GB", "12GB"],
+      color: SAMSUNG_COLORS,
+    },
+    active: true,
+  },
+
   // Galaxy Note Series
   {
     id: "galaxy-note-20-ultra",

@@ -67,31 +67,36 @@ export type ElectronicsPostingConfig = {
 };
 
 export const getElectronicsRootAndSubcategories = cache(async () => {
-  const supabase = await createSupabaseServerClient();
+  try {
+    const supabase = await createSupabaseServerClient();
 
-  const { data: root } = await supabase
-    .from("electronics_categories")
-    .select("*")
-    .eq("slug", "phones-electronics")
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
+    const { data: root } = await supabase
+      .from("electronics_categories")
+      .select("*")
+      .eq("slug", "phones-electronics")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
 
-  if (!root) {
+    if (!root) {
+      return { root: null as ElectronicsCategory | null, subcategories: [] as ElectronicsCategory[] };
+    }
+
+    const { data: subcategories } = await supabase
+      .from("electronics_categories")
+      .select("*")
+      .eq("parent_id", (root as ElectronicsCategory).id)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+
+    return {
+      root: root as ElectronicsCategory,
+      subcategories: (subcategories as ElectronicsCategory[]) ?? [],
+    };
+  } catch (error) {
+    console.warn("Falling back to empty electronics subcategories due to data error", error);
     return { root: null as ElectronicsCategory | null, subcategories: [] as ElectronicsCategory[] };
   }
-
-  const { data: subcategories } = await supabase
-    .from("electronics_categories")
-    .select("*")
-    .eq("parent_id", (root as ElectronicsCategory).id)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  return {
-    root: root as ElectronicsCategory,
-    subcategories: (subcategories as ElectronicsCategory[]) ?? [],
-  };
 });
 
 export const getElectronicsSubcategories = cache(async () => {
@@ -100,77 +105,102 @@ export const getElectronicsSubcategories = cache(async () => {
 });
 
 export const getElectronicsBrandsByCategoryId = cache(async (categoryId: number) => {
-  const supabase = await createSupabaseServerClient();
+  try {
+    const supabase = await createSupabaseServerClient();
 
-  const { data } = await supabase
-    .from("electronics_brands")
-    .select("*")
-    .eq("category_id", categoryId)
-    .eq("is_active", true)
-    .order("is_popular", { ascending: false })
-    .order("sort_order", { ascending: true })
-    .order("name", { ascending: true });
+    const { data } = await supabase
+      .from("electronics_brands")
+      .select("*")
+      .eq("category_id", categoryId)
+      .eq("is_active", true)
+      .order("is_popular", { ascending: false })
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
 
-  return (data as ElectronicsBrand[]) ?? [];
+    return (data as ElectronicsBrand[]) ?? [];
+  } catch (error) {
+    console.warn("Falling back to empty electronics brands due to data error", error);
+    return [] as ElectronicsBrand[];
+  }
 });
 
 export const getElectronicsModelsByBrandId = cache(async (brandId: number) => {
-  const supabase = await createSupabaseServerClient();
+  try {
+    const supabase = await createSupabaseServerClient();
 
-  const { data } = await supabase
-    .from("electronics_models")
-    .select("*")
-    .eq("brand_id", brandId)
-    .eq("is_active", true)
-    .order("is_popular", { ascending: false })
-    .order("release_year", { ascending: false })
-    .order("name", { ascending: true });
+    const { data } = await supabase
+      .from("electronics_models")
+      .select("*")
+      .eq("brand_id", brandId)
+      .eq("is_active", true)
+      .order("is_popular", { ascending: false })
+      .order("release_year", { ascending: false })
+      .order("name", { ascending: true });
 
-  return (data as ElectronicsModel[]) ?? [];
+    return (data as ElectronicsModel[]) ?? [];
+  } catch (error) {
+    console.warn("Falling back to empty electronics models due to data error", error);
+    return [] as ElectronicsModel[];
+  }
 });
 
 export const getElectronicsModelSpecs = cache(async (modelId: number) => {
-  const supabase = await createSupabaseServerClient();
+  try {
+    const supabase = await createSupabaseServerClient();
 
-  const { data } = await supabase
-    .from("electronics_model_specs")
-    .select("*")
-    .eq("model_id", modelId)
-    .order("spec_group", { ascending: true })
-    .order("spec_label", { ascending: true });
+    const { data } = await supabase
+      .from("electronics_model_specs")
+      .select("*")
+      .eq("model_id", modelId)
+      .order("spec_group", { ascending: true })
+      .order("spec_label", { ascending: true });
 
-  return (data as ElectronicsModelSpec[]) ?? [];
+    return (data as ElectronicsModelSpec[]) ?? [];
+  } catch (error) {
+    console.warn("Falling back to empty electronics specs due to data error", error);
+    return [] as ElectronicsModelSpec[];
+  }
 });
 
 export const getElectronicsModelOptions = cache(async (modelId: number) => {
-  const supabase = await createSupabaseServerClient();
+  try {
+    const supabase = await createSupabaseServerClient();
 
-  const { data } = await supabase
-    .from("electronics_model_options")
-    .select("*")
-    .eq("model_id", modelId)
-    .order("option_type", { ascending: true })
-    .order("sort_order", { ascending: true });
+    const { data } = await supabase
+      .from("electronics_model_options")
+      .select("*")
+      .eq("model_id", modelId)
+      .order("option_type", { ascending: true })
+      .order("sort_order", { ascending: true });
 
-  return (data as ElectronicsModelOption[]) ?? [];
+    return (data as ElectronicsModelOption[]) ?? [];
+  } catch (error) {
+    console.warn("Falling back to empty electronics options due to data error", error);
+    return [] as ElectronicsModelOption[];
+  }
 });
 
 export const getElectronicsPostingConfig = cache(async (electronicsCategoryId: number) => {
-  const supabase = await createSupabaseServerClient();
+  try {
+    const supabase = await createSupabaseServerClient();
 
-  const { data } = await supabase
-    .from("posting_category_config")
-    .select("*")
-    .eq("electronics_category_id", electronicsCategoryId)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
+    const { data } = await supabase
+      .from("posting_category_config")
+      .select("*")
+      .eq("electronics_category_id", electronicsCategoryId)
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
 
-  if (!data) {
+    if (!data) {
+      return null;
+    }
+
+    return data as ElectronicsPostingConfig;
+  } catch (error) {
+    console.warn("Falling back to no electronics posting config due to data error", error);
     return null;
   }
-
-  return data as ElectronicsPostingConfig;
 });
 
 export const getAdminElectronicsCatalog = cache(async () => {

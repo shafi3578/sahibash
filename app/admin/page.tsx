@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { adminGetStatsAction } from "@/lib/actions/listings";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import { localizePath } from "@/lib/i18n/routing";
 
 export default async function AdminPage() {
-  await requireAdmin();
+  await requirePermission("admins.view");
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
   const stats = await adminGetStatsAction();
@@ -26,6 +26,10 @@ export default async function AdminPage() {
         <Link href={href("/admin/listings")} className="inline-block rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{ui.admin.listingApprovalQueue}</Link>
         <Link href={href("/admin/search")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{ui.admin.searchAdmin}</Link>
         <Link href={href("/admin/categories")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{ui.admin.categoryAdmin}</Link>
+        <Link href={href("/admin/pages")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Pages</Link>
+        <Link href={href("/admin/users")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Users</Link>
+        <Link href={href("/admin/roles")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Roles</Link>
+        <Link href={href("/admin/audit")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Audit log</Link>
       </div>
     </main>
   );

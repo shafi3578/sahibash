@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type ListingDraftPayload = {
-  postingType: "sell" | "wanted" | "telegram" | "quick";
+  postingType: "sell" | "rent" | "wanted" | "telegram" | "quick";
   category: Record<string, unknown>;
   details: Record<string, unknown>;
   photos: unknown[];

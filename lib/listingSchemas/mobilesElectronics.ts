@@ -6,6 +6,8 @@ const sections = {
   hardware: localized("Hardware & Storage", "سخت افزار و ذخیره", "هارډویر او زېرمه"),
   battery: localized("Battery / Screen / Body", "بی باتری / صفحه / بدنه", "بیټرۍ / سکرین / بدن"),
   accessories: localized("Accessories & Warranty", "لوازم و گارانتی", "لوازم او تضمین"),
+  connectivity: localized("Connectivity & Security", "اتصال و امنیت", "نښلېدنه او امنیت"),
+  authenticity: localized("Authenticity & Warranty", "اصالت و گارانتی", "اصالت او تضمین"),
 };
 
 function isPhone(path: string) {
@@ -58,6 +60,18 @@ export const mobilesElectronicsSchema: ListingSchemaDefinition = {
       resolve: (context) => {
         const value = firstMeaningfulText(readAttributeValue(context.attributes, "model", "device_model", "phone_model"));
         return value ? { key: "model", label: localized("Model", "مدل", "ماډل")[context.locale], value, sectionKey: "summary" } : null;
+      },
+    },
+    {
+      key: "release_year",
+      label: localized("Release Year", "سال عرضه", "د خپرېدو کال"),
+      sectionKey: "summary",
+      order: 3,
+      highlight: true,
+      consumes: ["release_year", "year", "model_year"],
+      resolve: (context) => {
+        const value = firstMeaningfulText(readAttributeValue(context.attributes, "release_year", "year", "model_year"));
+        return value ? { key: "release_year", label: localized("Release Year", "سال عرضه", "د خپرېدو کال")[context.locale], value, sectionKey: "summary" } : null;
       },
     },
     {
@@ -137,10 +151,106 @@ export const mobilesElectronicsSchema: ListingSchemaDefinition = {
       },
     },
     {
+      key: "battery_capacity",
+      label: localized("Battery Capacity", "ظرفیت باتری", "د بیټرۍ ظرفیت"),
+      sectionKey: "battery",
+      order: 1,
+      showIf: (context) => isPhone(context.path) || isTablet(context.path),
+      consumes: ["battery_capacity"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "battery_capacity");
+        return value ? { key: "battery_capacity", label: localized("Battery Capacity", "ظرفیت باتری", "د بیټرۍ ظرفیت")[context.locale], value, sectionKey: "battery" } : null;
+      },
+    },
+    {
+      key: "camera",
+      label: localized("Camera", "دوربین", "کیمره"),
+      sectionKey: "summary",
+      order: 4,
+      showIf: (context) => isPhone(context.path) || isTablet(context.path),
+      consumes: ["camera"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "camera");
+        return value ? { key: "camera", label: localized("Camera", "دوربین", "کیمره")[context.locale], value, sectionKey: "summary" } : null;
+      },
+    },
+    {
+      key: "refresh_rate",
+      label: localized("Refresh Rate", "نرخ تازه سازی", "ریفریش ریټ"),
+      sectionKey: "hardware",
+      order: 5,
+      showIf: (context) => isPhone(context.path) || isTablet(context.path) || isTv(context.path),
+      consumes: ["refresh_rate"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "refresh_rate");
+        return value ? { key: "refresh_rate", label: localized("Refresh Rate", "نرخ تازه سازی", "ریفریش ریټ")[context.locale], value, sectionKey: "hardware" } : null;
+      },
+    },
+    {
+      key: "charging_port",
+      label: localized("Charging Port", "پورت شارژ", "د چارج کولو پورټ"),
+      sectionKey: "connectivity",
+      order: 1,
+      showIf: (context) => isPhone(context.path) || isTablet(context.path),
+      consumes: ["charging_port"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "charging_port");
+        return value ? { key: "charging_port", label: localized("Charging Port", "پورت شارژ", "د چارج کولو پورټ")[context.locale], value, sectionKey: "connectivity" } : null;
+      },
+    },
+    {
+      key: "dual_sim",
+      label: localized("Dual SIM", "دو سیم", "ډبل سیم"),
+      sectionKey: "connectivity",
+      order: 2,
+      showIf: (context) => isPhone(context.path) || isTablet(context.path),
+      consumes: ["dual_sim"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "dual_sim");
+        return value ? { key: "dual_sim", label: localized("Dual SIM", "دو سیم", "ډبل سیم")[context.locale], value, sectionKey: "connectivity" } : null;
+      },
+    },
+    {
+      key: "face_unlock",
+      label: localized("Face Unlock", "باز شدن با چهره", "د مخ له لارې خلاصول"),
+      sectionKey: "connectivity",
+      order: 3,
+      showIf: (context) => isPhone(context.path),
+      consumes: ["face_unlock"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "face_unlock");
+        return value ? { key: "face_unlock", label: localized("Face Unlock", "باز شدن با چهره", "د مخ له لارې خلاصول")[context.locale], value, sectionKey: "connectivity" } : null;
+      },
+    },
+    {
+      key: "originality_status",
+      label: localized("Originality / IMEI", "اصالت / IMEI", "اصالت / IMEI"),
+      sectionKey: "authenticity",
+      order: 1,
+      showIf: (context) => isPhone(context.path),
+      consumes: ["originality_status", "imei_status"],
+      resolve: (context) => {
+        const value = firstMeaningfulText(readAttributeValue(context.attributes, "originality_status", "imei_status"));
+        return value ? { key: "originality_status", label: localized("Originality / IMEI", "اصالت / IMEI", "اصالت / IMEI")[context.locale], value, sectionKey: "authenticity" } : null;
+      },
+    },
+    {
+      key: "purchase_source",
+      label: localized("Purchase Source", "محل خرید", "د اخیستلو ځای"),
+      sectionKey: "authenticity",
+      order: 2,
+      showIf: (context) => isPhone(context.path) || isTablet(context.path) || isLaptop(context.path),
+      consumes: ["purchase_source", "purchase_place"],
+      resolve: (context) => {
+        const value = firstMeaningfulText(readAttributeValue(context.attributes, "purchase_source", "purchase_place"));
+        return value ? { key: "purchase_source", label: localized("Purchase Source", "محل خرید", "د اخیستلو ځای")[context.locale], value, sectionKey: "authenticity" } : null;
+      },
+    },
+    {
       key: "battery_health",
       label: localized("Battery Health", "سلامت باتری", "د بیټرۍ حالت"),
       sectionKey: "battery",
-      order: 1,
+      order: 3,
       showIf: (context) => isPhone(context.path) || isTablet(context.path) || isLaptop(context.path),
       consumes: ["battery_health"],
       resolve: (context) => {
@@ -224,7 +334,7 @@ export const mobilesElectronicsSchema: ListingSchemaDefinition = {
       key: "screen_condition",
       label: localized("Screen Condition", "حالت صفحه", "د سکرین حالت"),
       sectionKey: "battery",
-      order: 3,
+      order: 4,
       showIf: (context) => isPhone(context.path) || isTablet(context.path) || isTv(context.path),
       consumes: ["screen_condition"],
       resolve: (context) => {
@@ -236,7 +346,7 @@ export const mobilesElectronicsSchema: ListingSchemaDefinition = {
       key: "body_condition",
       label: localized("Body Condition", "حالت بدنه", "د بدن حالت"),
       sectionKey: "battery",
-      order: 4,
+      order: 5,
       showIf: (context) => isPhone(context.path) || isTablet(context.path),
       consumes: ["body_condition"],
       resolve: (context) => {
@@ -248,7 +358,7 @@ export const mobilesElectronicsSchema: ListingSchemaDefinition = {
       key: "repair_history",
       label: localized("Repair History", "سابقه ترمیم", "د ترمیم تاریخچه"),
       sectionKey: "battery",
-      order: 5,
+      order: 6,
       showIf: (context) => isPhone(context.path) || isTablet(context.path) || isLaptop(context.path),
       consumes: ["repair_history"],
       resolve: (context) => {
@@ -260,7 +370,7 @@ export const mobilesElectronicsSchema: ListingSchemaDefinition = {
       key: "face_id",
       label: localized("Face ID", "Face ID", "Face ID"),
       sectionKey: "battery",
-      order: 6,
+      order: 7,
       showIf: (context) => isPhone(context.path),
       consumes: ["face_id"],
       resolve: (context) => {
@@ -272,7 +382,7 @@ export const mobilesElectronicsSchema: ListingSchemaDefinition = {
       key: "fingerprint",
       label: localized("Fingerprint", "اثر انگشت", "د ګوتې نښه"),
       sectionKey: "battery",
-      order: 7,
+      order: 8,
       showIf: (context) => isPhone(context.path),
       consumes: ["fingerprint"],
       resolve: (context) => {
@@ -352,26 +462,28 @@ export const mobilesElectronicsSchema: ListingSchemaDefinition = {
     {
       key: "original_copy",
       label: localized("Original / Copy", "اصلی / کپی", "اصلي / کاپي"),
-      sectionKey: "battery",
-      order: 8,
+      sectionKey: "authenticity",
+      order: 3,
       showIf: (context) => isAccessory(context.path),
       consumes: ["original_copy"],
       resolve: (context) => {
         const value = readAttributeValue(context.attributes, "original_copy");
-        return value ? { key: "original_copy", label: localized("Original / Copy", "اصلی / کپی", "اصلي / کاپي")[context.locale], value, sectionKey: "battery" } : null;
+        return value ? { key: "original_copy", label: localized("Original / Copy", "اصلی / کپی", "اصلي / کاپي")[context.locale], value, sectionKey: "authenticity" } : null;
       },
     },
   ],
   sections: [
-    { key: "summary", title: sections.summary, order: 10, fieldKeys: ["brand", "model", "pta_status", "smart_tv", "resolution", "wifi_sim", "accessory_type", "compatible_brand_model"], hideIfEmpty: true },
-    { key: "hardware", title: sections.hardware, order: 20, fieldKeys: ["storage", "ram", "processor", "graphics_card", "storage_type", "screen_size", "sim_type"], hideIfEmpty: true },
-    { key: "battery", title: sections.battery, order: 30, fieldKeys: ["battery_health", "condition", "screen_condition", "body_condition", "repair_history", "face_id", "fingerprint", "original_copy"], hideIfEmpty: true },
+    { key: "summary", title: sections.summary, order: 10, fieldKeys: ["brand", "model", "release_year", "camera", "pta_status", "smart_tv", "resolution", "wifi_sim", "accessory_type", "compatible_brand_model"], hideIfEmpty: true },
+    { key: "hardware", title: sections.hardware, order: 20, fieldKeys: ["storage", "ram", "processor", "graphics_card", "storage_type", "screen_size", "refresh_rate", "sim_type"], hideIfEmpty: true },
+    { key: "battery", title: sections.battery, order: 30, fieldKeys: ["battery_capacity", "battery_health", "condition", "screen_condition", "body_condition", "repair_history", "face_id", "fingerprint"], hideIfEmpty: true },
     { key: "accessories", title: sections.accessories, order: 40, fieldKeys: ["charger", "box_carton", "warranty", "exchange_possible"], hideIfEmpty: true },
+    { key: "connectivity", title: sections.connectivity, order: 50, fieldKeys: ["charging_port", "dual_sim", "face_unlock"], hideIfEmpty: true },
+    { key: "authenticity", title: sections.authenticity, order: 60, fieldKeys: ["originality_status", "purchase_source", "original_copy"], hideIfEmpty: true },
   ],
-  postingFields: ["brand", "model", "storage", "ram", "processor", "graphics_card", "storage_type", "screen_size", "battery_health", "sim_type", "pta_status", "smart_tv", "resolution", "wifi_sim", "condition", "screen_condition", "body_condition", "repair_history", "face_id", "fingerprint", "charger", "box_carton", "warranty", "exchange_possible", "accessory_type", "compatible_brand_model", "original_copy"],
+  postingFields: ["brand", "model", "release_year", "camera", "storage", "ram", "processor", "graphics_card", "storage_type", "screen_size", "refresh_rate", "battery_capacity", "battery_health", "sim_type", "pta_status", "smart_tv", "resolution", "wifi_sim", "condition", "screen_condition", "body_condition", "repair_history", "face_id", "fingerprint", "charging_port", "dual_sim", "face_unlock", "originality_status", "purchase_source", "charger", "box_carton", "warranty", "exchange_possible", "accessory_type", "compatible_brand_model", "original_copy"],
   requiredFields: ["brand", "model", "storage", "ram", "condition", "price", "province", "district", "photos"],
-  optionalFields: ["processor", "graphics_card", "storage_type", "screen_size", "battery_health", "sim_type", "pta_status", "smart_tv", "resolution", "wifi_sim", "screen_condition", "body_condition", "repair_history", "face_id", "fingerprint", "charger", "box_carton", "warranty", "exchange_possible", "accessory_type", "compatible_brand_model", "original_copy"],
-  filterFields: ["brand", "model", "storage", "ram", "screen_size", "condition", "price"],
+  optionalFields: ["release_year", "camera", "processor", "graphics_card", "storage_type", "screen_size", "refresh_rate", "battery_capacity", "battery_health", "sim_type", "pta_status", "smart_tv", "resolution", "wifi_sim", "screen_condition", "body_condition", "repair_history", "face_id", "fingerprint", "charging_port", "dual_sim", "face_unlock", "originality_status", "purchase_source", "charger", "box_carton", "warranty", "exchange_possible", "accessory_type", "compatible_brand_model", "original_copy"],
+  filterFields: ["brand", "model", "release_year", "storage", "ram", "screen_size", "condition", "price"],
   autoFillRules: [
     { when: localized("When brand and model are selected", "وقتی برند و مدل انتخاب شد", "کله چې برنډ او ماډل وټاکل شي"), suggest: [localized("Suggest storage options", "گزینه های حافظه را پیشنهاد کن", "د زېرمه انتخابونه وړاندیز کړه"), localized("Suggest RAM options", "گزینه های رم را پیشنهاد کن", "د رام انتخابونه وړاندیز کړه"), localized("Suggest release year", "سال عرضه را پیشنهاد کن", "د خپرېدو کال وړاندیز کړه"), localized("Suggest common colors", "رنگ های رایج را پیشنهاد کن", "عام رنګونه وړاندیز کړه")] },
   ],

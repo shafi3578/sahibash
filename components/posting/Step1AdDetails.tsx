@@ -27,8 +27,8 @@ export const Step1AdDetails = ({ onContinue }: Step1AdDetailsProps) => {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newPhotos = Array.from(e.target.files);
-      if (photos.length + newPhotos.length > 10) {
-        setErrors((prev) => ({ ...prev, photos: 'Maximum 10 photos allowed' }));
+      if (photos.length + newPhotos.length > 20) {
+        setErrors((prev) => ({ ...prev, photos: 'Maximum 20 photos allowed' }));
         return;
       }
       setPhotos((prev) => [...prev, ...newPhotos]);
@@ -84,7 +84,7 @@ export const Step1AdDetails = ({ onContinue }: Step1AdDetailsProps) => {
       {/* Photos Section */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Photos ({photos.length}/10)
+          Photos ({photos.length}/20)
         </label>
         
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2">
@@ -104,7 +104,7 @@ export const Step1AdDetails = ({ onContinue }: Step1AdDetailsProps) => {
             </div>
           ))}
           
-          {photos.length < 10 && (
+          {photos.length < 20 && (
             <label className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 h-24">
               <span className="text-2xl text-gray-400">+</span>
               <input
