@@ -11,6 +11,10 @@ export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: L
   const [config, setConfig] = useState(initial);
   const [activeLocale, setActiveLocale] = useState<(typeof locales)[number]>("en");
   const serialized = useMemo(() => JSON.stringify(config), [config]);
+  const detailPreview = useMemo(() => config.sections.filter((section) => section.visible).sort((a, b) => a.order - b.order).map((section) => ({
+    ...section,
+    fields: config.fields.filter((field) => field.active && field.detail && field.sectionKey === section.key).sort((a, b) => a.order - b.order),
+  })), [config]);
   const updateField = (index: number, patch: Partial<ConfiguredListingField>) => setConfig((current) => ({
     ...current,
     fields: current.fields.map((field, fieldIndex) => fieldIndex === index ? { ...field, ...patch } : field),
@@ -22,6 +26,16 @@ export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: L
   const addField = () => setConfig((current) => {
     const number = current.fields.length + 1;
     return { ...current, fields: [...current.fields, { key: `field_${number}`, type: "text", labels: { en: `Field ${number}`, fa: `Field ${number}`, ps: `Field ${number}` }, options: [], unit: null, sectionKey: current.sections[0]?.key || "details", order: current.fields.length, required: false, posting: true, filter: false, card: false, detail: true, active: true }] };
+  });
+  const updateSectionKey = (index: number, nextKey: string) => setConfig((current) => {
+    const previousKey = current.sections[index]?.key;
+    return { ...current, sections: current.sections.map((section, i) => i === index ? { ...section, key: nextKey } : section), fields: current.fields.map((field) => field.sectionKey === previousKey ? { ...field, sectionKey: nextKey } : field) };
+  });
+  const removeSection = (index: number) => setConfig((current) => {
+    if (current.sections.length <= 1) return current;
+    const removedKey = current.sections[index]?.key;
+    const sections = current.sections.filter((_, i) => i !== index);
+    return { ...current, sections, fields: current.fields.map((field) => field.sectionKey === removedKey ? { ...field, sectionKey: sections[0].key } : field) };
   });
 
   return (
@@ -40,13 +54,18 @@ export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: L
         <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Detail-page sections</h2><button type="button" onClick={addSection} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm font-semibold">Add section</button></div>
         <div className="mt-3 space-y-3">
           {config.sections.map((section, index) => <div key={`${section.key}-${index}`} className="grid gap-3 rounded-xl bg-[var(--surface-2)] p-3 md:grid-cols-[1fr_2fr_7rem_7rem_7rem]">
-            <input value={section.key} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, key: event.target.value } : item) }))} aria-label="Section key" className="rounded-lg border border-[var(--line)] px-3 py-2" />
+            <input value={section.key} onChange={(event) => updateSectionKey(index, event.target.value)} aria-label="Section key" className="rounded-lg border border-[var(--line)] px-3 py-2" />
             <input dir={activeLocale === "en" ? "ltr" : "rtl"} value={section.titles[activeLocale]} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, titles: { ...item.titles, [activeLocale]: event.target.value } } : item) }))} aria-label={`Section title in ${localeNames[activeLocale]}`} className="rounded-lg border border-[var(--line)] px-3 py-2" />
             <input type="number" min="0" value={section.order} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, order: Number(event.target.value) } : item) }))} aria-label="Section order" className="rounded-lg border border-[var(--line)] px-3 py-2" />
             <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={section.visible} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, visible: event.target.checked } : item) }))} /> Visible</label>
-            <button type="button" disabled={config.sections.length === 1} onClick={() => setConfig((current) => ({ ...current, sections: current.sections.filter((_, i) => i !== index) }))} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-40">Remove</button>
+            <button type="button" disabled={config.sections.length === 1} onClick={() => removeSection(index)} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-40">Remove</button>
           </div>)}
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4" dir={activeLocale === "en" ? "ltr" : "rtl"}>
+        <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Live detail-page preview</h2><p className="mt-1 text-sm text-[var(--ink-2)]">Only active fields with Detail enabled appear here.</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-bold">{localeNames[activeLocale]}</span></div>
+        <div className="mt-4 space-y-3">{detailPreview.map((section) => <section key={`preview-${section.key}`} className="overflow-hidden rounded-xl border border-[var(--line)] bg-white"><header className="border-b border-[var(--line)] bg-[var(--wash)] px-4 py-3"><h3 className="font-bold">{section.titles[activeLocale] || section.titles.en}</h3></header>{section.fields.length ? <div className="grid md:grid-cols-2">{section.fields.map((field) => <div key={`preview-${section.key}-${field.key}`} className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 py-3 text-sm"><span className="text-[var(--ink-2)]">{field.labels[activeLocale] || field.labels.en}</span><span className="font-semibold">{field.options[0]?.labels[activeLocale] || field.options[0]?.labels.en || (field.type === "boolean" ? "Yes / No" : "Example value")}</span></div>)}</div> : <p className="px-4 py-4 text-sm text-[var(--ink-2)]">No visible detail fields in this section.</p>}</section>)}</div>
       </section>
 
       <section className="rounded-2xl border border-[var(--line)] bg-white p-4">

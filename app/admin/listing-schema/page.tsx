@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getListingSchemaHistory } from "@/lib/data/listing-schema-config";
 import { normalizeListingSchemaConfig, type ListingSchemaConfig, type SchemaOption } from "@/lib/listing-schema-config";
 import { SchemaBuilder } from "./schema-builder";
+import { CategoryNavigator } from "./category-navigator";
 
 type Params = Promise<{ node?: string; saved?: string }>;
 const labels = (value: string) => ({ en: value, fa: value, ps: value });
@@ -39,8 +40,8 @@ export default async function ListingSchemaAdminPage({ searchParams }: { searchP
   return <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
     <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-3xl font-bold">Listing Schema Builder</h1><p className="mt-1 text-[var(--ink-2)]">Configure posting, search, cards and detail pages for every category and subcategory.</p></div><Link href="/admin/categories" className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm font-semibold">Back to categories</Link></div>
     {params.saved ? <p className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Version published successfully.</p> : null}
-    <form className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-4"><label className="text-sm font-bold">Category or subcategory<select name="node" defaultValue={selectedId} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">{allNodes.map((node) => <option key={node.id} value={node.id}>{`${"— ".repeat(Math.max(0, Number(node.level) - 1))}${node.path} — ${node.name}${node.is_active ? "" : " (inactive)"}`}</option>)}</select></label><button className="mt-3 rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">Load schema</button><p className="mt-2 text-xs text-[var(--ink-2)]">{allNodes.length} categories and subcategories available.</p></form>
+    <CategoryNavigator nodes={allNodes.map((node) => ({ ...node, id: Number(node.id), level: Number(node.level) }))} selectedId={selectedId} />
     <div className="mt-4 flex flex-wrap gap-3 text-sm text-[var(--ink-2)]"><span>Selected: <strong>{selected?.path ?? "None"}</strong></span><span>Published version: <strong>{published?.version ?? 0}</strong></span><span>History retained: <strong>{history.length}</strong></span></div>
-    {selected && config ? <div className="mt-6"><SchemaBuilder initial={config} categoryNodeId={selectedId} version={published?.version ?? 0} /></div> : <p className="mt-6">Select a category to begin.</p>}
+    {selected && config ? <div className="mt-6"><SchemaBuilder key={selectedId} initial={config} categoryNodeId={selectedId} version={published?.version ?? 0} /></div> : <p className="mt-6">Select a category to begin.</p>}
   </main>;
 }
