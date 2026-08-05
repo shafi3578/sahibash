@@ -26,6 +26,7 @@ import {
   buildElectronicsDynamicAttributeRows,
   normalizeElectronicsDynamicAttributes,
 } from "@/lib/posting/electronics-dynamic";
+import { validateListingImage } from "@/lib/posting/image-validation";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -907,6 +908,46 @@ async function ensureCategoryPostingAllowed(
   return { ok: true };
 }
 
+async function validatePublishedPostingSchema(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  categoryNodeId: number,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data } = await supabase
+    .from("listing_schema_versions")
+    .select("config")
+    .eq("category_node_id", categoryNodeId)
+    .eq("status", "published")
+    .maybeSingle();
+
+  const config = data?.config as { fields?: Array<Record<string, unknown>> } | undefined;
+  if (!Array.isArray(config?.fields)) return { ok: true };
+
+  for (const field of config.fields) {
+    if (field.active === false || field.posting === false) continue;
+    const key = String(field.key ?? "").trim();
+    if (!key) continue;
+    const values = formData.getAll(key).map((value) => String(value).trim()).filter(Boolean);
+    const labels = field.labels as Record<string, unknown> | undefined;
+    const label = String(labels?.en ?? key.replace(/_/g, " "));
+
+    if (field.required === true && values.length === 0) {
+      return { ok: false, message: `${label} is required.` };
+    }
+
+    if (values.length > 0 && Array.isArray(field.options) && field.options.length > 0) {
+      const allowed = new Set(
+        (field.options as Array<{ value?: unknown }>).map((option) => String(option.value ?? ""))
+      );
+      if (values.some((value) => !allowed.has(value))) {
+        return { ok: false, message: `Invalid value for ${label}.` };
+      }
+    }
+  }
+
+  return { ok: true };
+}
+
 async function resolveLegacySubcategoryId(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   categoryId: number,
@@ -1190,6 +1231,10 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   if (!postingGuard.ok) {
     return;
   }
+  const selectedCategoryNodeId = getSelectedCategoryNodeId(input);
+  if (!selectedCategoryNodeId) return;
+  const schemaGuard = await validatePublishedPostingSchema(supabase, selectedCategoryNodeId, formData);
+  if (!schemaGuard.ok) return;
 
   const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
   if (!vehicleGuard.ok) {
@@ -1270,6 +1315,10 @@ export async function createListingAction(formData: FormData): Promise<{
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
   }
+  const selectedCategoryNodeId = getSelectedCategoryNodeId(input);
+  if (!selectedCategoryNodeId) return { ok: false, message: "Must select a category" };
+  const schemaGuard = await validatePublishedPostingSchema(supabase, selectedCategoryNodeId, formData);
+  if (!schemaGuard.ok) return { ok: false, message: schemaGuard.message };
 
   const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
   if (!vehicleGuard.ok) {
@@ -1371,6 +1420,10 @@ export async function updateListingAction(
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
   }
+  const selectedCategoryNodeId = getSelectedCategoryNodeId(input);
+  if (!selectedCategoryNodeId) return { ok: false, message: "Must select a category" };
+  const schemaGuard = await validatePublishedPostingSchema(supabase, selectedCategoryNodeId, formData);
+  if (!schemaGuard.ok) return { ok: false, message: schemaGuard.message };
 
   const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
   if (!vehicleGuard.ok) {
@@ -1560,6 +1613,9 @@ export async function uploadListingImageFormAction(
     return;
   }
 
+  const validatedImage = await validateListingImage(image);
+  if (!validatedImage.ok) return;
+
   // Verify ownership
   const { data: listing } = await supabase
     .from("listings")
@@ -1571,8 +1627,7 @@ export async function uploadListingImageFormAction(
     return;
   }
 
-  const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${validatedImage.extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from("listing-images")
@@ -1620,9 +1675,9 @@ export async function uploadListingImageAction(
   }
   const supabase = await createSupabaseServerClient();
 
-  if (!image || image.size === 0) {
-    return { ok: false, message: "Invalid image" };
-  }
+  if (!image || image.size === 0) return { ok: false, message: "Invalid image" };
+  const validatedImage = await validateListingImage(image);
+  if (!validatedImage.ok) return validatedImage;
 
   const { data: listing, error: listingError } = await supabase
     .from("listings")
@@ -1646,8 +1701,7 @@ export async function uploadListingImageAction(
     }
   }
 
-  const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${validatedImage.extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from("listing-images")
