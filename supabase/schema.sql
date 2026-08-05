@@ -529,19 +529,20 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = ''
 as $$
-  select exists (
-    select 1
-    from public.profiles p
-    where p.id = uid
-      and p.role = 'admin'
-  )
-  or exists (
-    select 1
-    from public.admin_user_roles ur
-    where ur.user_id = uid
-  );
+  select uid is not null
+    and uid = (select auth.uid())
+    and (
+      exists (
+        select 1 from public.profiles p
+        where p.id = uid and p.role = 'admin'
+      )
+      or exists (
+        select 1 from public.admin_user_roles ur
+        where ur.user_id = uid
+      )
+    );
 $$;
 
 create or replace function public.handle_new_user()

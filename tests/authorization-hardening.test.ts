@@ -13,6 +13,16 @@ const migration = readFileSync(
   "utf8",
 );
 
+const rlsHelperMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260805045737_restore_guarded_rls_helpers.sql",
+  ),
+  "utf8",
+);
+
 const listingActions = readFileSync(
   join(process.cwd(), "lib", "actions", "listings.ts"),
   "utf8",
@@ -47,4 +57,10 @@ test("seller promotion actions cannot write featured or urgent flags", () => {
 
   assert.doesNotMatch(featuredAction, /\.update\(\{\s*featured/i);
   assert.doesNotMatch(urgentAction, /\.update\(\{\s*urgent/i);
+});
+
+test("public RLS helper is callable but cannot inspect another identity", () => {
+  assert.match(rlsHelperMigration, /uid = \(select auth\.uid\(\)\)/i);
+  assert.match(rlsHelperMigration, /grant execute on function public\.is_admin\(uuid\) to anon, authenticated, service_role/i);
+  assert.match(rlsHelperMigration, /set search_path = ''/i);
 });
