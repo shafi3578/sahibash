@@ -159,12 +159,16 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
                     slot={`hotspot-${part.key}`}
                     data-position={hotspot.position}
                     data-normal={hotspot.normal}
-                    className="pointer-events-none max-w-32 rounded-lg border-2 border-white bg-slate-950/90 px-2 py-1 text-center text-[10px] font-extrabold leading-tight text-white shadow-xl backdrop-blur-sm sm:max-w-40 sm:px-2.5 sm:py-1.5 sm:text-xs"
-                    style={{ borderColor: condition.color }}
+                    data-visibility-attribute="visible"
+                    className="pointer-events-none flex -translate-x-1/2 -translate-y-full flex-col items-center opacity-0 transition-opacity data-[visible]:opacity-100"
                     aria-label={`${damagePartLabel(part.key, locale)}: ${condition.labels[locale]}`}
                   >
-                    <span className="block whitespace-nowrap">{damagePartLabel(part.key, locale)}</span>
-                    <span className="block whitespace-nowrap" style={{ color: condition.color }}>{condition.labels[locale]}</span>
+                    <span className="max-w-32 rounded-md border bg-slate-950/95 px-2 py-1 text-center text-[9px] font-extrabold leading-tight text-white shadow-lg sm:max-w-40 sm:text-[11px]" style={{ borderColor: condition.color }}>
+                      <span className="block whitespace-nowrap">{damagePartLabel(part.key, locale)}</span>
+                      <span className="block whitespace-nowrap" style={{ color: condition.color }}>{condition.labels[locale]}</span>
+                    </span>
+                    <span className="block h-3 w-0.5" style={{ backgroundColor: condition.color }} aria-hidden="true" />
+                    <span className="block h-2.5 w-2.5 rounded-full border-2 border-white shadow-md" style={{ backgroundColor: condition.color }} aria-hidden="true" />
                   </button>
                 );
               }) : null}
