@@ -15,6 +15,7 @@ type TranslationTree = {
   footer: {
     platform: string;
     tagline: string;
+    quickLinks: string;
   };
   auth: {
     loginTitle: string;
@@ -354,6 +355,7 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
     footer: {
       platform: "Afghan",
       tagline: "Afghanistan marketplace for trusted listings.",
+      quickLinks: "Quick links",
     },
     auth: {
       loginTitle: "Login",
@@ -743,6 +745,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
     footer: {
       platform: "افغان",
       tagline: "بازار آنلاین افغانستان با اعلان های قابل اعتماد.",
+      quickLinks: "پیوندهای سریع",
     },
     auth: {
       loginTitle: "ورود",
@@ -836,6 +839,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
     footer: {
       platform: "افغان",
       tagline: "د افغانستان بازار د باوري اعلانونو لپاره.",
+      quickLinks: "چټک تړونونه",
     },
     auth: {
       loginTitle: "ننوتل",

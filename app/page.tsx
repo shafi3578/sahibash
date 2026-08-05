@@ -79,6 +79,12 @@ export default async function HomePage() {
   const featured = listings.filter((l) => l.featured).slice(0, 4);
   const latest = listings.slice(0, 8);
   const featuredRow = featured.length ? featured : latest.slice(0, 6);
+  const localizedNavigationLabel = (path: string, label: string) => {
+    if (path === "/listings") return t.home.browseListings;
+    if (path === "/categories") return t.home.mainCategories;
+    if (path.startsWith("/post-ad")) return t.home.postAd;
+    return label;
+  };
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-5 px-0 pb-28 pt-4 sm:px-4 sm:pb-16 lg:px-6">
@@ -89,7 +95,7 @@ export default async function HomePage() {
             <div className="inline-flex rounded-full border border-[#e6b85c]/40 bg-[#e6b85c]/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-[#f4d99c]">
               {afghanistanCopy.eyebrow}
             </div>
-            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.28em] text-white/60">{siteSettings.site_tagline}</p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.28em] text-white/60">{locale === "en" ? siteSettings.site_tagline : t.footer.tagline}</p>
             <h1 className="mt-3 max-w-3xl font-display text-4xl font-bold leading-[1.08] sm:text-6xl">
               {afghanistanCopy.heroTitle}
             </h1>
@@ -98,11 +104,11 @@ export default async function HomePage() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href={href(siteSettings.home_primary_cta_path ?? "/listings")} className="rounded-xl bg-[#e6b85c] px-5 py-3 text-sm font-bold text-[#18352f] shadow-lg shadow-black/10 transition hover:bg-[#f2cb7a]">
-                {siteSettings.home_primary_cta_label}
+                {localizedNavigationLabel(siteSettings.home_primary_cta_path ?? "/listings", siteSettings.home_primary_cta_label ?? t.home.browseListings)}
               </Link>
               {siteSettings.home_secondary_cta_label && siteSettings.home_secondary_cta_path ? (
                 <Link href={href(siteSettings.home_secondary_cta_path)} className="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur">
-                  {siteSettings.home_secondary_cta_label}
+                  {localizedNavigationLabel(siteSettings.home_secondary_cta_path, siteSettings.home_secondary_cta_label)}
                 </Link>
               ) : null}
             </div>
@@ -125,7 +131,7 @@ export default async function HomePage() {
             <div className="mt-3 grid gap-2">
             {(siteSettings.navigation_links ?? []).slice(0, 3).map((link) => (
               <Link key={`${link.label}-${link.path}`} href={href(link.path)} className="rounded-xl px-3 py-2 text-sm font-semibold text-white/85 transition hover:bg-white/10 hover:text-white">
-                {link.label}
+                {localizedNavigationLabel(link.path, link.label)}
               </Link>
             ))}
             </div>

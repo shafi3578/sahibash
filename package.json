@@ -11,7 +11,10 @@
     "test:search-parity": "node --import tsx --test tests/multilingual-search-parity.test.ts",
     "test:posting-access": "node --import tsx --test tests/posting-access-control.test.ts tests/listing-image-validation.test.ts tests/vehicle-model-catalog.test.ts",
     "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts",
-    "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts tests/taxonomy-schema-migrations.test.ts"
+    "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts tests/taxonomy-schema-migrations.test.ts",
+    "test:security": "node --import tsx --test tests/authorization-hardening.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:i18n-parity && npm run test:search-parity && npm run test:posting-access && npm run test:smart-posting && npm run test:listing-schema && npm run test:security"
   },
   "dependencies": {
     "@google/model-viewer": "^4.2.0",

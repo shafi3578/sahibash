@@ -836,24 +836,25 @@ alter table public.ai_detection_logs enable row level security;
 
 -- profiles
 
+revoke insert, update on table public.profiles from anon, authenticated;
+grant select on table public.profiles to authenticated;
+grant update (full_name, phone, city, avatar_url, province, preferred_language, updated_at)
+on public.profiles to authenticated;
+
 drop policy if exists profiles_select_own_or_admin on public.profiles;
 create policy profiles_select_own_or_admin
 on public.profiles
 for select
 using (auth.uid() = id or public.is_admin(auth.uid()));
 
-drop policy if exists profiles_insert_own on public.profiles;
-create policy profiles_insert_own
-on public.profiles
-for insert
-with check (auth.uid() = id);
-
 drop policy if exists profiles_update_own_or_admin on public.profiles;
-create policy profiles_update_own_or_admin
+drop policy if exists profiles_update_own on public.profiles;
+create policy profiles_update_own
 on public.profiles
 for update
-using (auth.uid() = id or public.is_admin(auth.uid()))
-with check (auth.uid() = id or public.is_admin(auth.uid()));
+to authenticated
+using ((select auth.uid()) = id)
+with check ((select auth.uid()) = id);
 
 -- categories / category_nodes / category_fields
 
@@ -952,14 +953,20 @@ with check (
 );
 
 drop policy if exists listings_update_owner_or_admin on public.listings;
-create policy listings_update_owner_or_admin
+drop policy if exists listings_update_owner_limited_or_admin on public.listings;
+create policy listings_update_owner_limited_or_admin
 on public.listings
 for update
-using (user_id = auth.uid() or public.is_admin(auth.uid()))
+to authenticated
+using (user_id = (select auth.uid()) or (select public.is_admin((select auth.uid()))))
 with check (
-  public.is_admin(auth.uid())
+  (select public.is_admin((select auth.uid())))
   or (
-    user_id = auth.uid()
+    user_id = (select auth.uid())
+    and featured = false
+    and urgent = false
+    and approved_by is null
+    and approved_at is null
     and status in ('pending', 'rejected', 'sold', 'expired')
   )
 );

@@ -1912,66 +1912,18 @@ export async function toggleListingFeaturedAction(
   listingId: string,
   featured: boolean
 ): Promise<{ ok: boolean; message: string }> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-
-  const { data: listing, error: fetchError } = await supabase
-    .from("listings")
-    .select("user_id")
-    .eq("id", listingId)
-    .single();
-
-  if (fetchError || !listing || listing.user_id !== user.id) {
-    return { ok: false, message: "Unauthorized" };
-  }
-
-  const { error } = await supabase
-    .from("listings")
-    .update({ featured })
-    .eq("id", listingId);
-
-  if (error) {
-    return { ok: false, message: error.message };
-  }
-
-  revalidatePath("/");
-  revalidatePath("/listings");
-  revalidatePath(`/listings/${listingId}`);
-  revalidatePath(`/listings/${listingId}/manage`);
-  revalidatePath("/dashboard/my-ads");
-  return { ok: true, message: featured ? "Listing featured" : "Listing unfeatured" };
+  void listingId;
+  void featured;
+  await requireUser();
+  return { ok: false, message: "Featured promotion requires administrator approval." };
 }
 
 export async function toggleListingUrgentAction(
   listingId: string,
   urgent: boolean
 ): Promise<{ ok: boolean; message: string }> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-
-  const { data: listing, error: fetchError } = await supabase
-    .from("listings")
-    .select("user_id")
-    .eq("id", listingId)
-    .single();
-
-  if (fetchError || !listing || listing.user_id !== user.id) {
-    return { ok: false, message: "Unauthorized" };
-  }
-
-  const { error } = await supabase
-    .from("listings")
-    .update({ urgent })
-    .eq("id", listingId);
-
-  if (error) {
-    return { ok: false, message: error.message };
-  }
-
-  revalidatePath("/");
-  revalidatePath("/listings");
-  revalidatePath(`/listings/${listingId}`);
-  revalidatePath(`/listings/${listingId}/manage`);
-  revalidatePath("/dashboard/my-ads");
-  return { ok: true, message: urgent ? "Listing marked urgent" : "Urgent removed" };
+  void listingId;
+  void urgent;
+  await requireUser();
+  return { ok: false, message: "Urgent promotion requires administrator approval." };
 }
