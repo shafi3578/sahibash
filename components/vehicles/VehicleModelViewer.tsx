@@ -19,6 +19,22 @@ type ModelViewerMaterial = {
 
 type ModelViewerElement = HTMLElement & { model?: { materials: ModelViewerMaterial[] } };
 
+const PANEL_HOTSPOTS: Record<string, { position: string; normal: string }> = {
+  front_bumper: { position: "0m 0.4m 2.2m", normal: "0m 0m 1m" },
+  hood: { position: "0m 0.9m 1.3m", normal: "0m 1m 0.25m" },
+  roof: { position: "0m 1.4m 0m", normal: "0m 1m 0m" },
+  trunk: { position: "0m 0.8m -1.5m", normal: "0m 1m -0.25m" },
+  rear_bumper: { position: "0m 0.4m -2.2m", normal: "0m 0m -1m" },
+  front_left_fender: { position: "-0.9m 0.65m 1.4m", normal: "-1m 0.25m 0m" },
+  front_right_fender: { position: "0.9m 0.65m 1.4m", normal: "1m 0.25m 0m" },
+  front_left_door: { position: "-1m 0.7m 0.4m", normal: "-1m 0.15m 0m" },
+  front_right_door: { position: "1m 0.7m 0.4m", normal: "1m 0.15m 0m" },
+  rear_left_door: { position: "-1m 0.7m -0.6m", normal: "-1m 0.15m 0m" },
+  rear_right_door: { position: "1m 0.7m -0.6m", normal: "1m 0.15m 0m" },
+  rear_left_fender: { position: "-0.9m 0.6m -1.5m", normal: "-1m 0.2m 0m" },
+  rear_right_fender: { position: "0.9m 0.6m -1.5m", normal: "1m 0.2m 0m" },
+};
+
 function hexColorFactor(hex: string): [number, number, number, number] {
   const value = hex.replace("#", "");
   return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255).concat(1) as [number, number, number, number];
@@ -131,7 +147,28 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
               loading="eager"
               reveal="auto"
               className="h-[320px] w-full sm:h-[460px]"
-            />
+            >
+              {model.supportsPanelColors ? nonOriginalParts.map((part) => {
+                const hotspot = PANEL_HOTSPOTS[part.key];
+                if (!hotspot) return null;
+                const condition = damageCondition(part.condition);
+                return (
+                  <button
+                    key={part.key}
+                    type="button"
+                    slot={`hotspot-${part.key}`}
+                    data-position={hotspot.position}
+                    data-normal={hotspot.normal}
+                    className="pointer-events-none max-w-32 rounded-lg border-2 border-white bg-slate-950/90 px-2 py-1 text-center text-[10px] font-extrabold leading-tight text-white shadow-xl backdrop-blur-sm sm:max-w-40 sm:px-2.5 sm:py-1.5 sm:text-xs"
+                    style={{ borderColor: condition.color }}
+                    aria-label={`${damagePartLabel(part.key, locale)}: ${condition.labels[locale]}`}
+                  >
+                    <span className="block whitespace-nowrap">{damagePartLabel(part.key, locale)}</span>
+                    <span className="block whitespace-nowrap" style={{ color: condition.color }}>{condition.labels[locale]}</span>
+                  </button>
+                );
+              }) : null}
+            </model-viewer>
             {state === "loading" ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-center gap-2 bg-white/85 px-3 py-2 text-xs font-semibold backdrop-blur-sm" aria-live="polite">
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
