@@ -19,22 +19,6 @@ type ModelViewerMaterial = {
 
 type ModelViewerElement = HTMLElement & { model?: { materials: ModelViewerMaterial[] } };
 
-const PANEL_HOTSPOTS: Record<string, { position: string; normal: string }> = {
-  front_bumper: { position: "0m 0.4m 2.2m", normal: "0m 0m 1m" },
-  hood: { position: "0m 0.78m 1.62m", normal: "0m 1m 0.25m" },
-  roof: { position: "0m 1.4m 0m", normal: "0m 1m 0m" },
-  trunk: { position: "0m 0.8m -1.5m", normal: "0m 1m -0.25m" },
-  rear_bumper: { position: "0m 0.4m -2.2m", normal: "0m 0m -1m" },
-  front_left_fender: { position: "-0.78m 0.62m 1.4m", normal: "-1m 0.25m 0m" },
-  front_right_fender: { position: "0.78m 0.62m 1.4m", normal: "1m 0.25m 0m" },
-  front_left_door: { position: "-0.78m 0.66m 0.3m", normal: "-1m 0.15m 0m" },
-  front_right_door: { position: "0.78m 0.66m 0.3m", normal: "1m 0.15m 0m" },
-  rear_left_door: { position: "-0.78m 0.66m -0.62m", normal: "-1m 0.15m 0m" },
-  rear_right_door: { position: "0.78m 0.66m -0.62m", normal: "1m 0.15m 0m" },
-  rear_left_fender: { position: "-0.78m 0.58m -1.5m", normal: "-1m 0.2m 0m" },
-  rear_right_fender: { position: "0.78m 0.58m -1.5m", normal: "1m 0.2m 0m" },
-};
-
 function hexColorFactor(hex: string): [number, number, number, number] {
   const value = hex.replace("#", "");
   return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255).concat(1) as [number, number, number, number];
@@ -147,33 +131,7 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
               loading="eager"
               reveal="auto"
               className="h-[320px] w-full sm:h-[460px]"
-            >
-              {model.supportsPanelColors ? nonOriginalParts.map((part) => {
-                const hotspot = PANEL_HOTSPOTS[part.key];
-                if (!hotspot) return null;
-                const condition = damageCondition(part.condition);
-                return (
-                  <button
-                    key={part.key}
-                    type="button"
-                    slot={`hotspot-${part.key}`}
-                    data-position={hotspot.position}
-                    data-normal={hotspot.normal}
-                    data-visibility-attribute="visible"
-                    className="pointer-events-none -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity data-[visible]:opacity-100"
-                    aria-label={`${damagePartLabel(part.key, locale)}: ${condition.labels[locale]}`}
-                  >
-                    <span
-                      className="block whitespace-nowrap text-center text-[10px] font-black uppercase leading-none tracking-tight text-white/90 sm:text-xs"
-                      style={{ WebkitTextStroke: `1px ${condition.color}`, textShadow: "0 1px 2px rgba(0,0,0,.95), 0 0 5px rgba(0,0,0,.8)" }}
-                    >
-                      <span className="block">{condition.labels[locale]}</span>
-                      <span className="mt-0.5 block text-[7px] font-extrabold normal-case tracking-normal text-white/80 sm:text-[8px]">{damagePartLabel(part.key, locale)}</span>
-                    </span>
-                  </button>
-                );
-              }) : null}
-            </model-viewer>
+            />
             {state === "loading" ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-center gap-2 bg-white/85 px-3 py-2 text-xs font-semibold backdrop-blur-sm" aria-live="polite">
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
