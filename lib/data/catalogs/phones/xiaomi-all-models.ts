@@ -6,9 +6,6 @@
 import type { CatalogModel } from "@/lib/catalog/types";
 
 const XIAOMI_COLORS = ["Black", "White", "Silver", "Gray", "Blue", "Green", "Orange", "Purple", "Pink", "Gold"];
-const ANDROID_STORAGE = ["32GB", "64GB", "128GB", "256GB", "512GB"];
-const ANDROID_RAM = ["3GB", "4GB", "6GB", "8GB", "12GB", "16GB"];
-
 export const MODELS: CatalogModel[] = [
   // Xiaomi Mi Series - Premium
   {

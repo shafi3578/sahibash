@@ -1,5 +1,5 @@
 import type { ListingSchemaDefinition } from "./shared";
-import { firstMeaningfulText, localized, readAttributeValue, readListingValue, yesNo } from "./shared";
+import { firstMeaningfulText, localized, readAttributeValue, readListingValue } from "./shared";
 
 const sections = {
   summary: localized("Property Summary", "خلاصه ملک", "د ملک لنډیز"),

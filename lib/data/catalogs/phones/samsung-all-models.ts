@@ -6,9 +6,6 @@
 import type { CatalogModel } from "@/lib/catalog/types";
 
 const SAMSUNG_COLORS = ["Phantom Black", "Phantom Silver", "Midnight Black", "Silver", "White", "Graphite", "Amber", "Lavender", "Cream", "Light Blue", "Beige", "Green", "Violet", "Gray", "Gold", "Bronze", "Pink"];
-const ANDROID_STORAGE = ["32GB", "64GB", "128GB", "256GB", "512GB", "1TB"];
-const ANDROID_RAM = ["3GB", "4GB", "6GB", "8GB", "12GB", "16GB"];
-
 export const MODELS: CatalogModel[] = [
   // Galaxy S Series - Latest
   {

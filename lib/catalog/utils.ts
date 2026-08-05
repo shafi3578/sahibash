@@ -2,7 +2,7 @@
  * Catalog utility functions for brand/model lookups and auto-fill logic
  */
 
-import type { CatalogBrand, CatalogModel, AutoFillResult, StableSpec } from "./types";
+import type { CatalogBrand, CatalogModel, AutoFillResult } from "./types";
 
 /**
  * Dynamically load a catalog for a category

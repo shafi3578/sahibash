@@ -89,7 +89,7 @@ export function searchProvinces(
     const allNames = [p.name_en, p.name_fa, p.name_ps, ...(p.aliases || [])].map((n) =>
       n.toLowerCase()
     );
-    return allNames.some((n) => n.includes(lower));
+    return name.includes(lower) || allNames.some((n) => n.includes(lower));
   });
 }
 
@@ -109,7 +109,7 @@ export function searchDistricts(
     const allNames = [d.name_en, d.name_fa, d.name_ps, ...(d.aliases || [])].map((n) =>
       n.toLowerCase()
     );
-    return allNames.some((n) => n.includes(lower));
+    return name.includes(lower) || allNames.some((n) => n.includes(lower));
   });
 }
 
@@ -129,6 +129,6 @@ export function searchAreas(
     const allNames = [a.name_en, a.name_fa, a.name_ps, ...(a.aliases || [])].map((n) =>
       n.toLowerCase()
     );
-    return allNames.some((n) => n.includes(lower));
+    return name.includes(lower) || allNames.some((n) => n.includes(lower));
   });
 }

@@ -8,7 +8,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { AISuggestion } from "@/lib/posting/types";
-import { getRootCategories, getChildCategories } from "@/lib/posting/categoryTree";
 
 type SuggestionRequest = {
   title: string;

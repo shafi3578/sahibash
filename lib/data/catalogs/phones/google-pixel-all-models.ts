@@ -6,9 +6,6 @@
 import type { CatalogModel } from "@/lib/catalog/types";
 
 const PIXEL_COLORS = ["Obsidian", "Porcelain", "Bay", "Snow", "Sage", "Chalk", "Hazel", "Peony", "Stormy Black", "Cloudy White", "Coral", "Orange", "Purple"];
-const ANDROID_STORAGE = ["32GB", "64GB", "128GB", "256GB", "512GB"];
-const ANDROID_RAM = ["6GB", "8GB", "12GB"];
-
 export const MODELS: CatalogModel[] = [
   // Pixel 9 Series (2024)
   {

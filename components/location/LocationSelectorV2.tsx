@@ -5,7 +5,7 @@ import { ProvinceSelector } from './ProvinceSelector';
 import { DistrictSelector } from './DistrictSelector';
 import { AreaSelector } from './AreaSelector';
 import { useProvinces, useDistricts, useAreas, useSubmitCustomArea } from '@/lib/location/hooks';
-import type { LocationSelection, LocaleType, Province, District, Area } from '@/lib/location/types';
+import type { LocationSelection, LocaleType, Province, District } from '@/lib/location/types';
 import { formatLocationDisplay, validateLocation } from '@/lib/location/utils';
 
 interface LocationSelectorProps {
@@ -104,7 +104,7 @@ export function LocationSelector({
   );
 
   const handleAreaSelect = useCallback(
-    (areaId: string, area: Area) => {
+    (areaId: string) => {
       setSelectedAreaId(areaId);
       setSelectedAreaCustom(null);
       emitChange(selectedProvinceId, selectedDistrictId, areaId, null);

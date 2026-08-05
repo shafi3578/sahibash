@@ -59,7 +59,7 @@ async function executeMigrations() {
       // Execute the SQL
       const { error } = await supabase.rpc('sql', {
         query: sql
-      }).catch(async (err) => {
+      }).catch(async () => {
         // If RPC method doesn't exist, try direct execution
         return await supabase.from('_migrations').insert({
           name: path.basename(migrationFile),
@@ -90,7 +90,7 @@ async function executeMigrations() {
               failedCount++;
               break;
             }
-          } catch (e) {
+          } catch {
             // Silently continue - some statements may not be executable via RPC
           }
         }

@@ -10,7 +10,6 @@ import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import {
   getSimpleCategoryConfig,
-  getSimpleCategoryFieldKeys,
   getSimpleCategoryKind,
   getSimpleCategoryModelOptions,
   labelFor,

@@ -13,7 +13,6 @@ import {
   type VehicleBranchKey,
   type VehicleBrandCatalog,
   type VehicleModelCatalog,
-  type VehicleOption,
 } from "./vehicleFields";
 
 export * from "./vehicleFields";

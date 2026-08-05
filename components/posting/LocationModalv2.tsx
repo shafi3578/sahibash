@@ -22,9 +22,6 @@ export interface LocationSelection {
 }
 
 export const LocationModalv2 = ({ isOpen, onClose, onSave }: LocationModalProps) => {
-  const [step, setStep] = useState<'country' | 'city' | 'district' | 'neighborhood'>(
-    'country'
-  );
   const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');

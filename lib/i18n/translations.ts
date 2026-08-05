@@ -937,7 +937,6 @@ try {
 } catch (err) {
   // Fail-safe: do not throw during module load — fall back to whatever is present
   // and let existing runtime warnings surface for diagnosis.
-  // eslint-disable-next-line no-console
   console.error('[i18n] failed to rebuild fa/ps locales from overrides:', err && String(err));
 }
 

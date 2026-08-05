@@ -9,8 +9,6 @@ export async function GET(req: NextRequest): Promise<NextResponse<BrandListRespo
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
-    const subcategory = searchParams.get("subcategory");
-
     if (!category) {
       return NextResponse.json(
         { success: false, data: [], error: "Missing category parameter" },

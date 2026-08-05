@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       data: districts,
       province_id: provinceId,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch districts' },
       { status: 500 }
