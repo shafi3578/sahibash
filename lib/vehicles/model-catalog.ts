@@ -22,17 +22,21 @@ export function selectVehicleModel3D(input: {
   make?: string | null;
   model?: string | null;
   year?: string | number | null;
+  title?: string | null;
 }): VehicleModel3D | null {
   const make = normalized(input.make);
   const model = normalized(input.model);
-  const combined = `${make} ${model}`.trim();
+  const title = normalized(input.title);
+  const combined = `${make} ${model} ${title}`.trim();
   const year = Number.parseInt(String(input.year ?? ""), 10);
 
-  if (!combined || (!combined.includes("toyota") && make && make !== "-")) return null;
-  if (model.includes("fielder")) return VEHICLE_MODELS_3D[0];
-  if (model.includes("4runner") || model.includes("4 runner")) return VEHICLE_MODELS_3D[1];
-  if (model.includes("land cruiser") || model === "300" || model.includes("lc300")) return VEHICLE_MODELS_3D[2];
-  if (model.includes("auris")) return VEHICLE_MODELS_3D[3];
-  if (model.includes("corolla")) return Number.isFinite(year) && year < 2010 ? VEHICLE_MODELS_3D[4] : VEHICLE_MODELS_3D[5];
+  if (!combined) return null;
+  if (combined.includes("fielder")) return VEHICLE_MODELS_3D[0];
+  if (combined.includes("4runner") || combined.includes("4 runner")) return VEHICLE_MODELS_3D[1];
+  if (combined.includes("land cruiser") || combined.includes("lc300") || model === "300") return VEHICLE_MODELS_3D[2];
+  if (combined.includes("auris")) return VEHICLE_MODELS_3D[3];
+  if (combined.includes("corolla") || combined.includes("corola")) {
+    return Number.isFinite(year) && year >= 1950 && year < 2010 ? VEHICLE_MODELS_3D[4] : VEHICLE_MODELS_3D[5];
+  }
   return null;
 }

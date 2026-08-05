@@ -10,7 +10,6 @@ import { reportListingTranslationIssueAction } from "@/lib/actions/translations"
 import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
-import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
 import { VehicleModelViewer } from "@/components/vehicles/VehicleModelViewer";
 import LocationCard from "@/components/location/LocationCard";
 import type { LocationVisibility } from "@/components/location/LocationCard";
@@ -26,11 +25,6 @@ import { labelForLocale } from "@/lib/listing-schema-config";
 import { selectVehicleModel3D } from "@/lib/vehicles/model-catalog";
 
 type NamedLocationRelation = { name?: string | null } | null;
-type VehicleDamagePart = { part_key: string; part_label: string; condition: string };
-type VehicleDamagePayload = {
-  all_original: boolean;
-  vehicle_damage_parts?: VehicleDamagePart[] | null;
-};
 
 function readAttributeValue(value: unknown, locale: "en" | "fa" | "ps") {
   if (typeof value === "string") return value;
@@ -224,10 +218,13 @@ export default async function ListingDetailPage({
   }, {});
   const vehicleMakeValue = attributeMap.get("locked__make")
     || attributeMap.get("locked__brand")
+    || attributeMap.get("make")
+    || attributeMap.get("brand")
     || listing.vehicle_brand
     || vehicleVariant?.generation?.model?.brand?.name
     || "-";
   const vehicleModelValue = attributeMap.get("locked__model")
+    || attributeMap.get("model")
     || listing.vehicle_model
     || vehicleVariant?.generation?.model?.name
     || "-";
@@ -256,6 +253,7 @@ export default async function ListingDetailPage({
     make: vehicleMakeValue,
     model: vehicleModelValue,
     year: vehicleYearValue,
+    title: displayTitle,
   }) : null;
   const vehiclePlateNumberValue = attributeMap.get("plate_number")
     || attributeMap.get("license_plate")
@@ -787,17 +785,6 @@ export default async function ListingDetailPage({
             }}
           />
         )}
-
-        {listing.vehicle_damage ? (
-          <VehicleDamageCard
-            allOriginal={(listing.vehicle_damage as VehicleDamagePayload).all_original}
-            parts={((listing.vehicle_damage as VehicleDamagePayload).vehicle_damage_parts ?? []).map((p: VehicleDamagePart) => ({
-              part_key: p.part_key,
-              part_label: p.part_label,
-              condition: p.condition,
-            }))}
-          />
-        ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.description}</h2>

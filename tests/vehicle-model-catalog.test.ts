@@ -24,6 +24,30 @@ test("does not show an inaccurate Toyota model for unrelated vehicles", () => {
   assert.equal(selectVehicleModel3D({ make: "Toyota", model: "Hilux", year: 2020 }), null);
 });
 
+test("matches 3D models from current published-schema vehicle values", () => {
+  const attributes = new Map([
+    ["make", "Toyota"],
+    ["model", "Corolla"],
+    ["year", "2020"],
+  ]);
+  assert.equal(selectVehicleModel3D({
+    make: attributes.get("make"),
+    model: attributes.get("model"),
+    year: attributes.get("year"),
+  })?.id, "corolla-2020");
+});
+
+test("uses an explicit supported model in the listing title when custom attributes are invalid", () => {
+  assert.equal(selectVehicleModel3D({
+    make: "invalid custom brand",
+    model: "invalid custom model",
+    year: 345435,
+    title: "corola 2024 new",
+  })?.id, "corolla-2020");
+  assert.equal(selectVehicleModel3D({ title: "Honda Civic 2024" }), null);
+  assert.equal(selectVehicleModel3D({ title: "Toyota Hilux 2024" }), null);
+});
+
 test("all configured vehicle assets are valid GLB v2 containers", () => {
   for (const model of VEHICLE_MODELS_3D) {
     const bytes = readFileSync(join(process.cwd(), "public", model.src.replace(/^\//, "")));
