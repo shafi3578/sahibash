@@ -3,6 +3,7 @@ export type VehicleModel3D = {
   label: string;
   src: string;
   matchNote: string;
+  supportsPanelColors?: boolean;
 };
 
 export const VEHICLE_MODELS_3D: readonly VehicleModel3D[] = [
@@ -11,7 +12,7 @@ export const VEHICLE_MODELS_3D: readonly VehicleModel3D[] = [
   { id: "land-cruiser-300-2022", label: "Toyota Land Cruiser 300 2022", src: "/models/vehicles/toyota-land-cruiser-300-2022.glb", matchNote: "Land Cruiser 300" },
   { id: "auris-wagon", label: "Toyota Auris Wagon", src: "/models/vehicles/toyota-auris-wagon.glb", matchNote: "Auris Wagon" },
   { id: "corolla-1995", label: "Toyota Corolla 1995", src: "/models/vehicles/toyota-corolla-1995.glb", matchNote: "Corolla (classic)" },
-  { id: "corolla-2020", label: "Toyota Corolla 2020", src: "/models/vehicles/toyota-corolla-2020.glb", matchNote: "Corolla (modern)" },
+  { id: "corolla-2020", label: "Toyota Corolla 2020", src: "/models/vehicles/toyota-corolla-2020-conditioned.glb", matchNote: "Corolla (modern)", supportsPanelColors: true },
 ] as const;
 
 function normalized(value: string | number | null | undefined) {

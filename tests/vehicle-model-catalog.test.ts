@@ -57,6 +57,18 @@ test("all configured vehicle assets are valid GLB v2 containers", () => {
   }
 });
 
+test("modern Corolla model exposes independently colorable physical body panels", () => {
+  const model = VEHICLE_MODELS_3D.find((candidate) => candidate.id === "corolla-2020");
+  assert.ok(model?.supportsPanelColors);
+  const bytes = readFileSync(join(process.cwd(), "public", model.src.replace(/^\//, "")));
+  const jsonLength = bytes.readUInt32LE(12);
+  const json = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").trim());
+  const panelMaterials = new Set(
+    (json.materials ?? []).map((material: { name?: string }) => material.name).filter((name: string | undefined) => name?.startsWith("condition__")),
+  );
+  assert.deepEqual(panelMaterials, new Set(defaultVehicleDamageParts().map((part) => `condition__${part.key}`)));
+});
+
 test("normalizes vehicle body reports and rejects unknown panels or conditions", () => {
   const normalized = normalizeVehicleDamageParts([
     { key: "hood", label: "Attacker-controlled label", condition: "painted" },

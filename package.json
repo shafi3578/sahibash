@@ -26,6 +26,7 @@
     "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
+    "@gltf-transform/core": "4.4.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

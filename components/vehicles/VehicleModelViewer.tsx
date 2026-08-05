@@ -12,6 +12,29 @@ import {
 
 type ViewerState = "idle" | "loading" | "ready" | "error";
 
+type ModelViewerMaterial = {
+  name: string;
+  pbrMetallicRoughness: { setBaseColorFactor: (color: [number, number, number, number]) => void };
+};
+
+type ModelViewerElement = HTMLElement & { model?: { materials: ModelViewerMaterial[] } };
+
+function hexColorFactor(hex: string): [number, number, number, number] {
+  const value = hex.replace("#", "");
+  return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255).concat(1) as [number, number, number, number];
+}
+
+function applyPanelColors(viewer: ModelViewerElement, model: VehicleModel3D, parts: DamagePart[]) {
+  if (!model.supportsPanelColors || !viewer.model) return;
+  const partsByKey = new Map(parts.map((part) => [part.key, part]));
+  for (const material of viewer.model.materials) {
+    if (!material.name.startsWith("condition__")) continue;
+    const part = partsByKey.get(material.name.slice("condition__".length));
+    if (!part) continue;
+    material.pbrMetallicRoughness.setBaseColorFactor(hexColorFactor(damageCondition(part.condition).color));
+  }
+}
+
 const COPY = {
   en: { title: "Interactive 3D view", description: "Inspect the vehicle from every angle. Seller-reported paint, replacement, and damage are connected to this 3D reference below; listing photos remain the authoritative condition record.", descriptionNoReport: "Inspect the reference vehicle from every angle. Listing photos remain the authoritative condition record.", load: "Load 3D view", loading: "Loading 3D model…", retry: "Try again", error: "The 3D model could not be displayed on this device.", controls: "Drag to rotate · Scroll or pinch to zoom", fullscreen: "Full screen", reference: "Reference model", report: "Seller body-condition report", allOriginal: "Seller reported all body panels as original", marked: "reported panels need attention", overlay: "Condition overlay" },
   fa: { title: "نمای تعاملی سه‌بعدی", description: "موتر را از هر زاویه بررسی کنید. رنگ، تعویض و آسیب ثبت‌شده توسط فروشنده در پایین به این مرجع سه‌بعدی وصل است؛ عکس‌های اعلان مرجع اصلی وضعیت است.", descriptionNoReport: "موتر مرجع را از هر زاویه بررسی کنید. عکس‌های اعلان مرجع اصلی وضعیت است.", load: "نمایش مدل سه‌بعدی", loading: "مدل سه‌بعدی بارگذاری می‌شود…", retry: "تلاش دوباره", error: "مدل سه‌بعدی در این دستگاه نمایش داده نشد.", controls: "برای چرخش بکشید · برای زوم اسکرول یا نیشگون کنید", fullscreen: "تمام صفحه", reference: "مدل مرجع", report: "گزارش وضعیت بدنه فروشنده", allOriginal: "فروشنده تمام قطعات بدنه را اصلی ثبت کرده است", marked: "قطعه ثبت‌شده نیاز به توجه دارد", overlay: "لایه وضعیت" },
@@ -22,7 +45,7 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
   const [requested, setRequested] = useState(false);
   const [state, setState] = useState<ViewerState>("idle");
   const frameRef = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<HTMLElement>(null);
+  const viewerRef = useRef<ModelViewerElement>(null);
   const text = COPY[locale];
   const nonOriginalParts = getNonOriginalVehicleDamageParts(damageParts);
 
@@ -38,7 +61,10 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || !requested) return;
-    const handleLoad = () => setState("ready");
+    const handleLoad = () => {
+      applyPanelColors(viewer, model, nonOriginalParts);
+      setState("ready");
+    };
     const handleError = () => setState("error");
     viewer.addEventListener("load", handleLoad);
     viewer.addEventListener("error", handleError);
@@ -46,7 +72,7 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
       viewer.removeEventListener("load", handleLoad);
       viewer.removeEventListener("error", handleError);
     };
-  }, [requested, state]);
+  }, [model, nonOriginalParts, requested, state]);
 
   function retry() {
     setRequested(false);
