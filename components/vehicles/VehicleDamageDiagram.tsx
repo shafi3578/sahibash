@@ -24,19 +24,19 @@ type PanelGeometry =
   | { kind: "rect"; x: number; y: number; width: number; height: number; rx: number };
 
 const PANEL_GEOMETRY: Record<string, PanelGeometry> = {
-  front_bumper: { kind: "rect", x: 145, y: 18, width: 130, height: 30, rx: 9 },
-  hood: { kind: "path", d: "M155 70 Q210 45 265 70 L256 182 Q210 164 164 182 Z" },
-  roof: { kind: "path", d: "M164 208 Q210 188 256 208 L253 350 Q210 370 167 350 Z" },
-  trunk: { kind: "path", d: "M167 374 Q210 390 253 374 L262 472 Q210 496 158 472 Z" },
-  rear_bumper: { kind: "rect", x: 145, y: 510, width: 130, height: 30, rx: 9 },
-  front_left_fender: { kind: "path", d: "M34 70 L96 70 L126 180 L111 197 L75 172 L34 166 Z" },
-  front_right_fender: { kind: "path", d: "M386 70 L324 70 L294 180 L309 197 L345 172 L386 166 Z" },
-  front_left_door: { kind: "path", d: "M34 181 L76 177 L113 204 L114 282 L34 264 Z" },
-  front_right_door: { kind: "path", d: "M386 181 L344 177 L307 204 L306 282 L386 264 Z" },
-  rear_left_door: { kind: "path", d: "M34 277 L114 295 L113 372 L76 399 L34 395 Z" },
-  rear_right_door: { kind: "path", d: "M386 277 L306 295 L307 372 L344 399 L386 395 Z" },
-  rear_left_fender: { kind: "path", d: "M34 410 L75 404 L111 379 L126 396 L96 480 L34 480 Z" },
-  rear_right_fender: { kind: "path", d: "M386 410 L345 404 L309 379 L294 396 L324 480 L386 480 Z" },
+  front_bumper: { kind: "rect", x: 151, y: 8, width: 118, height: 27, rx: 5 },
+  hood: { kind: "path", d: "M158 55 Q210 39 262 55 L255 137 Q210 126 165 137 Z" },
+  roof: { kind: "path", d: "M169 205 L251 205 L249 289 Q210 300 171 289 Z" },
+  trunk: { kind: "path", d: "M168 316 Q210 328 252 316 L260 371 Q210 389 160 371 Z" },
+  rear_bumper: { kind: "rect", x: 151, y: 397, width: 118, height: 27, rx: 5 },
+  front_left_fender: { kind: "path", d: "M31 58 L91 58 L126 137 L108 151 L73 137 L31 133 Z" },
+  front_right_fender: { kind: "path", d: "M389 58 L329 58 L294 137 L312 151 L347 137 L389 133 Z" },
+  front_left_door: { kind: "path", d: "M31 145 L72 143 L111 158 L116 218 L31 203 Z" },
+  front_right_door: { kind: "path", d: "M389 145 L348 143 L309 158 L304 218 L389 203 Z" },
+  rear_left_door: { kind: "path", d: "M31 215 L116 230 L111 288 L72 304 L31 302 Z" },
+  rear_right_door: { kind: "path", d: "M389 215 L304 230 L309 288 L348 304 L389 302 Z" },
+  rear_left_fender: { kind: "path", d: "M31 314 L73 310 L108 296 L126 310 L91 376 L31 376 Z" },
+  rear_right_fender: { kind: "path", d: "M389 314 L347 310 L312 296 L294 310 L329 376 L389 376 Z" },
 };
 
 function DiagramPart({ part, active, label, onSelect }: { part: DamagePart; active: boolean; label: string; onSelect: () => void }) {
@@ -100,27 +100,27 @@ export function VehicleDamageDiagram({ value, onChange, locale = "en" }: { value
 
         <div className="grid items-center gap-5 p-4 md:grid-cols-[minmax(280px,410px)_1fr] md:p-5">
           <div className="flex justify-center rounded-2xl border border-slate-200 bg-[#faf8ef] p-3 shadow-inner sm:p-5">
-            <svg viewBox="0 0 420 558" className="w-full max-w-[390px]" aria-label="Exploded top view vehicle body condition selector">
-              <text x="210" y="11" textAnchor="middle" fontSize="10" fontWeight="800" letterSpacing="2" fill="#64748b">{COPY[locale].front}</text>
+            <svg viewBox="0 0 420 432" className="w-full max-w-[420px]" aria-label="Exploded top view vehicle body condition selector">
+              <text x="210" y="7" textAnchor="middle" fontSize="9" fontWeight="800" letterSpacing="2" fill="#64748b">{COPY[locale].front}</text>
 
-              <path d="M153 64 Q210 38 267 64 L276 189 Q278 230 274 278 L270 371 Q272 425 266 480 Q210 509 154 480 Q148 425 150 371 L146 278 Q142 230 144 189 Z" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="3" />
-              <path d="M165 188 Q210 169 255 188 L250 219 Q210 202 170 219 Z" fill="#dbeafe" stroke="#94a3b8" strokeWidth="1.5" />
-              <path d="M169 354 Q210 374 251 354 L255 383 Q210 402 165 383 Z" fill="#dbeafe" stroke="#94a3b8" strokeWidth="1.5" />
+              <path d="M157 52 Q210 36 263 52 L266 140 Q270 171 263 202 L257 292 Q263 320 260 375 Q210 394 160 375 Q157 320 163 292 L157 202 Q150 171 154 140 Z" fill="#fff" stroke="#d7dce3" strokeWidth="4" />
+              <path d="M165 140 Q210 127 255 140 L250 196 Q210 185 170 196 Z" fill="#fff" stroke="#e5e7eb" strokeWidth="2" />
+              <path d="M171 291 Q210 303 249 291 L253 315 Q210 325 167 315 Z" fill="#fff" stroke="#e5e7eb" strokeWidth="2" />
 
               {value.map((part) => <DiagramPart key={part.key} part={part} active={activePart === part.key} label={damagePartLabel(part.key, locale)} onSelect={() => setActivePart(activePart === part.key ? null : part.key)} />)}
-              <g fill="#334155" stroke="#0f172a" strokeWidth="2" pointerEvents="none">
-                <circle cx="25" cy="140" r="23" /><circle cx="395" cy="140" r="23" />
-                <circle cx="25" cy="410" r="23" /><circle cx="395" cy="410" r="23" />
+              <g fill="#d1d5db" stroke="#f3f4f6" strokeWidth="3" pointerEvents="none">
+                <circle cx="24" cy="111" r="23" /><circle cx="396" cy="111" r="23" />
+                <circle cx="24" cy="325" r="23" /><circle cx="396" cy="325" r="23" />
               </g>
-              <g fill="#94a3b8" pointerEvents="none">
-                <circle cx="25" cy="140" r="11" /><circle cx="395" cy="140" r="11" />
-                <circle cx="25" cy="410" r="11" /><circle cx="395" cy="410" r="11" />
+              <g fill="#d1d5db" stroke="#f8fafc" strokeWidth="2" pointerEvents="none">
+                <circle cx="24" cy="111" r="11" /><circle cx="396" cy="111" r="11" />
+                <circle cx="24" cy="325" r="11" /><circle cx="396" cy="325" r="11" />
               </g>
               <g fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5">
-                <rect x="159" y="24" width="24" height="9" rx="3" /><rect x="237" y="24" width="24" height="9" rx="3" />
-                <rect x="159" y="518" width="24" height="9" rx="3" /><rect x="237" y="518" width="24" height="9" rx="3" />
+                <rect x="160" y="16" width="22" height="8" rx="3" fill="#fff" /><rect x="238" y="16" width="22" height="8" rx="3" fill="#fff" />
+                <rect x="160" y="406" width="22" height="8" rx="3" fill="#fff" /><rect x="238" y="406" width="22" height="8" rx="3" fill="#fff" />
               </g>
-              <text x="210" y="555" textAnchor="middle" fontSize="10" fontWeight="800" letterSpacing="2" fill="#64748b">{COPY[locale].rear}</text>
+              <text x="210" y="431" textAnchor="middle" fontSize="9" fontWeight="800" letterSpacing="2" fill="#64748b">{COPY[locale].rear}</text>
             </svg>
           </div>
 

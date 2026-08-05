@@ -133,14 +133,13 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
               className="h-[320px] w-full sm:h-[460px]"
             />
             {nonOriginalParts.length > 0 ? (
-              <div className="pointer-events-none absolute start-3 top-3 max-w-[min(78%,320px)] rounded-xl border border-white/70 bg-slate-950/75 p-2.5 text-white shadow-lg backdrop-blur-sm" aria-label={text.overlay}>
-                <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wider text-white/80">{text.overlay}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {nonOriginalParts.slice(0, 5).map((part) => {
+              <div className="pointer-events-none absolute inset-x-3 top-3 max-h-[150px] overflow-auto rounded-xl border border-white/80 bg-slate-950/85 p-3 text-white shadow-xl backdrop-blur-md sm:end-auto sm:max-w-[390px]" aria-label={text.overlay}>
+                <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-white">{text.overlay}</p>
+                <div className="flex flex-wrap gap-2">
+                  {nonOriginalParts.map((part) => {
                     const condition = damageCondition(part.condition);
-                    return <span key={part.key} className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-slate-900"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: condition.color }} />{damagePartLabel(part.key, locale)} · {condition.labels[locale]}</span>;
+                    return <span key={part.key} className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-extrabold leading-4 text-slate-950 shadow-sm"><span className="h-3 w-3 shrink-0 rounded-full ring-1 ring-black/15" style={{ backgroundColor: condition.color }} /><span>{damagePartLabel(part.key, locale)}: <strong style={{ color: condition.color }}>{condition.labels[locale]}</strong></span></span>;
                   })}
-                  {nonOriginalParts.length > 5 ? <span className="rounded-full bg-white/20 px-2 py-1 text-[10px] font-bold">+{nonOriginalParts.length - 5}</span> : null}
                 </div>
               </div>
             ) : null}
