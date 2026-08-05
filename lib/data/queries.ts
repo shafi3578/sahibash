@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { reportDataError } from "@/lib/observability/data-errors";
 import type {
   ListingWithRelations,
   ListingWithImages,
@@ -766,6 +767,7 @@ export async function getApprovedListings(
       const { data, error } = await query;
 
       if (error || !data) {
+        if (error) reportDataError("approved-listings.select", error);
         return [];
       }
 
@@ -821,7 +823,8 @@ export async function getApprovedListings(
       }
 
       return translatedRows.slice(0, 40);
-    } catch {
+    } catch (error) {
+      reportDataError("approved-listings.unexpected", error);
       return [];
     }
 }
@@ -1237,11 +1240,13 @@ export async function getUserListings(userId: string): Promise<ListingWithRelati
       .order("created_at", { ascending: false });
 
     if (error || !data) {
+      if (error) reportDataError("categories.select", error);
       return [];
     }
 
     return data as ListingWithRelations[];
-  } catch {
+  } catch (error) {
+    reportDataError("categories.unexpected", error);
     return [];
   }
 }

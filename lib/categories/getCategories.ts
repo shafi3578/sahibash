@@ -9,6 +9,7 @@ import {
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
 import { getCategoryCounts, getCategoryListingCount } from "@/lib/categories/getCategoryCounts";
 import type { CategoryNode } from "@/types/database";
+import { reportDataError } from "@/lib/observability/data-errors";
 
 export type CategoryNodeWithCount = CategoryNode & {
   count: number;
@@ -115,7 +116,10 @@ export const getHomeCategoryNodes = cache(async (): Promise<CategoryNodeWithCoun
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
-  if (error || !data) return [];
+  if (error || !data) {
+    if (error) reportDataError("home-category-nodes.select", error);
+    return [];
+  }
 
   const allNodes = (data as Record<string, unknown>[])
     .map(castNode)

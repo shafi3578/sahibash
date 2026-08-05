@@ -23,6 +23,16 @@ const rlsHelperMigration = readFileSync(
   "utf8",
 );
 
+const advisorHardeningMigration = readFileSync(
+  join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260805050542_database_advisor_hardening.sql",
+  ),
+  "utf8",
+);
+
 const listingActions = readFileSync(
   join(process.cwd(), "lib", "actions", "listings.ts"),
   "utf8",
@@ -63,4 +73,13 @@ test("public RLS helper is callable but cannot inspect another identity", () => 
   assert.match(rlsHelperMigration, /uid = \(select auth\.uid\(\)\)/i);
   assert.match(rlsHelperMigration, /grant execute on function public\.is_admin\(uuid\) to anon, authenticated, service_role/i);
   assert.match(rlsHelperMigration, /set search_path = ''/i);
+});
+
+test("database advisor hardening pins function paths and covers foreign keys", () => {
+  const fixedPaths = advisorHardeningMigration.match(/set search_path = public, pg_temp/gi) ?? [];
+  const coveringIndexes = advisorHardeningMigration.match(/create index if not exists/gi) ?? [];
+  assert.equal(fixedPaths.length, 19);
+  assert.equal(coveringIndexes.length, 27);
+  assert.match(advisorHardeningMigration, /drop index if exists public\.idx_listings_category_node_id/i);
+  assert.doesNotMatch(advisorHardeningMigration, /delete\s+from|truncate\s+/i);
 });

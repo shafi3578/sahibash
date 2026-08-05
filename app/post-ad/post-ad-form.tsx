@@ -226,11 +226,13 @@ export default function PostAdForm({
     locale,
     initialListingType = "for_sale",
     initialMode = "standard",
+    initialRootSlug = "",
   }: Props & {
     t: Dictionary;
     locale: AppLocale;
     initialListingType?: "for_sale" | "for_rent" | "wanted";
     initialMode?: PostMode;
+    initialRootSlug?: string;
   }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -267,6 +269,7 @@ export default function PostAdForm({
   const [images, setImages] = useState<StagedImage[]>([]);
 
   const [vehicleSelection, setVehicleSelection] = useState<VehicleSelection>(EMPTY_VEHICLE_SELECTION);
+  const initialRootAppliedRef = useRef(false);
   const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultDamageParts());
 
   const [core, setCore] = useState<CoreForm>({
@@ -780,6 +783,15 @@ export default function PostAdForm({
 
     setLoadingTree(false);
   }, [fetchFields]);
+
+  useEffect(() => {
+    if (initialRootAppliedRef.current || !initialRootSlug || selectedRoot) return;
+    const initialRoot = activeCategories.find((category) => category.slug === initialRootSlug);
+    if (!initialRoot) return;
+    initialRootAppliedRef.current = true;
+    const timer = window.setTimeout(() => void chooseRoot(initialRoot), 0);
+    return () => window.clearTimeout(timer);
+  }, [activeCategories, chooseRoot, initialRootSlug, selectedRoot]);
 
   async function chooseNode(node: CategoryNode) {
     setLoadingTree(true);

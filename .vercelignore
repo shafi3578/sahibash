@@ -16,3 +16,6 @@ app/**/debug/
 .github/
 .vscode/
 .temp/
+
+# Preserved source model; production uses the conditioned panel-aware variant.
+/public/models/vehicles/toyota-corolla-2020.glb

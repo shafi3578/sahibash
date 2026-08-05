@@ -16,6 +16,7 @@ export default async function PostAdCreatePage({
 }) {
   const params = await searchParams;
   const posting = getParam(params.posting);
+  const initialRootSlug = getParam(params.category);
 
   const [categories, { t, locale }] = await Promise.all([
     getPostingRootCategories(),
@@ -34,6 +35,7 @@ export default async function PostAdCreatePage({
         locale={locale}
         initialListingType={initialListingType}
         initialMode={initialMode}
+        initialRootSlug={initialRootSlug}
       />
     </main>
   );

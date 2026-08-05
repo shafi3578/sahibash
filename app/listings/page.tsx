@@ -13,6 +13,11 @@ export default async function ListingsPage() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {listings.map((listing) => <ListingCard key={listing.id} listing={listing} />)}
       </div>
+      {listings.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-8 text-center text-sm text-[var(--ink-2)]">
+          {ui.listingsPage.empty}
+        </div>
+      ) : null}
     </main>
   );
 }
