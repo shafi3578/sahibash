@@ -2,14 +2,14 @@
 
 import React from "react";
 import {
-  FieldDef, LeafSubcategory, Lang, getLeafById, localizeDigits,
+  FieldDef, Lang, getLeafById,
 } from "@/data/electronics-categories";
 
 interface Props {
   leafId: string;                     // selected subcategory id
   lang: Lang;                         // current locale
-  values: Record<string, any>;        // your existing form state slice
-  onChange: (key: string, value: any) => void; // your existing setter
+  values: Record<string, unknown>;
+  onChange: (key: string, value: unknown) => void;
 }
 
 const OTHER_VALUE = "other";
@@ -31,7 +31,10 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
   };
 
   const renderField = (field: FieldDef) => {
-    const value = values[field.key] ?? "";
+    const rawValue = values[field.key];
+    const value = typeof rawValue === "string" || typeof rawValue === "number" || Array.isArray(rawValue)
+      ? rawValue
+      : "";
     const label = field.labels[lang];
     const isOther = value === OTHER_VALUE;
 
@@ -57,7 +60,7 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
             {field.allowOther && isOther && (
               <input
                 type="text"
-                value={values[`${field.key}_other`] ?? ""}
+                value={typeof values[`${field.key}_other`] === "string" ? String(values[`${field.key}_other`]) : ""}
                 onChange={(e) => onChange(`${field.key}_other`, e.target.value)}
                 placeholder={
                   lang === "en" ? "Enter manually" :
@@ -70,7 +73,8 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
       }
 
       case "cascading-select": {
-        const parentValue = values[field.dependsOn!] ?? "";
+        const rawParentValue = values[field.dependsOn!];
+        const parentValue = typeof rawParentValue === "string" ? rawParentValue : "";
         const options = field.optionsByParent?.[parentValue] ?? [];
         const showFreeText =
           isOther || (parentValue && options.length === 0) || parentValue === OTHER_VALUE;
@@ -103,7 +107,11 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
             {showFreeText && (
               <input
                 type="text"
-                value={values[`${field.key}_other`] ?? (options.length === 0 ? value : "")}
+                value={
+                  typeof values[`${field.key}_other`] === "string"
+                    ? String(values[`${field.key}_other`])
+                    : options.length === 0 && typeof value === "string" ? value : ""
+                }
                 onChange={(e) =>
                   options.length === 0
                     ? onChange(field.key, e.target.value)

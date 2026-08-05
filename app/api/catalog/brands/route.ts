@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { BrandListResponse } from "@/lib/catalog/types";
+import type { BrandListResponse, CatalogBrand } from "@/lib/catalog/types";
 
 /**
  * GET /api/catalog/brands?category=phones&subcategory=mobile-phones
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<BrandListRespo
     }
 
     // Import catalog dynamically based on category
-    let brands: any[] = [];
+    let brands: CatalogBrand[] = [];
 
     if (category === "phones") {
       // Import phone brands

@@ -1,15 +1,9 @@
-import { NewPostingFormv2 } from '@/components/posting/NewPostingFormv2';
-import type { AppLocale } from '@/lib/i18n/translations';
+import { redirect } from "next/navigation";
+import type { AppLocale } from "@/lib/i18n/translations";
 
-type PageProps = {
-  params: Promise<{ locale: AppLocale }>;
-};
+type PageProps = { params: Promise<{ locale: AppLocale }> };
 
-export const metadata = {
-  title: 'Post a New Ad - v2',
-  description: 'Create a new listing on Afghan with the new form',
-};
-
-export default async function PostAdPage({ params }: PageProps) {
-  return <NewPostingFormv2 />;
+export default async function LegacyLocalizedPostAdV2Page({ params }: PageProps) {
+  const { locale } = await params;
+  redirect(`/${locale}/post-ad/create`);
 }

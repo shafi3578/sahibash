@@ -52,6 +52,30 @@ export function LocationSelector({
   const { areas, loading: areasLoading } = useAreas(selectedProvinceId, selectedDistrictId);
   const { submit: submitCustomArea } = useSubmitCustomArea();
 
+  const emitChange = useCallback((
+    provinceId: string | null,
+    districtId: string | null,
+    areaId: string | null,
+    areaCustom: string | null,
+    provinceData: Province | null = selectedProvinceData,
+    districtData: District | null = selectedDistrictData
+  ) => {
+    const validationErrors = validateLocation(provinceId, districtId, areaId, areaCustom);
+    setErrors(validationErrors);
+
+    if (Object.keys(validationErrors).length === 0 || !required) {
+      onLocationChange(Object.keys(validationErrors).length === 0 ? {
+        province_id: provinceId || '',
+        province_name: provinceData?.name_en,
+        district_id: districtId || undefined,
+        district_name: districtData?.name_en,
+        area_id: areaId || undefined,
+        area_custom: areaCustom || undefined,
+        location_gps_private: true,
+      } : null);
+    }
+  }, [onLocationChange, required, selectedDistrictData, selectedProvinceData]);
+
   // Handlers
   const handleProvinceSelect = useCallback(
     (provinceId: string, province: Province) => {
@@ -62,9 +86,9 @@ export function LocationSelector({
       setSelectedDistrictData(null);
       setSelectedAreaId(null);
       setSelectedAreaCustom(null);
-      emitChange(provinceId, null, null, null);
+      emitChange(provinceId, null, null, null, province, null);
     },
-    []
+    [emitChange]
   );
 
   const handleDistrictSelect = useCallback(
@@ -74,9 +98,9 @@ export function LocationSelector({
       // Reset area when district changes
       setSelectedAreaId(null);
       setSelectedAreaCustom(null);
-      emitChange(selectedProvinceId, districtId, null, null);
+      emitChange(selectedProvinceId, districtId, null, null, selectedProvinceData, district);
     },
-    [selectedProvinceId]
+    [emitChange, selectedProvinceData, selectedProvinceId]
   );
 
   const handleAreaSelect = useCallback(
@@ -85,7 +109,7 @@ export function LocationSelector({
       setSelectedAreaCustom(null);
       emitChange(selectedProvinceId, selectedDistrictId, areaId, null);
     },
-    [selectedProvinceId, selectedDistrictId]
+    [emitChange, selectedProvinceId, selectedDistrictId]
   );
 
   const handleCustomAreaSelect = useCallback(
@@ -94,7 +118,7 @@ export function LocationSelector({
       setSelectedAreaCustom(customArea);
       emitChange(selectedProvinceId, selectedDistrictId, null, customArea);
     },
-    [selectedProvinceId, selectedDistrictId]
+    [emitChange, selectedProvinceId, selectedDistrictId]
   );
 
   const handleSubmitCustomArea = useCallback(
@@ -111,33 +135,6 @@ export function LocationSelector({
     },
     [selectedProvinceId, selectedDistrictId, submitCustomArea]
   );
-
-  // Helper to emit location change
-  const emitChange = (
-    provinceId: string | null,
-    districtId: string | null,
-    areaId: string | null,
-    areaCustom: string | null
-  ) => {
-    const location: LocationSelection = {
-      province_id: provinceId || '',
-      province_name: selectedProvinceData?.name_en,
-      district_id: districtId || undefined,
-      district_name: selectedDistrictData?.name_en,
-      area_id: areaId || undefined,
-      area_custom: areaCustom || undefined,
-      location_gps_private: true,
-    };
-
-    // Validate
-    const validationErrors = validateLocation(provinceId, districtId, areaId, areaCustom);
-    setErrors(validationErrors);
-
-    // Emit if valid or not required to be valid yet
-    if (Object.keys(validationErrors).length === 0 || !required) {
-      onLocationChange(Object.keys(validationErrors).length === 0 ? location : null);
-    }
-  };
 
   const displayText = formatLocationDisplay(
     selectedProvinceData,

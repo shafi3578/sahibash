@@ -1731,7 +1731,11 @@ export default function PostAdForm({
       <section className="mt-4 space-y-4 rounded-xl border border-[var(--line)] p-3">
         <h3 className="text-sm font-bold">{t.postAd.vehicleDetails}</h3>
         <p className="text-sm text-[var(--ink-2)]">{branchSpecificHint}</p>
-        <VehicleSmartSelector categoryPath={finalNode?.path ?? null} onChange={setVehicleSelection} />
+        <VehicleSmartSelector
+          key={finalNode?.path ?? "vehicle-selector"}
+          categoryPath={finalNode?.path ?? null}
+          onChange={setVehicleSelection}
+        />
 
         <div className="grid gap-3 sm:grid-cols-2">
           {branchFields.map((field) => renderVehicleField(field))}

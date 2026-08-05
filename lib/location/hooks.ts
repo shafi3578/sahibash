@@ -48,8 +48,6 @@ export function useDistricts(provinceId: string | null | undefined) {
 
   useEffect(() => {
     if (!provinceId) {
-      setDistricts([]);
-      setError(null);
       return;
     }
 
@@ -78,7 +76,11 @@ export function useDistricts(provinceId: string | null | undefined) {
     fetchDistricts();
   }, [provinceId]);
 
-  return { districts, loading, error };
+  return {
+    districts: provinceId ? districts : [],
+    loading: provinceId ? loading : false,
+    error: provinceId ? error : null,
+  };
 }
 
 /**
@@ -96,8 +98,6 @@ export function useAreas(
 
   useEffect(() => {
     if (!provinceId) {
-      setAreas([]);
-      setError(null);
       return;
     }
 
@@ -130,7 +130,11 @@ export function useAreas(
     fetchAreas();
   }, [provinceId, districtId, popularOnly]);
 
-  return { areas, loading, error };
+  return {
+    areas: provinceId ? areas : [],
+    loading: provinceId ? loading : false,
+    error: provinceId ? error : null,
+  };
 }
 
 /**

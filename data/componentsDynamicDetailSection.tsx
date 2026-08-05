@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import {
   Lang, getLeafById, getFieldLabel, getOptionLabel, localizeDigits,
 } from "@/data/electronics-categories";
@@ -8,7 +7,7 @@ import {
 interface Props {
   leafId: string;
   lang: Lang;
-  attributes: Record<string, any>; // saved ad attributes from API
+  attributes: Record<string, unknown>; // saved ad attributes from API
   features?: string[];             // saved feature keys
 }
 
@@ -21,10 +20,10 @@ export default function DynamicDetailSection({ leafId, lang, attributes, feature
     if (!field) return null;
     const raw = attributes[key];
     const other = attributes[`${key}_other`];
-    if (other) return other;
+    if (other) return String(other);
     if (raw === undefined || raw === null || raw === "") return null;
     if (Array.isArray(raw)) {
-      return raw.map((v) => getOptionLabel(field, v, lang)).join(lang === "en" ? ", " : "، ");
+      return raw.map((v) => getOptionLabel(field, String(v), lang)).join(lang === "en" ? ", " : "، ");
     }
     const label =
       field.type === "select" || field.type === "cascading-select" || field.type === "multi-select"

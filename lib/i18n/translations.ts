@@ -924,14 +924,14 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
 // readable while preserving the project's English-first fallback behavior.
 try {
   // Defensive: only run when TRANSLATIONS.en is present and overrides exist
-  if ((TRANSLATIONS as any).en) {
-    (TRANSLATIONS as any).fa = mergeOverrides(
-      (TRANSLATIONS as any).en,
-      (CRITICAL_TRANSLATION_OVERRIDES as any).fa || {}
+  if (TRANSLATIONS.en) {
+    TRANSLATIONS.fa = mergeOverrides(
+      TRANSLATIONS.en as unknown as Record<string, unknown>,
+      CRITICAL_TRANSLATION_OVERRIDES.fa || {}
     ) as TranslationTree;
-    (TRANSLATIONS as any).ps = mergeOverrides(
-      (TRANSLATIONS as any).en,
-      (CRITICAL_TRANSLATION_OVERRIDES as any).ps || {}
+    TRANSLATIONS.ps = mergeOverrides(
+      TRANSLATIONS.en as unknown as Record<string, unknown>,
+      CRITICAL_TRANSLATION_OVERRIDES.ps || {}
     ) as TranslationTree;
   }
 } catch (err) {

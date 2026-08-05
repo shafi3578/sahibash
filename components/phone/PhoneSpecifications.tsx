@@ -2,12 +2,6 @@
 
 import { useState, useEffect } from "react";
 
-interface SpecField {
-  label: string;
-  value: string;
-  locked: boolean;
-}
-
 interface SelectableField {
   id: string;
   field_key: string;
@@ -15,7 +9,7 @@ interface SelectableField {
   field_label_fa: string;
   field_label_ps: string;
   field_type: string;
-  options_json?: Record<string, any>;
+  options_json?: { options?: string[] };
   is_required: boolean;
 }
 

@@ -10,10 +10,12 @@ export function useTranslation(locale: AppLocale = "en") {
 
   const t = useCallback(
     (key: string, defaultValue?: string) => {
-      let current: any = dict;
+      let current: unknown = dict;
       
       for (const part of key.split(".")) {
-        current = current?.[part];
+        current = current && typeof current === "object"
+          ? (current as Record<string, unknown>)[part]
+          : undefined;
       }
       
       return (current as string) || defaultValue || key;
