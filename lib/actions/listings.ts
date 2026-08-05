@@ -27,6 +27,7 @@ import {
   normalizeElectronicsDynamicAttributes,
 } from "@/lib/posting/electronics-dynamic";
 import { validateListingImage } from "@/lib/posting/image-validation";
+import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -297,14 +298,16 @@ async function persistVehicleDamage(
   const rawParts = toFormValueText(formData.get("damage_parts_json"));
   if (!rawParts) return;
 
-  let parts: Array<{ key: string; label: string; condition: string }>;
+  let parsed: unknown;
   try {
-    parts = JSON.parse(rawParts) as Array<{ key: string; label: string; condition: string }>;
+    parsed = JSON.parse(rawParts);
   } catch {
     return;
   }
+  const parts = normalizeVehicleDamageParts(parsed);
+  if (parts.length !== 13) return;
 
-  const allOriginal = toFormValueText(formData.get("damage_all_original")) === "true";
+  const allOriginal = parts.every((part) => part.condition === "original");
 
   try {
     const { data: report, error: reportErr } = await supabase

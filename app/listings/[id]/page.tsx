@@ -11,6 +11,7 @@ import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
 import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
+import { VehicleModelViewer } from "@/components/vehicles/VehicleModelViewer";
 import LocationCard from "@/components/location/LocationCard";
 import type { LocationVisibility } from "@/components/location/LocationCard";
 import { getDictionary } from "@/lib/i18n/server";
@@ -22,6 +23,7 @@ import DynamicDetailSection from "@/data/componentsDynamicDetailSection";
 import { ELECTRONICS_DYNAMIC_LEAF_KEY } from "@/lib/posting/electronics-dynamic";
 import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
 import { labelForLocale } from "@/lib/listing-schema-config";
+import { selectVehicleModel3D } from "@/lib/vehicles/model-catalog";
 
 type NamedLocationRelation = { name?: string | null } | null;
 type VehicleDamagePart = { part_key: string; part_label: string; condition: string };
@@ -250,6 +252,11 @@ export default async function ListingDetailPage({
     || "-";
   const vehicleMileageValue = attributeMap.get("mileage") || "-";
   const vehicleYearValue = attributeMap.get("year") || "-";
+  const vehicleModel3D = isVehicleListing ? selectVehicleModel3D({
+    make: vehicleMakeValue,
+    model: vehicleModelValue,
+    year: vehicleYearValue,
+  }) : null;
   const vehiclePlateNumberValue = attributeMap.get("plate_number")
     || attributeMap.get("license_plate")
     || attributeMap.get("vehicle_plate_number")
@@ -569,6 +576,8 @@ export default async function ListingDetailPage({
       </div>
       <div className="space-y-4 pb-20 sm:pb-0">
         <ListingGallery images={listing.listing_images ?? []} title={displayTitle} />
+
+        {vehicleModel3D ? <VehicleModelViewer model={vehicleModel3D} locale={locale} /> : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           {isWanted ? (

@@ -1,219 +1,132 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { AppLocale } from "@/lib/i18n/translations";
+import {
+  VEHICLE_DAMAGE_CONDITIONS,
+  damageCondition,
+  damagePartLabel,
+  defaultVehicleDamageParts,
+  type DamagePart,
+  type VehicleDamageCondition,
+} from "@/lib/vehicles/damage-report";
 
-const PARTS = [
-  { key: "hood",               label: "Hood",               group: "top" },
-  { key: "roof",               label: "Roof",               group: "top" },
-  { key: "trunk",              label: "Trunk",              group: "top" },
-  { key: "front_bumper",       label: "Front Bumper",       group: "front_rear" },
-  { key: "rear_bumper",        label: "Rear Bumper",        group: "front_rear" },
-  { key: "front_left_fender",  label: "Front Left Fender",  group: "fender" },
-  { key: "front_right_fender", label: "Front Right Fender", group: "fender" },
-  { key: "rear_left_fender",   label: "Rear Left Fender",   group: "fender" },
-  { key: "rear_right_fender",  label: "Rear Right Fender",  group: "fender" },
-  { key: "front_left_door",    label: "Front Left Door",    group: "door" },
-  { key: "front_right_door",   label: "Front Right Door",   group: "door" },
-  { key: "rear_left_door",     label: "Rear Left Door",     group: "door" },
-  { key: "rear_right_door",    label: "Rear Right Door",    group: "door" },
-] as const;
+export type { DamagePart } from "@/lib/vehicles/damage-report";
 
-const CONDITIONS = [
-  { value: "original",       label: "Original",       color: "#6b7280", bg: "bg-gray-500",  ring: "ring-gray-400" },
-  { value: "local_painted",  label: "Locally Painted", color: "#ea580c", bg: "bg-orange-500", ring: "ring-orange-400" },
-  { value: "painted",        label: "Painted",        color: "#2563eb", bg: "bg-blue-500",  ring: "ring-blue-400" },
-  { value: "changed",        label: "Changed",        color: "#dc2626", bg: "bg-red-500",   ring: "ring-red-400" },
-] as const;
+const COPY = {
+  en: { original: "All body panels are original", help: "Select a panel, then choose its condition. Report paint, replacement, or visible damage honestly.", choose: "Choose panel condition", tap: "Tap any colored body panel to update it.", front: "FRONT", rear: "REAR" },
+  fa: { original: "تمام قطعات بدنه اصلی است", help: "یک قطعه را انتخاب کرده و وضعیت آن را تعیین کنید. رنگ، تعویض یا آسیب قابل مشاهده را صادقانه ثبت کنید.", choose: "وضعیت قطعه را انتخاب کنید", tap: "برای تغییر وضعیت، روی هر قطعه رنگی بدنه بزنید.", front: "جلو", rear: "عقب" },
+  ps: { original: "د بدنې ټولې برخې اصلي دي", help: "یوه برخه وټاکئ او حالت یې مشخص کړئ. رنګ، بدلون یا ښکاره زیان په رښتینولۍ ثبت کړئ.", choose: "د برخې حالت وټاکئ", tap: "د حالت د بدلولو لپاره په رنګه برخه ټک وکړئ.", front: "مخ", rear: "شا" },
+} as const;
 
-export type DamagePart = { key: string; label: string; condition: string };
-
-type Props = {
-  value: DamagePart[];
-  onChange: (parts: DamagePart[]) => void;
+const COORDS: Record<string, [number, number, number, number]> = {
+  hood: [60, 25, 100, 54], front_bumper: [52, 12, 116, 18], roof: [64, 125, 92, 58],
+  trunk: [60, 225, 100, 48], rear_bumper: [52, 276, 116, 18],
+  front_left_fender: [20, 36, 38, 44], front_right_fender: [162, 36, 38, 44],
+  rear_left_fender: [20, 224, 38, 48], rear_right_fender: [162, 224, 38, 48],
+  front_left_door: [18, 92, 40, 62], front_right_door: [162, 92, 40, 62],
+  rear_left_door: [18, 158, 40, 62], rear_right_door: [162, 158, 40, 62],
 };
 
-function conditionColor(cond: string) {
-  return CONDITIONS.find((c) => c.value === cond)?.color ?? CONDITIONS[0].color;
-}
-
-function DiagramPart({
-  partKey, x, y, w, h, label, activePart, onTap, getCondition,
-}: {
-  partKey: string; x: number; y: number; w: number; h: number; label: string;
-  activePart: string | null; onTap: (key: string | null) => void;
-  getCondition: (key: string) => string;
-}) {
-  const cond = getCondition(partKey);
-  const color = conditionColor(cond);
-  const isActive = activePart === partKey;
+function DiagramPart({ part, active, label, onSelect }: { part: DamagePart; active: boolean; label: string; onSelect: () => void }) {
+  const coords = COORDS[part.key];
+  if (!coords) return null;
+  const [x, y, width, height] = coords;
   return (
-    <g onClick={() => onTap(isActive ? null : partKey)} className="cursor-pointer" role="button" aria-label={label}>
-      <rect x={x} y={y} width={w} height={h} rx={3} fill={color} fillOpacity={0.75}
-        stroke={isActive ? "#1d4ed8" : "#374151"} strokeWidth={isActive ? 2.5 : 1.2} />
-      <text x={x + w / 2} y={y + h / 2 + 4} textAnchor="middle" fontSize={8} fill="#fff"
-        fontWeight="600" pointerEvents="none">
-        {label}
-      </text>
-    </g>
+    <rect
+      x={x} y={y} width={width} height={height} rx={7}
+      fill={damageCondition(part.condition).color}
+      fillOpacity={part.condition === "original" ? 0.45 : 0.88}
+      stroke={active ? "#0f172a" : "#475569"}
+      strokeWidth={active ? 3 : 1.2}
+      className="cursor-pointer transition-opacity hover:opacity-80"
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+    />
   );
 }
 
-export function VehicleDamageDiagram({ value, onChange }: Props) {
+export function VehicleDamageDiagram({ value, onChange, locale = "en" }: { value: DamagePart[]; onChange: (parts: DamagePart[]) => void; locale?: AppLocale }) {
   const [activePart, setActivePart] = useState<string | null>(null);
-  const allOriginal = value.every((p) => p.condition === "original");
+  const partMap = useMemo(() => new Map(value.map((part) => [part.key, part])), [value]);
+  const allOriginal = value.every((part) => part.condition === "original");
 
-  const partMap = useMemo(() => {
-    return new Map(value.map((p) => [p.key, p.condition]));
-  }, [value]);
-
-  function setPart(key: string, condition: string) {
-    const next = value.map((p) => (p.key === key ? { ...p, condition } : p));
-    onChange(next);
+  function setPart(key: string, condition: VehicleDamageCondition) {
+    onChange(value.map((part) => part.key === key ? { ...part, condition } : part));
     setActivePart(null);
-  }
-
-  function setAllOriginal() {
-    onChange(value.map((p) => ({ ...p, condition: "original" })));
-    setActivePart(null);
-  }
-
-  function getCondition(key: string) {
-    return partMap.get(key) ?? "original";
   }
 
   return (
-    <div className="space-y-3">
-      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-semibold">
-        <input
-          type="checkbox"
-          checked={allOriginal}
-          onChange={(e) => {
-            if (e.target.checked) setAllOriginal();
-          }}
-          className="h-4 w-4 accent-[var(--accent)]"
-        />
-        All parts are original (factory condition)
+    <div className="space-y-3" dir={locale === "en" ? "ltr" : "rtl"}>
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-semibold">
+        <input type="checkbox" checked={allOriginal} onChange={(event) => event.target.checked && onChange(defaultVehicleDamageParts())} className="h-4 w-4 accent-[var(--accent)]" />
+        {COPY[locale].original}
       </label>
+      <p className="text-xs leading-5 text-[var(--ink-2)]">{COPY[locale].help}</p>
 
-      <div className="overflow-hidden rounded-xl border border-[var(--line)] bg-white">
-        <div className="flex flex-wrap gap-2 border-b border-[var(--line)] px-3 py-2">
-          {CONDITIONS.map((c) => (
-            <span
-              key={c.value}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold text-white ${c.bg}`}
-            >
-              <span className="h-2 w-2 rounded-full bg-white/60" />
-              {c.label}
+      <div className="overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-sm">
+        <div className="flex flex-wrap gap-2 border-b border-[var(--line)] p-3">
+          {VEHICLE_DAMAGE_CONDITIONS.map((condition) => (
+            <span key={condition.value} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-white ${condition.className}`}>
+              <span className="h-2 w-2 rounded-full bg-white/70" />{condition.labels[locale]}
             </span>
           ))}
         </div>
 
-        <div className="flex justify-center p-3">
-          <svg
-            viewBox="0 0 220 340"
-            className="w-full max-w-[220px]"
-            style={{ maxHeight: 340 }}
-            aria-label="Vehicle damage diagram"
-          >
-            {/* Car body outline */}
-            <rect x={50} y={10} width={120} height={320} rx={20} fill="#f1f5f9" stroke="#94a3b8" strokeWidth={1.5} />
+        <div className="grid items-center gap-4 p-4 md:grid-cols-[minmax(220px,300px)_1fr]">
+          <div className="flex justify-center rounded-2xl bg-gradient-to-b from-slate-50 to-slate-100 p-3">
+            <svg viewBox="0 0 220 310" className="w-full max-w-[250px]" aria-label="Top view vehicle body condition selector">
+              <text x="110" y="9" textAnchor="middle" fontSize="8" fontWeight="700" fill="#64748b">{COPY[locale].front}</text>
+              <path d="M61 24 Q70 5 110 5 Q150 5 159 24 L174 62 L174 250 Q160 300 110 304 Q60 300 46 250 L46 62 Z" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5" />
+              <rect x="65" y="82" width="90" height="38" rx="9" fill="#bfdbfe" stroke="#64748b" />
+              <rect x="65" y="187" width="90" height="32" rx="9" fill="#bfdbfe" stroke="#64748b" />
+              <circle cx="39" cy="71" r="10" fill="#334155" /><circle cx="181" cy="71" r="10" fill="#334155" />
+              <circle cx="39" cy="239" r="10" fill="#334155" /><circle cx="181" cy="239" r="10" fill="#334155" />
+              {value.map((part) => <DiagramPart key={part.key} part={part} active={activePart === part.key} label={damagePartLabel(part.key, locale)} onSelect={() => setActivePart(activePart === part.key ? null : part.key)} />)}
+              <text x="110" y="307" textAnchor="middle" fontSize="8" fontWeight="700" fill="#64748b">{COPY[locale].rear}</text>
+            </svg>
+          </div>
 
-            {/* Hood */}
-            <DiagramPart partKey="hood"  x={60} y={15}  w={100} h={55} label="Hood" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Front bumper */}
-            <DiagramPart partKey="front_bumper" x={55} y={8}  w={110} h={18} label="Front Bumper" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Windshield area — non-interactive */}
-            <rect x={62} y={72} width={96} height={40} rx={4} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
-            <text x={110} y={96} textAnchor="middle" fontSize={7} fill="#475569" fontWeight="500">Windshield</text>
-            {/* Roof */}
-            <DiagramPart partKey="roof" x={62} y={114} w={96} h={55} label="Roof" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Rear windshield area */}
-            <rect x={62} y={171} width={96} height={30} rx={4} fill="#cbd5e1" stroke="#64748b" strokeWidth={1} />
-            <text x={110} y={190} textAnchor="middle" fontSize={7} fill="#475569" fontWeight="500">Rear Glass</text>
-            {/* Trunk */}
-            <DiagramPart partKey="trunk" x={60} y={203} w={100} h={55} label="Trunk" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Rear bumper */}
-            <DiagramPart partKey="rear_bumper" x={55} y={260} w={110} h={18} label="Rear Bumper" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
+          <div className="space-y-3">
+            {activePart ? (
+              <>
+                <p className="text-sm font-bold">{damagePartLabel(activePart, locale)} — {COPY[locale].choose}</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {VEHICLE_DAMAGE_CONDITIONS.map((condition) => {
+                    const selected = partMap.get(activePart)?.condition === condition.value;
+                    return (
+                      <button key={condition.value} type="button" onClick={() => setPart(activePart, condition.value)} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-start text-xs font-bold transition ${selected ? `${condition.className} border-transparent text-white` : "border-[var(--line)] bg-white hover:bg-[var(--surface-2)]"}`}>
+                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: condition.color }} />{condition.labels[locale]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : <p className="rounded-xl bg-[var(--surface-2)] p-4 text-sm text-[var(--ink-2)]">{COPY[locale].tap}</p>}
 
-            {/* Front left fender */}
-            <DiagramPart partKey="front_left_fender" x={20} y={22} w={38} h={38} label="FL Fender" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Front right fender */}
-            <DiagramPart partKey="front_right_fender" x={162} y={22} w={38} h={38} label="FR Fender" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Rear left fender */}
-            <DiagramPart partKey="rear_left_fender" x={20} y={220} w={38} h={38} label="RL Fender" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Rear right fender */}
-            <DiagramPart partKey="rear_right_fender" x={162} y={220} w={38} h={38} label="RR Fender" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-
-            {/* Front left door */}
-            <DiagramPart partKey="front_left_door" x={18} y={72} w={40} h={68} label="FL Door" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Front right door */}
-            <DiagramPart partKey="front_right_door" x={162} y={72} w={40} h={68} label="FR Door" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Rear left door */}
-            <DiagramPart partKey="rear_left_door" x={18} y={148} w={40} h={68} label="RL Door" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-            {/* Rear right door */}
-            <DiagramPart partKey="rear_right_door" x={162} y={148} w={40} h={68} label="RR Door" activePart={activePart} onTap={setActivePart} getCondition={getCondition} />
-          </svg>
-        </div>
-
-        {activePart ? (
-          <div className="border-t border-[var(--line)] bg-[var(--surface-2)] px-3 py-3">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--ink-2)]">
-              {PARTS.find((p) => p.key === activePart)?.label} — select condition
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {CONDITIONS.map((c) => {
-                const current = getCondition(activePart);
-                return (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setPart(activePart, c.value)}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
-                      current === c.value
-                        ? `border-transparent text-white ${c.bg}`
-                        : "border-[var(--line)] bg-white text-[var(--ink-1)]"
-                    }`}
-                  >
-                    <span
-                      className="inline-block h-3 w-3 flex-shrink-0 rounded-full"
-                      style={{ backgroundColor: c.color }}
-                    />
-                    {c.label}
-                  </button>
-                );
-              })}
+            <div className="grid gap-2 sm:grid-cols-2">
+              {value.filter((part) => part.condition !== "original").map((part) => (
+                <button key={part.key} type="button" onClick={() => setActivePart(part.key)} className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-start text-xs">
+                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: damageCondition(part.condition).color }} />
+                  <span><strong>{damagePartLabel(part.key, locale)}</strong><br /><span className="text-[var(--ink-2)]">{damageCondition(part.condition).labels[locale]}</span></span>
+                </button>
+              ))}
             </div>
           </div>
-        ) : (
-          <p className="border-t border-[var(--line)] px-3 py-2 text-xs text-[var(--ink-2)]">
-            Tap any part to set its condition.
-          </p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {value
-          .filter((p) => p.condition !== "original")
-          .map((p) => (
-            <div
-              key={p.key}
-              className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-xs"
-            >
-              <span
-                className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                style={{ backgroundColor: conditionColor(p.condition) }}
-              />
-              <span className="font-semibold">{p.label}</span>
-              <span className="text-[var(--ink-2)]">
-                {CONDITIONS.find((c) => c.value === p.condition)?.label ?? p.condition}
-              </span>
-            </div>
-          ))}
+        </div>
       </div>
     </div>
   );
 }
 
 export function defaultDamageParts(): DamagePart[] {
-  return PARTS.map((p) => ({ key: p.key, label: p.label, condition: "original" }));
+  return defaultVehicleDamageParts();
 }

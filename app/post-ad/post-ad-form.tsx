@@ -1744,7 +1744,7 @@ export default function PostAdForm({
         {showDamageDiagram ? (
           <div>
             <p className="mb-2 text-sm font-semibold">{t.postAd.damagePaintReport}</p>
-            <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} />
+            <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} locale={locale} />
           </div>
         ) : null}
       </section>
