@@ -21,18 +21,18 @@ type ModelViewerElement = HTMLElement & { model?: { materials: ModelViewerMateri
 
 const PANEL_HOTSPOTS: Record<string, { position: string; normal: string }> = {
   front_bumper: { position: "0m 0.4m 2.2m", normal: "0m 0m 1m" },
-  hood: { position: "0m 0.9m 1.3m", normal: "0m 1m 0.25m" },
+  hood: { position: "0m 0.78m 1.62m", normal: "0m 1m 0.25m" },
   roof: { position: "0m 1.4m 0m", normal: "0m 1m 0m" },
   trunk: { position: "0m 0.8m -1.5m", normal: "0m 1m -0.25m" },
   rear_bumper: { position: "0m 0.4m -2.2m", normal: "0m 0m -1m" },
-  front_left_fender: { position: "-0.9m 0.65m 1.4m", normal: "-1m 0.25m 0m" },
-  front_right_fender: { position: "0.9m 0.65m 1.4m", normal: "1m 0.25m 0m" },
-  front_left_door: { position: "-1m 0.7m 0.4m", normal: "-1m 0.15m 0m" },
-  front_right_door: { position: "1m 0.7m 0.4m", normal: "1m 0.15m 0m" },
-  rear_left_door: { position: "-1m 0.7m -0.6m", normal: "-1m 0.15m 0m" },
-  rear_right_door: { position: "1m 0.7m -0.6m", normal: "1m 0.15m 0m" },
-  rear_left_fender: { position: "-0.9m 0.6m -1.5m", normal: "-1m 0.2m 0m" },
-  rear_right_fender: { position: "0.9m 0.6m -1.5m", normal: "1m 0.2m 0m" },
+  front_left_fender: { position: "-0.78m 0.62m 1.4m", normal: "-1m 0.25m 0m" },
+  front_right_fender: { position: "0.78m 0.62m 1.4m", normal: "1m 0.25m 0m" },
+  front_left_door: { position: "-0.78m 0.66m 0.3m", normal: "-1m 0.15m 0m" },
+  front_right_door: { position: "0.78m 0.66m 0.3m", normal: "1m 0.15m 0m" },
+  rear_left_door: { position: "-0.78m 0.66m -0.62m", normal: "-1m 0.15m 0m" },
+  rear_right_door: { position: "0.78m 0.66m -0.62m", normal: "1m 0.15m 0m" },
+  rear_left_fender: { position: "-0.78m 0.58m -1.5m", normal: "-1m 0.2m 0m" },
+  rear_right_fender: { position: "0.78m 0.58m -1.5m", normal: "1m 0.2m 0m" },
 };
 
 function hexColorFactor(hex: string): [number, number, number, number] {
@@ -160,15 +160,16 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
                     data-position={hotspot.position}
                     data-normal={hotspot.normal}
                     data-visibility-attribute="visible"
-                    className="pointer-events-none flex -translate-x-1/2 -translate-y-full flex-col items-center opacity-0 transition-opacity data-[visible]:opacity-100"
+                    className="pointer-events-none -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity data-[visible]:opacity-100"
                     aria-label={`${damagePartLabel(part.key, locale)}: ${condition.labels[locale]}`}
                   >
-                    <span className="max-w-32 rounded-md border bg-slate-950/95 px-2 py-1 text-center text-[9px] font-extrabold leading-tight text-white shadow-lg sm:max-w-40 sm:text-[11px]" style={{ borderColor: condition.color }}>
-                      <span className="block whitespace-nowrap">{damagePartLabel(part.key, locale)}</span>
-                      <span className="block whitespace-nowrap" style={{ color: condition.color }}>{condition.labels[locale]}</span>
+                    <span
+                      className="block whitespace-nowrap text-center text-[10px] font-black uppercase leading-none tracking-tight text-white/90 sm:text-xs"
+                      style={{ WebkitTextStroke: `1px ${condition.color}`, textShadow: "0 1px 2px rgba(0,0,0,.95), 0 0 5px rgba(0,0,0,.8)" }}
+                    >
+                      <span className="block">{condition.labels[locale]}</span>
+                      <span className="mt-0.5 block text-[7px] font-extrabold normal-case tracking-normal text-white/80 sm:text-[8px]">{damagePartLabel(part.key, locale)}</span>
                     </span>
-                    <span className="block h-3 w-0.5" style={{ backgroundColor: condition.color }} aria-hidden="true" />
-                    <span className="block h-2.5 w-2.5 rounded-full border-2 border-white shadow-md" style={{ backgroundColor: condition.color }} aria-hidden="true" />
                   </button>
                 );
               }) : null}
