@@ -56,6 +56,10 @@ export function normalizeVehicleDamageParts(input: unknown): DamagePart[] {
   return result;
 }
 
+export function getNonOriginalVehicleDamageParts(parts: readonly DamagePart[]) {
+  return parts.filter((part) => part.condition !== "original");
+}
+
 export function damagePartLabel(key: string, locale: AppLocale) {
   return partByKey.get(key)?.labels[locale] ?? key.replace(/_/g, " ");
 }

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { selectVehicleModel3D, VEHICLE_MODELS_3D } from "../lib/vehicles/model-catalog";
-import { defaultVehicleDamageParts, normalizeVehicleDamageParts, shouldShowVehicleDamageDiagram } from "../lib/vehicles/damage-report";
+import { defaultVehicleDamageParts, getNonOriginalVehicleDamageParts, normalizeVehicleDamageParts, shouldShowVehicleDamageDiagram } from "../lib/vehicles/damage-report";
 
 test("maps all six supported Toyota model families to local GLB assets", () => {
   const cases = [
@@ -79,4 +79,16 @@ test("shows the seller body-condition diagram for applicable vehicle branches", 
   assert.equal(shouldShowVehicleDamageDiagram("vehicles", "parts"), false);
   assert.equal(shouldShowVehicleDamageDiagram("vehicles", "bicycles"), false);
   assert.equal(shouldShowVehicleDamageDiagram("real-estate", "cars"), false);
+});
+
+test("connects only seller-reported non-original panels to the buyer 3D report", () => {
+  const report = normalizeVehicleDamageParts([
+    { key: "hood", condition: "local_painted" },
+    { key: "roof", condition: "original" },
+    { key: "rear_bumper", condition: "changed" },
+  ]);
+  assert.deepEqual(getNonOriginalVehicleDamageParts(report).map((part) => [part.key, part.condition]), [
+    ["hood", "local_painted"],
+    ["rear_bumper", "changed"],
+  ]);
 });

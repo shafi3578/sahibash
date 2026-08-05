@@ -23,6 +23,7 @@ import { ELECTRONICS_DYNAMIC_LEAF_KEY } from "@/lib/posting/electronics-dynamic"
 import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
 import { labelForLocale } from "@/lib/listing-schema-config";
 import { selectVehicleModel3D } from "@/lib/vehicles/model-catalog";
+import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 
 type NamedLocationRelation = { name?: string | null } | null;
 
@@ -255,6 +256,12 @@ export default async function ListingDetailPage({
     year: vehicleYearValue,
     title: displayTitle,
   }) : null;
+  const vehicleDamageParts = normalizeVehicleDamageParts(
+    (listing.vehicle_damage?.vehicle_damage_parts ?? []).map((part) => ({
+      key: part.part_key,
+      condition: part.condition,
+    }))
+  );
   const vehiclePlateNumberValue = attributeMap.get("plate_number")
     || attributeMap.get("license_plate")
     || attributeMap.get("vehicle_plate_number")
@@ -575,7 +582,7 @@ export default async function ListingDetailPage({
       <div className="space-y-4 pb-20 sm:pb-0">
         <ListingGallery images={listing.listing_images ?? []} title={displayTitle} />
 
-        {vehicleModel3D ? <VehicleModelViewer model={vehicleModel3D} locale={locale} /> : null}
+        {vehicleModel3D ? <VehicleModelViewer model={vehicleModel3D} locale={locale} damageParts={vehicleDamageParts} hasDamageReport={Boolean(listing.vehicle_damage)} /> : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           {isWanted ? (

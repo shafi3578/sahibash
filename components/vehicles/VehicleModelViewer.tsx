@@ -3,21 +3,28 @@
 import { useEffect, useRef, useState } from "react";
 import type { AppLocale } from "@/lib/i18n/translations";
 import type { VehicleModel3D } from "@/lib/vehicles/model-catalog";
+import {
+  damageCondition,
+  damagePartLabel,
+  getNonOriginalVehicleDamageParts,
+  type DamagePart,
+} from "@/lib/vehicles/damage-report";
 
 type ViewerState = "idle" | "loading" | "ready" | "error";
 
 const COPY = {
-  en: { title: "Interactive 3D view", description: "Inspect the vehicle from every angle. The 3D model is a visual reference for the selected make and model; listing photos remain the authoritative condition record.", load: "Load 3D view", loading: "Loading 3D model…", retry: "Try again", error: "The 3D model could not be displayed on this device.", controls: "Drag to rotate · Scroll or pinch to zoom", fullscreen: "Full screen", reference: "Reference model" },
-  fa: { title: "نمای تعاملی سه‌بعدی", description: "موتر را از هر زاویه بررسی کنید. مدل سه‌بعدی تنها مرجع تصویری ساخت و مدل انتخاب‌شده است؛ عکس‌های اعلان وضعیت اصلی را نشان می‌دهند.", load: "نمایش مدل سه‌بعدی", loading: "مدل سه‌بعدی بارگذاری می‌شود…", retry: "تلاش دوباره", error: "مدل سه‌بعدی در این دستگاه نمایش داده نشد.", controls: "برای چرخش بکشید · برای زوم اسکرول یا نیشگون کنید", fullscreen: "تمام صفحه", reference: "مدل مرجع" },
-  ps: { title: "متقابل درې‌بعدي لید", description: "موټر له هرې زاویې وګورئ. درې‌بعدي ماډل د ټاکل شوي جوړ او ماډل لپاره انځوریزه بېلګه ده؛ د اعلان عکسونه د حالت اصلي ریکارډ دی.", load: "درې‌بعدي لید پرانیزئ", loading: "درې‌بعدي ماډل پورته کېږي…", retry: "بیا هڅه", error: "درې‌بعدي ماډل په دې وسیله کې ونه ښودل شو.", controls: "د څرخول لپاره کش کړئ · د زوم لپاره سکرول یا پنچ کړئ", fullscreen: "بشپړ سکرین", reference: "مرجع ماډل" },
+  en: { title: "Interactive 3D view", description: "Inspect the vehicle from every angle. Seller-reported paint, replacement, and damage are connected to this 3D reference below; listing photos remain the authoritative condition record.", descriptionNoReport: "Inspect the reference vehicle from every angle. Listing photos remain the authoritative condition record.", load: "Load 3D view", loading: "Loading 3D model…", retry: "Try again", error: "The 3D model could not be displayed on this device.", controls: "Drag to rotate · Scroll or pinch to zoom", fullscreen: "Full screen", reference: "Reference model", report: "Seller body-condition report", allOriginal: "Seller reported all body panels as original", marked: "reported panels need attention", overlay: "Condition overlay" },
+  fa: { title: "نمای تعاملی سه‌بعدی", description: "موتر را از هر زاویه بررسی کنید. رنگ، تعویض و آسیب ثبت‌شده توسط فروشنده در پایین به این مرجع سه‌بعدی وصل است؛ عکس‌های اعلان مرجع اصلی وضعیت است.", descriptionNoReport: "موتر مرجع را از هر زاویه بررسی کنید. عکس‌های اعلان مرجع اصلی وضعیت است.", load: "نمایش مدل سه‌بعدی", loading: "مدل سه‌بعدی بارگذاری می‌شود…", retry: "تلاش دوباره", error: "مدل سه‌بعدی در این دستگاه نمایش داده نشد.", controls: "برای چرخش بکشید · برای زوم اسکرول یا نیشگون کنید", fullscreen: "تمام صفحه", reference: "مدل مرجع", report: "گزارش وضعیت بدنه فروشنده", allOriginal: "فروشنده تمام قطعات بدنه را اصلی ثبت کرده است", marked: "قطعه ثبت‌شده نیاز به توجه دارد", overlay: "لایه وضعیت" },
+  ps: { title: "متقابل درې‌بعدي لید", description: "موټر له هرې زاویې وګورئ. د پلورونکي ثبت شوی رنګ، بدلون او زیان لاندې له دې درې‌بعدي مرجع سره نښلول شوی؛ د اعلان عکسونه د حالت اصلي ریکارډ دی.", descriptionNoReport: "مرجع موټر له هرې زاویې وګورئ. د اعلان عکسونه د حالت اصلي ریکارډ دی.", load: "درې‌بعدي لید پرانیزئ", loading: "درې‌بعدي ماډل پورته کېږي…", retry: "بیا هڅه", error: "درې‌بعدي ماډل په دې وسیله کې ونه ښودل شو.", controls: "د څرخول لپاره کش کړئ · د زوم لپاره سکرول یا پنچ کړئ", fullscreen: "بشپړ سکرین", reference: "مرجع ماډل", report: "د پلورونکي د بدنې راپور", allOriginal: "پلورونکي د بدنې ټولې برخې اصلي ثبت کړې دي", marked: "ثبت شوې برخې پاملرنې ته اړتیا لري", overlay: "د حالت پوښ" },
 } as const;
 
-export function VehicleModelViewer({ model, locale }: { model: VehicleModel3D; locale: AppLocale }) {
+export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageReport = false }: { model: VehicleModel3D; locale: AppLocale; damageParts?: DamagePart[]; hasDamageReport?: boolean }) {
   const [requested, setRequested] = useState(false);
   const [state, setState] = useState<ViewerState>("idle");
   const frameRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLElement>(null);
   const text = COPY[locale];
+  const nonOriginalParts = getNonOriginalVehicleDamageParts(damageParts);
 
   useEffect(() => {
     if (!requested) return;
@@ -59,7 +66,7 @@ export function VehicleModelViewer({ model, locale }: { model: VehicleModel3D; l
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] p-4 sm:p-5">
         <div>
           <h2 className="text-base font-bold">{text.title}</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--ink-2)]">{text.description}</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--ink-2)]">{hasDamageReport ? text.description : text.descriptionNoReport}</p>
         </div>
         <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-semibold text-[var(--ink-2)]">
           {text.reference}: {model.label}
@@ -99,6 +106,18 @@ export function VehicleModelViewer({ model, locale }: { model: VehicleModel3D; l
               reveal="auto"
               className="h-[320px] w-full sm:h-[460px]"
             />
+            {nonOriginalParts.length > 0 ? (
+              <div className="pointer-events-none absolute start-3 top-3 max-w-[min(78%,320px)] rounded-xl border border-white/70 bg-slate-950/75 p-2.5 text-white shadow-lg backdrop-blur-sm" aria-label={text.overlay}>
+                <p className="mb-2 text-[10px] font-extrabold uppercase tracking-wider text-white/80">{text.overlay}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {nonOriginalParts.slice(0, 5).map((part) => {
+                    const condition = damageCondition(part.condition);
+                    return <span key={part.key} className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-slate-900"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: condition.color }} />{damagePartLabel(part.key, locale)} · {condition.labels[locale]}</span>;
+                  })}
+                  {nonOriginalParts.length > 5 ? <span className="rounded-full bg-white/20 px-2 py-1 text-[10px] font-bold">+{nonOriginalParts.length - 5}</span> : null}
+                </div>
+              </div>
+            ) : null}
             {state === "loading" ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-center gap-2 bg-white/85 px-3 py-2 text-xs font-semibold backdrop-blur-sm" aria-live="polite">
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
@@ -112,6 +131,28 @@ export function VehicleModelViewer({ model, locale }: { model: VehicleModel3D; l
           </>
         )}
       </div>
+
+      {hasDamageReport ? <div className="border-t border-[var(--line)] p-4 sm:p-5" dir={locale === "en" ? "ltr" : "rtl"}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold">{text.report}</h3>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${nonOriginalParts.length > 0 ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-800"}`}>
+            {nonOriginalParts.length > 0 ? `${nonOriginalParts.length} ${text.marked}` : text.allOriginal}
+          </span>
+        </div>
+        {nonOriginalParts.length > 0 ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {nonOriginalParts.map((part) => {
+              const condition = damageCondition(part.condition);
+              return (
+                <div key={part.key} className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs">
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: condition.color }} />
+                  <span><strong>{damagePartLabel(part.key, locale)}</strong><br /><span className="text-[var(--ink-2)]">{condition.labels[locale]}</span></span>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div> : null}
     </section>
   );
 }
