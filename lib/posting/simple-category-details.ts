@@ -823,6 +823,13 @@ export function getSimpleCategoryConfig(kind: SimpleCategoryKind | null | undefi
   return kind ? CONFIGS[kind] : null;
 }
 
+export function shouldUseSimpleCategoryFallback(
+  config: SimpleCategoryConfig | null | undefined,
+  usesPublishedSchema: boolean
+) {
+  return Boolean(config) && !usesPublishedSchema;
+}
+
 export function getSimpleCategoryFieldKeys(kind: SimpleCategoryKind | null | undefined) {
   const config = getSimpleCategoryConfig(kind);
   if (!config) return [];

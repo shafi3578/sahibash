@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { labelForLocale, normalizeListingSchemaConfig } from "../lib/listing-schema-config";
+import { getSimpleCategoryConfig, shouldUseSimpleCategoryFallback } from "../lib/posting/simple-category-details";
 
 test("normalizes, orders, and preserves multilingual schema controls", () => {
   const config = normalizeListingSchemaConfig({
@@ -21,4 +22,10 @@ test("normalizes, orders, and preserves multilingual schema controls", () => {
 test("rejects duplicate keys and invalid option values", () => {
   assert.throws(() => normalizeListingSchemaConfig({ sections: [{ key: "details" }], fields: [{ key: "x", type: "text" }, { key: "x", type: "text" }] }), /duplicate key/);
   assert.throws(() => normalizeListingSchemaConfig({ sections: [{ key: "details" }], fields: [{ key: "x", type: "select", options: [{ value: "" }] }] }), /empty or duplicate option/);
+});
+
+test("published subcategory schemas replace hidden fallback posting fields", () => {
+  const carFallback = getSimpleCategoryConfig("car");
+  assert.equal(shouldUseSimpleCategoryFallback(carFallback, false), true);
+  assert.equal(shouldUseSimpleCategoryFallback(carFallback, true), false);
 });

@@ -26,6 +26,7 @@ import {
   getSimpleCategoryModelOptions,
   labelFor,
   optionLabel,
+  shouldUseSimpleCategoryFallback,
 } from "@/lib/posting/simple-category-details";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
 
@@ -352,6 +353,7 @@ export default function PostAdForm({
   const finalPath = finalNode?.path;
   const simpleCategoryKind = useMemo(() => getSimpleCategoryKind(finalPath, rootSlug), [finalPath, rootSlug]);
   const simpleCategoryConfig = useMemo(() => getSimpleCategoryConfig(simpleCategoryKind), [simpleCategoryKind]);
+  const usesSimpleCategoryFallback = shouldUseSimpleCategoryFallback(simpleCategoryConfig, usesPublishedSchema);
   const vehicleBranch = useMemo(() => getVehicleBranchFromPath(finalPath), [finalPath]);
 
   type VehicleBranchDetailField = {
@@ -1329,7 +1331,7 @@ export default function PostAdForm({
     if (!core.contact_phone) return postAdCopy.contactPhoneRequired;
     if (!core.rulesAccepted) return postAdCopy.acceptRulesRequired;
 
-    if (simpleCategoryConfig) {
+    if (usesSimpleCategoryFallback && simpleCategoryConfig) {
       for (const field of simpleCategoryConfig.fields.filter((item) => item.required)) {
         const value = dynamicValues[field.key];
         if (field.type === "multiselect") {
@@ -1755,7 +1757,7 @@ export default function PostAdForm({
     ? renderVehicleDetailsSection(vehicleBranch)
     : null;
 
-  const simpleCategoryFieldsSection = simpleCategoryConfig && !usesPublishedSchema ? (
+  const simpleCategoryFieldsSection = simpleCategoryConfig && usesSimpleCategoryFallback ? (
     <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
       <h3 className="text-sm font-bold">{labelFor(locale, simpleCategoryConfig.title)}</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
