@@ -19,27 +19,37 @@ const COPY = {
   ps: { original: "د بدنې ټولې برخې اصلي دي", help: "یوه برخه وټاکئ او حالت یې مشخص کړئ. رنګ، بدلون یا ښکاره زیان په رښتینولۍ ثبت کړئ.", choose: "د برخې حالت وټاکئ", tap: "د حالت د بدلولو لپاره په رنګه برخه ټک وکړئ.", front: "مخ", rear: "شا" },
 } as const;
 
-const COORDS: Record<string, [number, number, number, number]> = {
-  hood: [60, 25, 100, 54], front_bumper: [52, 12, 116, 18], roof: [64, 125, 92, 58],
-  trunk: [60, 225, 100, 48], rear_bumper: [52, 276, 116, 18],
-  front_left_fender: [20, 36, 38, 44], front_right_fender: [162, 36, 38, 44],
-  rear_left_fender: [20, 224, 38, 48], rear_right_fender: [162, 224, 38, 48],
-  front_left_door: [18, 92, 40, 62], front_right_door: [162, 92, 40, 62],
-  rear_left_door: [18, 158, 40, 62], rear_right_door: [162, 158, 40, 62],
+type PanelGeometry =
+  | { kind: "path"; d: string }
+  | { kind: "rect"; x: number; y: number; width: number; height: number; rx: number };
+
+const PANEL_GEOMETRY: Record<string, PanelGeometry> = {
+  front_bumper: { kind: "rect", x: 145, y: 18, width: 130, height: 30, rx: 9 },
+  hood: { kind: "path", d: "M155 70 Q210 45 265 70 L256 182 Q210 164 164 182 Z" },
+  roof: { kind: "path", d: "M164 208 Q210 188 256 208 L253 350 Q210 370 167 350 Z" },
+  trunk: { kind: "path", d: "M167 374 Q210 390 253 374 L262 472 Q210 496 158 472 Z" },
+  rear_bumper: { kind: "rect", x: 145, y: 510, width: 130, height: 30, rx: 9 },
+  front_left_fender: { kind: "path", d: "M34 70 L96 70 L126 180 L111 197 L75 172 L34 166 Z" },
+  front_right_fender: { kind: "path", d: "M386 70 L324 70 L294 180 L309 197 L345 172 L386 166 Z" },
+  front_left_door: { kind: "path", d: "M34 181 L76 177 L113 204 L114 282 L34 264 Z" },
+  front_right_door: { kind: "path", d: "M386 181 L344 177 L307 204 L306 282 L386 264 Z" },
+  rear_left_door: { kind: "path", d: "M34 277 L114 295 L113 372 L76 399 L34 395 Z" },
+  rear_right_door: { kind: "path", d: "M386 277 L306 295 L307 372 L344 399 L386 395 Z" },
+  rear_left_fender: { kind: "path", d: "M34 410 L75 404 L111 379 L126 396 L96 480 L34 480 Z" },
+  rear_right_fender: { kind: "path", d: "M386 410 L345 404 L309 379 L294 396 L324 480 L386 480 Z" },
 };
 
 function DiagramPart({ part, active, label, onSelect }: { part: DamagePart; active: boolean; label: string; onSelect: () => void }) {
-  const coords = COORDS[part.key];
-  if (!coords) return null;
-  const [x, y, width, height] = coords;
+  const geometry = PANEL_GEOMETRY[part.key];
+  if (!geometry) return null;
+  const condition = damageCondition(part.condition);
   return (
-    <rect
-      x={x} y={y} width={width} height={height} rx={7}
-      fill={damageCondition(part.condition).color}
-      fillOpacity={part.condition === "original" ? 0.45 : 0.88}
+    <g
+      fill={condition.color}
+      fillOpacity={part.condition === "original" ? 0.38 : 0.9}
       stroke={active ? "#0f172a" : "#475569"}
-      strokeWidth={active ? 3 : 1.2}
-      className="cursor-pointer transition-opacity hover:opacity-80"
+      strokeWidth={active ? 4 : 1.5}
+      className="cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
       onClick={onSelect}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -50,7 +60,14 @@ function DiagramPart({ part, active, label, onSelect }: { part: DamagePart; acti
       role="button"
       tabIndex={0}
       aria-label={label}
-    />
+    >
+      <title>{label}: {condition.labels.en}</title>
+      {geometry.kind === "path" ? (
+        <path d={geometry.d} vectorEffect="non-scaling-stroke" />
+      ) : (
+        <rect x={geometry.x} y={geometry.y} width={geometry.width} height={geometry.height} rx={geometry.rx} vectorEffect="non-scaling-stroke" />
+      )}
+    </g>
   );
 }
 
@@ -81,17 +98,29 @@ export function VehicleDamageDiagram({ value, onChange, locale = "en" }: { value
           ))}
         </div>
 
-        <div className="grid items-center gap-4 p-4 md:grid-cols-[minmax(220px,300px)_1fr]">
-          <div className="flex justify-center rounded-2xl bg-gradient-to-b from-slate-50 to-slate-100 p-3">
-            <svg viewBox="0 0 220 310" className="w-full max-w-[250px]" aria-label="Top view vehicle body condition selector">
-              <text x="110" y="9" textAnchor="middle" fontSize="8" fontWeight="700" fill="#64748b">{COPY[locale].front}</text>
-              <path d="M61 24 Q70 5 110 5 Q150 5 159 24 L174 62 L174 250 Q160 300 110 304 Q60 300 46 250 L46 62 Z" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5" />
-              <rect x="65" y="82" width="90" height="38" rx="9" fill="#bfdbfe" stroke="#64748b" />
-              <rect x="65" y="187" width="90" height="32" rx="9" fill="#bfdbfe" stroke="#64748b" />
-              <circle cx="39" cy="71" r="10" fill="#334155" /><circle cx="181" cy="71" r="10" fill="#334155" />
-              <circle cx="39" cy="239" r="10" fill="#334155" /><circle cx="181" cy="239" r="10" fill="#334155" />
+        <div className="grid items-center gap-5 p-4 md:grid-cols-[minmax(280px,410px)_1fr] md:p-5">
+          <div className="flex justify-center rounded-2xl border border-slate-200 bg-[#faf8ef] p-3 shadow-inner sm:p-5">
+            <svg viewBox="0 0 420 558" className="w-full max-w-[390px]" aria-label="Exploded top view vehicle body condition selector">
+              <text x="210" y="11" textAnchor="middle" fontSize="10" fontWeight="800" letterSpacing="2" fill="#64748b">{COPY[locale].front}</text>
+
+              <path d="M153 64 Q210 38 267 64 L276 189 Q278 230 274 278 L270 371 Q272 425 266 480 Q210 509 154 480 Q148 425 150 371 L146 278 Q142 230 144 189 Z" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="3" />
+              <path d="M165 188 Q210 169 255 188 L250 219 Q210 202 170 219 Z" fill="#dbeafe" stroke="#94a3b8" strokeWidth="1.5" />
+              <path d="M169 354 Q210 374 251 354 L255 383 Q210 402 165 383 Z" fill="#dbeafe" stroke="#94a3b8" strokeWidth="1.5" />
+
               {value.map((part) => <DiagramPart key={part.key} part={part} active={activePart === part.key} label={damagePartLabel(part.key, locale)} onSelect={() => setActivePart(activePart === part.key ? null : part.key)} />)}
-              <text x="110" y="307" textAnchor="middle" fontSize="8" fontWeight="700" fill="#64748b">{COPY[locale].rear}</text>
+              <g fill="#334155" stroke="#0f172a" strokeWidth="2" pointerEvents="none">
+                <circle cx="25" cy="140" r="23" /><circle cx="395" cy="140" r="23" />
+                <circle cx="25" cy="410" r="23" /><circle cx="395" cy="410" r="23" />
+              </g>
+              <g fill="#94a3b8" pointerEvents="none">
+                <circle cx="25" cy="140" r="11" /><circle cx="395" cy="140" r="11" />
+                <circle cx="25" cy="410" r="11" /><circle cx="395" cy="410" r="11" />
+              </g>
+              <g fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5">
+                <rect x="159" y="24" width="24" height="9" rx="3" /><rect x="237" y="24" width="24" height="9" rx="3" />
+                <rect x="159" y="518" width="24" height="9" rx="3" /><rect x="237" y="518" width="24" height="9" rx="3" />
+              </g>
+              <text x="210" y="555" textAnchor="middle" fontSize="10" fontWeight="800" letterSpacing="2" fill="#64748b">{COPY[locale].rear}</text>
             </svg>
           </div>
 
