@@ -63,3 +63,10 @@ export function damagePartLabel(key: string, locale: AppLocale) {
 export function damageCondition(value: string) {
   return VEHICLE_DAMAGE_CONDITIONS.find((condition) => condition.value === value) ?? VEHICLE_DAMAGE_CONDITIONS[0];
 }
+
+export function shouldShowVehicleDamageDiagram(
+  rootSlug: string | null | undefined,
+  branchKey: string | null | undefined
+) {
+  return rootSlug === "vehicles" && Boolean(branchKey) && branchKey !== "parts" && branchKey !== "bicycles";
+}

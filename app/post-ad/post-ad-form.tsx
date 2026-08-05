@@ -12,6 +12,7 @@ import {
   type VehicleSelection,
 } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
+import { shouldShowVehicleDamageDiagram } from "@/lib/vehicles/damage-report";
 import { getVehicleBranchFromPath, type VehicleBranchDefinition, type VehicleBranchKey } from "@/data/catalog/vehicles";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
@@ -1710,7 +1711,6 @@ export default function PostAdForm({
   }
 
   function renderVehicleDetailsSection(branch: VehicleBranchDefinition) {
-    const showDamageDiagram = branch.key !== "parts" && branch.key !== "bicycles";
     const branchFields = VEHICLE_BRANCH_DETAIL_FIELDS[branch.key] ?? [];
     const branchSpecificHint = (() => {
       switch (branch.key) {
@@ -1743,12 +1743,6 @@ export default function PostAdForm({
           {branchFields.map((field) => renderVehicleField(field))}
         </div>
 
-        {showDamageDiagram ? (
-          <div>
-            <p className="mb-2 text-sm font-semibold">{t.postAd.damagePaintReport}</p>
-            <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} locale={locale} />
-          </div>
-        ) : null}
       </section>
     );
   }
@@ -1907,6 +1901,13 @@ export default function PostAdForm({
           );
         })}
       </div>
+    </section>
+  ) : null;
+
+  const vehicleDamageSection = shouldShowVehicleDamageDiagram(rootSlug, vehicleBranch?.key) ? (
+    <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+      <h3 className="mb-3 text-sm font-bold">{t.postAd.damagePaintReport}</h3>
+      <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} locale={locale} />
     </section>
   ) : null;
 
@@ -2264,6 +2265,8 @@ export default function PostAdForm({
                 </div>
               </section>
             ) : null}
+
+            {vehicleDamageSection}
 
             {!simpleCategoryConfig && extraPhoneFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
