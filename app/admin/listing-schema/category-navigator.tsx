@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { updateSchemaCategoryStatusAction } from "@/lib/actions/listing-schema";
 
 export type SchemaCategoryNode = { id: number; name: string; path: string; level: number; is_active: boolean };
 
@@ -38,6 +39,17 @@ export function CategoryNavigator({ nodes, selectedId }: { nodes: SchemaCategory
       <span className="font-semibold">{selected?.name}</span><span className="text-[var(--ink-2)]">{selected?.path}</span>
       {isLoading ? <span className="ms-auto font-semibold text-[var(--accent)]">Loading editor…</span> : <span className="ms-auto text-[var(--ink-2)]">Select another item to load its editor automatically.</span>}
     </div>
+    {selected ? <form action={updateSchemaCategoryStatusAction} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--surface-2)] p-3">
+      <input type="hidden" name="category_node_id" value={selected.id} />
+      <input type="hidden" name="is_active" value={selected.is_active ? "false" : "true"} />
+      <div>
+        <p className="text-sm font-bold">Category availability</p>
+        <p className="text-xs text-[var(--ink-2)]">Inactive categories remain editable here but are hidden from public category selection.</p>
+      </div>
+      <button type="submit" className={`rounded-xl px-4 py-2 text-sm font-bold ${selected.is_active ? "border border-amber-300 bg-amber-50 text-amber-800" : "bg-emerald-600 text-white"}`}>
+        {selected.is_active ? "Deactivate category" : "Activate category"}
+      </button>
+    </form> : null}
     <p className="mt-2 text-xs text-[var(--ink-2)]">Showing {filtered.length} of {nodes.length} categories and subcategories.</p>
   </section>;
 }

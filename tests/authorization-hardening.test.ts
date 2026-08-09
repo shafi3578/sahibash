@@ -38,6 +38,16 @@ const listingActions = readFileSync(
   "utf8",
 );
 
+const listingSchemaActions = readFileSync(
+  join(process.cwd(), "lib", "actions", "listing-schema.ts"),
+  "utf8",
+);
+
+const schemaCategoryNavigator = readFileSync(
+  join(process.cwd(), "app", "admin", "listing-schema", "category-navigator.tsx"),
+  "utf8",
+);
+
 test("authenticated users cannot insert profiles or update authorization columns", () => {
   assert.match(migration, /revoke insert, update on table public\.profiles from anon, authenticated/i);
   assert.match(migration, /grant update \([\s\S]*preferred_language[\s\S]*\) on public\.profiles to authenticated/i);
@@ -82,4 +92,21 @@ test("database advisor hardening pins function paths and covers foreign keys", (
   assert.equal(coveringIndexes.length, 27);
   assert.match(advisorHardeningMigration, /drop index if exists public\.idx_listings_category_node_id/i);
   assert.doesNotMatch(advisorHardeningMigration, /delete\s+from|truncate\s+/i);
+});
+
+test("schema builder category activation is super-admin-only and audited", () => {
+  const statusAction = listingSchemaActions.slice(
+    listingSchemaActions.indexOf("export async function updateSchemaCategoryStatusAction"),
+  );
+
+  assert.match(statusAction, /await requireSuperAdministrator\(\)/);
+  assert.match(statusAction, /Number\.isInteger\(categoryNodeId\)/);
+  assert.match(statusAction, /\.from\("category_nodes"\)/);
+  assert.match(statusAction, /current\.parent_id === null/);
+  assert.match(statusAction, /\.from\("categories"\)/);
+  assert.match(statusAction, /action: "CATEGORY_UPDATED"/);
+  assert.match(statusAction, /source: "listing_schema_builder"/);
+  assert.match(schemaCategoryNavigator, /action=\{updateSchemaCategoryStatusAction\}/);
+  assert.match(schemaCategoryNavigator, /Deactivate category/);
+  assert.match(schemaCategoryNavigator, /Activate category/);
 });
