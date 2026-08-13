@@ -6,10 +6,17 @@ import { publishListingSchemaAction } from "@/lib/actions/listing-schema";
 
 const localeNames = { en: "English", fa: "دری", ps: "پښتو" } as const;
 const locales = ["en", "fa", "ps"] as const;
+const editorText = {
+  en: { publish: "Publish new version", sections: "Detail-page sections", addSection: "Add section", preview: "Live detail-page preview", previewHelp: "Only active fields with Detail enabled appear here.", fields: "Fields, filters, cards and details", addField: "Add field", safety: "Changes are published atomically as a new version. Turning off a field does not delete values from existing listings." },
+  fa: { publish: "نشر نسخه جدید", sections: "بخش‌های صفحه جزئیات", addSection: "افزودن بخش", preview: "پیش‌نمایش زنده صفحه جزئیات", previewHelp: "فقط فیلدهای فعال که نمایش جزئیات دارند در اینجا دیده می‌شوند.", fields: "فیلدها، فیلترها، کارت‌ها و جزئیات", addField: "افزودن فیلد", safety: "تغییرات به‌صورت یک نسخه جدید نشر می‌شوند. غیرفعال‌کردن فیلد، معلومات اعلان‌های موجود را حذف نمی‌کند." },
+  ps: { publish: "نوې نسخه خپره کړئ", sections: "د تفصیلاتو پاڼې برخې", addSection: "برخه زیاتول", preview: "د تفصیلاتو ژوندۍ کتنه", previewHelp: "یوازې فعال فیلډونه چې د تفصیلاتو ښودنه لري دلته ښکاري.", fields: "فیلډونه، فلټرونه، کارتونه او تفصیلات", addField: "فیلډ زیاتول", safety: "بدلونونه د نوې نسخې په توګه خپرېږي. د فیلډ بندول د پخوانیو اعلانونو معلومات نه ړنګوي." },
+} as const;
 
 export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: ListingSchemaConfig; categoryNodeId: number; version: number }) {
   const [config, setConfig] = useState(initial);
   const [activeLocale, setActiveLocale] = useState<(typeof locales)[number]>("en");
+  const copy = editorText[activeLocale];
+  const direction = activeLocale === "en" ? "ltr" : "rtl";
   const serialized = useMemo(() => JSON.stringify(config), [config]);
   const detailPreview = useMemo(() => config.sections.filter((section) => section.visible).sort((a, b) => a.order - b.order).map((section) => ({
     ...section,
@@ -47,11 +54,11 @@ export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: L
         <div className="flex gap-2" role="tablist" aria-label="Editing language">
           {locales.map((locale) => <button key={locale} type="button" onClick={() => setActiveLocale(locale)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${activeLocale === locale ? "bg-[var(--ink-1)] text-white" : "bg-[var(--surface-2)]"}`}>{localeNames[locale]}</button>)}
         </div>
-        <button className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-bold text-white">Publish new version</button>
+        <button className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-bold text-white">{copy.publish}</button>
       </div>
 
-      <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-        <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Detail-page sections</h2><button type="button" onClick={addSection} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm font-semibold">Add section</button></div>
+      <section className="rounded-2xl border border-[var(--line)] bg-white p-4" dir={direction}>
+        <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">{copy.sections}</h2><button type="button" onClick={addSection} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm font-semibold">{copy.addSection}</button></div>
         <div className="mt-3 space-y-3">
           {config.sections.map((section, index) => <div key={`${section.key}-${index}`} className="grid gap-3 rounded-xl bg-[var(--surface-2)] p-3 md:grid-cols-[1fr_2fr_7rem_7rem_7rem]">
             <input value={section.key} onChange={(event) => updateSectionKey(index, event.target.value)} aria-label="Section key" className="rounded-lg border border-[var(--line)] px-3 py-2" />
@@ -63,14 +70,14 @@ export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: L
         </div>
       </section>
 
-      <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4" dir={activeLocale === "en" ? "ltr" : "rtl"}>
-        <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Live detail-page preview</h2><p className="mt-1 text-sm text-[var(--ink-2)]">Only active fields with Detail enabled appear here.</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-bold">{localeNames[activeLocale]}</span></div>
+      <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4" dir={direction}>
+        <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-bold">{copy.preview}</h2><p className="mt-1 text-sm text-[var(--ink-2)]">{copy.previewHelp}</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-bold">{localeNames[activeLocale]}</span></div>
         <div className="mt-4 space-y-3">{detailPreview.map((section) => <section key={`preview-${section.key}`} className="overflow-hidden rounded-xl border border-[var(--line)] bg-white"><header className="border-b border-[var(--line)] bg-[var(--wash)] px-4 py-3"><h3 className="font-bold">{section.titles[activeLocale] || section.titles.en}</h3></header>{section.fields.length ? <div className="grid md:grid-cols-2">{section.fields.map((field) => <div key={`preview-${section.key}-${field.key}`} className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 py-3 text-sm"><span className="text-[var(--ink-2)]">{field.labels[activeLocale] || field.labels.en}</span><span className="font-semibold">{field.options[0]?.labels[activeLocale] || field.options[0]?.labels.en || (field.type === "boolean" ? "Yes / No" : "Example value")}</span></div>)}</div> : <p className="px-4 py-4 text-sm text-[var(--ink-2)]">No visible detail fields in this section.</p>}</section>)}</div>
       </section>
 
-      <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
-        <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Fields, filters, cards and details</h2><button type="button" onClick={addField} className="rounded-lg bg-[var(--ink-1)] px-3 py-2 text-sm font-semibold text-white">Add field</button></div>
-        <p className="mt-1 text-sm text-[var(--ink-2)]">Changes are published atomically as a new version. Turning off a field does not delete values from existing listings.</p>
+      <section className="rounded-2xl border border-[var(--line)] bg-white p-4" dir={direction}>
+        <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">{copy.fields}</h2><button type="button" onClick={addField} className="rounded-lg bg-[var(--ink-1)] px-3 py-2 text-sm font-semibold text-white">{copy.addField}</button></div>
+        <p className="mt-1 text-sm text-[var(--ink-2)]">{copy.safety}</p>
         <div className="mt-4 space-y-4">
           {config.fields.map((field, index) => <article key={`${field.key}-${index}`} className="rounded-xl border border-[var(--line)] p-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_9rem_1fr_7rem]">
