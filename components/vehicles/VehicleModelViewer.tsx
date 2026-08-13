@@ -128,7 +128,7 @@ export function VehicleModelViewer({ model, locale, damageParts = [], hasDamageR
               environment-image="neutral"
               interaction-prompt="auto"
               touch-action="pan-y"
-              loading="eager"
+              loading="lazy"
               reveal="auto"
               className="h-[320px] w-full sm:h-[460px]"
             />
