@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getListingById } from "@/lib/data/queries";
+import { getListingById, getSimilarListings } from "@/lib/data/queries";
 import Link from "next/link";
 import { toggleFavoriteAction } from "@/lib/actions/favorites";
 import { createReportAction } from "@/lib/actions/reports";
@@ -26,6 +26,7 @@ import { selectVehicleModel3D } from "@/lib/vehicles/model-catalog";
 import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { ListingContactActions } from "@/components/listings/listing-contact-actions";
+import { ListingCard } from "@/components/listing-card";
 
 type NamedLocationRelation = { name?: string | null } | null;
 
@@ -62,6 +63,7 @@ export default async function ListingDetailPage({
   const qp = await searchParams;
   const listing = await getListingById(id, locale);
   if (!listing) notFound();
+  const similarListings = listing.status === "approved" ? await getSimilarListings(listing, locale, 4) : [];
   await recordSearchTelemetryClick(qp.st, id);
   const viewerLanguageCode = appLocaleToListingLanguage(locale);
   const showOriginal = qp.view === "original";
@@ -931,6 +933,12 @@ export default async function ListingDetailPage({
           {t.listing.translationUnavailable}
         </div>
       ) : null}
+
+      {similarListings.length > 0 ? <section className="mt-8 border-t border-[var(--line)] pt-6">
+        <h2 className="font-display text-2xl font-bold">{locale === "fa" ? "اعلان‌های مشابه" : locale === "ps" ? "ورته اعلانونه" : "Similar listings"}</h2>
+        <p className="mt-1 text-sm text-[var(--ink-2)]">{locale === "fa" ? "بر اساس دسته‌بندی، موقعیت و محدوده قیمت" : locale === "ps" ? "د کټګورۍ، ځای او بیې له مخې" : "Based on category, location, and price range"}</p>
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">{similarListings.map(item=><ListingCard key={item.id} listing={item}/>)}</div>
+      </section> : null}
 
       {!isOwner ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">

@@ -1097,6 +1097,16 @@ export async function getListingById(
   }
 }
 
+export async function getSimilarListings(listing: ListingWithRelations, locale: AppLocale = "en", limit = 4): Promise<ListingWithRelations[]> {
+  const candidates = await getApprovedListings({locale,categoryId:Number(listing.category_id),province:listing.province ?? undefined,sort:"newest"});
+  const basePrice=Number(listing.price)||0;
+  return candidates.filter(item=>item.id!==listing.id).map(item=>{
+    const price=Number(item.price)||0; const priceDistance=basePrice>0?Math.abs(price-basePrice)/basePrice:1;
+    const locationScore=item.district&&item.district===listing.district?2:item.province===listing.province?1:0;
+    return {item,score:locationScore+Math.max(0,1-priceDistance)};
+  }).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.item);
+}
+
 export async function getCategoryNodeByPath(path: string): Promise<CategoryNode | null> {
   try {
     const supabase = await createSupabaseServerClient();
