@@ -1,4 +1,3 @@
-import { CategoryRow } from "@/components/categories/CategoryRow";
 import type { CategoryNodeWithCount } from "@/lib/categories/getCategories";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { localizeCategoryName, localizeCategorySubtitle } from "@/lib/i18n/category-labels";
@@ -53,43 +52,22 @@ export async function CategoryHomeList({ categories, locale = "en" }: Props) {
 
   return (
     <div className="space-y-3">
-      <section className="overflow-hidden border border-slate-200 bg-white">
+      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-2xl sm:border">
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           {t.home.mainCategories}
         </div>
-        {launchRows.map((category) => (
-          <CategoryRow
-            key={category.id}
-              href={category.id > 0 ? localizePath(`/categories/${category.slug}?node=${category.id}`, locale) : localizePath(`/categories/${category.slug}`, locale)}
-            title={category.name}
-            subtitle={category.subtitle}
-            icon={category.icon}
-            showCount={false}
-            showIcon
-          />
-        ))}
+        <div className="grid grid-cols-4 gap-2 p-3">
+          {launchRows.slice(0, 4).map((category) => (
+            <a key={category.id} href={category.id > 0 ? localizePath(`/categories/${category.slug}?node=${category.id}`, locale) : localizePath(`/categories/${category.slug}`, locale)} className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl bg-[var(--surface-2)] p-2 text-center">
+              <span aria-hidden="true" className="text-2xl">{category.slug === "real-estate" ? "⌂" : category.slug === "vehicles" ? "🚙" : category.slug === "mobile-phones-tablets" ? "▣" : "♻"}</span>
+              <span className="line-clamp-2 text-xs font-bold">{category.name}</span>
+            </a>
+          ))}
+        </div>
+        <a href={localizePath("/categories", locale)} className="flex min-h-11 items-center justify-center border-t border-slate-200 text-sm font-semibold text-[var(--accent)]">{t.home.openCategoryBrowser}</a>
       </section>
 
-      {comingSoonRows.length > 0 ? (
-        <section className="overflow-hidden border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 bg-amber-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
-            {`${t.home.moreCategories} (${t.home.comingSoon})`}
-          </div>
-          {comingSoonRows.map((category) => (
-            <CategoryRow
-              key={category.id}
-              href={localizePath(`/categories/${category.slug}`, locale)}
-              title={category.name}
-              subtitle={category.subtitle}
-              icon={category.icon}
-              showCount={false}
-              showIcon
-              comingSoon
-              comingSoonLabel={t.home.comingSoon}
-            />
-          ))}
-        </section>
-      ) : null}
+      {comingSoonRows.length > 0 ? <p className="hidden text-xs text-slate-500 lg:block">{`${comingSoonRows.length} ${t.home.moreCategories} · ${t.home.comingSoon}`}</p> : null}
     </div>
   );
 }

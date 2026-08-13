@@ -88,7 +88,7 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-5 px-0 pb-28 pt-4 sm:px-4 sm:pb-16 lg:px-6">
-      <section className="relative overflow-hidden border-y border-emerald-950/10 bg-[#103b32] text-white sm:rounded-[2rem] sm:border sm:shadow-[0_24px_80px_-36px_rgba(15,59,50,0.8)]">
+      <section className="relative hidden overflow-hidden border-y border-emerald-950/10 bg-[#103b32] text-white sm:rounded-[2rem] sm:border sm:shadow-[0_24px_80px_-36px_rgba(15,59,50,0.8)] lg:block">
         <div aria-hidden="true" className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_20%,#e6b85c_0_1px,transparent_1.5px),linear-gradient(135deg,transparent_0_48%,rgba(255,255,255,.08)_49%_51%,transparent_52%)] [background-size:24px_24px,72px_72px]" />
         <div className="relative grid gap-8 px-5 py-10 sm:px-8 lg:grid-cols-[1.35fr_0.65fr] lg:px-12 lg:py-14">
           <div>
@@ -139,7 +139,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="mx-4 grid gap-4 rounded-[1.75rem] border border-amber-900/10 bg-[#fbf7ed] p-5 sm:mx-0 sm:grid-cols-[1fr_auto] sm:items-center sm:p-7">
+      <section className="mx-4 hidden gap-4 rounded-[1.75rem] border border-amber-900/10 bg-[#fbf7ed] p-5 sm:mx-0 sm:grid-cols-[1fr_auto] sm:items-center sm:p-7 lg:grid">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#9a5b30]">{afghanistanCopy.discover}</p>
           <h2 className="mt-2 font-display text-2xl font-semibold text-[#173c32]">{afghanistanCopy.trustTitle}</h2>
@@ -153,7 +153,7 @@ export default async function HomePage() {
       </section>
 
       {homepageSections.length > 0 ? (
-        <section className="space-y-3 px-4 sm:px-0">
+        <section className="hidden space-y-3 px-4 sm:px-0 lg:block">
           {homepageSections.map((section) => (
             <div key={section.slug} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">{section.section_type}</p>

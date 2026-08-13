@@ -57,7 +57,7 @@ export async function SiteHeader() {
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-black/10 bg-[var(--brand)] text-[var(--ink-1)]">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4 lg:px-8">
+        <div className="mx-auto flex min-h-14 max-w-7xl items-center justify-between gap-2 px-4 py-2 sm:gap-3 sm:px-6 lg:px-8 lg:py-4">
           <Link href={href("/")} className="shrink-0 font-display text-2xl font-bold sm:text-3xl">{siteSettings.site_name}</Link>
           <nav className="hidden flex-1 items-center justify-center gap-2 lg:flex">
             {navigationItems.map((link) => (
@@ -66,7 +66,7 @@ export async function SiteHeader() {
               </Link>
             ))}
           </nav>
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+          <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
             <LanguageSwitcher locale={locale} label={t.header.language} />
 
             <Link href={user ? href(postAdCreatePath) : guestPostAdHref} className="hidden whitespace-nowrap rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold leading-none text-white lg:inline-flex lg:text-sm">{t.header.postAd}</Link>
@@ -78,19 +78,19 @@ export async function SiteHeader() {
                 {canManageAdministratorArea && (
                   <Link href={href("/administrator")} className="hidden whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">Administrator</Link>
                 )}
-                <Link href={href("/dashboard")} className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.myProfile}</Link>
-                <form action={signOutAction}><button className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.logout}</button></form>
+                <Link href={href("/dashboard")} className="hidden min-h-11 min-w-0 items-center whitespace-nowrap rounded-full border border-black/20 bg-white px-3 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">{t.header.myProfile}</Link>
+                <form action={signOutAction} className="hidden sm:block"><button className="min-h-11 min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 text-xs font-semibold leading-none sm:text-sm">{t.header.logout}</button></form>
               </>
             ) : (
               <>
-                <Link href={href("/login")} className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.login}</Link>
-                <Link href={href("/register")} className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.register}</Link>
+                <Link href={href("/login")} className="inline-flex min-h-11 min-w-0 items-center whitespace-nowrap rounded-full border border-black/20 bg-white px-3 text-xs font-semibold leading-none sm:text-sm">{t.header.login}</Link>
+                <Link href={href("/register")} className="hidden min-h-11 min-w-0 items-center whitespace-nowrap rounded-full border border-black/20 bg-white px-3 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">{t.header.register}</Link>
               </>
             )}
           </div>
         </div>
       </header>
-      <FloatingPostAdButton locale={locale} label={t.header.postAd} href={user ? href(postAdCreatePath) : guestPostAdHref} />
+      <div className="hidden lg:block"><FloatingPostAdButton locale={locale} label={t.header.postAd} href={user ? href(postAdCreatePath) : guestPostAdHref} /></div>
     </>
   );
 }
