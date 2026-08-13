@@ -44,3 +44,10 @@ export async function getModerationEntries() {
 
   return data ?? [];
 }
+
+export async function moderateListingAction(formData:FormData){
+ await requirePermission("listings.moderate"); const listingId=String(formData.get("listing_id")??""); const status=String(formData.get("status")??""); const reason=String(formData.get("reason_code")??"").trim();
+ if(!/^[0-9a-f-]{36}$/i.test(listingId)||!["approved","rejected","pending","sold","expired"].includes(status)||!reason) throw new Error("Invalid moderation request");
+ const supabase=await createSupabaseServerClient(); const {error}=await supabase.rpc("moderate_listing",{p_listing_id:listingId,p_to_status:status,p_reason_code:reason,p_internal_note:String(formData.get("internal_note")??"").slice(0,2000),p_seller_explanation:String(formData.get("seller_explanation")??"").slice(0,2000)}); if(error) throw new Error(error.message);
+ revalidatePath("/admin/listings"); revalidatePath(`/listings/${listingId}`); redirect("/admin/listings");
+}

@@ -25,6 +25,7 @@ export default async function AdminPage() {
       <div className="mt-6 flex flex-wrap gap-2">
         <Link href={href("/admin/listings")} className="inline-block rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{ui.admin.listingApprovalQueue}</Link>
         <Link href={href("/admin/search")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{ui.admin.searchAdmin}</Link>
+        <Link href={href("/admin/analytics")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Liquidity analytics</Link>
         <Link href={href("/admin/categories")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{ui.admin.categoryAdmin}</Link>
         <Link href={href("/admin/listing-schema")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Listing Schema Builder</Link>
         <Link href={href("/admin/pages")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Pages</Link>

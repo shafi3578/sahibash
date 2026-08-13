@@ -2,10 +2,10 @@ import { requirePermission } from "@/lib/auth";
 import { ListingCard } from "@/components/listing-card";
 import {
   deleteListingAction,
-  updateListingStatusAction,
 } from "@/lib/actions/listings";
 import {
   getModerationEntries,
+  moderateListingAction,
   saveModerationEntryAction,
 } from "@/lib/actions/moderation-workflow";
 import {
@@ -87,10 +87,13 @@ export default async function AdminListingsPage() {
           <div key={listing.id} className="space-y-3 rounded-2xl border border-[var(--line)] bg-white p-4">
             <ListingCard listing={listing} showStatus />
             <div className="flex flex-wrap gap-2">
-              <form action={async () => { "use server"; await updateListingStatusAction(listing.id, "approved"); }}>
+              <form action={moderateListingAction} className="flex flex-wrap gap-2">
+                <input type="hidden" name="listing_id" value={listing.id}/><input type="hidden" name="status" value="approved"/><input type="hidden" name="reason_code" value="meets_marketplace_policy"/>
                 <button className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white">{ui.admin.approve}</button>
               </form>
-              <form action={async () => { "use server"; await updateListingStatusAction(listing.id, "rejected"); }}>
+              <form action={moderateListingAction} className="flex flex-wrap gap-2">
+                <input type="hidden" name="listing_id" value={listing.id}/><input type="hidden" name="status" value="rejected"/><input type="hidden" name="reason_code" value="policy_or_quality_issue"/>
+                <input name="seller_explanation" required maxLength={2000} placeholder="Seller-visible reason" className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-sm"/>
                 <button className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white">{ui.admin.reject}</button>
               </form>
               <form action={async () => { "use server"; await deleteListingAction(listing.id); }}>
