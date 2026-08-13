@@ -89,6 +89,7 @@ function renderDynamicFilterInput(
       <select
         key={def.id}
         name={def.filter_key}
+        aria-label={def.filter_label}
         defaultValue={selected}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -104,6 +105,7 @@ function renderDynamicFilterInput(
       <select
         key={def.id}
         name={def.filter_key}
+        aria-label={def.filter_label}
         defaultValue={selected}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -122,6 +124,7 @@ function renderDynamicFilterInput(
     <input
       key={def.id}
       name={def.filter_key}
+      aria-label={def.filter_label}
       defaultValue={selected}
       type={inputType}
       placeholder={def.filter_label}
@@ -147,6 +150,7 @@ function FilterFields({
     <>
       <input
         name="q"
+        aria-label={t.search.searchListings}
         defaultValue={params.q ?? ""}
         placeholder={t.search.searchListings}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
@@ -154,6 +158,7 @@ function FilterFields({
 
       <select
         name="province"
+        aria-label={t.home.allAfghanistan}
         defaultValue={params.province ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -167,6 +172,7 @@ function FilterFields({
 
       <input
         name="district"
+        aria-label={t.search.district}
         defaultValue={params.district ?? ""}
         placeholder={t.search.district}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
@@ -174,6 +180,7 @@ function FilterFields({
 
       <select
         name="categoryId"
+        aria-label={t.search.allCategories}
         defaultValue={params.categoryId ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -187,6 +194,7 @@ function FilterFields({
 
       <select
         name="sort"
+        aria-label={t.search.newest}
         defaultValue={params.sort ?? "newest"}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -198,6 +206,7 @@ function FilterFields({
 
       <select
         name="postedWithin"
+        aria-label={t.search.postedWithin}
         defaultValue={params.postedWithin ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -209,6 +218,7 @@ function FilterFields({
 
       <select
         name="listingType"
+        aria-label={t.search.allAdTypes}
         defaultValue={params.listingType ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >

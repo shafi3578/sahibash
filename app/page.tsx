@@ -173,6 +173,7 @@ export default async function HomePage() {
         <form action={href("/search")} className="grid grid-cols-[1fr_auto] gap-2 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-4">
           <input
             name="q"
+            aria-label={t.home.searchPlaceholder}
             placeholder={t.home.searchPlaceholder}
             className="min-w-0 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm"
           />

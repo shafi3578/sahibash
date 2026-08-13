@@ -7,9 +7,16 @@ import type { ListingImage } from "@/types/database";
 type Props = {
   images: ListingImage[];
   title: string;
+  labels?: {
+    open: string;
+    close: string;
+    previous: string;
+    next: string;
+    photo: string;
+  };
 };
 
-export function ListingGallery({ images, title }: Props) {
+export function ListingGallery({ images, title, labels = { open: "Open photo", close: "Close", previous: "Previous", next: "Next", photo: "Photo" } }: Props) {
   const [index, setIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -35,7 +42,7 @@ export function ListingGallery({ images, title }: Props) {
   return (
     <>
       <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-black">
-        <button type="button" className="relative block aspect-[4/3] w-full" onClick={() => setFullscreen(true)}>
+        <button type="button" aria-label={labels.open} className="relative block aspect-[4/3] w-full" onClick={() => setFullscreen(true)}>
           <Image
             src={src}
             alt={title}
@@ -59,6 +66,8 @@ export function ListingGallery({ images, title }: Props) {
               <button
                 key={img.id}
                 type="button"
+                aria-label={`${labels.photo} ${i + 1}`}
+                aria-current={i === index ? "true" : undefined}
                 onClick={() => setIndex(i)}
                 className={`relative aspect-square overflow-hidden rounded-lg border ${i === index ? "border-[var(--accent)]" : "border-[var(--line)]"}`}
               >
@@ -74,8 +83,8 @@ export function ListingGallery({ images, title }: Props) {
           <div className="mx-auto flex h-full w-full max-w-5xl flex-col">
             <div className="mb-3 flex items-center justify-between text-white">
               <p className="text-sm font-semibold">{index + 1} / {count}</p>
-              <button type="button" onClick={() => setFullscreen(false)} className="rounded-lg border border-white/30 px-3 py-1 text-sm">
-                Close
+              <button type="button" aria-label={labels.close} onClick={() => setFullscreen(false)} className="min-h-11 rounded-lg border border-white/30 px-3 py-2 text-sm">
+                {labels.close}
               </button>
             </div>
             <div className="relative flex-1">
@@ -92,17 +101,19 @@ export function ListingGallery({ images, title }: Props) {
               <div className="mt-3 flex items-center justify-between gap-2">
                 <button
                   type="button"
+                  aria-label={labels.previous}
                   onClick={() => setIndex((prev) => (prev - 1 + count) % count)}
-                  className="rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white"
+                  className="min-h-11 rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white"
                 >
-                  Prev
+                  {labels.previous}
                 </button>
                 <button
                   type="button"
+                  aria-label={labels.next}
                   onClick={() => setIndex((prev) => (prev + 1) % count)}
-                  className="rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white"
+                  className="min-h-11 rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white"
                 >
-                  Next
+                  {labels.next}
                 </button>
               </div>
             ) : null}

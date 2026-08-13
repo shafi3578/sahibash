@@ -24,6 +24,7 @@ import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
 import { labelForLocale } from "@/lib/listing-schema-config";
 import { selectVehicleModel3D } from "@/lib/vehicles/model-catalog";
 import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
 
 type NamedLocationRelation = { name?: string | null } | null;
 
@@ -110,7 +111,14 @@ export default async function ListingDetailPage({
     }),
   })).filter((section) => section.rows.length > 0);
   const hasConfiguredView = configuredSections.length > 0;
-  const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
+  const categoryLabel = [
+    listing.category?.name
+      ? localizeCategoryName({ locale, fallbackName: listing.category.name, slug: listing.category.slug })
+      : "",
+    listing.category_node?.name
+      ? localizeCategoryName({ locale, fallbackName: listing.category_node.name, slug: listing.category_node.slug, path: listing.category_node.path })
+      : "",
+  ].filter(Boolean).join(" › ");
   const simpleCategoryKind = getSimpleCategoryKind(listing.category_node?.path ?? undefined, listing.category?.slug ?? null);
   const simpleCategoryConfig = getSimpleCategoryConfig(simpleCategoryKind);
   const locationParts = listing.location_visibility === "exact"
@@ -137,6 +145,11 @@ export default async function ListingDetailPage({
         month: "short",
       })
     : null;
+  const galleryLabels = locale === "fa"
+    ? { open: "باز کردن عکس", close: "بستن", previous: "قبلی", next: "بعدی", photo: "عکس" }
+    : locale === "ps"
+      ? { open: "انځور پرانیستل", close: "تړل", previous: "مخکینی", next: "بل", photo: "انځور" }
+      : { open: "Open photo", close: "Close", previous: "Previous", next: "Next", photo: "Photo" };
   const groupedSpecs = Object.entries(specView.grouped)
     .map(([group, rows]) => [group, rows.filter((row) => isMeaningfulValue(row.value))] as const)
     .filter(([, rows]) => rows.length > 0)
@@ -580,7 +593,7 @@ export default async function ListingDetailPage({
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-2)]">{categoryLabel || t.listing.category}</p>
       </div>
       <div className="space-y-4 pb-20 sm:pb-0">
-        <ListingGallery images={listing.listing_images ?? []} title={displayTitle} />
+        <ListingGallery images={listing.listing_images ?? []} title={displayTitle} labels={galleryLabels} />
 
         {vehicleModel3D ? <VehicleModelViewer model={vehicleModel3D} locale={locale} damageParts={vehicleDamageParts} hasDamageReport={Boolean(listing.vehicle_damage)} /> : null}
 
