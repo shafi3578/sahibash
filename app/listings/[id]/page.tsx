@@ -25,6 +25,7 @@ import { labelForLocale } from "@/lib/listing-schema-config";
 import { selectVehicleModel3D } from "@/lib/vehicles/model-catalog";
 import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { ListingContactActions } from "@/components/listings/listing-contact-actions";
 
 type NamedLocationRelation = { name?: string | null } | null;
 
@@ -775,9 +776,7 @@ export default async function ListingDetailPage({
             <p className="mt-2 text-sm text-[var(--ink-2)]">{t.listing.minimumOffer}: {new Intl.NumberFormat("en-US").format(listing.minimum_offer)} {listing.currency}</p>
           ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
-            {listing.contact_phone ? (
-              <a href={callHref} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">{t.listing.callSeller}</a>
-            ) : null}
+            {listing.contact_phone ? <ListingContactActions listingId={listing.id} title={displayTitle} phone={listing.contact_phone} locale={locale} /> : null}
             {!isOwner ? (
               <Link href={`/listings/${listing.id}?compose=1`} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
             ) : null}
@@ -902,7 +901,9 @@ export default async function ListingDetailPage({
           <select name="reason" required defaultValue="" className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm">
             <option value="" disabled>{t.listing.selectReportReason}</option>
             <option value={t.listing.fraudOrScam}>{t.listing.fraudOrScam}</option>
+            <option value={locale === "fa" ? "فروخته‌شده یا موجود نیست" : locale === "ps" ? "پلورل شوی یا نشته" : "Sold or unavailable"}>{locale === "fa" ? "فروخته‌شده یا موجود نیست" : locale === "ps" ? "پلورل شوی یا نشته" : "Sold or unavailable"}</option>
             <option value={t.listing.wrongCategory}>{t.listing.wrongCategory}</option>
+            <option value={locale === "fa" ? "اطلاعات نادرست" : locale === "ps" ? "ناسم معلومات" : "Incorrect information"}>{locale === "fa" ? "اطلاعات نادرست" : locale === "ps" ? "ناسم معلومات" : "Incorrect information"}</option>
             <option value={t.listing.duplicateListing}>{t.listing.duplicateListing}</option>
             <option value={t.listing.prohibitedOrUnsafeItem}>{t.listing.prohibitedOrUnsafeItem}</option>
             <option value={t.listing.spamOrMisleading}>{t.listing.spamOrMisleading}</option>
@@ -934,9 +935,7 @@ export default async function ListingDetailPage({
       {!isOwner ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
           <div className="mx-auto flex w-full max-w-5xl gap-2">
-            {listing.contact_phone ? (
-              <a href={callHref} className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">{t.listing.call}</a>
-            ) : null}
+            {listing.contact_phone ? <a href={callHref} className="flex min-h-12 items-center rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">{t.listing.call}</a> : null}
             <Link href={`/listings/${listing.id}?compose=1`} className="flex-1 rounded-lg bg-[var(--ink-1)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.message}</Link>
             <Link href={`/listings/${listing.id}?offerbox=1`} className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.offer}</Link>
           </div>

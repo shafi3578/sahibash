@@ -18,6 +18,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { saveSearchAction } from "@/lib/actions/saved-searches";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -413,6 +414,14 @@ export default async function SearchPage({
       <p className="mt-2 text-sm text-[var(--ink-2)]">
         {t.search.subtitle}
       </p>
+
+      {hasSearchSignal ? (
+        <form action={saveSearchAction} className="mt-4 flex max-w-xl gap-2 rounded-xl border border-[var(--line)] bg-white p-2">
+          <input type="hidden" name="params" value={buildParamsFromRecord(params).toString()} />
+          <input name="name" required maxLength={80} defaultValue={params.q || (locale === "fa" ? "جستجوی من" : locale === "ps" ? "زما لټون" : "My search")} aria-label="Saved search name" className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--line)] px-3 text-sm" />
+          <button className="min-h-11 rounded-lg bg-[var(--ink-1)] px-4 text-sm font-semibold text-white">{locale === "fa" ? "ذخیره جستجو" : locale === "ps" ? "لټون خوندي کړئ" : "Save search"}</button>
+        </form>
+      ) : null}
 
       {intent ? (
         <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--ink-2)]">

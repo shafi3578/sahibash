@@ -78,7 +78,7 @@ export default async function HomePage() {
 
   const featured = listings.filter((l) => l.featured).slice(0, 4);
   const latest = listings.slice(0, 8);
-  const featuredRow = featured.length ? featured : latest.slice(0, 6);
+  const featuredRow = featured;
   const localizedNavigationLabel = (path: string, label: string) => {
     if (path === "/listings") return t.home.browseListings;
     if (path === "/categories") return t.home.mainCategories;
@@ -196,7 +196,7 @@ export default async function HomePage() {
         <CategoryHomeList categories={mobileCategories} locale={locale} />
       </section>
 
-      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
+      {featuredRow.length > 0 ? <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
           {t.home.featuredListings}
         </div>
@@ -227,7 +227,7 @@ export default async function HomePage() {
             })}
           </div>
         </div>
-      </section>
+      </section> : null}
 
       <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
