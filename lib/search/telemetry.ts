@@ -23,22 +23,18 @@ export async function logSearchTelemetry(args: {
 }) {
   try {
     const supabase = await createSupabaseServerClient();
-    const { data } = await supabase
-      .from("search_telemetry")
-      .insert({
-        query_text: sanitizeText(args.queryText),
-        normalized_query: sanitizeText(args.normalizedQuery),
-        selected_language: sanitizeText(args.selectedLanguage) || "en",
-        result_count: Math.max(0, Number(args.resultCount) || 0),
-        category_filter: normalizeNullableFilter(args.categoryFilter),
-        province_filter: normalizeNullableFilter(args.provinceFilter),
-        district_filter: normalizeNullableFilter(args.districtFilter),
-        rewritten_terms: Array.from(new Set((args.rewrittenTerms ?? []).map((term) => sanitizeText(term)).filter(Boolean))),
-      })
-      .select("id")
-      .maybeSingle();
+    const { data, error } = await supabase.rpc("record_search_telemetry", {
+      p_query_text: sanitizeText(args.queryText),
+      p_normalized_query: sanitizeText(args.normalizedQuery),
+      p_selected_language: sanitizeText(args.selectedLanguage) || "en",
+      p_result_count: Math.max(0, Number(args.resultCount) || 0),
+      p_category_filter: normalizeNullableFilter(args.categoryFilter),
+      p_province_filter: normalizeNullableFilter(args.provinceFilter),
+      p_district_filter: normalizeNullableFilter(args.districtFilter),
+      p_rewritten_terms: Array.from(new Set((args.rewrittenTerms ?? []).map((term) => sanitizeText(term)).filter(Boolean))),
+    });
 
-    return String((data as { id?: string } | null)?.id ?? "");
+    return error ? "" : String(data ?? "");
   } catch {
     return "";
   }
@@ -53,11 +49,10 @@ export async function recordSearchTelemetryClick(telemetryId: string | null | un
 
   try {
     const supabase = await createSupabaseServerClient();
-    await supabase
-      .from("search_telemetry")
-      .update({ clicked_listing_id: listing })
-      .eq("id", telemetry)
-      .is("clicked_listing_id", null);
+    await supabase.rpc("record_search_telemetry_click", {
+      p_telemetry_id: telemetry,
+      p_listing_id: listing,
+    });
   } catch {
     // Non-blocking analytics operation.
   }
