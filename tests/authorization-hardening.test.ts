@@ -48,6 +48,11 @@ const schemaCategoryNavigator = readFileSync(
   "utf8",
 );
 
+const aiCategoryRoute = readFileSync(
+  join(process.cwd(), "app", "api", "ai", "category-suggestion", "route.ts"),
+  "utf8",
+);
+
 test("authenticated users cannot insert profiles or update authorization columns", () => {
   assert.match(migration, /revoke insert, update on table public\.profiles from anon, authenticated/i);
   assert.match(migration, /grant update \([\s\S]*preferred_language[\s\S]*\) on public\.profiles to authenticated/i);
@@ -109,4 +114,14 @@ test("schema builder category activation is super-admin-only and audited", () =>
   assert.match(schemaCategoryNavigator, /action=\{updateSchemaCategoryStatusAction\}/);
   assert.match(schemaCategoryNavigator, /Deactivate category/);
   assert.match(schemaCategoryNavigator, /Activate category/);
+});
+
+test("paid AI category inference requires a user and bounds uploaded input", () => {
+  assert.match(aiCategoryRoute, /if \(!user\)/);
+  assert.match(aiCategoryRoute, /status: 401/);
+  assert.match(aiCategoryRoute, /MAX_IMAGE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(aiCategoryRoute, /image\.type\.startsWith\("image\/"\)/);
+  assert.match(aiCategoryRoute, /title\.length > 120/);
+  assert.match(aiCategoryRoute, /description\.length > 5000/);
+  assert.doesNotMatch(aiCategoryRoute, /error instanceof Error \? error\.message/);
 });
