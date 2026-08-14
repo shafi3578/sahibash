@@ -12,12 +12,38 @@ type Suggestion = {
   confidence: number;
 };
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_URLS = 12;
+
+function parseImageUrls(raw: FormDataEntryValue | null): string[] {
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  let candidates: unknown;
+  try {
+    candidates = JSON.parse(raw);
+  } catch {
+    candidates = [raw];
+  }
+  if (!Array.isArray(candidates) || candidates.length > MAX_IMAGE_URLS) {
+    throw new Error("INVALID_IMAGE_URLS");
+  }
+  return candidates.map((candidate) => {
+    const value = String(candidate);
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("INVALID_IMAGE_URLS");
+    return value;
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createSupabaseServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ suggestion: null, message: "Authentication required" }, { status: 401 });
+    }
 
     const key = process.env.HUGGINGFACE_API_KEY;
     if (!key) {
@@ -30,18 +56,20 @@ export async function POST(request: Request) {
     const description = String(formData.get("description") ?? "").trim();
     const imageUrlsRaw = formData.get("image_urls");
 
-    const imageUrls = (() => {
-      if (!imageUrlsRaw) return [] as string[];
-      if (typeof imageUrlsRaw === "string") {
-        try {
-          const parsed = JSON.parse(imageUrlsRaw) as unknown;
-          return Array.isArray(parsed) ? parsed.map((item) => String(item)) : [];
-        } catch {
-          return imageUrlsRaw ? [imageUrlsRaw] : [];
-        }
-      }
-      return [] as string[];
-    })();
+    if (title.length > 120 || description.length > 5000) {
+      return NextResponse.json({ suggestion: null, message: "Input is too long" }, { status: 413 });
+    }
+
+    if (image instanceof File && (!image.type.startsWith("image/") || image.size > MAX_IMAGE_BYTES)) {
+      return NextResponse.json({ suggestion: null, message: "Image must be a supported file up to 10 MB" }, { status: 413 });
+    }
+
+    let imageUrls: string[];
+    try {
+      imageUrls = parseImageUrls(imageUrlsRaw);
+    } catch {
+      return NextResponse.json({ suggestion: null, message: "Image URLs are invalid" }, { status: 400 });
+    }
 
     if (!(image instanceof File) && !title && !description) {
       return NextResponse.json({ suggestion: null, message: "Please provide image or title/description" }, { status: 400 });
@@ -114,33 +142,31 @@ export async function POST(request: Request) {
           : null,
     };
 
-    if (user) {
-      await supabase.from("ai_detection_logs").insert({
-        user_id: user.id,
-        image_urls: imageUrls,
-        title: title || null,
-        description: description || null,
-        detected_labels: labels,
-        suggested_category_node_id: suggestedCategoryNodeId,
-        suggested_specs: specsMatch
-          ? {
-              brand: specsMatch.brand,
-              model: specsMatch.model,
-              ...specsMatch.specs,
-            }
-          : {},
-        confidence: suggestion?.confidence ?? null,
-      });
-    }
+    await supabase.from("ai_detection_logs").insert({
+      user_id: user.id,
+      image_urls: imageUrls,
+      title: title || null,
+      description: description || null,
+      detected_labels: labels,
+      suggested_category_node_id: suggestedCategoryNodeId,
+      suggested_specs: specsMatch
+        ? {
+            brand: specsMatch.brand,
+            model: specsMatch.model,
+            ...specsMatch.specs,
+          }
+        : {},
+      confidence: suggestion?.confidence ?? null,
+    });
 
     return NextResponse.json(responsePayload);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         suggestion: null,
-        message: error instanceof Error ? error.message : "AI suggestion failed",
+        message: "AI suggestion failed",
       },
-      { status: 200 }
+      { status: 500 }
     );
   }
 }

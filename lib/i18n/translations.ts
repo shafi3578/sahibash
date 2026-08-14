@@ -352,7 +352,7 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       language: "Language",
     },
     footer: {
-      platform: "Afghan",
+      platform: "Sahibash",
       tagline: "Afghanistan marketplace for trusted listings.",
     },
     auth: {
