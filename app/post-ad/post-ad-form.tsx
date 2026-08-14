@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
 import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
@@ -13,6 +12,7 @@ import {
   type VehicleSelection,
 } from "@/components/vehicles/VehicleSmartSelector";
 import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
+import { shouldShowVehicleDamageDiagram } from "@/lib/vehicles/damage-report";
 import { getVehicleBranchFromPath, type VehicleBranchDefinition, type VehicleBranchKey } from "@/data/catalog/vehicles";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
@@ -27,7 +27,9 @@ import {
   getSimpleCategoryModelOptions,
   labelFor,
   optionLabel,
+  shouldUseSimpleCategoryFallback,
 } from "@/lib/posting/simple-category-details";
+import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -71,19 +73,6 @@ type StoredLocation = {
 
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
-const ACTIVE_POSTING_CATEGORY_SLUGS = [
-  "vehicles",
-  "real-estate",
-  "mobile-phones-tablets",
-  "electronics-computers",
-  "second-hand-items",
-  "clothing-personal-items",
-  "jobs",
-  "services",
-  "home-furniture-appliances",
-  "farm-animals",
-  "wanted-request-ads",
-] as const;
 
 const LOCATION_DYNAMIC_KEYS = new Set([
   "city",
@@ -177,8 +166,8 @@ const PHONE_FORM_FIELDS = [
 
 function fieldOptions(optionsJson: Record<string, unknown> | string[] | null) {
   if (!optionsJson) return [];
-  if (Array.isArray(optionsJson)) return optionsJson.map((value) => String(value));
-  return Object.values(optionsJson).map((value) => String(value));
+  if (Array.isArray(optionsJson)) return optionsJson.map((value) => ({ value: String(value), label: String(value) }));
+  return Object.entries(optionsJson).map(([value, label]) => ({ value, label: String(label) }));
 }
 
 function buildFallbackFields(categoryNodeId: number, path: string | undefined, rootSlug: string) {
@@ -237,31 +226,37 @@ export default function PostAdForm({
     locale,
     initialListingType = "for_sale",
     initialMode = "standard",
+    initialRootSlug = "",
   }: Props & {
     t: Dictionary;
     locale: AppLocale;
     initialListingType?: "for_sale" | "for_rent" | "wanted";
     initialMode?: PostMode;
+    initialRootSlug?: string;
   }) {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [draftStorageKey, setDraftStorageKey] = useState(DRAFT_KEY);
   const [pendingDraft, setPendingDraft] = useState<{
     core?: CoreForm;
     dynamicValues?: Record<string, string | boolean | string[]>;
+    category?: { root_slug?: string; final_path?: string; listing_type?: "for_sale" | "for_rent" | "wanted" };
+    location?: { province_id?: number; district_id?: number; area_text?: string; location_visibility?: "exact" | "approximate" | "province_district" };
   } | null>(null);
 
   const [step, setStep] = useState<Step>(1);
   const [stepError, setStepError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [categoryQuery, setCategoryQuery] = useState("");
+  const [draftSaveState, setDraftSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const [selectedRoot, setSelectedRoot] = useState<Category | null>(null);
   const [pathNodes, setPathNodes] = useState<CategoryNode[]>([]);
   const [currentOptions, setCurrentOptions] = useState<CategoryNode[]>([]);
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
   const [dynamicFields, setDynamicFields] = useState<CategoryField[]>([]);
+  const [usesPublishedSchema, setUsesPublishedSchema] = useState(false);
   const [dynamicValues, setDynamicValues] = useState<Record<string, string | boolean | string[]>>({});
   const [loadingTree, setLoadingTree] = useState(false);
 
@@ -274,6 +269,7 @@ export default function PostAdForm({
   const [images, setImages] = useState<StagedImage[]>([]);
 
   const [vehicleSelection, setVehicleSelection] = useState<VehicleSelection>(EMPTY_VEHICLE_SELECTION);
+  const initialRootAppliedRef = useRef(false);
   const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultDamageParts());
 
   const [core, setCore] = useState<CoreForm>({
@@ -325,20 +321,23 @@ export default function PostAdForm({
   }, []);
 
   const activeCategories = useMemo(
-    () => categories.filter((category) =>
-      ACTIVE_POSTING_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_POSTING_CATEGORY_SLUGS)[number])
-      && !category.is_coming_soon
-    ),
+    () => categories.filter((category) => category.is_active !== false && !category.is_coming_soon),
     [categories]
   );
 
   const comingSoonCategories = useMemo(
-    () => categories.filter((category) =>
-      !ACTIVE_POSTING_CATEGORY_SLUGS.includes(category.slug as (typeof ACTIVE_POSTING_CATEGORY_SLUGS)[number])
-      || category.is_coming_soon
-    ),
+    () => categories.filter((category) => category.is_active !== false && category.is_coming_soon),
     [categories]
   );
+
+  const filteredActiveCategories = useMemo(() => {
+    const query = categoryQuery.trim().toLocaleLowerCase(locale);
+    if (!query) return activeCategories;
+    return activeCategories.filter((category) => {
+      const localized = localizeCategoryName({ locale, fallbackName: category.name, slug: category.slug });
+      return `${localized} ${category.name} ${category.slug}`.toLocaleLowerCase(locale).includes(query);
+    });
+  }, [activeCategories, categoryQuery, locale]);
 
   const breadcrumb = useMemo(
     () =>
@@ -358,6 +357,7 @@ export default function PostAdForm({
   const finalPath = finalNode?.path;
   const simpleCategoryKind = useMemo(() => getSimpleCategoryKind(finalPath, rootSlug), [finalPath, rootSlug]);
   const simpleCategoryConfig = useMemo(() => getSimpleCategoryConfig(simpleCategoryKind), [simpleCategoryKind]);
+  const usesSimpleCategoryFallback = shouldUseSimpleCategoryFallback(simpleCategoryConfig, usesPublishedSchema);
   const vehicleBranch = useMemo(() => getVehicleBranchFromPath(finalPath), [finalPath]);
 
   type VehicleBranchDetailField = {
@@ -368,7 +368,7 @@ export default function PostAdForm({
     required?: boolean;
   };
 
-  const VEHICLE_BRANCH_DETAIL_FIELDS: Record<VehicleBranchKey, VehicleBranchDetailField[]> = {
+  const VEHICLE_BRANCH_DETAIL_FIELDS = useMemo<Record<VehicleBranchKey, VehicleBranchDetailField[]>>(() => ({
     cars: [
       { key: "vehicle_year", label: "Year", type: "number", required: true },
       { key: "vehicle_mileage", label: "Mileage", type: "text" },
@@ -424,7 +424,7 @@ export default function PostAdForm({
       { key: "vehicle_mileage", label: "Mileage", type: "text" },
       { key: "vehicle_description", label: "Description", type: "text" },
     ],
-  };
+  }), []);
 
   const allowedVehicleDynamicKeys = useMemo(() => {
     const allowedKeys = new Set(dynamicFields.map((field) => field.field_key));
@@ -450,14 +450,16 @@ export default function PostAdForm({
       }
     }
     return allowedKeys;
-  }, [dynamicFields, rootSlug, simpleCategoryKind, vehicleBranch]);
+  }, [VEHICLE_BRANCH_DETAIL_FIELDS, dynamicFields, rootSlug, simpleCategoryKind, vehicleBranch]);
 
   const resolvedImageConfig = useMemo(() => {
     if (!finalNode) return null;
     return postingConfig ?? inferImageConfig(rootSlug, finalPath);
   }, [finalNode, finalPath, postingConfig, rootSlug]);
 
-  const showPhotoStep = Boolean(resolvedImageConfig?.requires_images || images.length > 0);
+  // Photos are always offered as a dedicated step; category policy determines
+  // whether they are optional or required.
+  const showPhotoStep = true;
   const locationStep = showPhotoStep ? 4 : 3;
   const previewStep = showPhotoStep ? 5 : 4;
   const publishStep = showPhotoStep ? 6 : 5;
@@ -519,6 +521,17 @@ export default function PostAdForm({
         detectOrChooseManual: "لطفا موقعیت دستگاه را تشخیص دهید یا روش دستی را انتخاب کنید.",
         completeRequiredFields: "لطفا فیلدهای الزامی را تکمیل کنید.",
         categoryRequired: "دسته بندی الزامی است.",
+        searchCategories: "جستجوی دسته‌بندی",
+        noCategoriesFound: "دسته‌بندی مطابق پیدا نشد.",
+        savingDraft: "در حال ذخیره پیش‌نویس…",
+        draftSaved: "پیش‌نویس ذخیره شد",
+        draftSaveFailed: "ذخیره پیش‌نویس ناموفق بود",
+        invalidImageType: "فقط تصاویر JPG، PNG، WebP یا HEIC پذیرفته می‌شوند.",
+        imageTooLarge: "حجم هر تصویر باید کمتر از ۱۰ مگابایت باشد.",
+        maxPhotosReached: "حداکثر تعداد تصاویر برای این دسته‌بندی رسیده است.",
+        required: "الزامی",
+        optional: "اختیاری",
+        characters: "نویسه",
       };
     }
 
@@ -561,6 +574,17 @@ export default function PostAdForm({
         detectOrChooseManual: "مهرباني وکړئ د وسیلې ځای ومومئ یا لاسي طریقه وټاکئ.",
         completeRequiredFields: "مهرباني وکړئ اړین فیلډونه بشپړ کړئ.",
         categoryRequired: "کټګوري اړینه ده.",
+        searchCategories: "کټګورۍ ولټوئ",
+        noCategoriesFound: "سمه کټګوري ونه موندل شوه.",
+        savingDraft: "مسوده خوندي کېږي…",
+        draftSaved: "مسوده خوندي شوه",
+        draftSaveFailed: "مسوده خوندي نه شوه",
+        invalidImageType: "یوازې JPG، PNG، WebP یا HEIC انځورونه منل کېږي.",
+        imageTooLarge: "هر انځور باید له ۱۰ MB څخه کوچنی وي.",
+        maxPhotosReached: "د دې کټګورۍ د انځورونو حد پوره شو.",
+        required: "اړین",
+        optional: "اختیاري",
+        characters: "توري",
       };
     }
 
@@ -602,6 +626,17 @@ export default function PostAdForm({
       detectOrChooseManual: "Please detect your device location or choose manual location.",
       completeRequiredFields: "Please complete required fields.",
       categoryRequired: "Category is required.",
+      searchCategories: "Search categories",
+      noCategoriesFound: "No matching category found.",
+      savingDraft: "Saving draft…",
+      draftSaved: "Draft saved",
+      draftSaveFailed: "Draft could not be saved",
+      invalidImageType: "Only JPG, PNG, WebP, or HEIC images are accepted.",
+      imageTooLarge: "Each image must be smaller than 10 MB.",
+      maxPhotosReached: "You have reached the photo limit for this category.",
+      required: "Required",
+      optional: "Optional",
+      characters: "characters",
     };
   }, [locale]);
 
@@ -634,14 +669,35 @@ export default function PostAdForm({
     return parsed;
   }
 
-  async function fetchFields(categoryNodeId: number, path: string | undefined, rootSlugName: string) {
+  const fetchFields = useCallback(async (categoryNodeId: number, path: string | undefined, rootSlugName: string) => {
+    const supabase = createSupabaseBrowserClient();
+    const { data: schemaRow } = await supabase.from("listing_schema_versions").select("config")
+      .eq("category_node_id", categoryNodeId).eq("status", "published").maybeSingle();
+    const schemaConfig = schemaRow?.config as { fields?: Array<Record<string, unknown>> } | undefined;
+    if (Array.isArray(schemaConfig?.fields)) {
+      const configured = schemaConfig.fields.filter((field) => field.active !== false && field.posting !== false).map((field, index) => {
+        const localizedLabels = field.labels as Record<string, unknown> | undefined;
+        const options = Array.isArray(field.options) ? field.options as Array<{ value?: unknown; labels?: Record<string, unknown> }> : [];
+        return {
+          id: -(categoryNodeId * 1000 + index + 1), category_node_id: categoryNodeId,
+          field_key: String(field.key ?? ""), field_label: String(localizedLabels?.[locale] ?? localizedLabels?.en ?? field.key ?? ""),
+          field_type: field.type, is_required: field.required === true,
+          options_json: Object.fromEntries(options.map((option) => [String(option.value ?? ""), String(option.labels?.[locale] ?? option.labels?.en ?? option.value ?? "")])),
+          unit: field.unit ?? null, display_order: Number(field.order ?? index), sort_order: Number(field.order ?? index),
+          is_active: true, created_at: "", updated_at: "",
+        } as CategoryField;
+      }).filter((field) => field.field_key);
+      setUsesPublishedSchema(true);
+      setDynamicFields(configured);
+      return;
+    }
+    setUsesPublishedSchema(false);
     const simpleKind = getSimpleCategoryKind(path, rootSlugName);
     if (simpleKind) {
       setDynamicFields([]);
       return;
     }
 
-    const supabase = createSupabaseBrowserClient();
     const orderedBySort = await supabase
       .from("category_fields")
       .select("*")
@@ -669,7 +725,7 @@ export default function PostAdForm({
     }
 
     setDynamicFields(buildFallbackFields(categoryNodeId, path, rootSlugName) as CategoryField[]);
-  }
+  }, [locale]);
 
   async function fetchPostingConfig(categoryId: number) {
     const supabase = createSupabaseBrowserClient();
@@ -726,10 +782,20 @@ export default function PostAdForm({
     }
 
     setLoadingTree(false);
-  }, []);
+  }, [fetchFields]);
+
+  useEffect(() => {
+    if (initialRootAppliedRef.current || !initialRootSlug || selectedRoot) return;
+    const initialRoot = activeCategories.find((category) => category.slug === initialRootSlug);
+    if (!initialRoot) return;
+    initialRootAppliedRef.current = true;
+    const timer = window.setTimeout(() => void chooseRoot(initialRoot), 0);
+    return () => window.clearTimeout(timer);
+  }, [activeCategories, chooseRoot, initialRootSlug, selectedRoot]);
 
   async function chooseNode(node: CategoryNode) {
     setLoadingTree(true);
+    setDynamicValues({});
 
     const nextPath = [...pathNodes, node];
     setPathNodes(nextPath);
@@ -804,18 +870,6 @@ export default function PostAdForm({
       ...(allowedVehicleDynamicKeys.has(secondaryKey) ? { [secondaryKey]: value } : {}),
     }));
   }
-
-  useEffect(() => {
-    const allowedKeys = allowedVehicleDynamicKeys;
-
-    setDynamicValues((prev) => {
-      const entries = Object.entries(prev).filter(([key]) => allowedKeys.has(key));
-      if (entries.length === Object.keys(prev).length) {
-        return prev;
-      }
-      return Object.fromEntries(entries);
-    });
-  }, [dynamicFields, rootSlug, simpleCategoryKind]);
 
   const normalizeLocationName = useCallback((value: string) => {
     return value
@@ -1021,13 +1075,32 @@ export default function PostAdForm({
     if (files.length === 0) return;
 
     const maxImages = Math.max(1, resolvedImageConfig?.max_images ?? 10);
-    const next = files.map((file, index) => ({
+    const invalidType = files.find((file) => !ALLOWED_LISTING_IMAGE_TYPES.has(file.type));
+    if (invalidType) {
+      setStepError(postAdCopy.invalidImageType);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    const oversized = files.find((file) => file.size > MAX_LISTING_IMAGE_BYTES);
+    if (oversized) {
+      setStepError(postAdCopy.imageTooLarge);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (images.length + files.length > maxImages) {
+      setStepError(postAdCopy.maxPhotosReached);
+    } else {
+      setStepError(null);
+    }
+
+    const availableSlots = Math.max(0, maxImages - images.length);
+    const next = files.slice(0, availableSlots).map((file, index) => ({
       file,
       previewUrl: URL.createObjectURL(file),
       isPrimary: images.length === 0 && index === 0,
     }));
 
-    setImages((prev) => [...prev, ...next].slice(0, maxImages));
+    setImages((prev) => [...prev, ...next]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -1094,6 +1167,8 @@ export default function PostAdForm({
           rulesAccepted: true,
         },
         dynamicValues: (details.dynamic_values as Record<string, string | boolean | string[]>) ?? {},
+        category: (response.draft.category ?? {}) as { root_slug?: string; final_path?: string; listing_type?: "for_sale" | "for_rent" | "wanted" },
+        location: (response.draft.location ?? {}) as { province_id?: number; district_id?: number; area_text?: string; location_visibility?: "exact" | "approximate" | "province_district" },
       });
 
     };
@@ -1105,19 +1180,68 @@ export default function PostAdForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function continueDraft() {
+  useEffect(() => {
+    try {
+      const raw = globalThis.localStorage?.getItem(draftStorageKey);
+      if (!raw) return;
+      const localDraft = JSON.parse(raw) as { core?: CoreForm; dynamicValues?: Record<string, string | boolean | string[]> };
+      if (localDraft.core || localDraft.dynamicValues) {
+        globalThis.queueMicrotask(() => setPendingDraft((current) => current ?? localDraft));
+      }
+    } catch {
+      globalThis.localStorage?.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey]);
+
+  async function continueDraft() {
     if (pendingDraft?.core) {
       setCore(pendingDraft.core);
     }
     if (pendingDraft?.dynamicValues) {
-        const filtered: Record<string, string | boolean | string[]> = {};
-      for (const [key, value] of Object.entries(pendingDraft.dynamicValues)) {
-        if (allowedVehicleDynamicKeys.has(key)) {
-          filtered[key] = value;
-        }
+      setDynamicValues(pendingDraft.dynamicValues);
+    }
+    if (pendingDraft?.category?.listing_type) {
+      setListingTypeChoice(pendingDraft.category.listing_type);
+    }
+    if (pendingDraft?.location) {
+      setSelectedProvinceId(Number(pendingDraft.location.province_id) || null);
+      setSelectedDistrictId(Number(pendingDraft.location.district_id) || null);
+      setAreaText(String(pendingDraft.location.area_text ?? ""));
+      setLocationVisibility(pendingDraft.location.location_visibility ?? "province_district");
+      if (pendingDraft.location.province_id && pendingDraft.location.district_id) {
+        setLocationMethod("manual");
+        setLocationConfirmed(true);
       }
+    }
 
-      setDynamicValues(filtered);
+    const finalPathToRestore = pendingDraft?.category?.final_path;
+    const rootSlugToRestore = pendingDraft?.category?.root_slug;
+    const rootCategory = activeCategories.find((category) => category.slug === rootSlugToRestore);
+    if (rootCategory && finalPathToRestore) {
+      setLoadingTree(true);
+      const segments = finalPathToRestore.split("/").filter(Boolean);
+      const paths = segments.map((_, index) => segments.slice(0, index + 1).join("/"));
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("category_nodes")
+        .select("*")
+        .eq("category_id", rootCategory.id)
+        .in("path", paths)
+        .eq("is_active", true);
+      const byPath = new Map(((data as CategoryNode[]) ?? []).map((node) => [node.path, node]));
+      const restoredNodes = paths.map((path) => byPath.get(path)).filter((node): node is CategoryNode => Boolean(node));
+      const restoredFinal = restoredNodes.at(-1) ?? null;
+      if (restoredFinal?.path === finalPathToRestore) {
+        setSelectedRoot(rootCategory);
+        setPathNodes(restoredNodes);
+        setCurrentOptions([]);
+        setFinalNode(restoredFinal);
+        await Promise.all([
+          fetchFields(restoredFinal.id, restoredFinal.path, rootCategory.slug),
+          fetchPostingConfig(rootCategory.id),
+        ]);
+      }
+      setLoadingTree(false);
     }
     setPendingDraft(null);
   }
@@ -1128,13 +1252,19 @@ export default function PostAdForm({
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      const hasMeaningfulDraft = Boolean(
+        finalPath || core.title.trim() || core.description.trim() || core.price.trim() || images.length > 0
+      );
+      if (!hasMeaningfulDraft) return;
+
+      setDraftSaveState("saving");
       globalThis.localStorage?.setItem(
         draftStorageKey,
         JSON.stringify({ core, dynamicValues })
       );
 
-      void saveListingDraftAction({
+      const result = await saveListingDraftAction({
         postingType: toPostingType(postMode, listingTypeChoice),
         category: {
           root_slug: rootSlug,
@@ -1169,7 +1299,8 @@ export default function PostAdForm({
         language: locale,
         status: "in_progress",
       });
-    }, 600);
+      setDraftSaveState(result.ok ? "saved" : result.statusCode === 401 ? "idle" : "error");
+    }, 900);
 
     return () => clearTimeout(timer);
   }, [
@@ -1213,7 +1344,7 @@ export default function PostAdForm({
     if (!core.contact_phone) return postAdCopy.contactPhoneRequired;
     if (!core.rulesAccepted) return postAdCopy.acceptRulesRequired;
 
-    if (simpleCategoryConfig) {
+    if (usesSimpleCategoryFallback && simpleCategoryConfig) {
       for (const field of simpleCategoryConfig.fields.filter((item) => item.required)) {
         const value = dynamicValues[field.key];
         if (field.type === "multiselect") {
@@ -1267,14 +1398,6 @@ export default function PostAdForm({
           }
         }
       }
-    }
-
-    if (!locationConfirmed) {
-      return postAdCopy.detectedLocationNeedsConfirmation;
-    }
-
-    if (!locationMethod) {
-      return postAdCopy.addLocationBeforePublish;
     }
 
     return null;
@@ -1505,8 +1628,9 @@ export default function PostAdForm({
         setStatus(t.postAd.publishing);
         const uploaded = await uploadListingImageAction(created.listingId, ordered[i].file, ordered[i].isPrimary);
         if (!uploaded.ok) {
-          setError(uploaded.message || postAdCopy.completeRequiredFields);
-          setStatus(null);
+          // The listing already exists at this point. Move to its management
+          // page so retrying cannot accidentally create a duplicate listing.
+          window.location.assign(`/listings/${created.listingId}/manage?upload=partial`);
           return;
         }
       }
@@ -1524,17 +1648,25 @@ export default function PostAdForm({
       await deleteMyDraftAction();
       setStatus(t.postAd.publishing);
       const destination = `/listings/${created.listingId}/manage`;
-      router.push(destination);
-      router.refresh();
       window.location.assign(destination);
     });
   }
 
   const renderDynamicFields = dynamicFields.filter((field) => !LOCATION_DYNAMIC_KEYS.has(field.field_key));
-  const extraPhoneFields = !simpleCategoryConfig && rootSlug === "mobile-phones-tablets"
+  const previewDynamicEntries = renderDynamicFields.flatMap((field) => {
+    const value = dynamicValues[field.field_key];
+    if (value === undefined || value === null || value === "" || value === false) return [];
+    const displayValue = Array.isArray(value)
+      ? value.join(", ")
+      : field.field_type === "boolean"
+        ? "✓"
+        : String(value);
+    return [{ key: field.field_key, label: field.field_label, value: displayValue }];
+  });
+  const extraPhoneFields = !usesPublishedSchema && !simpleCategoryConfig && rootSlug === "mobile-phones-tablets"
     ? PHONE_FORM_FIELDS.filter((field) => !dynamicFields.some((dynamicField) => dynamicField.field_key === field.key))
     : [];
-  const extraRealEstateFields = !simpleCategoryConfig && rootSlug === "real-estate"
+  const extraRealEstateFields = !usesPublishedSchema && !simpleCategoryConfig && rootSlug === "real-estate"
     ? REAL_ESTATE_FORM_FIELDS.filter((field) => !dynamicFields.some((dynamicField) => dynamicField.field_key === field.key))
     : [];
 
@@ -1591,7 +1723,6 @@ export default function PostAdForm({
   }
 
   function renderVehicleDetailsSection(branch: VehicleBranchDefinition) {
-    const showDamageDiagram = branch.key !== "parts" && branch.key !== "bicycles";
     const branchFields = VEHICLE_BRANCH_DETAIL_FIELDS[branch.key] ?? [];
     const branchSpecificHint = (() => {
       switch (branch.key) {
@@ -1614,18 +1745,16 @@ export default function PostAdForm({
       <section className="mt-4 space-y-4 rounded-xl border border-[var(--line)] p-3">
         <h3 className="text-sm font-bold">{t.postAd.vehicleDetails}</h3>
         <p className="text-sm text-[var(--ink-2)]">{branchSpecificHint}</p>
-        <VehicleSmartSelector categoryPath={finalNode?.path ?? null} onChange={setVehicleSelection} />
+        <VehicleSmartSelector
+          key={finalNode?.path ?? "vehicle-selector"}
+          categoryPath={finalNode?.path ?? null}
+          onChange={setVehicleSelection}
+        />
 
         <div className="grid gap-3 sm:grid-cols-2">
           {branchFields.map((field) => renderVehicleField(field))}
         </div>
 
-        {showDamageDiagram ? (
-          <div>
-            <p className="mb-2 text-sm font-semibold">{t.postAd.damagePaintReport}</p>
-            <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} />
-          </div>
-        ) : null}
       </section>
     );
   }
@@ -1634,7 +1763,7 @@ export default function PostAdForm({
     ? renderVehicleDetailsSection(vehicleBranch)
     : null;
 
-  const simpleCategoryFieldsSection = simpleCategoryConfig ? (
+  const simpleCategoryFieldsSection = simpleCategoryConfig && usesSimpleCategoryFallback ? (
     <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
       <h3 className="text-sm font-bold">{labelFor(locale, simpleCategoryConfig.title)}</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -1787,6 +1916,13 @@ export default function PostAdForm({
     </section>
   ) : null;
 
+  const vehicleDamageSection = shouldShowVehicleDamageDiagram(rootSlug, vehicleBranch?.key) ? (
+    <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
+      <h3 className="mb-3 text-sm font-bold">{t.postAd.damagePaintReport}</h3>
+      <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} locale={locale} />
+    </section>
+  ) : null;
+
   const suggestedCategoryLabel = useMemo(() => {
     if (!smartSuggestion || smartSuggestion.categorySlug === "other") {
       return null;
@@ -1816,11 +1952,32 @@ export default function PostAdForm({
   }, [activeCategories, chooseRoot, smartSuggestion]);
 
   return (
-    <div className="relative pb-28">
-      <div className="sticky top-0 z-10 rounded-2xl bg-sky-700 px-4 py-3 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wide">{t.postAd.postAd}</p>
-        <p className="text-sm">{t.postAd.step} {currentVisualStep} {t.postAd.of} {visualSteps.length}</p>
-        <p className="mt-1 text-xs text-sky-100">{visualSteps.join(" -> ")}</p>
+    <div className="relative pb-44 lg:pb-28">
+      <div className="sticky top-0 z-10 overflow-hidden rounded-2xl border border-emerald-950/10 bg-[#103b32] px-4 py-4 text-white shadow-lg shadow-emerald-950/10">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f4d99c]">{t.postAd.postAd}</p>
+            <p className="mt-1 text-sm font-semibold">{t.postAd.step} {currentVisualStep} {t.postAd.of} {visualSteps.length}</p>
+          </div>
+          <p className={`text-xs font-semibold ${draftSaveState === "error" ? "text-red-200" : "text-white/70"}`} aria-live="polite">
+            {draftSaveState === "saving" ? postAdCopy.savingDraft : draftSaveState === "saved" ? postAdCopy.draftSaved : draftSaveState === "error" ? postAdCopy.draftSaveFailed : ""}
+          </p>
+        </div>
+        <div className="mt-4 grid grid-cols-6 gap-1" aria-label={`${t.postAd.step} ${currentVisualStep} ${t.postAd.of} ${visualSteps.length}`}>
+          {visualSteps.map((label, index) => {
+            const number = index + 1;
+            const complete = number < currentVisualStep;
+            const current = number === currentVisualStep;
+            return (
+              <div key={label} className="min-w-0 text-center">
+                <div className={`mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${complete ? "bg-[#e6b85c] text-[#173c32]" : current ? "bg-white text-[#173c32] ring-4 ring-white/15" : "bg-white/10 text-white/60"}`}>
+                  {complete ? "✓" : number}
+                </div>
+                <p className={`mt-1 hidden truncate text-[10px] sm:block ${current ? "text-white" : "text-white/55"}`}>{label}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="mt-4 space-y-4">
@@ -1830,7 +1987,7 @@ export default function PostAdForm({
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={continueDraft}
+                onClick={() => void continueDraft()}
                 className="rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white"
               >
                 {postAdCopy.continueDraft}
@@ -1930,9 +2087,19 @@ export default function PostAdForm({
 
             {!selectedRoot ? (
               <>
+                <label className="mt-4 block text-sm font-semibold">
+                  <span className="sr-only">{postAdCopy.searchCategories}</span>
+                  <input
+                    type="search"
+                    value={categoryQuery}
+                    onChange={(event) => setCategoryQuery(event.target.value)}
+                    placeholder={postAdCopy.searchCategories}
+                    className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
+                  />
+                </label>
                 <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
-                  {activeCategories.map((category) => (
-                    <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
+                  {filteredActiveCategories.map((category) => (
+                    <button key={category.id} type="button" onClick={() => void chooseRoot(category)} className="flex w-full items-center justify-between px-4 py-3 text-start text-sm font-semibold transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600">
                       <span>
                         {localizeCategoryName({
                           locale,
@@ -1943,6 +2110,7 @@ export default function PostAdForm({
                       <span aria-hidden>&gt;</span>
                     </button>
                   ))}
+                  {filteredActiveCategories.length === 0 ? <p className="px-4 py-6 text-center text-sm text-[var(--ink-2)]">{postAdCopy.noCategoriesFound}</p> : null}
                 </div>
 
                 {comingSoonCategories.length > 0 ? (
@@ -1967,13 +2135,21 @@ export default function PostAdForm({
               <div className="mt-3 divide-y divide-[var(--line)] overflow-hidden rounded-xl border border-[var(--line)]">
                 {loadingTree ? <div className="px-4 py-3 text-sm text-[var(--ink-2)]">{t.postAd.loading}</div> : null}
                 {!loadingTree && currentOptions.length === 0 && finalNode ? (
-                  <div className="px-4 py-3 text-sm font-semibold text-green-700">
-                    {t.postAd.finalCategorySelected}: {localizeCategoryName({ locale, fallbackName: finalNode.name, slug: finalNode.slug, path: finalNode.path })}
+                  <div className="space-y-3 bg-emerald-50 px-4 py-4 text-sm font-semibold text-green-800">
+                    <p>{t.postAd.finalCategorySelected}: {localizeCategoryName({ locale, fallbackName: finalNode.name, slug: finalNode.slug, path: finalNode.path })}</p>
+                    <button
+                      type="button"
+                      data-testid="category-continue-to-details"
+                      onClick={goNext}
+                      className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#a7442f] px-4 py-3 font-bold text-white shadow-sm transition hover:bg-[#8d3524] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#a7442f]/25"
+                    >
+                      {t.postAd.continue} →
+                    </button>
                   </div>
                 ) : null}
                 {!loadingTree
                   ? currentOptions.map((node) => (
-                      <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold">
+                      <button key={node.id} type="button" onClick={() => void chooseNode(node)} className="flex w-full items-center justify-between px-4 py-3 text-start text-sm font-semibold transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600">
                         <span className="break-words">
                           {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
                         </span>
@@ -2016,25 +2192,27 @@ export default function PostAdForm({
             <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-semibold break-words">{breadcrumb || t.postAd.categoryNotSelected}</p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.title}
-                <input value={core.title} onChange={(event) => updateCore("title", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.title} <span className="text-red-600">*</span>
+                <input value={core.title} minLength={5} maxLength={120} required onChange={(event) => updateCore("title", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
+                <span className="mt-1 block text-end text-xs font-normal text-[var(--ink-2)]">{core.title.length}/120 {postAdCopy.characters}</span>
               </label>
-              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.description}
-                <textarea rows={4} value={core.description} onChange={(event) => updateCore("description", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.description} <span className="text-red-600">*</span>
+                <textarea rows={6} value={core.description} minLength={20} maxLength={5000} required onChange={(event) => updateCore("description", event.target.value)} className="mt-1 w-full resize-y rounded-xl border border-[var(--line)] px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
+                <span className="mt-1 block text-end text-xs font-normal text-[var(--ink-2)]">{core.description.length}/5000 {postAdCopy.characters}</span>
               </label>
-              <label className="text-sm font-semibold">{t.postAd.price}
-                <input type="number" min={1} value={core.price} onChange={(event) => updateCore("price", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              <label className="text-sm font-semibold">{t.postAd.price} <span className="text-red-600">*</span>
+                <input type="number" inputMode="decimal" min={1} required value={core.price} onChange={(event) => updateCore("price", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
               </label>
               <label className="text-sm font-semibold">{t.postAd.currency}
                 <select value={core.currency} onChange={(event) => updateCore("currency", event.target.value as "AFN" | "USD")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
                   {CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
                 </select>
               </label>
-              <label className="text-sm font-semibold">{t.postAd.contactPhone}
-                <input value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              <label className="text-sm font-semibold">{t.postAd.contactPhone} <span className="text-red-600">*</span>
+                <input type="tel" inputMode="tel" autoComplete="tel" minLength={7} maxLength={20} required value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
               </label>
               <label className="text-sm font-semibold">{t.postAd.contactName}
-                <input value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                <input autoComplete="name" maxLength={80} value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
               </label>
               <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
                 <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
@@ -2048,7 +2226,7 @@ export default function PostAdForm({
 
             {simpleCategoryFieldsSection}
 
-            {!simpleCategoryConfig && renderDynamicFields.length > 0 ? (
+            {(!simpleCategoryConfig || usesPublishedSchema) && renderDynamicFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
                 <h3 className="text-sm font-bold">{t.postAd.additionalCategoryFields}</h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2065,7 +2243,7 @@ export default function PostAdForm({
                               onChange={(event) => updateDynamic(field.field_key, event.target.checked)}
                               className="h-4 w-4"
                             />
-                            {field.field_label}
+                            {field.field_label} {field.is_required ? <span className="text-red-600">*</span> : null}
                           </span>
                         </label>
                       );
@@ -2075,15 +2253,16 @@ export default function PostAdForm({
                       const options = fieldOptions(field.options_json);
                       return (
                         <label key={field.id} className="text-sm font-semibold">
-                          {field.field_label}
+                          {field.field_label} {field.is_required ? <span className="text-red-600">*</span> : null}
                           <select
+                            required={field.is_required}
                             value={String(value ?? "")}
                             onChange={(event) => updateDynamic(field.field_key, event.target.value)}
                             className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
                           >
                             <option value="">{t.postAd.select}</option>
                             {options.map((option) => (
-                              <option key={`${field.id}-${option}`} value={option}>{option}</option>
+                              <option key={`${field.id}-${option.value}`} value={option.value}>{option.label}</option>
                             ))}
                           </select>
                         </label>
@@ -2092,8 +2271,9 @@ export default function PostAdForm({
 
                     return (
                       <label key={field.id} className="text-sm font-semibold">
-                        {field.field_label}
+                        {field.field_label} {field.is_required ? <span className="text-red-600">*</span> : null}
                         <input
+                          required={field.is_required}
                           type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
                           value={String(value ?? "")}
                           onChange={(event) => updateDynamic(field.field_key, event.target.value)}
@@ -2105,6 +2285,8 @@ export default function PostAdForm({
                 </div>
               </section>
             ) : null}
+
+            {vehicleDamageSection}
 
             {!simpleCategoryConfig && extraPhoneFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
@@ -2235,7 +2417,8 @@ export default function PostAdForm({
               {resolvedImageConfig?.recommended_images ? ` ${t.postAd.recommended}: ${resolvedImageConfig.recommended_images}` : ""}
             </p>
 
-            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
+            <p className="mt-2 text-xs text-[var(--ink-2)]">JPG, PNG, WebP or HEIC · 10 MB max per photo · {images.length}/{resolvedImageConfig?.max_images ?? 10}</p>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple className="hidden" onChange={onPickFiles} />
             {images.length === 0 ? (
               <button
                 type="button"
@@ -2250,7 +2433,7 @@ export default function PostAdForm({
                   {images.map((img, index) => (
                     <div key={`${img.previewUrl}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--line)]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.previewUrl} alt={`Upload ${index + 1}`} className="h-full w-full object-cover" />
+                      <img src={img.previewUrl} alt={`${core.title || t.postAd.photosLabel} ${index + 1}`} className="h-full w-full object-cover" />
                       <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-1 text-[10px] font-semibold text-white">
                         <button type="button" onClick={() => setPrimary(index)}>{t.postAd.primary}</button>
                         <button type="button" onClick={() => removeImage(index)}>{t.postAd.remove}</button>
@@ -2388,6 +2571,9 @@ export default function PostAdForm({
                 {districtOptions.find((item) => item.id === selectedDistrictId)?.name ?? "-"}
               </p>
               <p><span className="font-semibold">{t.postAd.photosLabel}:</span> {images.length}</p>
+              {previewDynamicEntries.map((entry) => (
+                <p key={entry.key}><span className="font-semibold">{entry.label}:</span> {entry.value}</p>
+              ))}
             </div>
           </section>
         ) : null}
@@ -2399,11 +2585,11 @@ export default function PostAdForm({
           </section>
         ) : null}
 
-        {stepError ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{stepError}</p> : null}
-        {error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
+        {stepError ? <p role="alert" aria-live="assertive" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{stepError}</p> : null}
+        {error ? <p role="alert" aria-live="assertive" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--line)] bg-white px-4 py-3">
+      <div data-testid="posting-step-actions" className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 border-t border-[var(--line)] bg-white px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,.08)] lg:bottom-0">
         <div className="mx-auto flex w-full max-w-5xl gap-2">
           {step > 1 ? (
             <button type="button" onClick={goPrev} className="rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-semibold">
@@ -2412,7 +2598,7 @@ export default function PostAdForm({
           ) : null}
 
           {!isPublishStep ? (
-            <button type="button" onClick={goNext} className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white">
+            <button type="button" onClick={goNext} disabled={loadingTree} className="flex-1 rounded-xl bg-[#a7442f] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#8d3524] disabled:cursor-not-allowed disabled:opacity-60">
               {t.postAd.continue}
             </button>
           ) : (

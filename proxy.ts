@@ -8,7 +8,10 @@ import { isPostAdPath, isProtectedPostingPath } from "@/lib/auth/protected-route
 
 const EXCLUDED_PATH_PREFIXES = ["/api", "/_next", "/favicon.ico", "/robots.txt", "/sitemap.xml"];
 
-function isExcludedPath(pathname: string) {
+export function isProxyExcludedPath(pathname: string) {
+  if (pathname === "/locale") {
+    return true;
+  }
   if (EXCLUDED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return true;
   }
@@ -32,7 +35,7 @@ export async function proxy(request: NextRequest) {
   const { search } = request.nextUrl;
   const { originalPathname, effectivePathname, pathLocale, strippedPath } = resolveProxyPath(request.url, request.nextUrl.pathname);
 
-  if (isExcludedPath(effectivePathname)) {
+  if (isProxyExcludedPath(effectivePathname)) {
     return updateSession(request);
   }
 
