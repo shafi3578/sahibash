@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { ModelDetailResponse } from "@/lib/catalog/types";
+import type { CatalogModel, ModelDetailResponse } from "@/lib/catalog/types";
 
 /**
  * GET /api/catalog/models/[id]?category=phones&brandId=apple
@@ -22,13 +22,13 @@ export async function GET(
       );
     }
 
-    let model: any = null;
+    let model: CatalogModel | null = null;
 
     if (category === "phones") {
       try {
         const brandCatalog = await import(`@/lib/data/catalogs/phones/${brandId}`);
         const models = brandCatalog.MODELS || [];
-        model = models.find((m: any) => m.id === modelId);
+        model = (models as CatalogModel[]).find((item) => item.id === modelId) ?? null;
       } catch {
         // Brand catalog not found
       }
@@ -36,7 +36,7 @@ export async function GET(
       try {
         const brandCatalog = await import(`@/lib/data/catalogs/vehicles/${brandId}`);
         const models = brandCatalog.MODELS || [];
-        model = models.find((m: any) => m.id === modelId);
+        model = (models as CatalogModel[]).find((item) => item.id === modelId) ?? null;
       } catch {
         // Brand catalog not found
       }
@@ -44,7 +44,7 @@ export async function GET(
       try {
         const brandCatalog = await import(`@/lib/data/catalogs/laptops/${brandId}`);
         const models = brandCatalog.MODELS || [];
-        model = models.find((m: any) => m.id === modelId);
+        model = (models as CatalogModel[]).find((item) => item.id === modelId) ?? null;
       } catch {
         // Brand catalog not found
       }

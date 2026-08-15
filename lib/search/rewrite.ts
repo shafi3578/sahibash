@@ -15,7 +15,7 @@ export type SearchRewriteContext = {
   rewrittenTerms: string[];
 };
 
-export type SearchRewriteClient = Pick<SupabaseClient<any>, "from">;
+export type SearchRewriteClient = Pick<SupabaseClient, "from">;
 
 function normalizeAliasList(values: string[] | null | undefined): string[] {
   return (values ?? [])

@@ -44,4 +44,19 @@ next-env.d.ts
 .temp/
 .vscode/
 tmp_test_image.png
+
+# local maintenance and diagnostic artifacts
+/__tmp_*
+/tmp-*
+/tmp_*
+/create_super_admin.js
+/find_or_create_super_admin.js
+/query_site_settings.js
+/verify_super_admin_email.js
+/curl-output.txt
+/screenshots/
+/admin-*.png
+/*.log
+/work/
+/app/**/debug/
 .vercel

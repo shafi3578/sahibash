@@ -60,15 +60,6 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
   const [otherBrand, setOtherBrand] = useState("");
   const [otherModel, setOtherModel] = useState("");
 
-  useEffect(() => {
-    setSelectedSubtype(null);
-    setSelectedBrand(null);
-    setSelectedModel(null);
-    setSelectedVariant(null);
-    setOtherBrand("");
-    setOtherModel("");
-  }, [categoryPath]);
-
   const brands = useMemo(() => {
     if (!branch) {
       return [];
@@ -106,7 +97,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
     );
 
     if (match) {
-      setSelectedBrand(match);
+      queueMicrotask(() => setSelectedBrand(match));
     }
   }, [aiSuggestedBrand, branch, brands]);
 
@@ -125,7 +116,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
     );
 
     if (match) {
-      setSelectedModel(match);
+      queueMicrotask(() => setSelectedModel(match));
     }
   }, [aiSuggestedModel, models]);
 

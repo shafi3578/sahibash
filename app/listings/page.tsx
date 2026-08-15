@@ -10,9 +10,14 @@ export default async function ListingsPage() {
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="font-display text-3xl font-bold">{ui.listingsPage.allListings}</h1>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
         {listings.map((listing) => <ListingCard key={listing.id} listing={listing} />)}
       </div>
+      {listings.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-8 text-center text-sm text-[var(--ink-2)]">
+          {ui.listingsPage.empty}
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -199,6 +199,7 @@ type LocationUi = {
 
 type ListingsPageUi = {
   allListings: string;
+  empty: string;
 };
 
 type ListingManageUi = {
@@ -509,6 +510,7 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
     },
     listingsPage: {
       allListings: "All Listings",
+      empty: "No active listings are available right now. Please check again soon.",
     },
     listingManage: {
       notFoundOrUnauthorized: "Listing not found or unauthorized",
@@ -799,6 +801,7 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
     },
     listingsPage: {
       allListings: "همه اعلان‌ها",
+      empty: "در حال حاضر اعلان فعالی موجود نیست. لطفاً بعداً دوباره بررسی کنید.",
     },
     listingManage: {
       notFoundOrUnauthorized: "اعلان پیدا نشد یا اجازه دسترسی ندارید",
@@ -1089,6 +1092,7 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
     },
     listingsPage: {
       allListings: "ټول اعلانونه",
+      empty: "اوس مهال فعال اعلانونه نشته. مهرباني وکړئ وروسته بیا وګورئ.",
     },
     listingManage: {
       notFoundOrUnauthorized: "اعلان ونه موندل شو یا اجازه نه لرئ",

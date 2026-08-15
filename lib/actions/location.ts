@@ -1,8 +1,7 @@
 'use server';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { type LocationVisibility } from '@/components/location/LocationPrivacy';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 type NearbyListingRow = {
   id: string;
@@ -42,23 +41,7 @@ export async function saveListingLocation(
     visibility?: LocationVisibility;
   }
 ) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase
     .from('listings')
@@ -98,23 +81,7 @@ export async function getNearbyListings(
     limit?: number;
   }
 ) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  const supabase = await createSupabaseServerClient();
 
   // Using Haversine formula for distance calculation
   // cos(lat1) * cos(lat2) * cos(lon2-lon1) + sin(lat1) * sin(lat2)
@@ -195,23 +162,7 @@ export async function getListingsByLocation(
     offset?: number;
   }
 ) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  const supabase = await createSupabaseServerClient();
 
   let query = supabase
     .from('listings')
@@ -267,23 +218,7 @@ export async function getListingsByLocation(
  * Get location information for a listing (respecting visibility)
  */
 export async function getListingLocationInfo(listingId: string) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('listings')

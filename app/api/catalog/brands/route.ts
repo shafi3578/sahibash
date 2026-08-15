@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { BrandListResponse } from "@/lib/catalog/types";
+import type { BrandListResponse, CatalogBrand } from "@/lib/catalog/types";
 
 /**
  * GET /api/catalog/brands?category=phones&subcategory=mobile-phones
@@ -9,8 +9,6 @@ export async function GET(req: NextRequest): Promise<NextResponse<BrandListRespo
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
-    const subcategory = searchParams.get("subcategory");
-
     if (!category) {
       return NextResponse.json(
         { success: false, data: [], error: "Missing category parameter" },
@@ -19,7 +17,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<BrandListRespo
     }
 
     // Import catalog dynamically based on category
-    let brands: any[] = [];
+    let brands: CatalogBrand[] = [];
 
     if (category === "phones") {
       // Import phone brands

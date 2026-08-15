@@ -9,30 +9,39 @@
     "lint": "eslint",
     "test:i18n-parity": "node --import tsx --test tests/i18n-key-parity.test.ts",
     "test:search-parity": "node --import tsx --test tests/multilingual-search-parity.test.ts",
-    "test:posting-access": "node --import tsx --test tests/posting-access-control.test.ts",
-    "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts"
+    "test:posting-access": "node --import tsx --test tests/posting-access-control.test.ts tests/listing-image-validation.test.ts tests/vehicle-model-catalog.test.ts",
+    "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts",
+    "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts tests/taxonomy-schema-migrations.test.ts",
+    "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/marketplace-ranking.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:i18n-parity && npm run test:search-parity && npm run test:posting-access && npm run test:smart-posting && npm run test:listing-schema && npm run test:security"
   },
   "dependencies": {
+    "@google/model-viewer": "^4.2.0",
     "@huggingface/inference": "^4.13.19",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "@types/leaflet": "^1.9.21",
     "leaflet": "^1.9.4",
-    "next": "16.2.9",
+    "next": "^16.2.11",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
+    "@gltf-transform/core": "4.4.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "^16.2.11",
     "supabase": "^2.107.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5"
+  },
+  "overrides": {
+    "nanoid": "3.3.18"
   }
 }

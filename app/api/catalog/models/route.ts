@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { ModelListResponse, ModelDetailResponse } from "@/lib/catalog/types";
+import type { CatalogModel, ModelListResponse } from "@/lib/catalog/types";
 
 /**
  * GET /api/catalog/models?category=phones&brandId=apple
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ModelListRespo
       );
     }
 
-    let models: any[] = [];
+    let models: CatalogModel[] = [];
 
     if (category === "phones") {
       // Dynamically import brand-specific models

@@ -1,5 +1,5 @@
-import { NewPostingFormv2 } from '@/components/posting/NewPostingFormv2';
+import { redirect } from "next/navigation";
 
-export default function PostAdPage() {
-  return <NewPostingFormv2 />;
+export default function LegacyPostAdV2Page() {
+  redirect("/post-ad/create");
 }

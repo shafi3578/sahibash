@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { isPostAdPath, isProtectedPostingPath } from "@/lib/auth/protected-routes";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 test("Protected posting paths are correctly detected", () => {
   const protectedPaths = [
@@ -43,4 +45,11 @@ test("Post ad path marker works for reason=post messaging", () => {
   assert.equal(isPostAdPath("/post-ad/create"), true);
   assert.equal(isPostAdPath("/post-ad/electronics"), true);
   assert.equal(isPostAdPath("/search"), false);
+});
+
+test("legacy posting routes converge on the canonical posting flow", () => {
+  for (const route of ["create-new", "create-v2", "electronics"]) {
+    const source = readFileSync(join(process.cwd(), "app", "post-ad", route, "page.tsx"), "utf8");
+    assert.match(source, /redirect\("\/post-ad\/create/);
+  }
 });

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch models for this brand
-    let query = supabase
+    const query = supabase
       .from("phone_models")
       .select(
         `id, 

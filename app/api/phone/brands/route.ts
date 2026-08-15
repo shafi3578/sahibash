@@ -1,11 +1,11 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * GET /api/phone/brands
  * Fetch all active phone brands for the posting flow
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
 

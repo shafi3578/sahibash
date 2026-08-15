@@ -1,0 +1,106 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import test from "node:test";
+import { selectVehicleModel3D, VEHICLE_MODELS_3D } from "../lib/vehicles/model-catalog";
+import { defaultVehicleDamageParts, getNonOriginalVehicleDamageParts, normalizeVehicleDamageParts, shouldShowVehicleDamageDiagram } from "../lib/vehicles/damage-report";
+
+test("maps all six supported Toyota model families to local GLB assets", () => {
+  const cases = [
+    [{ make: "Toyota", model: "Corolla Fielder", year: 2005 }, "corolla-fielder-2005"],
+    [{ make: "Toyota", model: "4Runner", year: 2015 }, "4runner-2015"],
+    [{ make: "Toyota", model: "Land Cruiser 300", year: 2022 }, "land-cruiser-300-2022"],
+    [{ make: "Toyota", model: "Auris", year: 2014 }, "auris-wagon"],
+    [{ make: "Toyota", model: "Corolla", year: 1995 }, "corolla-1995"],
+    [{ make: "Toyota", model: "Corolla", year: 2020 }, "corolla-2020"],
+  ] as const;
+
+  for (const [input, expected] of cases) assert.equal(selectVehicleModel3D(input)?.id, expected);
+  assert.equal(VEHICLE_MODELS_3D.length, 6);
+});
+
+test("does not show an inaccurate Toyota model for unrelated vehicles", () => {
+  assert.equal(selectVehicleModel3D({ make: "Honda", model: "Civic", year: 2020 }), null);
+  assert.equal(selectVehicleModel3D({ make: "Toyota", model: "Hilux", year: 2020 }), null);
+});
+
+test("matches 3D models from current published-schema vehicle values", () => {
+  const attributes = new Map([
+    ["make", "Toyota"],
+    ["model", "Corolla"],
+    ["year", "2020"],
+  ]);
+  assert.equal(selectVehicleModel3D({
+    make: attributes.get("make"),
+    model: attributes.get("model"),
+    year: attributes.get("year"),
+  })?.id, "corolla-2020");
+});
+
+test("uses an explicit supported model in the listing title when custom attributes are invalid", () => {
+  assert.equal(selectVehicleModel3D({
+    make: "invalid custom brand",
+    model: "invalid custom model",
+    year: 345435,
+    title: "corola 2024 new",
+  })?.id, "corolla-2020");
+  assert.equal(selectVehicleModel3D({ title: "Honda Civic 2024" }), null);
+  assert.equal(selectVehicleModel3D({ title: "Toyota Hilux 2024" }), null);
+});
+
+test("all configured vehicle assets are valid GLB v2 containers", () => {
+  for (const model of VEHICLE_MODELS_3D) {
+    const bytes = readFileSync(join(process.cwd(), "public", model.src.replace(/^\//, "")));
+    assert.equal(bytes.subarray(0, 4).toString("ascii"), "glTF", model.label);
+    assert.equal(bytes.readUInt32LE(4), 2, model.label);
+    assert.equal(bytes.readUInt32LE(8), bytes.length, model.label);
+  }
+});
+
+test("modern Corolla model exposes independently colorable physical body panels", () => {
+  const model = VEHICLE_MODELS_3D.find((candidate) => candidate.id === "corolla-2020");
+  assert.ok(model?.supportsPanelColors);
+  const bytes = readFileSync(join(process.cwd(), "public", model.src.replace(/^\//, "")));
+  const jsonLength = bytes.readUInt32LE(12);
+  const json = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").trim());
+  const panelMaterials = new Set(
+    (json.materials ?? []).map((material: { name?: string }) => material.name).filter((name: string | undefined) => name?.startsWith("condition__")),
+  );
+  assert.deepEqual(panelMaterials, new Set(defaultVehicleDamageParts().map((part) => `condition__${part.key}`)));
+});
+
+test("normalizes vehicle body reports and rejects unknown panels or conditions", () => {
+  const normalized = normalizeVehicleDamageParts([
+    { key: "hood", label: "Attacker-controlled label", condition: "painted" },
+    { key: "hood", condition: "changed" },
+    { key: "unknown_panel", condition: "painted" },
+    { key: "roof", condition: "not-valid" },
+    { key: "front_left_door", condition: "damaged" },
+  ]);
+
+  assert.deepEqual(normalized, [
+    { key: "hood", label: "Hood", condition: "painted" },
+    { key: "front_left_door", label: "Front-left door", condition: "damaged" },
+  ]);
+  assert.equal(defaultVehicleDamageParts().length, 13);
+});
+
+test("shows the seller body-condition diagram for applicable vehicle branches", () => {
+  assert.equal(shouldShowVehicleDamageDiagram("vehicles", "cars"), true);
+  assert.equal(shouldShowVehicleDamageDiagram("vehicles", "pickup"), true);
+  assert.equal(shouldShowVehicleDamageDiagram("vehicles", "parts"), false);
+  assert.equal(shouldShowVehicleDamageDiagram("vehicles", "bicycles"), false);
+  assert.equal(shouldShowVehicleDamageDiagram("real-estate", "cars"), false);
+});
+
+test("connects only seller-reported non-original panels to the buyer 3D report", () => {
+  const report = normalizeVehicleDamageParts([
+    { key: "hood", condition: "local_painted" },
+    { key: "roof", condition: "original" },
+    { key: "rear_bumper", condition: "changed" },
+  ]);
+  assert.deepEqual(getNonOriginalVehicleDamageParts(report).map((part) => [part.key, part.condition]), [
+    ["hood", "local_painted"],
+    ["rear_bumper", "changed"],
+  ]);
+});

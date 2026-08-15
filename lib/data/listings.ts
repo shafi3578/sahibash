@@ -6,6 +6,7 @@ import {
   LAUNCH_ACTIVE_CATEGORY_SLUGS,
 } from "@/lib/categories/categoryTree";
 import type { Category } from "@/types/database";
+import { reportDataError } from "@/lib/observability/data-errors";
 
 const PUBLIC_TEST_TEXT_PATTERNS = [
   "%test listing%",
@@ -25,13 +26,16 @@ export const getCategoriesWithStats = cache(
     try {
       const supabase = await createSupabaseServerClient();
 
-      const { data: categories } = await supabase
+      const { data: categories, error: categoriesError } = await supabase
         .from("categories")
         .select("*")
         .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS, ...COMING_SOON_HOME_CATEGORY_SLUGS])
         .order("display_order", { ascending: true });
 
-      if (!categories) return [];
+      if (categoriesError || !categories) {
+        if (categoriesError) reportDataError("category-stats.select", categoriesError);
+        return [];
+      }
 
       const normalized = (categories as Category[]).map((category) => ({
         ...category,
@@ -66,7 +70,8 @@ export const getCategoriesWithStats = cache(
       );
 
       return withCounts.sort((a, b) => a.display_order - b.display_order);
-    } catch {
+    } catch (error) {
+      reportDataError("category-stats.unexpected", error);
       return [];
     }
   }

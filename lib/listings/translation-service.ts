@@ -44,7 +44,7 @@ type GlossaryEntry = {
   aliases?: string[];
 };
 
-type TranslationServiceClient = Pick<SupabaseClient<any>, "from">;
+type TranslationServiceClient = Pick<SupabaseClient, "from">;
 
 const AFGHAN_MARKETPLACE_GLOSSARY: GlossaryEntry[] = [
   { canonical: "phone", en: "phone", fa: "موبایل", ps: "تلیفون", aliases: ["مبایل", "mobile", "cellphone"] },

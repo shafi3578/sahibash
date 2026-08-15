@@ -18,6 +18,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { saveSearchAction } from "@/lib/actions/saved-searches";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -89,6 +90,7 @@ function renderDynamicFilterInput(
       <select
         key={def.id}
         name={def.filter_key}
+        aria-label={def.filter_label}
         defaultValue={selected}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -104,6 +106,7 @@ function renderDynamicFilterInput(
       <select
         key={def.id}
         name={def.filter_key}
+        aria-label={def.filter_label}
         defaultValue={selected}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -122,6 +125,7 @@ function renderDynamicFilterInput(
     <input
       key={def.id}
       name={def.filter_key}
+      aria-label={def.filter_label}
       defaultValue={selected}
       type={inputType}
       placeholder={def.filter_label}
@@ -147,6 +151,7 @@ function FilterFields({
     <>
       <input
         name="q"
+        aria-label={t.search.searchListings}
         defaultValue={params.q ?? ""}
         placeholder={t.search.searchListings}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
@@ -154,6 +159,7 @@ function FilterFields({
 
       <select
         name="province"
+        aria-label={t.home.allAfghanistan}
         defaultValue={params.province ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -167,6 +173,7 @@ function FilterFields({
 
       <input
         name="district"
+        aria-label={t.search.district}
         defaultValue={params.district ?? ""}
         placeholder={t.search.district}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
@@ -174,6 +181,7 @@ function FilterFields({
 
       <select
         name="categoryId"
+        aria-label={t.search.allCategories}
         defaultValue={params.categoryId ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -187,6 +195,7 @@ function FilterFields({
 
       <select
         name="sort"
+        aria-label={t.search.newest}
         defaultValue={params.sort ?? "newest"}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -198,6 +207,7 @@ function FilterFields({
 
       <select
         name="postedWithin"
+        aria-label={t.search.postedWithin}
         defaultValue={params.postedWithin ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -209,6 +219,7 @@ function FilterFields({
 
       <select
         name="listingType"
+        aria-label={t.search.allAdTypes}
         defaultValue={params.listingType ?? ""}
         className="rounded-xl border border-[var(--line)] px-3 py-2"
       >
@@ -245,7 +256,7 @@ export default async function SearchPage({
   const effectiveCategoryNodeId = explicitCategoryNodeId ?? intentNode?.id ?? undefined;
 
   const [filterDefinitions, effectiveNode, children, parentPath] = await Promise.all([
-    getFilterDefinitionsForNode(effectiveCategoryNodeId),
+    getFilterDefinitionsForNode(effectiveCategoryNodeId, locale),
     effectiveCategoryNodeId ? getCategoryNodeById(effectiveCategoryNodeId) : Promise.resolve(null),
     effectiveCategoryNodeId ? getCategoryChildren(effectiveCategoryNodeId) : Promise.resolve([]),
     effectiveCategoryNodeId ? getCategoryPath(effectiveCategoryNodeId) : Promise.resolve([]),
@@ -403,6 +414,14 @@ export default async function SearchPage({
       <p className="mt-2 text-sm text-[var(--ink-2)]">
         {t.search.subtitle}
       </p>
+
+      {hasSearchSignal ? (
+        <form action={saveSearchAction} className="mt-4 flex max-w-xl gap-2 rounded-xl border border-[var(--line)] bg-white p-2">
+          <input type="hidden" name="params" value={buildParamsFromRecord(params).toString()} />
+          <input name="name" required maxLength={80} defaultValue={params.q || (locale === "fa" ? "جستجوی من" : locale === "ps" ? "زما لټون" : "My search")} aria-label="Saved search name" className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--line)] px-3 text-sm" />
+          <button className="min-h-11 rounded-lg bg-[var(--ink-1)] px-4 text-sm font-semibold text-white">{locale === "fa" ? "ذخیره جستجو" : locale === "ps" ? "لټون خوندي کړئ" : "Save search"}</button>
+        </form>
+      ) : null}
 
       {intent ? (
         <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] px-3 py-2 text-sm text-[var(--ink-2)]">

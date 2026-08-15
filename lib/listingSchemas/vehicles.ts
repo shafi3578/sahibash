@@ -1,5 +1,5 @@
 import type { ListingSchemaDefinition } from "./shared";
-import { firstMeaningfulText, formatList, formatNumber, isMeaningfulValue, localized, readAttributeValue, readListingValue, yesNo } from "./shared";
+import { firstMeaningfulText, isMeaningfulValue, localized, readAttributeValue, readListingValue } from "./shared";
 
 const vehicleSections = {
   summary: localized("Vehicle Summary", "خلاصه وسایط", "د وسایطو لنډیز"),

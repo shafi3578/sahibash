@@ -1,0 +1,12 @@
+begin;
+drop policy if exists categories_public_select_active on public.categories;
+drop policy if exists categories_admin_manage on public.categories;
+create policy categories_anon_select_active on public.categories for select to anon using(is_active=true);
+create policy categories_authenticated_select on public.categories for select to authenticated using(is_active=true or (select public.is_admin((select auth.uid()))));
+create policy categories_admin_manage on public.categories for all to authenticated using((select public.is_admin((select auth.uid())))) with check((select public.is_admin((select auth.uid()))));
+drop policy if exists category_nodes_public_select_active on public.category_nodes;
+drop policy if exists category_nodes_admin_manage on public.category_nodes;
+create policy category_nodes_anon_select_active on public.category_nodes for select to anon using(is_active=true);
+create policy category_nodes_authenticated_select on public.category_nodes for select to authenticated using(is_active=true or (select public.is_admin((select auth.uid()))));
+create policy category_nodes_admin_manage on public.category_nodes for all to authenticated using((select public.is_admin((select auth.uid())))) with check((select public.is_admin((select auth.uid()))));
+commit;

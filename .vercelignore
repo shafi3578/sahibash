@@ -1,0 +1,21 @@
+.env*
+app/**/debug/
+/screenshots/
+*.log
+/admin-categories.png
+/admin-electronics.png
+/curl-output.txt
+/__tmp_*
+/tmp-*
+/tmp_*
+/create_super_admin.js
+/find_or_create_super_admin.js
+/query_site_settings.js
+/verify_super_admin_email.js
+.git/
+.github/
+.vscode/
+.temp/
+
+# Preserved source model; production uses the conditioned panel-aware variant.
+/public/models/vehicles/toyota-corolla-2020.glb

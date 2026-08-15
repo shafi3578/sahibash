@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       district_id: districtId,
       popular_only: popularOnly,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch areas' },
       { status: 500 }
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { province_id, district_id, name_en, name_fa, name_ps, user_id } = body;
+    const { province_id, district_id, name_en, name_fa, name_ps } = body;
 
     // Validate required fields
     if (!province_id || !name_en) {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         is_approved: false,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Failed to submit area' },
       { status: 500 }

@@ -3,8 +3,6 @@ import { redirect } from "next/navigation";
 import { ListingCard } from "@/components/listing-card";
 import {
   bumpListingAction,
-  toggleListingFeaturedAction,
-  toggleListingUrgentAction,
   updateListingStatusAction,
   deleteListingAction,
 } from "@/lib/actions/listings";
@@ -200,48 +198,6 @@ export default async function ListingManagePage({ params }: PageProps) {
                 className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700"
               >
                 ⬆ {ui.listingManage.bumpDate}
-              </button>
-            </form>
-          )}
-
-          {/* Featured Toggle */}
-          {listing.status === "approved" && (
-            <form
-              action={async () => {
-                "use server";
-                await toggleListingFeaturedAction(listingId, !listing.featured);
-              }}
-            >
-              <button
-                type="submit"
-                className={`w-full rounded-lg px-4 py-3 font-semibold text-white ${
-                  listing.featured
-                    ? "bg-amber-600 hover:bg-amber-700"
-                    : "bg-amber-500 hover:bg-amber-600"
-                }`}
-              >
-                ⭐ {listing.featured ? ui.listingManage.removeFeatured : ui.listingManage.makeFeatured}
-              </button>
-            </form>
-          )}
-
-          {/* Urgent Toggle */}
-          {listing.status === "approved" && (
-            <form
-              action={async () => {
-                "use server";
-                await toggleListingUrgentAction(listingId, !listing.urgent);
-              }}
-            >
-              <button
-                type="submit"
-                className={`w-full rounded-lg px-4 py-3 font-semibold text-white ${
-                  listing.urgent
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-red-500 hover:bg-red-600"
-                }`}
-              >
-                🔴 {listing.urgent ? ui.listingManage.removeUrgent : ui.listingManage.markUrgent}
               </button>
             </form>
           )}

@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 /**
  * GET /api/location/provinces
  * Returns all provinces
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // This would connect to Supabase in production
     // For now, return structured response format
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: provinces,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch provinces' },
       { status: 500 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 interface PhoneModel {
   id: string;
@@ -32,7 +32,6 @@ export function PhoneModelSelector({
   onBack,
 }: PhoneModelSelectorProps) {
   const [models, setModels] = useState<PhoneModel[]>([]);
-  const [filteredModels, setFilteredModels] = useState<PhoneModel[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
@@ -51,7 +50,6 @@ export function PhoneModelSelector({
         }
 
         setModels(result.data);
-        setFilteredModels(result.data);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to load phone models";
@@ -65,14 +63,10 @@ export function PhoneModelSelector({
     fetchModels();
   }, [brandId]);
 
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredModels(models);
-      return;
-    }
-
+  const filteredModels = useMemo(() => {
+    if (!searchQuery.trim()) return models;
     const query = searchQuery.toLowerCase();
-    const filtered = models.filter((model) => {
+    return models.filter((model) => {
       return (
         model.model_name_en.toLowerCase().includes(query) ||
         (model.model_name_fa || "").toLowerCase().includes(query) ||
@@ -80,7 +74,6 @@ export function PhoneModelSelector({
       );
     });
 
-    setFilteredModels(filtered);
   }, [searchQuery, models]);
 
   const handleModelClick = (model: PhoneModel) => {
