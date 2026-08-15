@@ -20,7 +20,7 @@ export type ListingTranslationActor = "ai" | "human" | "seller";
 // Location Types
 export type LocationSource = "manual" | "device" | "browser" | "gps" | "map_pin";
 export type LocationVisibility = "exact" | "approximate" | "hidden" | "province_district";
-export type ListingType = "for_sale" | "wanted";
+export type ListingType = "for_sale" | "for_rent" | "wanted";
 
 export type CategoryId = number;
 export type CategoryNodeId = number;

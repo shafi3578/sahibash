@@ -69,6 +69,19 @@ export const PHONE_BRANDS: CatalogBrand[] = [
     active: true,
   },
   {
+    id: "google",
+    name: "Google",
+    aliases: ["google pixel", "pixel"],
+    categoryId: "phones-electronics",
+    active: true,
+  },
+  {
+    id: "motorola",
+    name: "Motorola",
+    categoryId: "phones-electronics",
+    active: true,
+  },
+  {
     id: "tecno",
     name: "Tecno",
     categoryId: "phones-electronics",
@@ -95,6 +108,18 @@ export const PHONE_BRANDS: CatalogBrand[] = [
   {
     id: "sony",
     name: "Sony",
+    categoryId: "phones-electronics",
+    active: true,
+  },
+  {
+    id: "itel",
+    name: "itel",
+    categoryId: "phones-electronics",
+    active: true,
+  },
+  {
+    id: "hmd",
+    name: "HMD",
     categoryId: "phones-electronics",
     active: true,
   },

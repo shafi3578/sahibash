@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import {
   adminCreateElectronicsBrandAction,
   adminCreateElectronicsModelAction,
@@ -10,7 +10,7 @@ import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 
 export default async function AdminElectronicsPage() {
-  await requireAdmin();
+  await requirePermission("electronics.view");
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
   const snapshot = await getElectronicsAdminSnapshot();

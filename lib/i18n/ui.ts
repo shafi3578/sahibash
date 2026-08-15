@@ -496,7 +496,7 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       selectLocationFirst: "Please select a location first",
       methodTitle: "How would you like to add the location?",
       methodCurrentTitle: "Use My Current Location",
-      methodCurrentDescription: "Let Sahibash detect your location automatically (faster)",
+      methodCurrentDescription: "Let Afghan detect your location automatically (faster)",
       methodManualTitle: "Select Manually",
       methodManualDescription: "Choose province, district, and area from lists",
       methodMapTitle: "Choose on Map",

@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission, getCurrentUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { recordAuditEvent } from "@/lib/audit";
 
 function text(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -14,58 +15,99 @@ function bool(value: FormDataEntryValue | null) {
 }
 
 export async function adminCreateCategoryAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("categories.create");
   const supabase = await createSupabaseServerClient();
+  const adminUser = await getCurrentUser();
 
   const name = text(formData.get("name"));
   const slug = text(formData.get("slug")).toLowerCase();
   if (!name || !slug) return;
 
-  await supabase.from("categories").insert({
+  const { data, error } = await supabase.from("categories").insert({
     name,
     slug,
     description: text(formData.get("description")) || null,
     display_order: Number(text(formData.get("display_order")) || "999"),
     is_active: bool(formData.get("is_active")),
-  });
+  }).select("id").single();
+
+  if (error) return;
+
+  if (adminUser) {
+    await recordAuditEvent({
+      adminUserId: adminUser.id,
+      action: "CATEGORY_CREATED",
+      entityType: "category",
+      entityId: String(data?.id ?? ""),
+      safeChanges: { name, slug, description: text(formData.get("description")) || null },
+    });
+  }
 
   revalidatePath("/admin/categories");
 }
 
 export async function adminUpdateCategoryAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("categories.update");
   const supabase = await createSupabaseServerClient();
+  const adminUser = await getCurrentUser();
 
   const id = Number(text(formData.get("id")));
   if (!Number.isFinite(id)) return;
 
-  await supabase
+  const payload = {
+    name: text(formData.get("name")),
+    slug: text(formData.get("slug")).toLowerCase(),
+    description: text(formData.get("description")) || null,
+    display_order: Number(text(formData.get("display_order")) || "999"),
+    is_active: bool(formData.get("is_active")),
+  };
+
+  const { error } = await supabase
     .from("categories")
-    .update({
-      name: text(formData.get("name")),
-      slug: text(formData.get("slug")).toLowerCase(),
-      description: text(formData.get("description")) || null,
-      display_order: Number(text(formData.get("display_order")) || "999"),
-      is_active: bool(formData.get("is_active")),
-    })
+    .update(payload)
     .eq("id", id);
+
+  if (error) return;
+
+  if (adminUser) {
+    await recordAuditEvent({
+      adminUserId: adminUser.id,
+      action: "CATEGORY_UPDATED",
+      entityType: "category",
+      entityId: String(id),
+      safeChanges: payload,
+    });
+  }
 
   revalidatePath("/admin/categories");
 }
 
 export async function adminDeleteCategoryAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("categories.archive");
   const supabase = await createSupabaseServerClient();
+  const adminUser = await getCurrentUser();
 
   const id = Number(text(formData.get("id")));
   if (!Number.isFinite(id)) return;
 
-  await supabase.from("categories").delete().eq("id", id);
+  const { error } = await supabase.from("categories").delete().eq("id", id);
+
+  if (error) return;
+
+  if (adminUser) {
+    await recordAuditEvent({
+      adminUserId: adminUser.id,
+      action: "CATEGORY_ARCHIVED",
+      entityType: "category",
+      entityId: String(id),
+    });
+  }
+
   revalidatePath("/admin/categories");
 }
 
 export async function adminUpsertCategoryAliasAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("categories.update");
   const supabase = await createSupabaseServerClient();
 
   const categoryId = Number(text(formData.get("category_id")));

@@ -16,6 +16,10 @@ import type { LocationVisibility } from "@/components/location/LocationCard";
 import { getDictionary } from "@/lib/i18n/server";
 import { appLocaleToListingLanguage } from "@/lib/listings/translation-service";
 import { recordSearchTelemetryClick } from "@/lib/search/telemetry";
+import { buildActiveListingSchemaView } from "@/lib/listingSchemas";
+import { getSimpleCategoryConfig, getSimpleCategoryKind, labelFor } from "@/lib/posting/simple-category-details";
+import DynamicDetailSection from "@/data/componentsDynamicDetailSection";
+import { ELECTRONICS_DYNAMIC_LEAF_KEY } from "@/lib/posting/electronics-dynamic";
 
 type NamedLocationRelation = { name?: string | null } | null;
 type VehicleDamagePart = { part_key: string; part_label: string; condition: string };
@@ -73,14 +77,30 @@ export default async function ListingDetailPage({
   const callHref = `tel:${listing.contact_phone.replace(/[^\d+]/g, "")}`;
   const fields = await getCategoryFieldsWithOptions(listing.category_node_id);
   const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
+  const dynamicLeafId = attrs.find((item) => item.attribute_key === ELECTRONICS_DYNAMIC_LEAF_KEY)?.attribute_value_text ?? null;
+  const dynamicAttributes = attrs.reduce<Record<string, unknown>>((acc, item) => {
+    if (item.attribute_key === ELECTRONICS_DYNAMIC_LEAF_KEY) return acc;
+    const value = item.attribute_value_json ?? item.attribute_value_text ?? item.attribute_value_number ?? item.attribute_value_boolean ?? null;
+    if (value === null || value === undefined || value === "") return acc;
+    acc[item.attribute_key] = value;
+    return acc;
+  }, {});
+  const dynamicFeatures = Array.isArray(dynamicAttributes.features)
+    ? dynamicAttributes.features.filter((item): item is string => typeof item === "string")
+    : [];
+  const shouldRenderDynamicElectronics = Boolean(dynamicLeafId);
+  const schemaView = buildActiveListingSchemaView(listing, locale);
+  const hasLeafSchemaView = schemaView.sections.some((section) => section.rows.length > 0);
   const specView = buildListingSpecView(listing, fields, attrs, locale);
   const attributeMap = new Map(
     attrs.map((item) => {
-      const value = item.attribute_value_text ?? item.attribute_value_number ?? item.attribute_value_boolean ?? "";
+      const value = item.attribute_value_json ?? item.attribute_value_text ?? item.attribute_value_number ?? item.attribute_value_boolean ?? "";
       return [item.attribute_key, readAttributeValue(value, locale)];
     })
   );
   const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
+  const simpleCategoryKind = getSimpleCategoryKind(listing.category_node?.path ?? undefined, listing.category?.slug ?? null);
+  const simpleCategoryConfig = getSimpleCategoryConfig(simpleCategoryKind);
   const locationParts = listing.location_visibility === "exact"
     ? [listing.province, listing.district, listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean)
     : [listing.province, listing.district].filter(Boolean);
@@ -352,6 +372,60 @@ export default async function ListingDetailPage({
         }))
         .filter((section) => section.rows.length > 0)
     : dedupedSections;
+  const localizeDigits = (value: string) => {
+    if (locale === "en") return value;
+    const localeCode = locale === "fa" ? "fa-AF" : "ps-AF";
+    return value.replace(/\d+/g, (segment) => {
+      const numeric = Number(segment);
+      return Number.isFinite(numeric) ? new Intl.NumberFormat(localeCode).format(numeric) : segment;
+    });
+  };
+  const readSimpleValue = (key: string) => {
+    const raw = attributeMap.get(key);
+    if (!isMeaningfulValue(raw)) {
+      return null;
+    }
+    const value = String(raw ?? "").trim();
+    if (value.startsWith("[") && value.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        if (Array.isArray(parsed)) {
+          const normalized = parsed.map((item) => String(item).trim()).filter((item) => isMeaningfulValue(item));
+          return normalized.length > 0 ? localizeDigits(normalized.join(", ")) : null;
+        }
+      } catch {
+        // fall back to raw string
+      }
+    }
+    return localizeDigits(value);
+  };
+  const simpleQuickFacts = simpleCategoryConfig
+    ? simpleCategoryConfig.topCards
+        .map((card) => ({
+          key: card.key,
+          label: labelFor(locale, card.label),
+          value: readSimpleValue(card.key),
+        }))
+        .filter((row) => isMeaningfulValue(row.value))
+    : [];
+  const simpleRows = simpleCategoryConfig
+    ? simpleCategoryConfig.rows
+        .map((row) => ({
+          key: row.key,
+          label: labelFor(locale, row.label),
+          value: readSimpleValue(row.key),
+        }))
+        .filter((row) => isMeaningfulValue(row.value))
+    : [];
+  const simpleFeatureChips = (() => {
+    const raw = readSimpleValue("features");
+    if (!raw) return [] as string[];
+    return String(raw)
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => isMeaningfulValue(item));
+  })();
+  const hasSimpleLeafView = Boolean(simpleCategoryConfig) && (simpleQuickFacts.length > 0 || simpleRows.length > 0);
 
   const categorySlug = listing.category?.slug ?? "";
   const safetyTips = (() => {
@@ -514,7 +588,110 @@ export default async function ListingDetailPage({
           </div>
         </section>
 
-        {isVehicleListing ? (
+        {shouldRenderDynamicElectronics ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+            <DynamicDetailSection
+              leafId={dynamicLeafId!}
+              lang={locale}
+              attributes={dynamicAttributes}
+              features={dynamicFeatures}
+            />
+          </section>
+        ) : null}
+
+        {hasSimpleLeafView ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+            <h2 className="text-base font-bold">{labelFor(locale, simpleCategoryConfig!.title)}</h2>
+
+            {simpleQuickFacts.length > 0 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {simpleQuickFacts.map((fact) => (
+                  <div key={`simple-fact-${fact.key}`} className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 text-sm">
+                    <p className="text-[var(--ink-2)]">{fact.label}</p>
+                    <p className="mt-1 font-semibold text-[var(--ink-1)]">{fact.value}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {simpleRows.length > 0 ? (
+              <div className="mt-3 grid overflow-hidden rounded-xl border border-[var(--line)] md:grid-cols-2">
+                {simpleRows.map((row) => (
+                  <div key={`simple-row-${row.key}`} className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0 md:nth-[2n]:border-l">
+                    <span className="text-[var(--ink-2)]">{row.label}</span>
+                    <span className="text-right font-semibold text-[var(--ink-1)]">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {simpleFeatureChips.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {simpleFeatureChips.map((feature) => (
+                  <span key={`simple-feature-${feature}`} className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-3 py-1 text-xs font-semibold text-[var(--ink-1)]">
+                    {feature}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : hasLeafSchemaView ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+            <h2 className="text-base font-bold">{t.listing.specifications}</h2>
+
+            {schemaView.quickFacts.length > 0 ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {schemaView.quickFacts.map((fact) => (
+                  <div key={`fact-${fact.key}`} className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 text-sm">
+                    <p className="text-[var(--ink-2)]">{fact.label}</p>
+                    {Array.isArray(fact.value) ? (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {fact.value.map((item) => (
+                          <span key={`${fact.key}-${item}`} className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[var(--ink-1)]">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 font-semibold text-[var(--ink-1)]">{fact.value}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="mt-3 space-y-3">
+              {schemaView.sections.map((section) => (
+                <section key={section.key} className="overflow-hidden rounded-xl border border-[var(--line)]">
+                  <header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2">
+                    <h3 className="text-sm font-semibold">{section.title}</h3>
+                    {section.description ? <p className="mt-1 text-xs text-[var(--ink-2)]">{section.description}</p> : null}
+                  </header>
+                  <div className="grid divide-y divide-[var(--line)] md:grid-cols-2 md:divide-x md:divide-y-0">
+                    {section.rows.map((row) => (
+                      <div key={`${section.key}-${row.key}`} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                        <span className="text-[var(--ink-2)]">{row.label}</span>
+                        {Array.isArray(row.value) ? (
+                          <div className="flex flex-wrap justify-end gap-1 text-right font-semibold text-[var(--ink-1)]">
+                            {row.value.map((item) => (
+                              <span key={`${section.key}-${row.key}-${item}`} className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-xs font-semibold text-[var(--ink-1)]">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-right font-semibold text-[var(--ink-1)]">{row.value}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {!hasSimpleLeafView && !hasLeafSchemaView && isVehicleListing ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
             <h2 className="text-base font-bold">{t.postAd.vehicleDetails}</h2>
             {cleanedVehicleMetricRows.length > 0 ? (
@@ -626,6 +803,7 @@ export default async function ListingDetailPage({
           </section>
         ) : null}
 
+        {!hasSimpleLeafView ? (
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : t.listing.specifications}</h2>
 
@@ -667,6 +845,7 @@ export default async function ListingDetailPage({
             </div>
           )}
         </section>
+        ) : null}
 
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
           <h2 className="text-base font-bold text-amber-900">{t.listing.buyerSafetyWarning}</h2>

@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { LocaleSync } from "@/components/locale-sync";
+import { getSiteSettings } from "@/lib/actions/site-settings";
 import "./globals.css";
 
 const displayFont = Space_Grotesk({
@@ -18,10 +19,14 @@ const bodyFont = Source_Sans_3({
   weight: ["400", "500", "600", "700"],
 });
 
-export const metadata: Metadata = {
-  title: "Sahibash | Buy and Sell in Afghanistan",
-  description: "A modern Afghanistan marketplace for vehicles, real estate, electronics, and second-hand items.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const siteSettings = await getSiteSettings();
+
+  return {
+    title: `${siteSettings.site_name} | Buy and Sell in Afghanistan`,
+    description: siteSettings.site_tagline || "A modern Afghanistan marketplace for vehicles, real estate, electronics, and second-hand items.",
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +42,7 @@ export default async function RootLayout({
     <html
       lang={htmlLang}
       dir={dir}
+      suppressHydrationWarning
       className={`${displayFont.variable} ${bodyFont.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

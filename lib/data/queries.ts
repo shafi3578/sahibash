@@ -25,6 +25,7 @@ import type { AppLocale } from "@/lib/i18n/translations";
 import { buildSearchKeywordIndex, normalizeSearchText } from "@/lib/search/multilingual";
 import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
 import type { SearchRewriteClient } from "@/lib/search/rewrite";
+import { getSimpleCategoryConfig, getSimpleCategoryKind } from "@/lib/posting/simple-category-details";
 
 type ListingFilters = {
   locale?: AppLocale;
@@ -1145,9 +1146,45 @@ export async function getFilterDefinitionsForNode(
       ...((scopedDefs ?? []) as FilterDefinition[]),
     ];
 
+    const leafNode = await getCategoryNodeById(categoryNodeId);
+    const simpleKind = getSimpleCategoryKind(leafNode?.path ?? "", leafNode?.path?.split("/")[0]);
+    const simpleConfig = getSimpleCategoryConfig(simpleKind);
+    const generatedSimpleDefs: FilterDefinition[] = simpleConfig
+      ? simpleConfig.fields
+          .filter((field) => field.type !== "textarea")
+          .map((field, index) => {
+            const filterType = field.type === "number"
+              ? "range"
+              : field.type === "multiselect"
+                ? "multi_select"
+                : field.type === "select"
+                  ? "select"
+                  : "text";
+
+            return {
+              id: -(index + 1),
+              category_node_id: categoryNodeId,
+              filter_key: field.key,
+              filter_label: field.label.en,
+              filter_type: filterType,
+              options: (field.options ?? []).map((option) => option.value),
+              source_table: null,
+              source_column: null,
+              sort_order: index + 1,
+              is_active: true,
+            } satisfies FilterDefinition;
+          })
+      : [];
+
     const byKey = new Map<string, FilterDefinition>();
     for (const def of merged) {
       byKey.set(def.filter_key, def);
+    }
+
+    for (const def of generatedSimpleDefs) {
+      if (!byKey.has(def.filter_key)) {
+        byKey.set(def.filter_key, def);
+      }
     }
 
     return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);

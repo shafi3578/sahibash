@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function slugify(value: string) {
@@ -14,7 +14,7 @@ function slugify(value: string) {
 }
 
 export async function adminCreateElectronicsBrandAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("electronics.manage");
   const supabase = await createSupabaseServerClient();
 
   const categoryId = Number(formData.get("category_id") ?? 0);
@@ -40,7 +40,7 @@ export async function adminCreateElectronicsBrandAction(formData: FormData) {
 }
 
 export async function adminCreateElectronicsModelAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("electronics.manage");
   const supabase = await createSupabaseServerClient();
 
   const brandId = Number(formData.get("brand_id") ?? 0);
@@ -68,7 +68,7 @@ export async function adminCreateElectronicsModelAction(formData: FormData) {
 }
 
 export async function adminUpsertElectronicsSpecAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("electronics.manage");
   const supabase = await createSupabaseServerClient();
 
   const modelId = Number(formData.get("model_id") ?? 0);
@@ -97,7 +97,7 @@ export async function adminUpsertElectronicsSpecAction(formData: FormData) {
 }
 
 export async function adminUpsertElectronicsOptionAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("electronics.manage");
   const supabase = await createSupabaseServerClient();
 
   const modelId = Number(formData.get("model_id") ?? 0);
@@ -121,7 +121,7 @@ export async function adminUpsertElectronicsOptionAction(formData: FormData) {
 }
 
 export async function adminToggleElectronicsModelActiveAction(modelId: number, isActive: boolean) {
-  await requireAdmin();
+  await requirePermission("electronics.manage");
   const supabase = await createSupabaseServerClient();
 
   await supabase
@@ -133,7 +133,7 @@ export async function adminToggleElectronicsModelActiveAction(modelId: number, i
 }
 
 export async function adminUpdateElectronicsBrandOrderAction(brandId: number, sortOrder: number) {
-  await requireAdmin();
+  await requirePermission("electronics.manage");
   const supabase = await createSupabaseServerClient();
 
   await supabase
@@ -145,7 +145,7 @@ export async function adminUpdateElectronicsBrandOrderAction(brandId: number, so
 }
 
 export async function adminToggleElectronicsCategoryAction(categoryId: number, isActive: boolean) {
-  await requireAdmin();
+  await requirePermission("electronics.manage");
   const supabase = await createSupabaseServerClient();
 
   await supabase

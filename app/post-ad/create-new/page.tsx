@@ -7,7 +7,7 @@ type PageProps = {
 
 export const metadata = {
   title: "Post a New Ad",
-  description: "Create a new listing on Sahibash",
+  description: "Create a new listing on Afghan",
 };
 
 export default async function CreateNewPage({ params }: PageProps) {

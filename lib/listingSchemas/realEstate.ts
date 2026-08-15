@@ -4,6 +4,7 @@ import { firstMeaningfulText, localized, readAttributeValue, readListingValue, y
 const sections = {
   summary: localized("Property Summary", "خلاصه ملک", "د ملک لنډیز"),
   size: localized("Size & Rooms", "اندازه و اتاق ها", "اندازه او خونې"),
+  construction: localized("Construction", "ساختمان", "جوړښت"),
   utilities: localized("Utilities", "تسهیلات", "اسانتیاوې"),
   access: localized("Access & Location", "دسترسی و موقعیت", "لاسرسی او موقعیت"),
   documents: localized("Documents", "اسناد", "اسناد"),
@@ -247,6 +248,17 @@ export const realEstateSchema: ListingSchemaDefinition = {
       },
     },
     {
+      key: "solar_power",
+      label: localized("Solar / Backup Power", "سولر / برق اضطراری", "لمریزه / بیک اپ برېښنا"),
+      sectionKey: "utilities",
+      order: 4,
+      consumes: ["solar_power", "solar"],
+      resolve: (context) => {
+        const value = firstMeaningfulText(readAttributeValue(context.attributes, "solar_power", "solar"));
+        return value ? { key: "solar_power", label: localized("Solar / Backup Power", "سولر / برق اضطراری", "لمریزه / بیک اپ برېښنا")[context.locale], value, sectionKey: "utilities" } : null;
+      },
+    },
+    {
       key: "gas",
       label: localized("Gas", "گاز", "ګاز"),
       sectionKey: "utilities",
@@ -293,10 +305,34 @@ export const realEstateSchema: ListingSchemaDefinition = {
       },
     },
     {
+      key: "kitchen",
+      label: localized("Kitchen", "آشپزخانه", "پخلنځی"),
+      sectionKey: "features",
+      order: 4,
+      showIf: (context) => isHouse(context.path) || isApartment(context.path),
+      consumes: ["kitchen"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "kitchen");
+        return value ? { key: "kitchen", label: localized("Kitchen", "آشپزخانه", "پخلنځی")[context.locale], value, sectionKey: "features" } : null;
+      },
+    },
+    {
+      key: "balcony",
+      label: localized("Balcony", "بالکن", "بالکن"),
+      sectionKey: "features",
+      order: 5,
+      showIf: (context) => isHouse(context.path) || isApartment(context.path),
+      consumes: ["balcony"],
+      resolve: (context) => {
+        const value = readAttributeValue(context.attributes, "balcony");
+        return value ? { key: "balcony", label: localized("Balcony", "بالکن", "بالکن")[context.locale], value, sectionKey: "features" } : null;
+      },
+    },
+    {
       key: "security",
       label: localized("Security", "امنیت", "امنیت"),
       sectionKey: "features",
-      order: 4,
+      order: 6,
       showIf: (context) => isApartment(context.path) || isCommercial(context.path) || isStudentHousing(context.path),
       consumes: ["security"],
       resolve: (context) => {
@@ -464,15 +500,16 @@ export const realEstateSchema: ListingSchemaDefinition = {
   sections: [
     { key: "summary", title: sections.summary, order: 10, fieldKeys: ["property_type", "listing_type", "deposit", "land_type"], hideIfEmpty: true },
     { key: "size", title: sections.size, order: 20, fieldKeys: ["rooms", "bathrooms", "floors", "floor_number", "land_size", "building_size", "total_floors", "warehouse_size"], hideIfEmpty: true },
-    { key: "utilities", title: sections.utilities, order: 30, fieldKeys: ["water", "electricity", "gas"], hideIfEmpty: true },
-    { key: "access", title: sections.access, order: 40, fieldKeys: ["road_access", "distance_main_road", "frontage"], hideIfEmpty: true },
-    { key: "documents", title: sections.documents, order: 50, fieldKeys: ["document_type"], hideIfEmpty: true },
-    { key: "features", title: sections.features, order: 60, fieldKeys: ["parking", "furnished", "family_only", "security", "elevator", "truck_access", "loading_access", "yard", "ceiling_height", "office_room", "storage_suitability", "suitable_business", "boundary_wall", "suitable_use"], hideIfEmpty: true },
+    { key: "construction", title: sections.construction, order: 25, fieldKeys: ["year_built", "construction_status"], hideIfEmpty: true },
+    { key: "utilities", title: sections.utilities, order: 30, fieldKeys: ["water", "electricity", "gas", "solar_power"], hideIfEmpty: true },
+    { key: "access", title: sections.access, order: 40, fieldKeys: ["road_access", "road_width", "facing", "distance_main_road", "frontage"], hideIfEmpty: true },
+    { key: "documents", title: sections.documents, order: 50, fieldKeys: ["document_type", "ownership_type"], hideIfEmpty: true },
+    { key: "features", title: sections.features, order: 60, fieldKeys: ["parking", "furnished", "family_only", "security", "elevator", "truck_access", "loading_access", "yard", "kitchen", "balcony", "ceiling_height", "office_room", "storage_suitability", "suitable_business", "boundary_wall", "suitable_use"], hideIfEmpty: true },
   ],
-  postingFields: ["property_type", "listing_type", "deposit", "land_type", "land_size", "building_size", "rooms", "bathrooms", "floors", "floor_number", "total_floors", "warehouse_size", "document_type", "road_access", "distance_main_road", "frontage", "water", "electricity", "gas", "parking", "furnished", "family_only", "security", "elevator", "truck_access", "loading_access", "yard", "ceiling_height", "office_room", "storage_suitability", "suitable_business", "boundary_wall", "suitable_use"],
+  postingFields: ["property_type", "listing_type", "deposit", "land_type", "land_size", "building_size", "rooms", "bathrooms", "floors", "floor_number", "total_floors", "warehouse_size", "year_built", "construction_status", "ownership_type", "rent_period", "document_type", "road_access", "road_width", "facing", "distance_main_road", "frontage", "water", "electricity", "gas", "solar_power", "parking", "furnished", "family_only", "security", "elevator", "truck_access", "loading_access", "yard", "kitchen", "balcony", "ceiling_height", "office_room", "storage_suitability", "suitable_business", "boundary_wall", "suitable_use"],
   requiredFields: ["property_type", "price", "province", "district", "document_type", "road_access", "water", "electricity", "photos", "description"],
-  optionalFields: ["listing_type", "deposit", "land_type", "land_size", "building_size", "rooms", "bathrooms", "floors", "floor_number", "total_floors", "warehouse_size", "distance_main_road", "frontage", "gas", "parking", "furnished", "family_only", "security", "elevator", "truck_access", "loading_access", "yard", "ceiling_height", "office_room", "storage_suitability", "suitable_business", "boundary_wall", "suitable_use"],
-  filterFields: ["property_type", "listing_type", "province", "district", "rooms", "bathrooms", "land_size", "building_size", "furnished", "parking"],
+  optionalFields: ["listing_type", "deposit", "land_type", "land_size", "building_size", "rooms", "bathrooms", "floors", "floor_number", "total_floors", "warehouse_size", "year_built", "construction_status", "ownership_type", "rent_period", "distance_main_road", "frontage", "road_width", "facing", "gas", "solar_power", "parking", "furnished", "family_only", "security", "elevator", "truck_access", "loading_access", "yard", "kitchen", "balcony", "ceiling_height", "office_room", "storage_suitability", "suitable_business", "boundary_wall", "suitable_use"],
+  filterFields: ["property_type", "listing_type", "province", "district", "rooms", "bathrooms", "land_size", "building_size", "year_built", "furnished", "parking"],
   autoFillRules: [
     { when: localized("When property type, title, or room count are detected", "وقتی نوع ملک یا عنوان تشخیص شد", "کله چې د ملک ډول یا سرلیک تشخیص شي"), suggest: [localized("Suggest rooms", "تعداد اتاق را پیشنهاد کن", "د خونو وړاندیز وکړه"), localized("Suggest property type", "نوع ملک را پیشنهاد کن", "د ملک ډول وړاندیز کړه"), localized("Suggest area", "منطقه را پیشنهاد کن", "سیمه وړاندیز کړه")] },
   ],
@@ -484,6 +521,7 @@ export const realEstateSchema: ListingSchemaDefinition = {
   translationKeys: {
     sectionSummary: "listing.propertySummary",
     sectionSize: "listing.sizeRooms",
+    sectionConstruction: "listing.construction",
     sectionUtilities: "listing.utilities",
     sectionAccess: "listing.accessLocation",
     sectionDocuments: "listing.documents",

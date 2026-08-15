@@ -2,10 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentUser, requireAdmin, requireUser } from "@/lib/auth";
+import { getCurrentUser, requireUser } from "@/lib/auth";
+import { hasAdminPermission } from "@/lib/authorization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSelectedCategoryNodeId, listingSchema, type ListingInput } from "@/lib/validators/listing";
 import { getVehicleBranchFromPath } from "@/data/catalog/vehicles";
+import {
+  getAllSimpleCategoryFieldKeys,
+  getSimpleCategoryConfig,
+  getSimpleCategoryFieldKeys,
+  getSimpleCategoryKind,
+} from "@/lib/posting/simple-category-details";
 import {
   detectOriginalListingLanguage,
   markListingTranslationsStale,
@@ -13,6 +20,12 @@ import {
   queueListingTranslationJobs,
   sourceHash,
 } from "@/lib/listings/translation-service";
+import {
+  ELECTRONICS_DYNAMIC_ATTRIBUTES_KEY,
+  ELECTRONICS_DYNAMIC_LEAF_KEY,
+  buildElectronicsDynamicAttributeRows,
+  normalizeElectronicsDynamicAttributes,
+} from "@/lib/posting/electronics-dynamic";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -77,6 +90,8 @@ const RESERVED_FORM_KEYS = new Set([
   "electronics_model_id",
   "manual_brand",
   "manual_model",
+  "electronics_dynamic_leaf_id",
+  "electronics_dynamic_attributes_json",
   "electronics_condition",
   "electronics_storage",
   "electronics_ram",
@@ -141,7 +156,7 @@ function toAttributePayload(field: {
   field_key: string;
   field_type: string;
   unit: string | null;
-}, rawValue: FormDataEntryValue | null) {
+}, rawValue: FormDataEntryValue | null): ListingAttributeDraft {
   const value = toFormValueText(rawValue);
 
   if (field.field_type === "boolean") {
@@ -149,7 +164,10 @@ function toAttributePayload(field: {
     return {
       category_field_id: field.id,
       attribute_key: field.field_key,
+      attribute_value_text: null,
+      attribute_value_number: null,
       attribute_value_boolean: booleanValue,
+      attribute_value_json: null,
       unit: field.unit,
     };
   }
@@ -159,8 +177,11 @@ function toAttributePayload(field: {
     return {
       category_field_id: field.id,
       attribute_key: field.field_key,
+      attribute_value_text: null,
       attribute_value_number: Number.isFinite(numericValue as number) ? numericValue : null,
       unit: field.unit,
+      attribute_value_boolean: null,
+      attribute_value_json: null,
     };
   }
 
@@ -168,6 +189,9 @@ function toAttributePayload(field: {
     category_field_id: field.id,
     attribute_key: field.field_key,
     attribute_value_text: value || null,
+    attribute_value_number: null,
+    attribute_value_boolean: null,
+    attribute_value_json: null,
     unit: field.unit,
   };
 }
@@ -179,7 +203,10 @@ function toLockedAttributePayload(key: string, value: unknown) {
     return {
       category_field_id: null,
       attribute_key: attributeKey,
+      attribute_value_text: null,
+      attribute_value_number: null,
       attribute_value_boolean: value,
+      attribute_value_json: null,
       unit: null,
     };
   }
@@ -188,7 +215,10 @@ function toLockedAttributePayload(key: string, value: unknown) {
     return {
       category_field_id: null,
       attribute_key: attributeKey,
+      attribute_value_text: null,
       attribute_value_number: value,
+      attribute_value_boolean: null,
+      attribute_value_json: null,
       unit: null,
     };
   }
@@ -202,9 +232,22 @@ function toLockedAttributePayload(key: string, value: unknown) {
     category_field_id: null,
     attribute_key: attributeKey,
     attribute_value_text: textValue,
+    attribute_value_number: null,
+    attribute_value_boolean: null,
+    attribute_value_json: null,
     unit: null,
   };
 }
+
+type ListingAttributeDraft = {
+  category_field_id: number | null;
+  attribute_key: string;
+  attribute_value_text: string | null;
+  attribute_value_number: number | null;
+  attribute_value_boolean: boolean | null;
+  attribute_value_json: string[] | null;
+  unit: string | null;
+};
 
 async function persistLockedListingSpecs(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -448,6 +491,40 @@ async function persistListingCategoryPath(
   }
 }
 
+async function persistElectronicsDynamicAttributes(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  listingId: string,
+  formData: FormData
+) {
+  const leafId = toFormValueText(formData.get(ELECTRONICS_DYNAMIC_LEAF_KEY));
+  const rawAttributes = toFormValueText(formData.get(ELECTRONICS_DYNAMIC_ATTRIBUTES_KEY));
+  const dynamicAttributes = normalizeElectronicsDynamicAttributes(rawAttributes);
+
+  if (!leafId && Object.keys(dynamicAttributes).length === 0) {
+    return;
+  }
+
+  const dynamicKeys = new Set<string>([ELECTRONICS_DYNAMIC_LEAF_KEY]);
+  Object.keys(dynamicAttributes).forEach((key) => dynamicKeys.add(key));
+
+  try {
+    await supabase.from("listing_attributes").delete().eq("listing_id", listingId).in("attribute_key", Array.from(dynamicKeys));
+  } catch {
+    // ignore if older schema is missing the relevant table
+  }
+
+  const rows = buildElectronicsDynamicAttributeRows(listingId, leafId || null, dynamicAttributes);
+  if (rows.length === 0) {
+    return;
+  }
+
+  try {
+    await supabase.from("listing_attributes").insert(rows);
+  } catch {
+    // ignore if older schema is missing support for dynamic attributes
+  }
+}
+
 async function persistElectronicsListing(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   listingId: string,
@@ -533,22 +610,134 @@ async function persistListingAttributes(
   listingId: string,
   categoryNodeId: number,
   formData: FormData,
+  categoryPath: string | null | undefined,
   replaceExisting: boolean = false
 ) {
-  const { data: fields } = await supabase
-    .from("category_fields")
-    .select("id, field_key, field_type, unit")
-    .eq("category_node_id", categoryNodeId)
-    .eq("is_active", true);
+  const simpleKind = getSimpleCategoryKind(categoryPath ?? undefined, null);
+  const simpleFieldKeys = new Set(getSimpleCategoryFieldKeys(simpleKind));
+  const simpleConfig = getSimpleCategoryConfig(simpleKind);
+  const allSimpleFieldKeys = getAllSimpleCategoryFieldKeys();
+
+  const { data: fields } = simpleKind
+    ? { data: [] as Array<{ id: number; field_key: string; field_type: string; unit: string | null }> }
+    : await supabase
+        .from("category_fields")
+        .select("id, field_key, field_type, unit")
+        .eq("category_node_id", categoryNodeId)
+        .eq("is_active", true);
 
   const fieldMap = new Map((fields ?? []).map((field) => [field.field_key, field]));
-  const attributeRows = Array.from(formData.entries())
-    .filter(([key]) => !RESERVED_FORM_KEYS.has(key) && fieldMap.has(key))
-    .map(([key, value]) => toAttributePayload(fieldMap.get(key)!, value))
-    .filter((row) => Boolean(row.category_field_id));
+  const attributeRows: ListingAttributeDraft[] = simpleKind && simpleConfig
+    ? simpleConfig.fields.flatMap<ListingAttributeDraft>((field) => {
+        const values = formData.getAll(field.key).map((value) => toFormValueText(value)).filter(Boolean);
+        const customKey = `${field.key}Custom`;
+        const customValue = toFormValueText(formData.get(customKey));
+
+        if (values.length === 0 && !customValue) return [];
+
+        if (field.type === "multiselect") {
+          const merged = Array.from(new Set(values.flatMap((value) => {
+            try {
+              const parsedValue = JSON.parse(value) as unknown;
+              if (Array.isArray(parsedValue)) {
+                return parsedValue.map((item) => String(item));
+              }
+            } catch {
+              // fall through
+            }
+            return value.split(",").map((item) => item.trim()).filter(Boolean);
+          })));
+
+          return [{
+            listing_id: listingId,
+            category_field_id: null,
+            attribute_key: field.key,
+            attribute_value_text: null,
+            attribute_value_number: null,
+            attribute_value_boolean: null,
+            attribute_value_json: merged.length > 0 ? merged : null,
+            unit: null,
+          }];
+        }
+
+        const raw = values[0] ?? "";
+        const resolvedValue = field.allowCustom && raw.toLowerCase() === "other" && customValue
+          ? customValue
+          : raw;
+        if (!resolvedValue) {
+          return customValue
+            ? [{
+                category_field_id: null,
+                attribute_key: customKey,
+                attribute_value_text: customValue,
+                attribute_value_number: null,
+                attribute_value_boolean: null,
+                attribute_value_json: null,
+                unit: null,
+              }]
+            : [];
+        }
+
+        if (field.type === "number") {
+          const numericValue = Number(resolvedValue);
+          const bounded = Number.isFinite(numericValue)
+            && (field.min === undefined || numericValue >= field.min)
+            && (field.max === undefined || numericValue <= field.max)
+            ? numericValue
+            : null;
+          if (bounded === null) return [];
+          return [{
+            category_field_id: null,
+            attribute_key: field.key,
+            attribute_value_text: null,
+            attribute_value_number: bounded,
+            attribute_value_boolean: null,
+            attribute_value_json: null,
+            unit: field.key === "mileageKm" ? "Km" : null,
+          }];
+        }
+
+        const rows: ListingAttributeDraft[] = [{
+          category_field_id: null,
+          attribute_key: field.key,
+          attribute_value_text: resolvedValue,
+          attribute_value_number: null,
+          attribute_value_boolean: null,
+          attribute_value_json: null,
+          unit: null,
+        }];
+
+        if (field.allowCustom && customValue) {
+          rows.push({
+            category_field_id: null,
+            attribute_key: customKey,
+            attribute_value_text: customValue,
+            attribute_value_number: null,
+            attribute_value_boolean: null,
+            attribute_value_json: null,
+            unit: null,
+          });
+        }
+
+        return rows;
+      })
+    : Array.from(formData.entries())
+        .filter(([key]) => {
+          if (RESERVED_FORM_KEYS.has(key)) return false;
+          return fieldMap.has(key);
+        })
+        .map(([key, value]) => toAttributePayload(fieldMap.get(key)!, value))
+        .filter((row) => Boolean(row));
 
   if (replaceExisting) {
-    await supabase.from("listing_attributes").delete().eq("listing_id", listingId);
+    if (simpleKind) {
+      const keys = Array.from(new Set([...allSimpleFieldKeys, ...simpleFieldKeys]));
+      if (keys.length > 0) {
+        await supabase.from("listing_attributes").delete().eq("listing_id", listingId).in("attribute_key", keys);
+      }
+    } else {
+      await supabase.from("listing_attributes").delete().eq("listing_id", listingId);
+    }
   }
 
   if (attributeRows.length === 0) {
@@ -563,7 +752,7 @@ async function persistListingAttributes(
       attribute_value_text: row.attribute_value_text ?? null,
       attribute_value_number: row.attribute_value_number ?? null,
       attribute_value_boolean: row.attribute_value_boolean ?? null,
-      attribute_value_json: null,
+      attribute_value_json: row.attribute_value_json ?? null,
       unit: row.unit ?? null,
     }))
   );
@@ -603,6 +792,10 @@ async function validateVehicleSelectionForCategory(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const context = await resolveCategoryContext(supabase, input);
   if (!context || !context.categoryPath.startsWith("vehicles")) {
+    return { ok: true };
+  }
+
+  if (getSimpleCategoryKind(context.categoryPath, null)) {
     return { ok: true };
   }
 
@@ -996,7 +1189,8 @@ export async function createListingFormAction(formData: FormData): Promise<void>
     return;
   }
 
-  await persistListingAttributes(supabase, data.id, listing.context.categoryNodeId, formData);
+  await persistListingAttributes(supabase, data.id, listing.context.categoryNodeId, formData, listing.context.categoryPath);
+  await persistElectronicsDynamicAttributes(supabase, data.id, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
   await persistElectronicsListing(supabase, data.id, formData, {
@@ -1075,7 +1269,8 @@ export async function createListingAction(formData: FormData): Promise<{
     return { ok: false, message: error.message };
   }
 
-  await persistListingAttributes(supabase, data.id, createdListing.context.categoryNodeId, formData);
+  await persistListingAttributes(supabase, data.id, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath);
+  await persistElectronicsDynamicAttributes(supabase, data.id, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
   await persistElectronicsListing(supabase, data.id, formData, {
@@ -1188,7 +1383,8 @@ export async function updateListingAction(
     });
   }
 
-  await persistListingAttributes(supabase, listingId, createdListing.context.categoryNodeId, formData, true);
+  await persistListingAttributes(supabase, listingId, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath, true);
+  await persistElectronicsDynamicAttributes(supabase, listingId, formData);
   await persistLockedListingSpecs(supabase, listingId, formData);
   await persistVehicleMetaAttributes(supabase, listingId, formData);
   await persistElectronicsListing(supabase, listingId, formData, {
@@ -1236,7 +1432,7 @@ export async function updateListingStatusAction(
   status: "approved" | "rejected" | "pending" | "sold" | "expired",
   rejectionReason?: string
 ): Promise<{ ok: boolean; message: string }> {
-  await requireAdmin();
+  await requirePermission("listings.moderate");
   const supabase = await createSupabaseServerClient();
 
   const payload: Record<string, string | undefined> = {
@@ -1512,7 +1708,16 @@ export async function adminGetStatsAction(): Promise<{
   sold: number;
   reports: number;
 }> {
-  await requireAdmin();
+  const user = await getCurrentUser();
+  if (!user) {
+    return { pending: 0, approved: 0, rejected: 0, sold: 0, reports: 0 };
+  }
+
+  const canViewListings = await hasAdminPermission(user.id, "listings.view");
+  if (!canViewListings) {
+    return { pending: 0, approved: 0, rejected: 0, sold: 0, reports: 0 };
+  }
+
   const supabase = await createSupabaseServerClient();
 
   const [

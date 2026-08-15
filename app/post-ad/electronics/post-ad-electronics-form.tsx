@@ -6,6 +6,9 @@ import { createListingAction, uploadListingImageAction } from "@/lib/actions/lis
 import { CURRENCIES, AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { TRANSLATIONS } from "@/lib/i18n/translations";
+import DynamicCategoryFields from "@/data/componentsDynamicCategoryFields";
+import { getLeafById } from "@/data/electronics-categories";
+import { ELECTRONICS_DYNAMIC_ATTRIBUTES_KEY, ELECTRONICS_DYNAMIC_LEAF_KEY, getElectronicsDynamicValidationError, resolveElectronicsLeafId } from "@/lib/posting/electronics-dynamic";
 
 type ElectronicsCategory = {
   id: number;
@@ -60,6 +63,7 @@ type LocationMethod = "device" | "manual" | null;
 type Props = {
   subcategories: ElectronicsCategory[];
   t: (typeof TRANSLATIONS)["en"];
+  locale?: "en" | "fa" | "ps";
 };
 
 type Step = "category" | "brandModel" | "details" | "photos" | "location" | "preview";
@@ -83,7 +87,7 @@ function optionsByType(options: ElectronicsOption[], type: string) {
     .map((option) => option.option_value);
 }
 
-export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
+export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" }: Props) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -104,6 +108,8 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
 
   const [knownSpecs, setKnownSpecs] = useState<ElectronicsSpec[]>([]);
   const [modelOptions, setModelOptions] = useState<ElectronicsOption[]>([]);
+  const [dynamicLeafId, setDynamicLeafId] = useState<string | null>(null);
+  const [dynamicAttributes, setDynamicAttributes] = useState<Record<string, unknown>>({});
   const [postingConfig, setPostingConfig] = useState<PostingConfig>({
     requires_images: true,
     min_images: 1,
@@ -129,6 +135,15 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
   const [repairHistory, setRepairHistory] = useState("");
   const [networkRegistered, setNetworkRegistered] = useState("");
 
+  const selectedLeaf = useMemo(() => {
+    const requested = dynamicLeafId ?? selectedCategory?.slug ?? "";
+    return getLeafById(requested);
+  }, [dynamicLeafId, selectedCategory?.slug]);
+  const showGenericElectronicsFields = !selectedLeaf;
+  const storageOptions = useMemo(() => optionsByType(modelOptions, "storage") || [], [modelOptions]);
+  const colorOptions = useMemo(() => optionsByType(modelOptions, "color") || [], [modelOptions]);
+  const showPhotoStep = postingConfig.requires_images || images.length > 0;
+
   const [province, setProvince] = useState("");
   const [district, setDistrict] = useState("");
   const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
@@ -153,10 +168,6 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
     const modelName = manualModel ? (manualModelName || "Manual Model") : (selectedModel?.name ?? "Model");
     return `${t.postAdElectronics.phonesElectronics} -> ${categoryName} -> ${brandName} -> ${modelName}`;
   }, [selectedCategory?.name, selectedBrand?.name, selectedModel?.name, manualModel, manualBrandName, manualModelName, t.postAdElectronics.phonesElectronics]);
-
-  const storageOptions = useMemo(() => optionsByType(modelOptions, "storage"), [modelOptions]);
-  const colorOptions = useMemo(() => optionsByType(modelOptions, "color"), [modelOptions]);
-  const showPhotoStep = postingConfig.requires_images || images.length > 0;
 
   async function loadBrands(categoryId: number) {
     const response = await fetch(`/api/electronics/brands?categoryId=${categoryId}`, { method: "GET" });
@@ -203,6 +214,8 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
     setManualModelName("");
     setKnownSpecs([]);
     setModelOptions([]);
+    setDynamicLeafId(resolveElectronicsLeafId(category.slug));
+    setDynamicAttributes({});
     setStepError(null);
     setError(null);
 
@@ -416,6 +429,10 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
     };
   }, []);
 
+  function updateDynamicAttributes(key: string, value: unknown) {
+    setDynamicAttributes((prev) => ({ ...prev, [key]: value }));
+  }
+
   function gotoNext() {
     setStepError(null);
 
@@ -460,16 +477,19 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
         setStepError("Description must be at least 20 characters.");
         return;
       }
-      if (!condition) {
-        setStepError("Condition is required.");
-        return;
+      if (showGenericElectronicsFields) {
+        if (!condition) {
+          setStepError("Condition is required.");
+          return;
+        }
       }
       if (!price || Number(price) <= 0) {
         setStepError("Enter valid price.");
         return;
       }
-      if (selectedCategory?.slug === "mobile-phones" && !storage.trim()) {
-        setStepError("Storage is required for mobile phones.");
+      const dynamicError = getElectronicsDynamicValidationError(dynamicLeafId, dynamicAttributes, locale);
+      if (dynamicError) {
+        setStepError(dynamicError);
         return;
       }
       setStep(showPhotoStep ? "photos" : "location");
@@ -581,6 +601,8 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
     form.set("electronics_network_registered", networkRegistered);
     form.set("electronics_area", area);
     form.set("electronics_description", description);
+    form.set(ELECTRONICS_DYNAMIC_LEAF_KEY, dynamicLeafId ?? "");
+    form.set(ELECTRONICS_DYNAMIC_ATTRIBUTES_KEY, JSON.stringify(dynamicAttributes));
 
     form.set("condition", condition);
     if (storage.trim()) form.set("storage", storage);
@@ -714,12 +736,14 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
               <label className="text-sm font-semibold">Title
                 <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
-              <label className="text-sm font-semibold">Condition
-                <select value={condition} onChange={(event) => setCondition(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select</option>
-                  {CONDITION_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </label>
+              {showGenericElectronicsFields ? (
+                <label className="text-sm font-semibold">Condition
+                  <select value={condition} onChange={(event) => setCondition(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                    <option value="">Select</option>
+                    {CONDITION_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </label>
+              ) : null}
               <label className="text-sm font-semibold">Price
                 <input type="number" min={1} value={price} onChange={(event) => setPrice(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
@@ -728,62 +752,91 @@ export default function ElectronicsPostAdForm({ subcategories, t }: Props) {
                   {CURRENCIES.map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
               </label>
-              <label className="text-sm font-semibold">Storage
-                <select value={storage} onChange={(event) => setStorage(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select</option>
-                  {(storageOptions.length > 0 ? storageOptions : ["64GB", "128GB", "256GB", "512GB", "1TB", "Other"]).map((value) => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-semibold">RAM (optional)
-                <input value={ram} onChange={(event) => setRam(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
-              <label className="text-sm font-semibold">Color
-                <select value={color} onChange={(event) => setColor(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select</option>
-                  {(colorOptions.length > 0 ? colorOptions : ["Black", "White", "Blue", "Red", "Green", "Silver", "Gold", "Other"]).map((value) => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-semibold">Battery Health (optional)
-                <input value={batteryHealth} onChange={(event) => setBatteryHealth(event.target.value)} placeholder="e.g. 92%" className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
-              </label>
-              <label className="text-sm font-semibold">Warranty
-                <select value={warranty} onChange={(event) => setWarranty(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select</option>
-                  {WARRANTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-semibold">Repair History
-                <select value={repairHistory} onChange={(event) => setRepairHistory(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select</option>
-                  {REPAIR_HISTORY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-semibold">Network Registered
-                <select value={networkRegistered} onChange={(event) => setNetworkRegistered(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
-                  <option value="">Select</option>
-                  {NETWORK_REGISTERED_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-semibold sm:col-span-2">
-                <span className="flex items-center gap-2">
-                  <input type="checkbox" checked={boxIncluded} onChange={(event) => setBoxIncluded(event.target.checked)} className="h-4 w-4" />
-                  Box Included
-                </span>
-              </label>
-              <label className="text-sm font-semibold sm:col-span-2">
-                <span className="flex items-center gap-2">
-                  <input type="checkbox" checked={chargerIncluded} onChange={(event) => setChargerIncluded(event.target.checked)} className="h-4 w-4" />
-                  Charger Included
-                </span>
-              </label>
+              {showGenericElectronicsFields ? (
+                <label className="text-sm font-semibold">Storage
+                  <select value={storage} onChange={(event) => setStorage(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                    <option value="">Select</option>
+                    {(storageOptions.length > 0 ? storageOptions : ["64GB", "128GB", "256GB", "512GB", "1TB", "Other"]).map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {showGenericElectronicsFields ? (
+                <label className="text-sm font-semibold">RAM (optional)
+                  <input value={ram} onChange={(event) => setRam(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                </label>
+              ) : null}
+              {showGenericElectronicsFields ? (
+                <label className="text-sm font-semibold">Color
+                  <select value={color} onChange={(event) => setColor(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                    <option value="">Select</option>
+                    {(colorOptions.length > 0 ? colorOptions : ["Black", "White", "Blue", "Red", "Green", "Silver", "Gold", "Other"]).map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {showGenericElectronicsFields ? (
+                <label className="text-sm font-semibold">Battery Health (optional)
+                  <input value={batteryHealth} onChange={(event) => setBatteryHealth(event.target.value)} placeholder="e.g. 92%" className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                </label>
+              ) : null}
+              {showGenericElectronicsFields ? (
+                <label className="text-sm font-semibold">Warranty
+                  <select value={warranty} onChange={(event) => setWarranty(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                    <option value="">Select</option>
+                    {WARRANTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              {showGenericElectronicsFields ? (
+                <label className="text-sm font-semibold">Repair History
+                  <select value={repairHistory} onChange={(event) => setRepairHistory(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                    <option value="">Select</option>
+                    {REPAIR_HISTORY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              {showGenericElectronicsFields ? (
+                <label className="text-sm font-semibold">Network Registered
+                  <select value={networkRegistered} onChange={(event) => setNetworkRegistered(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+                    <option value="">Select</option>
+                    {NETWORK_REGISTERED_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </label>
+              ) : null}
+              {showGenericElectronicsFields ? (
+                <>
+                  <label className="text-sm font-semibold sm:col-span-2">
+                    <span className="flex items-center gap-2">
+                      <input type="checkbox" checked={boxIncluded} onChange={(event) => setBoxIncluded(event.target.checked)} className="h-4 w-4" />
+                      Box Included
+                    </span>
+                  </label>
+                  <label className="text-sm font-semibold sm:col-span-2">
+                    <span className="flex items-center gap-2">
+                      <input type="checkbox" checked={chargerIncluded} onChange={(event) => setChargerIncluded(event.target.checked)} className="h-4 w-4" />
+                      Charger Included
+                    </span>
+                  </label>
+                </>
+              ) : null}
               <label className="text-sm font-semibold sm:col-span-2">Description
                 <textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
             </div>
+
+            {dynamicLeafId ? (
+              <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                <DynamicCategoryFields
+                  leafId={dynamicLeafId}
+                  lang={locale}
+                  values={dynamicAttributes}
+                  onChange={updateDynamicAttributes}
+                />
+              </div>
+            ) : null}
           </section>
         ) : null}
 

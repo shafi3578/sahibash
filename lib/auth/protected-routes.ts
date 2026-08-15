@@ -1,5 +1,7 @@
 const PROTECTED_PREFIXES = [
-  "/post-ad",
+  "/post-ad/create",
+  "/post-ad/create-v2",
+  "/post-ad/create-new",
   "/dashboard/my-listings",
   "/dashboard/my-ads",
   "/listings/create",

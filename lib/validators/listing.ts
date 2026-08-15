@@ -59,7 +59,7 @@ export const listingSchema = z.object({
   location_accuracy: localizedInt(z.number().int().nonnegative()).optional(),
   location_visibility: z.enum(["exact", "approximate", "hidden", "province_district"]).optional(),
   is_location_confirmed: z.coerce.boolean().optional(),
-  listing_type: z.enum(["for_sale", "wanted"]).optional(),
+  listing_type: z.enum(["for_sale", "for_rent", "wanted"]).optional(),
   neighborhood: optionalText,
   address_optional: optionalText,
   video_url: z.string().trim().url().optional().or(z.literal("")),

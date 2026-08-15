@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { requirePermission, requireUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { listingLanguageLabel, type ListingLanguageCode } from "@/lib/listings/translation-service";
 
@@ -36,7 +36,7 @@ export async function reportListingTranslationIssueAction(formData: FormData) {
 }
 
 export async function adminUpdateListingTranslationAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("translations.update");
 
   const listingId = String(formData.get("listingId") ?? "").trim();
   const languageCode = String(formData.get("languageCode") ?? "").trim();
@@ -69,7 +69,7 @@ export async function adminUpdateListingTranslationAction(formData: FormData) {
 }
 
 export async function adminFlagListingTranslationAction(formData: FormData) {
-  await requireAdmin();
+  await requirePermission("translations.update");
 
   const listingId = String(formData.get("listingId") ?? "").trim();
   const languageCode = String(formData.get("languageCode") ?? "").trim();
