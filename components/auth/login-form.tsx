@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { TRANSLATIONS, getSafeTranslations, type AppLocale } from "@/lib/i18n/translations";
+import { localizeAuthError } from "@/lib/i18n/user-copy";
 
 type Dictionary = (typeof TRANSLATIONS)["en"];
 
@@ -25,7 +26,7 @@ export function LoginForm({ locale }: { locale: AppLocale }) {
       const supabase = createSupabaseBrowserClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
-        setError(signInError.message);
+        setError(localizeAuthError(signInError.message, locale));
         setIsLoading(false);
         return;
       }

@@ -85,7 +85,7 @@ export function LanguageSwitcher({ locale, label }: Props) {
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-40 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg lg:hidden"
+          className="absolute end-0 top-full z-50 mt-2 w-40 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-black/10 bg-white shadow-lg lg:hidden"
         >
           {(["en", "fa", "ps"] as AppLocale[]).map((nextLocale) => (
             <a

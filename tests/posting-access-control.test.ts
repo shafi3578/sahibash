@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { isPostAdPath, isProtectedPostingPath } from "@/lib/auth/protected-routes";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isProxyExcludedPath } from "@/proxy";
+import { isProxyExcludedPath, resolveBrowserLocale } from "@/proxy";
 
 const canonicalPostingForm = readFileSync(
   join(process.cwd(), "app", "post-ad", "post-ad-form.tsx"),
@@ -64,6 +64,13 @@ test("the locale switch endpoint bypasses locale-prefix enforcement", () => {
   assert.equal(isProxyExcludedPath("/locale"), true);
   assert.equal(isProxyExcludedPath("/api/location/provinces"), true);
   assert.equal(isProxyExcludedPath("/search"), false);
+});
+
+test("browser locale detection prefers supported Afghan locales and safely falls back to English", () => {
+  assert.equal(resolveBrowserLocale("ps-AF,ps;q=0.9,en;q=0.8"), "ps");
+  assert.equal(resolveBrowserLocale("fa-AF,fa;q=0.9"), "fa");
+  assert.equal(resolveBrowserLocale("de-DE,de;q=0.9"), "en");
+  assert.equal(resolveBrowserLocale(null), "en");
 });
 
 test("final category selection exposes a direct details action above mobile navigation", () => {

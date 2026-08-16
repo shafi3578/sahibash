@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { TRANSLATIONS, getSafeTranslations, type AppLocale } from "@/lib/i18n/translations";
+import { localizeAuthError } from "@/lib/i18n/user-copy";
 
 type Dictionary = (typeof TRANSLATIONS)["en"];
 
@@ -30,7 +31,7 @@ export function RegisterForm({ locale }: { locale: AppLocale }) {
         options: { data: { full_name: fullName } },
       });
       if (signUpError) {
-        setError(signUpError.message);
+        setError(localizeAuthError(signUpError.message, locale));
         setIsLoading(false);
         return;
       }

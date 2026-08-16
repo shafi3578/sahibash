@@ -6,6 +6,7 @@ import { FloatingPostAdButton } from "@/components/floating-post-ad-button";
 import { localizePath } from "@/lib/i18n/routing";
 import { getNavigationItems } from "@/lib/actions/navigation";
 import { getSiteSettings } from "@/lib/actions/site-settings";
+import { localizeNavigationLabel } from "@/lib/i18n/navigation-labels";
 
 async function signOutAction() {
   "use server";
@@ -62,7 +63,7 @@ export async function SiteHeader() {
           <nav className="hidden flex-1 items-center justify-center gap-2 lg:flex">
             {navigationItems.map((link) => (
               <Link key={`${link.id}-${link.path}`} href={href(link.path)} className="rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-sm font-semibold text-[var(--ink-1)]">
-                {link.label}
+                {localizeNavigationLabel(link.path, link.label, locale)}
               </Link>
             ))}
           </nav>

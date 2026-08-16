@@ -10,21 +10,23 @@ import {
 import { getMyListings } from "@/lib/data/queries";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
+import { formatDate as formatLocalizedDate, formatNumber } from "@/lib/i18n/format";
+import { USER_COPY } from "@/lib/i18n/user-copy";
 
 type SearchParams = {
   tab?: "active" | "inactive";
   q?: string;
 };
 
-function formatDate(dateValue: string | null | undefined) {
+function formatDate(dateValue: string | null | undefined, locale: "en" | "fa" | "ps") {
   if (!dateValue) return "-";
   const d = new Date(dateValue);
-  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString("en-GB");
+  return Number.isNaN(d.getTime()) ? "-" : formatLocalizedDate(d, locale);
 }
 
-function getStatusLabel(status: string, underReview: string) {
+function getStatusLabel(status: string, locale: "en" | "fa" | "ps", underReview: string) {
   if (status === "pending") return underReview;
-  return status;
+  return USER_COPY[locale].statuses[status as keyof typeof USER_COPY.en.statuses] ?? status;
 }
 
 export default async function MyAdsPage({
@@ -115,23 +117,23 @@ export default async function MyAdsPage({
               </p>
               <p>
                 {ui.dashboard.views}
-                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{listing.views_count}</span>
+                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{formatNumber(listing.views_count, locale)}</span>
               </p>
               <p>
                 {ui.dashboard.favorites}
-                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{listing.favorites_count}</span>
+                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{formatNumber(listing.favorites_count, locale)}</span>
               </p>
               <p>
                 {ui.dashboard.messages}
-                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{listing.messages_count}</span>
+                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{formatNumber(listing.messages_count, locale)}</span>
               </p>
               <p>
                 {ui.dashboard.status}
-                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{getStatusLabel(listing.status, ui.dashboard.underReview)}</span>
+                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{getStatusLabel(listing.status, locale, ui.dashboard.underReview)}</span>
               </p>
               <p>
                 {ui.dashboard.expiry}
-                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{formatDate(listing.expires_at)}</span>
+                <span className="mt-1 block font-semibold text-[var(--ink-1)]">{formatDate(listing.expires_at, locale)}</span>
               </p>
             </div>
 

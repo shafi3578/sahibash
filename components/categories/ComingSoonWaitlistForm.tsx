@@ -5,6 +5,7 @@ import { joinCategoryWaitlistAction } from "@/lib/actions/categories";
 import { usePathname } from "next/navigation";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import type { AppLocale } from "@/lib/i18n/translations";
+import { localizeActionMessage } from "@/lib/i18n/user-copy";
 
 type Props = {
   categorySlug: string;
@@ -34,11 +35,11 @@ export function ComingSoonWaitlistForm({ categorySlug, defaultEmail = "" }: Prop
           });
 
           if (!result.ok) {
-            setError(result.message);
+            setError(localizeActionMessage(result.message, locale));
             return;
           }
 
-          setMessage(result.message);
+          setMessage(localizeActionMessage(result.message, locale));
         });
       }}
       className="space-y-3"

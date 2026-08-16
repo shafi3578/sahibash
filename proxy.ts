@@ -31,6 +31,16 @@ export function resolveProxyPath(requestUrl: string, nextPathname: string) {
   };
 }
 
+export function resolveBrowserLocale(acceptLanguage: string | null) {
+  const requested = String(acceptLanguage ?? "").toLowerCase();
+  for (const token of requested.split(",")) {
+    const language = token.trim().split(";")[0];
+    const locale = normalizeLocaleInput(language) ?? normalizeLocaleInput(language.split("-")[0]);
+    if (locale) return locale;
+  }
+  return "en" as const;
+}
+
 export async function proxy(request: NextRequest) {
   const { search } = request.nextUrl;
   const { originalPathname, effectivePathname, pathLocale, strippedPath } = resolveProxyPath(request.url, request.nextUrl.pathname);
@@ -41,7 +51,7 @@ export async function proxy(request: NextRequest) {
 
   if (!pathLocale) {
     const cookieLocale = normalizeLocaleInput(request.cookies.get(LOCALE_COOKIE)?.value);
-    const preferredLocale = cookieLocale ?? "fa";
+    const preferredLocale = cookieLocale ?? resolveBrowserLocale(request.headers.get("accept-language"));
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = localizePath(originalPathname, preferredLocale);
     redirectUrl.search = search;

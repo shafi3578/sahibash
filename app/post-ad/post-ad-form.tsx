@@ -15,6 +15,7 @@ import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/com
 import { shouldShowVehicleDamageDiagram } from "@/lib/vehicles/damage-report";
 import { getVehicleBranchFromPath, type VehicleBranchDefinition, type VehicleBranchKey } from "@/data/catalog/vehicles";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
+import { localizeActionMessage } from "@/lib/i18n/user-copy";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
@@ -1618,7 +1619,7 @@ export default function PostAdForm({
       setStatus(t.postAd.publishing);
       const created = await createListingAction(form);
       if (!created.ok || !created.listingId) {
-        setError(created.message || postAdCopy.completeRequiredFields);
+        setError(created.message ? localizeActionMessage(created.message, locale) : postAdCopy.completeRequiredFields);
         setStatus(null);
         return;
       }

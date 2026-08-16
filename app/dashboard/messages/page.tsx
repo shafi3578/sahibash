@@ -5,6 +5,7 @@ import { replyMessageAction } from "@/lib/actions/messages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
+import { formatDate } from "@/lib/i18n/format";
 
 export default async function MessagesPage() {
   const user = await requireUser();
@@ -79,13 +80,13 @@ export default async function MessagesPage() {
                   const mine = msg.sender_user_id === user.id;
                   const isLatestUnreadIncoming = msg.id === thread.latestUnreadIncomingId;
                   return (
-                    <div key={msg.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${mine ? "ml-auto bg-[var(--ink-1)] text-white" : "bg-[var(--surface-2)] text-[var(--ink-1)]"} ${isLatestUnreadIncoming ? "ring-2 ring-red-300" : ""}`}>
+                    <div key={msg.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${mine ? "ms-auto bg-[var(--ink-1)] text-white" : "bg-[var(--surface-2)] text-[var(--ink-1)]"} ${isLatestUnreadIncoming ? "ring-2 ring-red-300" : ""}`}>
                       {!mine && isLatestUnreadIncoming ? (
                         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-red-700">{ui.dashboard.newSellerReply}</p>
                       ) : null}
                       <p>{msg.body}</p>
                       <p className={`mt-1 text-[10px] ${mine ? "text-white/80" : "text-[var(--ink-2)]"}`}>
-                        {new Date(msg.created_at).toLocaleString()}
+                        {formatDate(msg.created_at, locale, { dateStyle: "medium", timeStyle: "short" })}
                       </p>
                     </div>
                   );

@@ -45,6 +45,14 @@ import AdminAuditPage from "@/app/admin/audit/page";
 import AdminUsersPage from "@/app/admin/users/page";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getPublishedStaticPageBySlug } from "@/lib/data/static-pages";
+import type { AppLocale } from "@/lib/i18n/translations";
+import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
+import { PublicInfoPage } from "@/components/public-info-page";
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: AppLocale; slug?: string[] }> }) {
+  const { locale, slug } = await params;
+  return buildLocalizedMetadata(locale, slug);
+}
 
 const renderPage = <T extends Record<string, unknown>>(
   Page: ComponentType<T>,
@@ -182,6 +190,10 @@ export default async function LocaleCatchAllPage({
 
   if (first === "my-ads" && slug.length === 1) {
     return renderPage(MyAdsPage, { searchParams: resolvedSearchParams });
+  }
+
+  if (slug.length === 1 && (first === "privacy" || first === "terms" || first === "safety" || first === "contact")) {
+    return <PublicInfoPage page={first} />;
   }
 
   if (first === "admin") {

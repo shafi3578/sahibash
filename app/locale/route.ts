@@ -5,6 +5,7 @@ import {
 } from "@/lib/i18n/translations";
 import { LOCALE_COOKIE } from "@/lib/i18n/server";
 import { localizePath, normalizeLocaleInput, splitLocaleFromPath } from "@/lib/i18n/routing";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function isSupportedLocale(value: string): value is AppLocale {
   return (SUPPORTED_LOCALES as readonly string[]).includes(value);
@@ -52,6 +53,16 @@ export async function GET(request: Request) {
   target.pathname = localizePath(strippedPath, locale);
 
   const response = NextResponse.redirect(target);
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("profiles").update({ preferred_language: locale }).eq("id", user.id);
+    }
+  } catch {
+    // The cookie remains the reliable anonymous/session fallback.
+  }
   response.cookies.set({
     name: LOCALE_COOKIE,
     value: locale,
