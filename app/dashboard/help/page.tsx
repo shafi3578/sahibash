@@ -1,20 +1,26 @@
 import { requireUser } from "@/lib/auth";
 import { DashboardSection } from "@/components/dashboard-section";
+import { getDictionary } from "@/lib/i18n/server";
+import { getUiTranslations } from "@/lib/i18n/ui";
+import { DASHBOARD_COPY } from "@/lib/i18n/dashboard-copy";
 
 export default async function HelpCenterPage() {
   await requireUser();
+  const { locale } = await getDictionary();
+  const ui = getUiTranslations(locale);
+  const copy = DASHBOARD_COPY[locale];
 
   return (
     <DashboardSection
       currentPath="/dashboard/help"
-      title="Help Center"
-      description="Get support for listings, payments, and account issues."
+      title={ui.dashboard.helpCenter}
+      description={ui.dashboard.helpCenterDescription}
     >
       <ul className="space-y-2 text-sm text-[var(--ink-2)]">
-        <li>How to post a listing</li>
-        <li>How listing moderation works</li>
-        <li>How to report suspicious activity</li>
-        <li>How to contact support</li>
+        <li>{copy.helpPost}</li>
+        <li>{copy.helpModeration}</li>
+        <li>{copy.helpReport}</li>
+        <li>{copy.helpContact}</li>
       </ul>
     </DashboardSection>
   );

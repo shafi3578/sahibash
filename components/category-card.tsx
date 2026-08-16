@@ -3,6 +3,7 @@ import type { Category } from "@/types/database";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { localizeCategoryName, localizeCategorySubtitle } from "@/lib/i18n/category-labels";
 import { localizePath } from "@/lib/i18n/routing";
+import { formatNumber } from "@/lib/i18n/format";
 
 export function CategoryCard({
   category,
@@ -27,7 +28,7 @@ export function CategoryCard({
         {localizedSubtitle}
       </p>
       <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">
-        {new Intl.NumberFormat("en-US").format(category.count ?? 0)}
+        {formatNumber(category.count ?? 0, locale)}
       </p>
     </Link>
   );

@@ -3,6 +3,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import Link from "next/link";
 import { localizePath } from "@/lib/i18n/routing";
 import { getUiTranslations } from "@/lib/i18n/ui";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
 
 export default async function PostAdPage() {
   const [categories, { t, locale }] = await Promise.all([getPostingRootCategories(), getDictionary()]);
@@ -57,7 +58,7 @@ export default async function PostAdPage() {
         <p className="text-sm font-semibold">
           {ui.postAdLanding.activeCategories}
         </p>
-        <p className="mt-1 text-sm text-[var(--ink-2)]">{activeCategories.map((category) => category.name).join(" • ")}</p>
+        <p className="mt-1 text-sm text-[var(--ink-2)]">{activeCategories.map((category) => localizeCategoryName({ locale, fallbackName: category.name, slug: category.slug })).join(" • ")}</p>
       </div>
     </main>
   );

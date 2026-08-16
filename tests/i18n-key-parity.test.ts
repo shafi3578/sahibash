@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SUPPORTED_LOCALES, TRANSLATIONS, type AppLocale } from "@/lib/i18n/translations";
 import { UI_TRANSLATIONS } from "@/lib/i18n/ui";
+import { localizePath } from "@/lib/i18n/routing";
 
 type JsonMap = Record<string, unknown>;
 
@@ -82,4 +83,38 @@ test("UI translation tree keys are complete across locales", () => {
     "UI_TRANSLATIONS",
     UI_TRANSLATIONS as unknown as Record<AppLocale, JsonMap>
   );
+});
+
+test("Dari and Pashto translations do not silently reuse English copy", () => {
+  const allowedTechnicalPlaceholders = new Set([
+    "resetPassword.emailPlaceholder",
+    "waitlist.emailPlaceholder",
+  ]);
+
+  for (const [name, tree] of [
+    ["TRANSLATIONS", TRANSLATIONS],
+    ["UI_TRANSLATIONS", UI_TRANSLATIONS],
+  ] as const) {
+    const englishPaths = collectLeafPaths(tree.en);
+    for (const locale of ["fa", "ps"] as const) {
+      const copied = englishPaths.filter((path) =>
+        !allowedTechnicalPlaceholders.has(path)
+        && getValueAtPath(tree.en, path) === getValueAtPath(tree[locale], path)
+      );
+      assert.deepEqual(copied, [], `${name} contains English fallback copy in ${locale}: ${copied.join(", ")}`);
+    }
+  }
+});
+
+test("English dictionary contains English copy", () => {
+  const nonAsciiCore = collectLeafPaths(TRANSLATIONS.en).filter((path) =>
+    /[^\x00-\x7F]/.test(String(getValueAtPath(TRANSLATIONS.en, path)))
+  );
+  assert.deepEqual(nonAsciiCore, []);
+});
+
+test("localized route helper replaces an existing locale and preserves queries", () => {
+  assert.equal(localizePath("/fa/search?q=toyota", "ps"), "/ps/search?q=toyota");
+  assert.equal(localizePath("/listings/123", "en"), "/en/listings/123");
+  assert.equal(localizePath("/ps", "fa"), "/fa");
 });

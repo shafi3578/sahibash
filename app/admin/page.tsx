@@ -4,11 +4,13 @@ import { adminGetStatsAction } from "@/lib/actions/listings";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import { localizePath } from "@/lib/i18n/routing";
+import { ADMIN_CONTROL_COPY } from "@/lib/i18n/admin-control-copy";
 
 export default async function AdminPage() {
   await requirePermission("admins.view");
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
+  const copy = ADMIN_CONTROL_COPY[locale];
   const stats = await adminGetStatsAction();
   const href = (path: string) => localizePath(path, locale);
 
@@ -25,11 +27,13 @@ export default async function AdminPage() {
       <div className="mt-6 flex flex-wrap gap-2">
         <Link href={href("/admin/listings")} className="inline-block rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{ui.admin.listingApprovalQueue}</Link>
         <Link href={href("/admin/search")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{ui.admin.searchAdmin}</Link>
+        <Link href={href("/admin/analytics")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.analytics}</Link>
         <Link href={href("/admin/categories")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{ui.admin.categoryAdmin}</Link>
-        <Link href={href("/admin/pages")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Pages</Link>
-        <Link href={href("/admin/users")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Users</Link>
-        <Link href={href("/admin/roles")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Roles</Link>
-        <Link href={href("/admin/audit")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">Audit log</Link>
+        <Link href={href("/admin/listing-schema")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.schemaBuilder}</Link>
+        <Link href={href("/admin/pages")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.pages}</Link>
+        <Link href={href("/admin/users")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.users}</Link>
+        <Link href={href("/admin/roles")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.roles}</Link>
+        <Link href={href("/admin/audit")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.auditLog}</Link>
       </div>
     </main>
   );

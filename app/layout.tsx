@@ -1,30 +1,31 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Source_Sans_3 } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { LocaleSync } from "@/components/locale-sync";
 import { getSiteSettings } from "@/lib/actions/site-settings";
 import "./globals.css";
-
-const displayFont = Space_Grotesk({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["500", "700"],
-});
-
-const bodyFont = Source_Sans_3({
-  variable: "--font-body",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { PwaRegister } from "@/components/pwa-register";
+import { getCurrentUser } from "@/lib/auth";
+import { localeDirection, localeTag } from "@/lib/i18n/format";
+import { SITE_METADATA } from "@/lib/i18n/metadata";
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteSettings = await getSiteSettings();
+  const locale = await getCurrentLocale();
+  const localizedMetadata = SITE_METADATA[locale];
 
   return {
-    title: `${siteSettings.site_name} | Buy and Sell in Afghanistan`,
-    description: siteSettings.site_tagline || "A modern Afghanistan marketplace for vehicles, real estate, electronics, and second-hand items.",
+    title: `${siteSettings.site_name} | ${localizedMetadata.titleSuffix}`,
+    description: (locale === "en" ? siteSettings.site_tagline : null) || localizedMetadata.description,
+    alternates: {
+      languages: {
+        en: "/en",
+        "fa-AF": "/fa",
+        "ps-AF": "/ps",
+      },
+    },
   };
 }
 
@@ -36,20 +37,23 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getCurrentLocale();
-  const dir = locale === "en" ? "ltr" : "rtl";
-  const htmlLang = locale === "fa" ? "fa-AF" : locale === "ps" ? "ps-AF" : "en";
+  const dir = localeDirection(locale);
+  const htmlLang = localeTag(locale);
+  const user = await getCurrentUser();
   return (
     <html
       lang={htmlLang}
       dir={dir}
       suppressHydrationWarning
-      className={`${displayFont.variable} ${bodyFont.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col pb-20 lg:pb-0">
+        <PwaRegister />
         <LocaleSync locale={locale} />
         <SiteHeader />
         {children}
         <SiteFooter />
+        <MobileBottomNav locale={locale} authenticated={Boolean(user)} />
       </body>
     </html>
   );

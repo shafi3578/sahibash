@@ -76,7 +76,7 @@ export async function SiteHeader() {
                   <Link href={href("/admin")} className="hidden whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">{t.header.admin}</Link>
                 )}
                 {canManageAdministratorArea && (
-                  <Link href={href("/administrator")} className="hidden whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">Administrator</Link>
+                  <Link href={href("/administrator")} className="hidden whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">{t.header.admin}</Link>
                 )}
                 <Link href={href("/dashboard")} className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.myProfile}</Link>
                 <form action={signOutAction}><button className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.logout}</button></form>

@@ -12,7 +12,7 @@ type Props = {
 function localeLabel(code: AppLocale) {
   if (code === "fa") return "دری";
   if (code === "ps") return "پښتو";
-  return "EN";
+  return "English";
 }
 
 export function LanguageSwitcher({ locale, label }: Props) {

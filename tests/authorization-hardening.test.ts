@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { SCHEMA_BUILDER_COPY } from "@/lib/i18n/schema-builder-copy";
 
 const migration = readFileSync(
   join(
@@ -112,8 +113,10 @@ test("schema builder category activation is super-admin-only and audited", () =>
   assert.match(statusAction, /action: "CATEGORY_UPDATED"/);
   assert.match(statusAction, /source: "listing_schema_builder"/);
   assert.match(schemaCategoryNavigator, /action=\{updateSchemaCategoryStatusAction\}/);
-  assert.match(schemaCategoryNavigator, /Deactivate category/);
-  assert.match(schemaCategoryNavigator, /Activate category/);
+  assert.match(schemaCategoryNavigator, /copy\.deactivate/);
+  assert.match(schemaCategoryNavigator, /copy\.activate/);
+  assert.equal(SCHEMA_BUILDER_COPY.en.deactivate, "Deactivate category");
+  assert.equal(SCHEMA_BUILDER_COPY.en.activate, "Activate category");
 });
 
 test("paid AI category inference requires a user and bounds uploaded input", () => {

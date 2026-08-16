@@ -1,5 +1,6 @@
 import type { CategoryField, ListingAttribute, ListingWithRelations } from "@/types/database";
 import type { AppLocale } from "@/lib/i18n/translations";
+import { formatCurrencyAmount, formatDate, formatNumber } from "@/lib/i18n/format";
 
 type FieldMeta = {
   label: string;
@@ -90,7 +91,7 @@ function toValue(attr: ListingAttribute, locale: AppLocale): string | null {
     return text;
   }
   if (typeof attr.attribute_value_number === "number") {
-    return String(attr.attribute_value_number);
+    return formatNumber(attr.attribute_value_number, locale);
   }
   if (typeof attr.attribute_value_boolean === "boolean") {
     return yesNo(locale, attr.attribute_value_boolean);
@@ -187,10 +188,10 @@ export function buildListingSpecView(
         };
 
   const basicRows = [
-    { label: basicLabels.price, value: `${new Intl.NumberFormat("en-US").format(listing.price)} ${listing.currency}` },
+    { label: basicLabels.price, value: formatCurrencyAmount(listing.price, listing.currency, locale) },
     { label: basicLabels.propertyType, value: listing.category_node?.name ?? "" },
     { label: basicLabels.listingType, value: grouped.property_details?.find((x) => x.key === "rental_type")?.value ?? "" },
-    { label: basicLabels.listingDate, value: new Date(listing.created_at).toLocaleDateString() },
+    { label: basicLabels.listingDate, value: formatDate(listing.created_at, locale) },
     { label: basicLabels.listingId, value: listing.id },
     { label: basicLabels.province, value: listing.province ?? "" },
     { label: basicLabels.district, value: listing.district ?? "" },

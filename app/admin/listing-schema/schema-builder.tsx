@@ -3,20 +3,17 @@
 import { useMemo, useState } from "react";
 import type { ConfiguredListingField, ListingSchemaConfig } from "@/lib/listing-schema-config";
 import { publishListingSchemaAction } from "@/lib/actions/listing-schema";
+import type { AppLocale } from "@/lib/i18n/translations";
+import { SCHEMA_BUILDER_COPY } from "@/lib/i18n/schema-builder-copy";
 
 const localeNames = { en: "English", fa: "دری", ps: "پښتو" } as const;
 const locales = ["en", "fa", "ps"] as const;
-const editorText = {
-  en: { publish: "Publish new version", sections: "Detail-page sections", addSection: "Add section", preview: "Live detail-page preview", previewHelp: "Only active fields with Detail enabled appear here.", fields: "Fields, filters, cards and details", addField: "Add field", safety: "Changes are published atomically as a new version. Turning off a field does not delete values from existing listings." },
-  fa: { publish: "نشر نسخه جدید", sections: "بخش‌های صفحه جزئیات", addSection: "افزودن بخش", preview: "پیش‌نمایش زنده صفحه جزئیات", previewHelp: "فقط فیلدهای فعال که نمایش جزئیات دارند در اینجا دیده می‌شوند.", fields: "فیلدها، فیلترها، کارت‌ها و جزئیات", addField: "افزودن فیلد", safety: "تغییرات به‌صورت یک نسخه جدید نشر می‌شوند. غیرفعال‌کردن فیلد، معلومات اعلان‌های موجود را حذف نمی‌کند." },
-  ps: { publish: "نوې نسخه خپره کړئ", sections: "د تفصیلاتو پاڼې برخې", addSection: "برخه زیاتول", preview: "د تفصیلاتو ژوندۍ کتنه", previewHelp: "یوازې فعال فیلډونه چې د تفصیلاتو ښودنه لري دلته ښکاري.", fields: "فیلډونه، فلټرونه، کارتونه او تفصیلات", addField: "فیلډ زیاتول", safety: "بدلونونه د نوې نسخې په توګه خپرېږي. د فیلډ بندول د پخوانیو اعلانونو معلومات نه ړنګوي." },
-} as const;
-
-export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: ListingSchemaConfig; categoryNodeId: number; version: number }) {
+export function SchemaBuilder({ initial, categoryNodeId, version, locale }: { initial: ListingSchemaConfig; categoryNodeId: number; version: number; locale: AppLocale }) {
   const [config, setConfig] = useState(initial);
   const [activeLocale, setActiveLocale] = useState<(typeof locales)[number]>("en");
-  const copy = editorText[activeLocale];
-  const direction = activeLocale === "en" ? "ltr" : "rtl";
+  const copy = SCHEMA_BUILDER_COPY[locale];
+  const direction = locale === "en" ? "ltr" : "rtl";
+  const toggleLabels = { active: copy.active, required: copy.required, posting: copy.posting, filter: copy.filter, card: copy.card, detail: copy.detail };
   const serialized = useMemo(() => JSON.stringify(config), [config]);
   const detailPreview = useMemo(() => config.sections.filter((section) => section.visible).sort((a, b) => a.order - b.order).map((section) => ({
     ...section,
@@ -51,7 +48,7 @@ export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: L
       <input type="hidden" name="expected_version" value={version} />
       <input type="hidden" name="config" value={serialized} />
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-white p-4">
-        <div className="flex gap-2" role="tablist" aria-label="Editing language">
+        <div className="flex gap-2" role="tablist" aria-label={copy.editingLanguage}>
           {locales.map((locale) => <button key={locale} type="button" onClick={() => setActiveLocale(locale)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${activeLocale === locale ? "bg-[var(--ink-1)] text-white" : "bg-[var(--surface-2)]"}`}>{localeNames[locale]}</button>)}
         </div>
         <button className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-bold text-white">{copy.publish}</button>
@@ -61,18 +58,18 @@ export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: L
         <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">{copy.sections}</h2><button type="button" onClick={addSection} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm font-semibold">{copy.addSection}</button></div>
         <div className="mt-3 space-y-3">
           {config.sections.map((section, index) => <div key={`${section.key}-${index}`} className="grid gap-3 rounded-xl bg-[var(--surface-2)] p-3 md:grid-cols-[1fr_2fr_7rem_7rem_7rem]">
-            <input value={section.key} onChange={(event) => updateSectionKey(index, event.target.value)} aria-label="Section key" className="rounded-lg border border-[var(--line)] px-3 py-2" />
+            <input value={section.key} onChange={(event) => updateSectionKey(index, event.target.value)} aria-label={copy.sectionKey} className="rounded-lg border border-[var(--line)] px-3 py-2" />
             <input dir={activeLocale === "en" ? "ltr" : "rtl"} value={section.titles[activeLocale]} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, titles: { ...item.titles, [activeLocale]: event.target.value } } : item) }))} aria-label={`Section title in ${localeNames[activeLocale]}`} className="rounded-lg border border-[var(--line)] px-3 py-2" />
-            <input type="number" min="0" value={section.order} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, order: Number(event.target.value) } : item) }))} aria-label="Section order" className="rounded-lg border border-[var(--line)] px-3 py-2" />
-            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={section.visible} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, visible: event.target.checked } : item) }))} /> Visible</label>
-            <button type="button" disabled={config.sections.length === 1} onClick={() => removeSection(index)} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-40">Remove</button>
+            <input type="number" min="0" value={section.order} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, order: Number(event.target.value) } : item) }))} aria-label={copy.sectionOrder} className="rounded-lg border border-[var(--line)] px-3 py-2" />
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={section.visible} onChange={(event) => setConfig((current) => ({ ...current, sections: current.sections.map((item, i) => i === index ? { ...item, visible: event.target.checked } : item) }))} /> {copy.visible}</label>
+            <button type="button" disabled={config.sections.length === 1} onClick={() => removeSection(index)} className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-40">{copy.remove}</button>
           </div>)}
         </div>
       </section>
 
       <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4" dir={direction}>
         <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-bold">{copy.preview}</h2><p className="mt-1 text-sm text-[var(--ink-2)]">{copy.previewHelp}</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-bold">{localeNames[activeLocale]}</span></div>
-        <div className="mt-4 space-y-3">{detailPreview.map((section) => <section key={`preview-${section.key}`} className="overflow-hidden rounded-xl border border-[var(--line)] bg-white"><header className="border-b border-[var(--line)] bg-[var(--wash)] px-4 py-3"><h3 className="font-bold">{section.titles[activeLocale] || section.titles.en}</h3></header>{section.fields.length ? <div className="grid md:grid-cols-2">{section.fields.map((field) => <div key={`preview-${section.key}-${field.key}`} className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 py-3 text-sm"><span className="text-[var(--ink-2)]">{field.labels[activeLocale] || field.labels.en}</span><span className="font-semibold">{field.options[0]?.labels[activeLocale] || field.options[0]?.labels.en || (field.type === "boolean" ? "Yes / No" : "Example value")}</span></div>)}</div> : <p className="px-4 py-4 text-sm text-[var(--ink-2)]">No visible detail fields in this section.</p>}</section>)}</div>
+        <div className="mt-4 space-y-3">{detailPreview.map((section) => <section key={`preview-${section.key}`} className="overflow-hidden rounded-xl border border-[var(--line)] bg-white"><header className="border-b border-[var(--line)] bg-[var(--wash)] px-4 py-3"><h3 className="font-bold">{section.titles[activeLocale] || section.titles.en}</h3></header>{section.fields.length ? <div className="grid md:grid-cols-2">{section.fields.map((field) => <div key={`preview-${section.key}-${field.key}`} className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-4 py-3 text-sm"><span className="text-[var(--ink-2)]">{field.labels[activeLocale] || field.labels.en}</span><span className="font-semibold">{field.options[0]?.labels[activeLocale] || field.options[0]?.labels.en || (field.type === "boolean" ? copy.yesNo : copy.exampleValue)}</span></div>)}</div> : <p className="px-4 py-4 text-sm text-[var(--ink-2)]">{copy.noVisibleFields}</p>}</section>)}</div>
       </section>
 
       <section className="rounded-2xl border border-[var(--line)] bg-white p-4" dir={direction}>
@@ -81,23 +78,23 @@ export function SchemaBuilder({ initial, categoryNodeId, version }: { initial: L
         <div className="mt-4 space-y-4">
           {config.fields.map((field, index) => <article key={`${field.key}-${index}`} className="rounded-xl border border-[var(--line)] p-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_1fr_9rem_1fr_7rem]">
-              <label className="text-xs font-bold uppercase tracking-wide">Key<input value={field.key} onChange={(event) => updateField(index, { key: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm" /></label>
-              <label className="text-xs font-bold uppercase tracking-wide">{localeNames[activeLocale]} label<input dir={activeLocale === "en" ? "ltr" : "rtl"} value={field.labels[activeLocale]} onChange={(event) => updateField(index, { labels: { ...field.labels, [activeLocale]: event.target.value } })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm" /></label>
-              <label className="text-xs font-bold uppercase tracking-wide">Type<select value={field.type} onChange={(event) => updateField(index, { type: event.target.value as ConfiguredListingField["type"] })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm"><option value="text">Text</option><option value="number">Number</option><option value="boolean">Yes / no</option><option value="select">Select</option><option value="date">Date</option></select></label>
-              <label className="text-xs font-bold uppercase tracking-wide">Section<select value={field.sectionKey} onChange={(event) => updateField(index, { sectionKey: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm">{config.sections.map((section) => <option key={section.key} value={section.key}>{section.titles[activeLocale]}</option>)}</select></label>
-              <label className="text-xs font-bold uppercase tracking-wide">Order<input type="number" min="0" value={field.order} onChange={(event) => updateField(index, { order: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm" /></label>
+              <label className="text-xs font-bold uppercase tracking-wide">{copy.key}<input value={field.key} onChange={(event) => updateField(index, { key: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm" /></label>
+              <label className="text-xs font-bold uppercase tracking-wide">{localeNames[activeLocale]} {copy.label}<input dir={activeLocale === "en" ? "ltr" : "rtl"} value={field.labels[activeLocale]} onChange={(event) => updateField(index, { labels: { ...field.labels, [activeLocale]: event.target.value } })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm" /></label>
+              <label className="text-xs font-bold uppercase tracking-wide">{copy.type}<select value={field.type} onChange={(event) => updateField(index, { type: event.target.value as ConfiguredListingField["type"] })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm"><option value="text">{copy.text}</option><option value="number">{copy.number}</option><option value="boolean">{copy.boolean}</option><option value="select">{copy.select}</option><option value="date">{copy.date}</option></select></label>
+              <label className="text-xs font-bold uppercase tracking-wide">{copy.section}<select value={field.sectionKey} onChange={(event) => updateField(index, { sectionKey: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm">{config.sections.map((section) => <option key={section.key} value={section.key}>{section.titles[activeLocale]}</option>)}</select></label>
+              <label className="text-xs font-bold uppercase tracking-wide">{copy.order}<input type="number" min="0" value={field.order} onChange={(event) => updateField(index, { order: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2 text-sm" /></label>
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold">
-              {(["active", "required", "posting", "filter", "card", "detail"] as const).map((key) => <label key={key} className="flex items-center gap-2"><input type="checkbox" checked={field[key]} onChange={(event) => updateField(index, { [key]: event.target.checked })} />{key[0].toUpperCase() + key.slice(1)}</label>)}
+              {(["active", "required", "posting", "filter", "card", "detail"] as const).map((key) => <label key={key} className="flex items-center gap-2"><input type="checkbox" checked={field[key]} onChange={(event) => updateField(index, { [key]: event.target.checked })} />{toggleLabels[key]}</label>)}
             </div>
-            <button type="button" onClick={() => setConfig((current) => ({ ...current, fields: current.fields.filter((_, i) => i !== index) }))} className="mt-3 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700">Remove field</button>
-            {field.type === "select" ? <label className="mt-3 block text-xs font-bold uppercase tracking-wide">Options ({localeNames[activeLocale]})<textarea dir={activeLocale === "en" ? "ltr" : "rtl"} value={field.options.map((option) => `${option.value} | ${option.labels[activeLocale]}`).join("\n")} onChange={(event) => {
+            <button type="button" onClick={() => setConfig((current) => ({ ...current, fields: current.fields.filter((_, i) => i !== index) }))} className="mt-3 rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700">{copy.removeField}</button>
+            {field.type === "select" ? <label className="mt-3 block text-xs font-bold uppercase tracking-wide">{copy.options} ({localeNames[activeLocale]})<textarea dir={activeLocale === "en" ? "ltr" : "rtl"} value={field.options.map((option) => `${option.value} | ${option.labels[activeLocale]}`).join("\n")} onChange={(event) => {
               const existing = new Map(field.options.map((option) => [option.value, option]));
               const options = event.target.value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
                 const [value, ...labelParts] = line.split("|"); const cleanValue = value.trim(); const label = labelParts.join("|").trim() || cleanValue; const previous = existing.get(cleanValue);
                 return { value: cleanValue, labels: { en: previous?.labels.en || cleanValue, fa: previous?.labels.fa || cleanValue, ps: previous?.labels.ps || cleanValue, [activeLocale]: label } };
               }); updateField(index, { options });
-            }} className="mt-1 min-h-24 w-full rounded-lg border border-[var(--line)] px-3 py-2 font-mono text-sm" /><span className="mt-1 block normal-case text-[var(--ink-2)]">One per line: stored value | translated label</span></label> : null}
+            }} className="mt-1 min-h-24 w-full rounded-lg border border-[var(--line)] px-3 py-2 font-mono text-sm" /><span className="mt-1 block normal-case text-[var(--ink-2)]">{copy.optionsHelp}</span></label> : null}
           </article>)}
         </div>
       </section>

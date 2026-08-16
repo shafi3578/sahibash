@@ -227,6 +227,7 @@ type ListingManageUi = {
 };
 
 type ListingEditUi = {
+  other: string;
   notFoundOrUnauthorized: string;
   backToMyListings: string;
   editListing: string;
@@ -536,6 +537,7 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       deleteListing: "Delete Listing",
     },
     listingEdit: {
+      other: "Other",
       notFoundOrUnauthorized: "Listing not found or unauthorized",
       backToMyListings: "Back to My Listings",
       editListing: "Edit Listing",
@@ -827,6 +829,7 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       deleteListing: "حذف اعلان",
     },
     listingEdit: {
+      other: "سایر",
       notFoundOrUnauthorized: "اعلان پیدا نشد یا اجازه دسترسی ندارید",
       backToMyListings: "بازگشت به اعلان‌های من",
       editListing: "ویرایش اعلان",
@@ -1010,7 +1013,7 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       searchesWithResultsNoClick: "هغه لټونونه چې پایله لري خو کلیک نه لري",
       addCategory: "کټګوري زیاته کړئ",
       categoryName: "د کټګورۍ نوم",
-      categorySlug: "category-slug",
+      categorySlug: "د کټګورۍ لنډ نوم",
       description: "تشریح",
       displayOrder: "د ښودنې ترتیب",
       saveCategory: "کټګوري خوندي کړئ",
@@ -1118,6 +1121,7 @@ export const UI_TRANSLATIONS: Record<AppLocale, UiTranslations> = {
       deleteListing: "اعلان ړنګول",
     },
     listingEdit: {
+      other: "نور",
       notFoundOrUnauthorized: "اعلان ونه موندل شو یا اجازه نه لرئ",
       backToMyListings: "زما اعلانونو ته بېرته",
       editListing: "اعلان سمول",

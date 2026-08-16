@@ -295,7 +295,7 @@ export default async function EditListingPage({ params }: PageProps) {
                         {modelOptions.map((option) => (
                           <option key={option} value={option}>{option}</option>
                         ))}
-                        <option value="Other">Other</option>
+                        <option value="Other">{ui.listingEdit.other}</option>
                       </select>
                       {field.allowCustom ? (
                         <input
@@ -369,7 +369,7 @@ export default async function EditListingPage({ params }: PageProps) {
                         {(field.options ?? []).map((option) => (
                           <option key={option.value} value={option.value}>{optionLabel(locale, option)}</option>
                         ))}
-                        {field.allowCustom ? <option value="Other">Other</option> : null}
+                        {field.allowCustom ? <option value="Other">{ui.listingEdit.other}</option> : null}
                       </select>
                       {field.allowCustom ? (
                         <input

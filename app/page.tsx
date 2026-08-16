@@ -10,6 +10,7 @@ import { getApprovedListings } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatCurrencyAmount } from "@/lib/i18n/format";
 
 export default async function HomePage() {
   const { t, locale } = await getDictionary();
@@ -138,7 +139,7 @@ export default async function HomePage() {
                   <div className="space-y-1 p-2">
                     <p className="line-clamp-2 text-sm font-medium text-slate-800">{displayTitle}</p>
                     <p className="text-sm font-semibold text-[var(--accent)]">
-                      {new Intl.NumberFormat("en-US").format(listing.price)} {listing.currency}
+                      {formatCurrencyAmount(listing.price, listing.currency, locale)}
                     </p>
                   </div>
                 </Link>
@@ -173,7 +174,7 @@ export default async function HomePage() {
                   <p className="mt-1 line-clamp-1 text-sm text-slate-500">{province}</p>
                 </div>
                 <p className="shrink-0 text-xl font-semibold text-[#1967b1]">
-                  {new Intl.NumberFormat("en-US").format(listing.price)} {listing.currency}
+                  {formatCurrencyAmount(listing.price, listing.currency, locale)}
                 </p>
               </Link>
             );

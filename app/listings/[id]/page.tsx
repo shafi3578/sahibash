@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getListingById } from "@/lib/data/queries";
+import { getListingById, getSimilarListings } from "@/lib/data/queries";
 import Link from "next/link";
 import { toggleFavoriteAction } from "@/lib/actions/favorites";
 import { createReportAction } from "@/lib/actions/reports";
@@ -10,7 +10,7 @@ import { reportListingTranslationIssueAction } from "@/lib/actions/translations"
 import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
-import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
+import { VehicleModelViewer } from "@/components/vehicles/VehicleModelViewer";
 import LocationCard from "@/components/location/LocationCard";
 import type { LocationVisibility } from "@/components/location/LocationCard";
 import { getDictionary } from "@/lib/i18n/server";
@@ -20,13 +20,16 @@ import { buildActiveListingSchemaView } from "@/lib/listingSchemas";
 import { getSimpleCategoryConfig, getSimpleCategoryKind, labelFor } from "@/lib/posting/simple-category-details";
 import DynamicDetailSection from "@/data/componentsDynamicDetailSection";
 import { ELECTRONICS_DYNAMIC_LEAF_KEY } from "@/lib/posting/electronics-dynamic";
+import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
+import { labelForLocale } from "@/lib/listing-schema-config";
+import { selectVehicleModel3D } from "@/lib/vehicles/model-catalog";
+import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { ListingContactActions } from "@/components/listings/listing-contact-actions";
+import { ListingCard } from "@/components/listing-card";
+import { formatCurrencyAmount } from "@/lib/i18n/format";
 
 type NamedLocationRelation = { name?: string | null } | null;
-type VehicleDamagePart = { part_key: string; part_label: string; condition: string };
-type VehicleDamagePayload = {
-  all_original: boolean;
-  vehicle_damage_parts?: VehicleDamagePart[] | null;
-};
 
 function readAttributeValue(value: unknown, locale: "en" | "fa" | "ps") {
   if (typeof value === "string") return value;
@@ -61,6 +64,7 @@ export default async function ListingDetailPage({
   const qp = await searchParams;
   const listing = await getListingById(id, locale);
   if (!listing) notFound();
+  const similarListings = listing.status === "approved" ? await getSimilarListings(listing, locale, 4) : [];
   await recordSearchTelemetryClick(qp.st, id);
   const viewerLanguageCode = appLocaleToListingLanguage(locale);
   const showOriginal = qp.view === "original";
@@ -76,6 +80,7 @@ export default async function ListingDetailPage({
   const isOwner = currentUser?.id === listing.user_id;
   const callHref = `tel:${listing.contact_phone.replace(/[^\d+]/g, "")}`;
   const fields = await getCategoryFieldsWithOptions(listing.category_node_id);
+  const configuredSchema = await getPublishedListingSchema(listing.category_node_id);
   const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
   const dynamicLeafId = attrs.find((item) => item.attribute_key === ELECTRONICS_DYNAMIC_LEAF_KEY)?.attribute_value_text ?? null;
   const dynamicAttributes = attrs.reduce<Record<string, unknown>>((acc, item) => {
@@ -98,7 +103,26 @@ export default async function ListingDetailPage({
       return [item.attribute_key, readAttributeValue(value, locale)];
     })
   );
-  const categoryLabel = [listing.category?.name, listing.category_node?.name].filter(Boolean).join(" > ");
+  const configuredSections = (configuredSchema?.config.sections ?? []).filter((section) => section.visible).sort((a, b) => a.order - b.order).map((section) => ({
+    key: section.key,
+    title: labelForLocale(section.titles, locale),
+    rows: configuredSchema!.config.fields.filter((field) => field.active && field.detail && field.sectionKey === section.key).sort((a, b) => a.order - b.order).flatMap((field) => {
+      const direct = (listing as unknown as Record<string, unknown>)[field.key];
+      const raw = direct ?? attributeMap.get(field.key);
+      if (raw === null || raw === undefined || raw === "") return [];
+      const option = field.options.find((item) => item.value === String(raw));
+      return [{ key: field.key, label: labelForLocale(field.labels, locale), value: option ? labelForLocale(option.labels, locale) : String(raw) }];
+    }),
+  })).filter((section) => section.rows.length > 0);
+  const hasConfiguredView = configuredSections.length > 0;
+  const categoryLabel = [
+    listing.category?.name
+      ? localizeCategoryName({ locale, fallbackName: listing.category.name, slug: listing.category.slug })
+      : "",
+    listing.category_node?.name
+      ? localizeCategoryName({ locale, fallbackName: listing.category_node.name, slug: listing.category_node.slug, path: listing.category_node.path })
+      : "",
+  ].filter(Boolean).join(" › ");
   const simpleCategoryKind = getSimpleCategoryKind(listing.category_node?.path ?? undefined, listing.category?.slug ?? null);
   const simpleCategoryConfig = getSimpleCategoryConfig(simpleCategoryKind);
   const locationParts = listing.location_visibility === "exact"
@@ -125,6 +149,11 @@ export default async function ListingDetailPage({
         month: "short",
       })
     : null;
+  const galleryLabels = locale === "fa"
+    ? { open: "باز کردن عکس", close: "بستن", previous: "قبلی", next: "بعدی", photo: "عکس" }
+    : locale === "ps"
+      ? { open: "انځور پرانیستل", close: "تړل", previous: "مخکینی", next: "بل", photo: "انځور" }
+      : { open: "Open photo", close: "Close", previous: "Previous", next: "Next", photo: "Photo" };
   const groupedSpecs = Object.entries(specView.grouped)
     .map(([group, rows]) => [group, rows.filter((row) => isMeaningfulValue(row.value))] as const)
     .filter(([, rows]) => rows.length > 0)
@@ -207,10 +236,13 @@ export default async function ListingDetailPage({
   }, {});
   const vehicleMakeValue = attributeMap.get("locked__make")
     || attributeMap.get("locked__brand")
+    || attributeMap.get("make")
+    || attributeMap.get("brand")
     || listing.vehicle_brand
     || vehicleVariant?.generation?.model?.brand?.name
     || "-";
   const vehicleModelValue = attributeMap.get("locked__model")
+    || attributeMap.get("model")
     || listing.vehicle_model
     || vehicleVariant?.generation?.model?.name
     || "-";
@@ -235,6 +267,18 @@ export default async function ListingDetailPage({
     || "-";
   const vehicleMileageValue = attributeMap.get("mileage") || "-";
   const vehicleYearValue = attributeMap.get("year") || "-";
+  const vehicleModel3D = isVehicleListing ? selectVehicleModel3D({
+    make: vehicleMakeValue,
+    model: vehicleModelValue,
+    year: vehicleYearValue,
+    title: displayTitle,
+  }) : null;
+  const vehicleDamageParts = normalizeVehicleDamageParts(
+    (listing.vehicle_damage?.vehicle_damage_parts ?? []).map((part) => ({
+      key: part.part_key,
+      condition: part.condition,
+    }))
+  );
   const vehiclePlateNumberValue = attributeMap.get("plate_number")
     || attributeMap.get("license_plate")
     || attributeMap.get("vehicle_plate_number")
@@ -553,7 +597,9 @@ export default async function ListingDetailPage({
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-2)]">{categoryLabel || t.listing.category}</p>
       </div>
       <div className="space-y-4 pb-20 sm:pb-0">
-        <ListingGallery images={listing.listing_images ?? []} title={displayTitle} />
+        <ListingGallery images={listing.listing_images ?? []} title={displayTitle} labels={galleryLabels} />
+
+        {vehicleModel3D ? <VehicleModelViewer model={vehicleModel3D} locale={locale} damageParts={vehicleDamageParts} hasDamageReport={Boolean(listing.vehicle_damage)} /> : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           {isWanted ? (
@@ -581,7 +627,7 @@ export default async function ListingDetailPage({
               {t.listing.suitableForStudents}
             </p>
           ) : null}
-          <p className="mt-3 text-3xl font-bold text-[var(--accent)]">{new Intl.NumberFormat("en-US").format(listing.price)} {listing.currency}</p>
+          <p className="mt-3 text-3xl font-bold text-[var(--accent)]">{formatCurrencyAmount(listing.price, listing.currency, locale)}</p>
           <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-3 text-sm text-[var(--ink-2)] sm:grid-cols-2">
             {locationParts.length > 0 ? <p>{locationParts.join(" / ")}</p> : null}
             <p className="sm:text-right">{t.listing.posted}: {postedDate}</p>
@@ -599,7 +645,12 @@ export default async function ListingDetailPage({
           </section>
         ) : null}
 
-        {hasSimpleLeafView ? (
+        {hasConfiguredView ? (
+          <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+            <h2 className="text-base font-bold">{t.listing.specifications}</h2>
+            <div className="mt-3 space-y-3">{configuredSections.map((section) => <section key={section.key} className="overflow-hidden rounded-xl border border-[var(--line)]"><header className="border-b border-[var(--line)] bg-[var(--surface-2)] px-3 py-2"><h3 className="text-sm font-semibold">{section.title}</h3></header><div className="grid divide-y divide-[var(--line)] md:grid-cols-2">{section.rows.map((row) => <div key={row.key} className="flex items-start justify-between gap-3 px-3 py-2 text-sm"><span className="text-[var(--ink-2)]">{row.label}</span><span className="text-right font-semibold">{row.value}</span></div>)}</div></section>)}</div>
+          </section>
+        ) : hasSimpleLeafView ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
             <h2 className="text-base font-bold">{labelFor(locale, simpleCategoryConfig!.title)}</h2>
 
@@ -691,7 +742,7 @@ export default async function ListingDetailPage({
           </section>
         ) : null}
 
-        {!hasSimpleLeafView && !hasLeafSchemaView && isVehicleListing ? (
+        {!hasConfiguredView && !hasSimpleLeafView && !hasLeafSchemaView && isVehicleListing ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
             <h2 className="text-base font-bold">{t.postAd.vehicleDetails}</h2>
             {cleanedVehicleMetricRows.length > 0 ? (
@@ -725,12 +776,10 @@ export default async function ListingDetailPage({
             ) : null}
           </div>
           {listing.minimum_offer ? (
-            <p className="mt-2 text-sm text-[var(--ink-2)]">{t.listing.minimumOffer}: {new Intl.NumberFormat("en-US").format(listing.minimum_offer)} {listing.currency}</p>
+            <p className="mt-2 text-sm text-[var(--ink-2)]">{t.listing.minimumOffer}: {formatCurrencyAmount(listing.minimum_offer, listing.currency, locale)}</p>
           ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
-            {listing.contact_phone ? (
-              <a href={callHref} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">{t.listing.callSeller}</a>
-            ) : null}
+            {listing.contact_phone ? <ListingContactActions listingId={listing.id} title={displayTitle} phone={listing.contact_phone} locale={locale} /> : null}
             {!isOwner ? (
               <Link href={`/listings/${listing.id}?compose=1`} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
             ) : null}
@@ -758,17 +807,6 @@ export default async function ListingDetailPage({
             }}
           />
         )}
-
-        {listing.vehicle_damage ? (
-          <VehicleDamageCard
-            allOriginal={(listing.vehicle_damage as VehicleDamagePayload).all_original}
-            parts={((listing.vehicle_damage as VehicleDamagePayload).vehicle_damage_parts ?? []).map((p: VehicleDamagePart) => ({
-              part_key: p.part_key,
-              part_label: p.part_label,
-              condition: p.condition,
-            }))}
-          />
-        ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.description}</h2>
@@ -803,7 +841,7 @@ export default async function ListingDetailPage({
           </section>
         ) : null}
 
-        {!hasSimpleLeafView ? (
+        {!hasConfiguredView && !hasSimpleLeafView ? (
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{isVehicleListing ? t.listing.additionalDetails : t.listing.specifications}</h2>
 
@@ -866,7 +904,9 @@ export default async function ListingDetailPage({
           <select name="reason" required defaultValue="" className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm">
             <option value="" disabled>{t.listing.selectReportReason}</option>
             <option value={t.listing.fraudOrScam}>{t.listing.fraudOrScam}</option>
+            <option value={locale === "fa" ? "فروخته‌شده یا موجود نیست" : locale === "ps" ? "پلورل شوی یا نشته" : "Sold or unavailable"}>{locale === "fa" ? "فروخته‌شده یا موجود نیست" : locale === "ps" ? "پلورل شوی یا نشته" : "Sold or unavailable"}</option>
             <option value={t.listing.wrongCategory}>{t.listing.wrongCategory}</option>
+            <option value={locale === "fa" ? "اطلاعات نادرست" : locale === "ps" ? "ناسم معلومات" : "Incorrect information"}>{locale === "fa" ? "اطلاعات نادرست" : locale === "ps" ? "ناسم معلومات" : "Incorrect information"}</option>
             <option value={t.listing.duplicateListing}>{t.listing.duplicateListing}</option>
             <option value={t.listing.prohibitedOrUnsafeItem}>{t.listing.prohibitedOrUnsafeItem}</option>
             <option value={t.listing.spamOrMisleading}>{t.listing.spamOrMisleading}</option>
@@ -895,12 +935,16 @@ export default async function ListingDetailPage({
         </div>
       ) : null}
 
+      {similarListings.length > 0 ? <section className="mt-8 border-t border-[var(--line)] pt-6">
+        <h2 className="font-display text-2xl font-bold">{locale === "fa" ? "اعلان‌های مشابه" : locale === "ps" ? "ورته اعلانونه" : "Similar listings"}</h2>
+        <p className="mt-1 text-sm text-[var(--ink-2)]">{locale === "fa" ? "بر اساس دسته‌بندی، موقعیت و محدوده قیمت" : locale === "ps" ? "د کټګورۍ، ځای او بیې له مخې" : "Based on category, location, and price range"}</p>
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">{similarListings.map(item=><ListingCard key={item.id} listing={item}/>)}</div>
+      </section> : null}
+
       {!isOwner ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
           <div className="mx-auto flex w-full max-w-5xl gap-2">
-            {listing.contact_phone ? (
-              <a href={callHref} className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">{t.listing.call}</a>
-            ) : null}
+            {listing.contact_phone ? <a href={callHref} className="flex min-h-12 items-center rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">{t.listing.call}</a> : null}
             <Link href={`/listings/${listing.id}?compose=1`} className="flex-1 rounded-lg bg-[var(--ink-1)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.message}</Link>
             <Link href={`/listings/${listing.id}?offerbox=1`} className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.offer}</Link>
           </div>
@@ -944,7 +988,7 @@ export default async function ListingDetailPage({
             </div>
             {listing.minimum_offer ? (
               <p className="mb-3 text-sm text-[var(--ink-2)]">
-                {t.listing.minimumOffer}: {new Intl.NumberFormat("en-US").format(listing.minimum_offer)} {listing.currency}
+                {t.listing.minimumOffer}: {formatCurrencyAmount(listing.minimum_offer, listing.currency, locale)}
               </p>
             ) : null}
             <form action={createOfferAction} className="space-y-3">

@@ -13,6 +13,9 @@ import {
   type VehicleModelCatalog,
   type VehicleOption,
 } from "@/data/catalog/vehicles";
+import type { AppLocale } from "@/lib/i18n/translations";
+import { VEHICLE_SELECTOR_COPY } from "@/lib/i18n/vehicle-selector-copy";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
 
 export type VehicleSpec = { spec_key: string; spec_label: string; spec_value: string; is_locked: boolean };
 
@@ -29,6 +32,7 @@ export type VehicleSelection = {
 };
 
 type Props = {
+  locale: AppLocale;
   categoryPath?: string | null;
   aiSuggestedBrand?: string | null;
   aiSuggestedModel?: string | null;
@@ -51,8 +55,10 @@ function isOtherSlug(value?: string | null) {
   return value === "other-brand" || value === "other-model";
 }
 
-export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggestedModel, onChange }: Props) {
+export function VehicleSmartSelector({ locale, categoryPath, aiSuggestedBrand, aiSuggestedModel, onChange }: Props) {
+  const copy = VEHICLE_SELECTOR_COPY[locale];
   const branch = useMemo(() => getVehicleBranchFromPath(categoryPath), [categoryPath]);
+  const branchDisplayLabel = branch ? localizeCategoryName({ locale, fallbackName: branch.label, path: categoryPath }) : "";
   const [selectedSubtype, setSelectedSubtype] = useState<VehicleOption | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<VehicleOption | null>(null);
   const [selectedModel, setSelectedModel] = useState<VehicleModelCatalog | null>(null);
@@ -140,7 +146,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
     }
 
     return getVehicleLockedSpecs({
-      branchLabel: branch.label,
+      branchLabel: branchDisplayLabel,
       subtypeName: selectedSubtype?.name ?? null,
       brandName: resolvedBrandName || null,
       modelName: resolvedModelName || null,
@@ -150,10 +156,10 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
         || branch.key === "pickup"
         || branch.key === "vansMinibuses"
         || branch.key === "heavyTrucks"
-          ? branch.label
+          ? branchDisplayLabel
           : null,
     });
-  }, [branch, resolvedBrandName, resolvedModelName, selectedSubtype, selectedVariant]);
+  }, [branch, branchDisplayLabel, resolvedBrandName, resolvedModelName, selectedSubtype, selectedVariant]);
 
   useEffect(() => {
     onChange({
@@ -174,7 +180,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
   }
 
   const breadcrumbParts = [
-    branch.label,
+    branchDisplayLabel,
     selectedSubtype?.name,
     resolvedBrandName || undefined,
     resolvedModelName || undefined,
@@ -226,14 +232,14 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
             </span>
           ))}
           <button type="button" onClick={reset} className="ml-auto rounded-lg border border-[var(--line)] bg-white px-2 py-0.5 text-xs text-[var(--ink-2)]">
-            Change
+            {copy.change}
           </button>
         </div>
       ) : null}
 
       {showSubtypeChooser ? (
         <div>
-          <p className="mb-2 text-sm font-bold">{branch.subtypeLabel ?? "Select Type"}</p>
+          <p className="mb-2 text-sm font-bold">{copy.selectType}</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {(branch.subtypeOptions ?? []).map((option) => (
               <button
@@ -251,7 +257,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
 
       {showBrandChooser ? (
         <div>
-          <p className="mb-2 text-sm font-bold">{branch.brandMode === "optional" ? "Brand (Optional)" : "Select Brand"}</p>
+          <p className="mb-2 text-sm font-bold">{branch.brandMode === "optional" ? copy.brandOptional : copy.selectBrand}</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {brands.map((brand) => (
               <button
@@ -280,7 +286,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
               }}
               className="mt-2 text-xs font-semibold text-[var(--ink-2)]"
             >
-              Skip brand
+              {copy.skipBrand}
             </button>
           ) : null}
         </div>
@@ -289,22 +295,22 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
       {showManualBrandInput ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-semibold">
-            {branch.brandMode === "required" ? "Other Brand" : "Brand (Optional)"}
+            {branch.brandMode === "required" ? copy.otherBrand : copy.brandOptional}
             <input
               value={otherBrand}
               onChange={(event) => setOtherBrand(event.target.value)}
               className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-              placeholder="Enter brand"
+              placeholder={copy.enterBrand}
             />
           </label>
           {branch.modelMode !== "none" ? (
             <label className="text-sm font-semibold">
-              {branch.modelMode === "required" ? "Other Model" : "Model (Optional)"}
+              {branch.modelMode === "required" ? copy.otherModel : copy.modelOptional}
               <input
                 value={otherModel}
                 onChange={(event) => setOtherModel(event.target.value)}
                 className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-                placeholder="Enter model"
+                placeholder={copy.enterModel}
               />
             </label>
           ) : null}
@@ -313,7 +319,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
 
       {showModelChooser ? (
         <div>
-          <p className="mb-2 text-sm font-bold">{branch.modelMode === "optional" ? "Model (Optional)" : "Select Model"}</p>
+          <p className="mb-2 text-sm font-bold">{branch.modelMode === "optional" ? copy.modelOptional : copy.selectModel}</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {models.map((model) => (
               <button
@@ -339,7 +345,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
               }}
               className="mt-2 text-xs font-semibold text-[var(--ink-2)]"
             >
-              Skip model
+              {copy.skipModel}
             </button>
           ) : null}
         </div>
@@ -347,19 +353,19 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
 
       {showManualModelInput ? (
         <label className="block text-sm font-semibold">
-          {branch.modelMode === "required" ? "Other Model" : "Model (Optional)"}
+          {branch.modelMode === "required" ? copy.otherModel : copy.modelOptional}
           <input
             value={otherModel}
             onChange={(event) => setOtherModel(event.target.value)}
             className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-            placeholder="Enter model"
+            placeholder={copy.enterModel}
           />
         </label>
       ) : null}
 
       {showVariantChooser ? (
         <div>
-          <p className="mb-2 text-sm font-bold">Variant / Generation (Optional)</p>
+          <p className="mb-2 text-sm font-bold">{copy.variant}</p>
           <div className="grid grid-cols-1 gap-2">
             {variants.map((variant) => (
               <button
@@ -377,14 +383,14 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
             onClick={() => setSelectedVariant({ slug: "", name: "" })}
             className="mt-2 text-xs font-semibold text-[var(--ink-2)]"
           >
-            Skip variant
+            {copy.skipVariant}
           </button>
         </div>
       ) : null}
 
       {lockedSpecs.length > 0 ? (
         <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-          <p className="text-xs font-bold uppercase tracking-wide text-[var(--ink-2)]">Locked Selection Summary</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-[var(--ink-2)]">{copy.lockedSummary}</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {lockedSpecs.map((spec) => (
               <div key={spec.spec_key} className="rounded-lg bg-white px-3 py-2 text-sm">
@@ -393,7 +399,7 @@ export function VehicleSmartSelector({ categoryPath, aiSuggestedBrand, aiSuggest
               </div>
             ))}
           </div>
-          <p className="mt-2 text-xs text-[var(--ink-2)]">Only the category path, brand, model, and obvious body/category details are locked. Year, fuel, transmission, mileage, condition, documents, price, and similar item-specific fields stay seller-editable.</p>
+          <p className="mt-2 text-xs text-[var(--ink-2)]">{copy.lockedHelp}</p>
         </div>
       ) : null}
     </div>

@@ -1702,7 +1702,7 @@ export default function PostAdForm({
             onChange={(event) => updateDynamic(field.key, event.target.value)}
             className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
           >
-            <option value="">Select</option>
+            <option value="">{t.postAd.select}</option>
             {(field.options ?? []).map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
@@ -1746,6 +1746,7 @@ export default function PostAdForm({
         <h3 className="text-sm font-bold">{t.postAd.vehicleDetails}</h3>
         <p className="text-sm text-[var(--ink-2)]">{branchSpecificHint}</p>
         <VehicleSmartSelector
+          locale={locale}
           key={finalNode?.path ?? "vehicle-selector"}
           categoryPath={finalNode?.path ?? null}
           onChange={setVehicleSelection}
@@ -1807,7 +1808,7 @@ export default function PostAdForm({
                   {modelOptions.map((option) => (
                     <option key={option} value={option}>{option}</option>
                   ))}
-                  <option value="Other">Other</option>
+                  <option value="Other">{t.listing.other}</option>
                 </select>
                 {field.allowCustom && isOtherChoice(value) ? (
                   <input
@@ -2290,7 +2291,7 @@ export default function PostAdForm({
 
             {!simpleCategoryConfig && extraPhoneFields.length > 0 ? (
               <section className="mt-4 rounded-xl border border-[var(--line)] p-3">
-                <h3 className="text-sm font-bold">Phone details</h3>
+                <h3 className="text-sm font-bold">{t.postAd.phonesElectronicsDetails}</h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {extraPhoneFields.map((field) => {
                     const value = dynamicValues[field.key];
@@ -2320,7 +2321,7 @@ export default function PostAdForm({
                             onChange={(event) => updateDynamic(field.key, event.target.value)}
                             className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
                           >
-                            <option value="">Select</option>
+                            <option value="">{t.postAd.select}</option>
                             {(PHONE_FIELD_OPTIONS[field.key as keyof typeof PHONE_FIELD_OPTIONS] ?? []).map((option) => (
                               <option key={`${field.key}-${option}`} value={option}>{option}</option>
                             ))}
@@ -2377,7 +2378,7 @@ export default function PostAdForm({
                             onChange={(event) => updateDynamic(field.key, event.target.value)}
                             className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
                           >
-                            <option value="">Select</option>
+                            <option value="">{t.postAd.select}</option>
                             {(REAL_ESTATE_FIELD_OPTIONS[field.key as keyof typeof REAL_ESTATE_FIELD_OPTIONS] ?? []).map((option) => (
                               <option key={`${field.key}-${option}`} value={option}>{option}</option>
                             ))}
