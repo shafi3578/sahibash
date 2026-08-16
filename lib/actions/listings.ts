@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentUser, requireUser } from "@/lib/auth";
+import { getCurrentUser, requirePermission, requireUser } from "@/lib/auth";
 import { hasAdminPermission } from "@/lib/authorization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSelectedCategoryNodeId, listingSchema, type ListingInput } from "@/lib/validators/listing";
@@ -26,6 +26,8 @@ import {
   buildElectronicsDynamicAttributeRows,
   normalizeElectronicsDynamicAttributes,
 } from "@/lib/posting/electronics-dynamic";
+import { validateListingImage } from "@/lib/posting/image-validation";
+import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -152,7 +154,7 @@ function toFormValueBoolean(value: FormDataEntryValue | null) {
 }
 
 function toAttributePayload(field: {
-  id: number;
+  id: number | null;
   field_key: string;
   field_type: string;
   unit: string | null;
@@ -296,14 +298,16 @@ async function persistVehicleDamage(
   const rawParts = toFormValueText(formData.get("damage_parts_json"));
   if (!rawParts) return;
 
-  let parts: Array<{ key: string; label: string; condition: string }>;
+  let parsed: unknown;
   try {
-    parts = JSON.parse(rawParts) as Array<{ key: string; label: string; condition: string }>;
+    parsed = JSON.parse(rawParts);
   } catch {
     return;
   }
+  const parts = normalizeVehicleDamageParts(parsed);
+  if (parts.length !== 13) return;
 
-  const allOriginal = toFormValueText(formData.get("damage_all_original")) === "true";
+  const allOriginal = parts.every((part) => part.condition === "original");
 
   try {
     const { data: report, error: reportErr } = await supabase
@@ -618,7 +622,30 @@ async function persistListingAttributes(
   const simpleConfig = getSimpleCategoryConfig(simpleKind);
   const allSimpleFieldKeys = getAllSimpleCategoryFieldKeys();
 
-  const { data: fields } = simpleKind
+  const { data: publishedSchema } = await supabase.from("listing_schema_versions").select("config")
+    .eq("category_node_id", categoryNodeId).eq("status", "published").maybeSingle();
+  const configuredFields = ((publishedSchema?.config as { fields?: Array<Record<string, unknown>> } | null)?.fields ?? [])
+    .filter((field) => field.active !== false && field.posting !== false)
+    .map((field) => ({
+      id: null,
+      field_key: String(field.key ?? ""),
+      field_type: String(field.type ?? "text"),
+      unit: field.unit ? String(field.unit) : null,
+      required: field.required === true,
+      options: Array.isArray(field.options) ? (field.options as Array<{ value?: unknown }>).map((option) => String(option.value ?? "")) : [],
+    })).filter((field) => field.field_key);
+  const usesConfiguredSchema = configuredFields.length > 0;
+
+  for (const field of configuredFields) {
+    const value = toFormValueText(formData.get(field.field_key));
+    if (field.required && !value) throw new Error(`Missing required field: ${field.field_key}`);
+    if (value && field.field_type === "number" && !Number.isFinite(Number(value))) throw new Error(`Invalid number for ${field.field_key}`);
+    if (value && field.field_type === "select" && field.options.length > 0 && !field.options.includes(value)) throw new Error(`Invalid option for ${field.field_key}`);
+  }
+
+  const { data: fields } = usesConfiguredSchema
+    ? { data: configuredFields }
+    : simpleKind
     ? { data: [] as Array<{ id: number; field_key: string; field_type: string; unit: string | null }> }
     : await supabase
         .from("category_fields")
@@ -627,7 +654,7 @@ async function persistListingAttributes(
         .eq("is_active", true);
 
   const fieldMap = new Map((fields ?? []).map((field) => [field.field_key, field]));
-  const attributeRows: ListingAttributeDraft[] = simpleKind && simpleConfig
+  const attributeRows: ListingAttributeDraft[] = !usesConfiguredSchema && simpleKind && simpleConfig
     ? simpleConfig.fields.flatMap<ListingAttributeDraft>((field) => {
         const values = formData.getAll(field.key).map((value) => toFormValueText(value)).filter(Boolean);
         const customKey = `${field.key}Custom`;
@@ -730,7 +757,7 @@ async function persistListingAttributes(
         .filter((row) => Boolean(row));
 
   if (replaceExisting) {
-    if (simpleKind) {
+    if (simpleKind && !usesConfiguredSchema) {
       const keys = Array.from(new Set([...allSimpleFieldKeys, ...simpleFieldKeys]));
       if (keys.length > 0) {
         await supabase.from("listing_attributes").delete().eq("listing_id", listingId).in("attribute_key", keys);
@@ -879,6 +906,46 @@ async function ensureCategoryPostingAllowed(
 
   if (!["vehicles", "real-estate", "mobile-phones-tablets"].includes(String(fallback.data.slug))) {
     return { ok: false, message: "Posting in this category is not available yet." };
+  }
+
+  return { ok: true };
+}
+
+async function validatePublishedPostingSchema(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  categoryNodeId: number,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { data } = await supabase
+    .from("listing_schema_versions")
+    .select("config")
+    .eq("category_node_id", categoryNodeId)
+    .eq("status", "published")
+    .maybeSingle();
+
+  const config = data?.config as { fields?: Array<Record<string, unknown>> } | undefined;
+  if (!Array.isArray(config?.fields)) return { ok: true };
+
+  for (const field of config.fields) {
+    if (field.active === false || field.posting === false) continue;
+    const key = String(field.key ?? "").trim();
+    if (!key) continue;
+    const values = formData.getAll(key).map((value) => String(value).trim()).filter(Boolean);
+    const labels = field.labels as Record<string, unknown> | undefined;
+    const label = String(labels?.en ?? key.replace(/_/g, " "));
+
+    if (field.required === true && values.length === 0) {
+      return { ok: false, message: `${label} is required.` };
+    }
+
+    if (values.length > 0 && Array.isArray(field.options) && field.options.length > 0) {
+      const allowed = new Set(
+        (field.options as Array<{ value?: unknown }>).map((option) => String(option.value ?? ""))
+      );
+      if (values.some((value) => !allowed.has(value))) {
+        return { ok: false, message: `Invalid value for ${label}.` };
+      }
+    }
   }
 
   return { ok: true };
@@ -1167,6 +1234,10 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   if (!postingGuard.ok) {
     return;
   }
+  const selectedCategoryNodeId = getSelectedCategoryNodeId(input);
+  if (!selectedCategoryNodeId) return;
+  const schemaGuard = await validatePublishedPostingSchema(supabase, selectedCategoryNodeId, formData);
+  if (!schemaGuard.ok) return;
 
   const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
   if (!vehicleGuard.ok) {
@@ -1247,6 +1318,10 @@ export async function createListingAction(formData: FormData): Promise<{
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
   }
+  const selectedCategoryNodeId = getSelectedCategoryNodeId(input);
+  if (!selectedCategoryNodeId) return { ok: false, message: "Must select a category" };
+  const schemaGuard = await validatePublishedPostingSchema(supabase, selectedCategoryNodeId, formData);
+  if (!schemaGuard.ok) return { ok: false, message: schemaGuard.message };
 
   const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
   if (!vehicleGuard.ok) {
@@ -1348,6 +1423,10 @@ export async function updateListingAction(
   if (!postingGuard.ok) {
     return { ok: false, message: postingGuard.message };
   }
+  const selectedCategoryNodeId = getSelectedCategoryNodeId(input);
+  if (!selectedCategoryNodeId) return { ok: false, message: "Must select a category" };
+  const schemaGuard = await validatePublishedPostingSchema(supabase, selectedCategoryNodeId, formData);
+  if (!schemaGuard.ok) return { ok: false, message: schemaGuard.message };
 
   const vehicleGuard = await validateVehicleSelectionForCategory(supabase, input, formData);
   if (!vehicleGuard.ok) {
@@ -1537,6 +1616,9 @@ export async function uploadListingImageFormAction(
     return;
   }
 
+  const validatedImage = await validateListingImage(image);
+  if (!validatedImage.ok) return;
+
   // Verify ownership
   const { data: listing } = await supabase
     .from("listings")
@@ -1548,8 +1630,7 @@ export async function uploadListingImageFormAction(
     return;
   }
 
-  const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${validatedImage.extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from("listing-images")
@@ -1597,9 +1678,9 @@ export async function uploadListingImageAction(
   }
   const supabase = await createSupabaseServerClient();
 
-  if (!image || image.size === 0) {
-    return { ok: false, message: "Invalid image" };
-  }
+  if (!image || image.size === 0) return { ok: false, message: "Invalid image" };
+  const validatedImage = await validateListingImage(image);
+  if (!validatedImage.ok) return validatedImage;
 
   const { data: listing, error: listingError } = await supabase
     .from("listings")
@@ -1623,8 +1704,7 @@ export async function uploadListingImageAction(
     }
   }
 
-  const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
-  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${validatedImage.extension}`;
 
   const { error: uploadError } = await supabase.storage
     .from("listing-images")
@@ -1832,66 +1912,18 @@ export async function toggleListingFeaturedAction(
   listingId: string,
   featured: boolean
 ): Promise<{ ok: boolean; message: string }> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-
-  const { data: listing, error: fetchError } = await supabase
-    .from("listings")
-    .select("user_id")
-    .eq("id", listingId)
-    .single();
-
-  if (fetchError || !listing || listing.user_id !== user.id) {
-    return { ok: false, message: "Unauthorized" };
-  }
-
-  const { error } = await supabase
-    .from("listings")
-    .update({ featured })
-    .eq("id", listingId);
-
-  if (error) {
-    return { ok: false, message: error.message };
-  }
-
-  revalidatePath("/");
-  revalidatePath("/listings");
-  revalidatePath(`/listings/${listingId}`);
-  revalidatePath(`/listings/${listingId}/manage`);
-  revalidatePath("/dashboard/my-ads");
-  return { ok: true, message: featured ? "Listing featured" : "Listing unfeatured" };
+  void listingId;
+  void featured;
+  await requireUser();
+  return { ok: false, message: "Featured promotion requires administrator approval." };
 }
 
 export async function toggleListingUrgentAction(
   listingId: string,
   urgent: boolean
 ): Promise<{ ok: boolean; message: string }> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-
-  const { data: listing, error: fetchError } = await supabase
-    .from("listings")
-    .select("user_id")
-    .eq("id", listingId)
-    .single();
-
-  if (fetchError || !listing || listing.user_id !== user.id) {
-    return { ok: false, message: "Unauthorized" };
-  }
-
-  const { error } = await supabase
-    .from("listings")
-    .update({ urgent })
-    .eq("id", listingId);
-
-  if (error) {
-    return { ok: false, message: error.message };
-  }
-
-  revalidatePath("/");
-  revalidatePath("/listings");
-  revalidatePath(`/listings/${listingId}`);
-  revalidatePath(`/listings/${listingId}/manage`);
-  revalidatePath("/dashboard/my-ads");
-  return { ok: true, message: urgent ? "Listing marked urgent" : "Urgent removed" };
+  void listingId;
+  void urgent;
+  await requireUser();
+  return { ok: false, message: "Urgent promotion requires administrator approval." };
 }

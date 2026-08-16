@@ -31,7 +31,7 @@ export type SiteSettingsVersionRecord = SiteSettingsRecord & {
 };
 
 export const DEFAULT_SITE_SETTINGS = {
-  site_name: "Afghan",
+  site_name: "Sahibash",
   site_tagline: "Marketplace for Afghanistan",
   contact_email: "hello@afghan.com",
   contact_phone: "+93700000000",
@@ -57,8 +57,11 @@ function normalizeNavigationLinks(input: unknown): NavigationLinkRecord[] | unde
           return null;
         }
 
-        const label = typeof (item as Record<string, unknown>).label === "string" ? (item as Record<string, unknown>).label.trim() : "";
-        const path = typeof (item as Record<string, unknown>).path === "string" ? (item as Record<string, unknown>).path.trim() : "";
+        const record = item as Record<string, unknown>;
+        const labelValue = record.label;
+        const pathValue = record.path;
+        const label = typeof labelValue === "string" ? labelValue.trim() : "";
+        const path = typeof pathValue === "string" ? pathValue.trim() : "";
 
         return label && path ? { label, path } : null;
       })
@@ -140,7 +143,7 @@ export function resolvePublicSiteSettings(input?: Partial<SiteSettingsRecord>): 
     home_primary_cta_path: normalized.home_primary_cta_path ?? base.home_primary_cta_path,
     home_secondary_cta_label: normalized.home_secondary_cta_label ?? base.home_secondary_cta_label,
     home_secondary_cta_path: normalized.home_secondary_cta_path ?? base.home_secondary_cta_path,
-    navigation_links: normalized.navigation_links ?? base.navigation_links,
+    navigation_links: normalized.navigation_links ?? [...base.navigation_links],
     step_up_window_minutes: normalized.step_up_window_minutes ?? base.step_up_window_minutes,
   };
 }

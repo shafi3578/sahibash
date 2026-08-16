@@ -771,7 +771,7 @@ function normalizeCategoryPath(value: string | undefined) {
 
 export function getSimpleCategoryKind(path: string | undefined, rootSlug?: string | null): SimpleCategoryKind | null {
   const normalizedPath = normalizeCategoryPath(path);
-  const normalizedRoot = normalizeCategoryPath(rootSlug);
+  const normalizedRoot = normalizeCategoryPath(rootSlug ?? undefined);
 
   const isElectronicsRoot =
     normalizedRoot === "mobile-phones-tablets"
@@ -821,6 +821,13 @@ export function getSimpleCategoryKind(path: string | undefined, rootSlug?: strin
 
 export function getSimpleCategoryConfig(kind: SimpleCategoryKind | null | undefined) {
   return kind ? CONFIGS[kind] : null;
+}
+
+export function shouldUseSimpleCategoryFallback(
+  config: SimpleCategoryConfig | null | undefined,
+  usesPublishedSchema: boolean
+) {
+  return Boolean(config) && !usesPublishedSchema;
 }
 
 export function getSimpleCategoryFieldKeys(kind: SimpleCategoryKind | null | undefined) {

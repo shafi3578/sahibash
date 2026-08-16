@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { reportDataError } from "@/lib/observability/data-errors";
 import type {
   ListingWithRelations,
   ListingWithImages,
@@ -457,7 +458,8 @@ export async function getApprovedListings(
                 *,
                 category:category_id(*),
                 category_node:category_node_id(*),
-                listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at)
+                listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
+                listing_attributes(*)
               `
               )
               .eq("status", "approved")
@@ -555,7 +557,8 @@ export async function getApprovedListings(
                   *,
                   category:category_id(*),
                   category_node:category_node_id(*),
-                  listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at)
+                  listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
+                  listing_attributes(*)
                 `
                 )
                 .eq("status", "approved")
@@ -613,7 +616,8 @@ export async function getApprovedListings(
           *,
           category:category_id(*),
           category_node:category_node_id(*),
-          listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at)
+          listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
+          listing_attributes(*)
         `
         )
         .eq("status", "approved")
@@ -763,6 +767,7 @@ export async function getApprovedListings(
       const { data, error } = await query;
 
       if (error || !data) {
+        if (error) reportDataError("approved-listings.select", error);
         return [];
       }
 
@@ -818,7 +823,8 @@ export async function getApprovedListings(
       }
 
       return translatedRows.slice(0, 40);
-    } catch {
+    } catch (error) {
+      reportDataError("approved-listings.unexpected", error);
       return [];
     }
 }
@@ -1091,6 +1097,16 @@ export async function getListingById(
   }
 }
 
+export async function getSimilarListings(listing: ListingWithRelations, locale: AppLocale = "en", limit = 4): Promise<ListingWithRelations[]> {
+  const candidates = await getApprovedListings({locale,categoryId:Number(listing.category_id),province:listing.province ?? undefined,sort:"newest"});
+  const basePrice=Number(listing.price)||0;
+  return candidates.filter(item=>item.id!==listing.id).map(item=>{
+    const price=Number(item.price)||0; const priceDistance=basePrice>0?Math.abs(price-basePrice)/basePrice:1;
+    const locationScore=item.district&&item.district===listing.district?2:item.province===listing.province?1:0;
+    return {item,score:locationScore+Math.max(0,1-priceDistance)};
+  }).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.item);
+}
+
 export async function getCategoryNodeByPath(path: string): Promise<CategoryNode | null> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -1111,7 +1127,8 @@ export async function getCategoryNodeByPath(path: string): Promise<CategoryNode 
 }
 
 export async function getFilterDefinitionsForNode(
-  categoryNodeId?: number | null
+  categoryNodeId?: number | null,
+  locale: AppLocale = "en"
 ): Promise<FilterDefinition[]> {
   try {
     const supabase = await createSupabaseServerClient();
@@ -1187,6 +1204,28 @@ export async function getFilterDefinitionsForNode(
       }
     }
 
+    const { data: schemaRow } = await supabase.from("listing_schema_versions").select("config")
+      .eq("category_node_id", categoryNodeId).eq("status", "published").maybeSingle();
+    const configuredFields = ((schemaRow?.config as { fields?: Array<Record<string, unknown>> } | null)?.fields ?? []);
+    if (configuredFields.length > 0) {
+      const configuredKeys = new Set(configuredFields.map((field) => String(field.key ?? "")));
+      for (const key of configuredKeys) byKey.delete(key);
+      configuredFields.filter((field) => field.active !== false && field.filter === true).forEach((field, index) => {
+        const fieldLabels = field.labels as Record<string, unknown> | undefined;
+        const options = Array.isArray(field.options) ? field.options as Array<{ value?: unknown }> : [];
+        const fieldType = String(field.type ?? "text");
+        const key = String(field.key ?? "");
+        if (!key) return;
+        byKey.set(key, {
+          id: -(10000 + index), category_node_id: categoryNodeId, filter_key: key,
+          filter_label: String(fieldLabels?.[locale] ?? fieldLabels?.en ?? key),
+          filter_type: fieldType === "number" ? "range" : fieldType === "boolean" ? "boolean" : fieldType === "select" ? "select" : "text",
+          options: options.map((option) => String(option.value ?? "")).filter(Boolean), source_table: null, source_column: null,
+          sort_order: Number(field.order ?? index), is_active: true,
+        });
+      });
+    }
+
     return Array.from(byKey.values()).sort((a, b) => a.sort_order - b.sort_order);
   } catch {
     return [];
@@ -1202,18 +1241,22 @@ export async function getUserListings(userId: string): Promise<ListingWithRelati
       .select(
         `
         *,
-        listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order)
+        category_node:category_node_id(*),
+        listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order),
+        listing_attributes(*)
       `
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
     if (error || !data) {
+      if (error) reportDataError("categories.select", error);
       return [];
     }
 
     return data as ListingWithRelations[];
-  } catch {
+  } catch (error) {
+    reportDataError("categories.unexpected", error);
     return [];
   }
 }
@@ -1400,6 +1443,7 @@ export async function getListingWithOwnerStats(listingId: string, userId: string
       category:category_id(*),
       category_node:category_node_id(*),
       listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order),
+      listing_attributes(*),
       listing_notes(note, updated_at)
     `
     )

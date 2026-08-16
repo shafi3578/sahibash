@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
-import { requirePermission, getCurrentUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { recordAuditEvent } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeStaticPageDraft } from "@/lib/data/static-pages";
@@ -73,7 +73,7 @@ export async function saveStaticPageAction(formData: FormData) {
     .single();
 
   if (error || !data) {
-    throw new Error(error.message);
+    throw new Error(error?.message ?? "Unable to save static page.");
   }
 
   await recordAuditEvent({
@@ -104,7 +104,7 @@ export async function publishStaticPageAction(formData: FormData) {
   });
 
   if (error || !data) {
-    throw new Error(error.message);
+    throw new Error(error?.message ?? "Unable to publish static page.");
   }
 
   await recordAuditEvent({
@@ -136,7 +136,7 @@ export async function restoreStaticPageVersionAction(formData: FormData) {
   });
 
   if (error || !data) {
-    throw new Error(error.message);
+    throw new Error(error?.message ?? "Unable to restore static page.");
   }
 
   await recordAuditEvent({

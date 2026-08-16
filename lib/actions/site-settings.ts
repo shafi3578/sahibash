@@ -42,7 +42,7 @@ export async function saveSiteSettingsAction(formData: FormData) {
   });
 
   if (error || !data) {
-    throw new Error(error.message);
+    throw new Error(error?.message ?? "Unable to save site settings.");
   }
 
   await recordAuditEvent({
@@ -78,7 +78,7 @@ export async function restoreSiteSettingsVersionAction(formData: FormData) {
   });
 
   if (error || !data) {
-    throw new Error(error.message);
+    throw new Error(error?.message ?? "Unable to restore site settings.");
   }
 
   await recordAuditEvent({

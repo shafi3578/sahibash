@@ -1,5 +1,9 @@
-import ElectronicsPostAdPage from "@/app/post-ad/electronics/page";
+import { redirect } from "next/navigation";
+import type { AppLocale } from "@/lib/i18n/translations";
 
-export default async function LocalizedElectronicsPostAdPage() {
-  return <ElectronicsPostAdPage />;
+type PageProps = { params: Promise<{ locale: AppLocale }> };
+
+export default async function LocalizedLegacyElectronicsPage({ params }: PageProps) {
+  const { locale } = await params;
+  redirect(`/${locale}/post-ad/create`);
 }

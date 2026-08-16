@@ -54,11 +54,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: A
   return buildLocalizedMetadata(locale, slug);
 }
 
-const renderPage = <T extends Record<string, unknown>>(
-  Page: ComponentType<T>,
-  props: T = {} as T,
-) => {
-  return <Page {...props} />;
+// Adapt the locale catch-all props to the concrete page contracts. Next.js
+// validates each concrete page separately during the build.
+const renderPage = (Page: unknown, props: Record<string, unknown> = {}) => {
+  const RoutedPage = Page as ComponentType<Record<string, unknown>>;
+  return <RoutedPage {...props} />;
 };
 
 export default async function LocaleCatchAllPage({
@@ -74,54 +74,55 @@ export default async function LocaleCatchAllPage({
   const [first, second, third] = slug;
 
   if (slug.length === 0) {
-    return renderPage(HomePage, { searchParams: resolvedSearchParams });
+    return renderPage(HomePage);
   }
 
   if (first === "login" && slug.length === 1) {
-    return renderPage(LoginPage, { searchParams: resolvedSearchParams });
+    return renderPage(LoginPage, { searchParams });
   }
 
   if (first === "register" && slug.length === 1) {
-    return renderPage(RegisterPage, { searchParams: resolvedSearchParams });
+    return renderPage(RegisterPage, { searchParams });
   }
 
   if (first === "reset-password" && slug.length === 1) {
-    return renderPage(ResetPasswordPage, { searchParams: resolvedSearchParams });
+    return renderPage(ResetPasswordPage);
   }
 
   if (first === "search" && slug.length === 1) {
-    return renderPage(SearchPage, { searchParams: resolvedSearchParams });
+    return renderPage(SearchPage, { searchParams });
   }
 
   if (first === "post-ad") {
     if (slug.length === 1) {
-      return renderPage(PostAdPage, { searchParams: resolvedSearchParams });
+      return renderPage(PostAdPage);
     }
     if (second === "create") {
-      return renderPage(PostAdCreatePage, { searchParams: resolvedSearchParams });
+      return renderPage(PostAdCreatePage, { searchParams });
     }
     if (second === "create-new") {
-      return renderPage(PostAdCreateNewPage, { searchParams: resolvedSearchParams });
+      const locale = await getCurrentLocale();
+      return renderPage(PostAdCreateNewPage, { params: Promise.resolve({ locale }) });
     }
     if (second === "create-v2") {
-      return renderPage(PostAdCreateV2Page, { searchParams: resolvedSearchParams });
+      return renderPage(PostAdCreateV2Page);
     }
     if (second === "electronics") {
-      return renderPage(PostAdElectronicsPage, { searchParams: resolvedSearchParams });
+      return renderPage(PostAdElectronicsPage);
     }
   }
 
   if (first === "categories") {
     if (slug.length === 1) {
-      return renderPage(CategoriesPage, { searchParams: resolvedSearchParams });
+      return renderPage(CategoriesPage);
     }
     if (slug.length === 2) {
-      return renderPage(CategoryPage, { params: { slug: second }, searchParams: resolvedSearchParams });
+      return renderPage(CategoryPage, { params: Promise.resolve({ slug: second }), searchParams });
     }
   }
 
   if (first === "category" && slug.length === 2) {
-    return renderPage(CategoryPage, { params: { slug: second }, searchParams: resolvedSearchParams });
+    return renderPage(CategoryPage, { params: Promise.resolve({ slug: second }), searchParams });
   }
 
   if (first === "listings") {
@@ -135,17 +136,17 @@ export default async function LocaleCatchAllPage({
       if (second === "edit") {
         return renderPage(ListingsEditPage, { searchParams });
       }
-      return renderPage(ListingPage, { params: { id: second }, searchParams });
+      return renderPage(ListingPage, { params: Promise.resolve({ id: second }), searchParams });
     }
     if (slug.length === 3) {
       if (third === "edit") {
-        return renderPage(ListingEditPage, { params: { id: second }, searchParams });
+        return renderPage(ListingEditPage, { params: Promise.resolve({ id: second }), searchParams });
       }
       if (third === "manage") {
-        return renderPage(ListingManagePage, { params: { id: second }, searchParams });
+        return renderPage(ListingManagePage, { params: Promise.resolve({ id: second }) });
       }
       if (third === "price-history") {
-        return renderPage(ListingPriceHistoryPage, { params: { id: second }, searchParams });
+        return renderPage(ListingPriceHistoryPage, { params: Promise.resolve({ id: second }) });
       }
     }
   }

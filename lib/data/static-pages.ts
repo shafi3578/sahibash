@@ -57,10 +57,14 @@ export function normalizeStaticPageDraft(input: Record<string, unknown>) {
   const slugFa = typeof input.slug_fa === "string" ? input.slug_fa.trim() : "";
   const slugPs = typeof input.slug_ps === "string" ? input.slug_ps.trim() : "";
 
+  const localizedValue = (name: string, locale: AppLocaleKey) => {
+    const value = input[`${name}_${locale}`];
+    return typeof value === "string" ? value.trim() : "";
+  };
   const buildLocalized = (name: string) => ({
-    en: typeof input[`${name}_en`] === "string" ? input[`${name}_en`].trim() : "",
-    fa: typeof input[`${name}_fa`] === "string" ? input[`${name}_fa`].trim() : "",
-    ps: typeof input[`${name}_ps`] === "string" ? input[`${name}_ps`].trim() : "",
+    en: localizedValue(name, "en"),
+    fa: localizedValue(name, "fa"),
+    ps: localizedValue(name, "ps"),
   });
 
   return {

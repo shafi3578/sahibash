@@ -146,3 +146,16 @@ export async function requireAdmin() {
 
   return user;
 }
+
+export async function requireSuperAdministrator() {
+  const user = await requireUser();
+  const stepUpWindowMinutes = await getConfiguredStepUpWindowMinutes();
+  if (requiresStepUpAuth(user as Parameters<typeof requiresStepUpAuth>[0], stepUpWindowMinutes * 60 * 1000)) {
+    redirect("/dashboard?reason=security");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("is_super_administrator", { uid: user.id });
+  if (error || data !== true) redirect("/dashboard");
+  return user;
+}
