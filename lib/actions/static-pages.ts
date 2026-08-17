@@ -136,7 +136,7 @@ export async function restoreStaticPageVersionAction(formData: FormData) {
   });
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Unable to restore static page.");
+    throw new Error(error?.message ?? "Unable to restore static page version.");
   }
 
   await recordAuditEvent({

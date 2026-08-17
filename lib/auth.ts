@@ -155,7 +155,19 @@ export async function requireSuperAdministrator() {
   }
 
   const supabase = await createSupabaseServerClient();
+<<<<<<< HEAD
   const { data, error } = await supabase.rpc("is_super_administrator", { uid: user.id });
   if (error || data !== true) redirect("/dashboard");
+=======
+
+  const { data, error } = await supabase.rpc("is_super_administrator", {
+    uid: user.id,
+  });
+
+  if (error || data !== true) {
+    redirect("/dashboard");
+  }
+
+>>>>>>> 9ede65b (Fix production build blockers)
   return user;
 }

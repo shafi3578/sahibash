@@ -43,11 +43,11 @@ function localeField(locale: AppLocaleKey, field: string) {
 }
 
 function localizedString(page: Partial<StaticPageRecord> & Record<string, unknown>, locale: AppLocaleKey, field: "title" | "body" | "slug" | "seo_title" | "seo_description") {
-  const value = page[localeField(locale, field) as string];
+  const value = page[localeField(locale, field) as keyof typeof page];
   if (typeof value === "string" && value.trim()) {
     return value;
   }
-  const fallback = page[localeField("en", field) as string];
+  const fallback = page[localeField("en", field) as keyof typeof page];
   return typeof fallback === "string" ? fallback : "";
 }
 
@@ -57,16 +57,18 @@ export function normalizeStaticPageDraft(input: Record<string, unknown>) {
   const slugFa = typeof input.slug_fa === "string" ? input.slug_fa.trim() : "";
   const slugPs = typeof input.slug_ps === "string" ? input.slug_ps.trim() : "";
 
-  const localizedValue = (name: string, locale: AppLocaleKey) => {
-    const value = input[`${name}_${locale}`];
-    return typeof value === "string" ? value.trim() : "";
+  const buildLocalized = (name: string) => {
+    const values = {
+      en: input[`${name}_en` as keyof typeof input],
+      fa: input[`${name}_fa` as keyof typeof input],
+      ps: input[`${name}_ps` as keyof typeof input],
+    };
+    return {
+      en: typeof values.en === "string" ? values.en.trim() : "",
+      fa: typeof values.fa === "string" ? values.fa.trim() : "",
+      ps: typeof values.ps === "string" ? values.ps.trim() : "",
+    };
   };
-  const buildLocalized = (name: string) => ({
-    en: localizedValue(name, "en"),
-    fa: localizedValue(name, "fa"),
-    ps: localizedValue(name, "ps"),
-  });
-
   return {
     page_key: pageKey,
     slug_en: slugEn,

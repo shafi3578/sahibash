@@ -228,8 +228,7 @@ export default function PostAdForm({
     initialListingType = "for_sale",
     initialMode = "standard",
     initialRootSlug = "",
-  }: Props & {
-    t: Dictionary;
+  }: Props & {    t: Dictionary;
     locale: AppLocale;
     initialListingType?: "for_sale" | "for_rent" | "wanted";
     initialMode?: PostMode;
@@ -255,6 +254,48 @@ export default function PostAdForm({
   const [selectedRoot, setSelectedRoot] = useState<Category | null>(null);
   const [pathNodes, setPathNodes] = useState<CategoryNode[]>([]);
   const [currentOptions, setCurrentOptions] = useState<CategoryNode[]>([]);
+
+  const chooseRoot = useCallback(async (category: Category) => {
+    if (category.is_coming_soon) {
+      return;
+    }
+
+    setLoadingTree(true);
+    setSelectedRoot(category);
+    setFinalNode(null);
+    setDynamicFields([]);
+    setDynamicValues({});
+    setPostingConfig(null);
+    setVehicleSelection(EMPTY_VEHICLE_SELECTION);
+    setDamageParts(defaultDamageParts());
+
+    const root = await fetchRootNode(category.id);
+    if (!root) {
+      setPathNodes([]);
+      setCurrentOptions([]);
+      setLoadingTree(false);
+      return;
+    }
+
+    setPathNodes([root]);
+    const children = await fetchChildren(root.id);
+    setCurrentOptions(children);
+
+    if (children.length === 0) {
+      setFinalNode(root);
+      await Promise.all([fetchFields(root.id, root.path, category.slug), fetchPostingConfig(category.id)]);
+    }
+
+    setLoadingTree(false);
+  }, []);
+
+  useEffect(() => {
+    if (!initialRootSlug || selectedRoot) return;
+    const match = categories.find((category) => category.slug === initialRootSlug);
+    if (match) {
+      void chooseRoot(match);
+    }
+  }, [categories, chooseRoot, initialRootSlug, selectedRoot]);
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
   const [dynamicFields, setDynamicFields] = useState<CategoryField[]>([]);
   const [usesPublishedSchema, setUsesPublishedSchema] = useState(false);
@@ -751,6 +792,7 @@ export default function PostAdForm({
     });
   }
 
+<<<<<<< HEAD
   const chooseRoot = useCallback(async (category: Category) => {
     if (category.is_coming_soon) {
       return;
@@ -794,6 +836,8 @@ export default function PostAdForm({
     return () => window.clearTimeout(timer);
   }, [activeCategories, chooseRoot, initialRootSlug, selectedRoot]);
 
+=======
+>>>>>>> 9ede65b (Fix production build blockers)
   async function chooseNode(node: CategoryNode) {
     setLoadingTree(true);
     setDynamicValues({});

@@ -30,6 +30,7 @@ export default async function AdministratorSettingsPage() {
   const navigationLinksText = (settings.navigation_links ?? [])
     .map((link) => `${link.label}|${link.path}`)
     .join("\n");
+  const safeValue = (value: string | null | undefined) => value ?? "";
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
@@ -39,27 +40,27 @@ export default async function AdministratorSettingsPage() {
       <form action={saveSiteSettingsAction} className="mt-6 space-y-4 rounded-2xl border border-[var(--line)] bg-white p-5">
         <label className="block text-sm font-semibold">
           {copy.siteName}
-          <input name="site_name" defaultValue={settings.site_name ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          <input name="site_name" defaultValue={safeValue(settings.site_name)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
         </label>
 
         <label className="block text-sm font-semibold">
           {copy.tagline}
-          <input name="site_tagline" defaultValue={settings.site_tagline ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          <input name="site_tagline" defaultValue={safeValue(settings.site_tagline)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
         </label>
 
         <label className="block text-sm font-semibold">
           {copy.contactEmail}
-          <input type="email" name="contact_email" defaultValue={settings.contact_email ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          <input type="email" name="contact_email" defaultValue={safeValue(settings.contact_email)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
         </label>
 
         <label className="block text-sm font-semibold">
           {copy.contactPhone}
-          <input name="contact_phone" defaultValue={settings.contact_phone ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          <input name="contact_phone" defaultValue={safeValue(settings.contact_phone)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
         </label>
 
         <label className="block text-sm font-semibold">
           {copy.defaultLocale}
-          <select name="default_locale" defaultValue={settings.default_locale ?? "fa"} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
+          <select name="default_locale" defaultValue={safeValue(settings.default_locale)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
             <option value="fa">fa</option>
             <option value="en">en</option>
             <option value="ps">ps</option>
@@ -68,33 +69,34 @@ export default async function AdministratorSettingsPage() {
 
         <label className="block text-sm font-semibold">
           {copy.heroTitle}
-          <input name="home_hero_title" defaultValue={settings.home_hero_title ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          <input name="home_hero_title" defaultValue={safeValue(settings.home_hero_title)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
         </label>
 
         <label className="block text-sm font-semibold">
           {copy.heroSubtitle}
-          <textarea name="home_hero_subtitle" defaultValue={settings.home_hero_subtitle ?? ""} className="mt-1 min-h-24 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+          <textarea name="home_hero_subtitle" defaultValue={safeValue(settings.home_hero_subtitle)} className="mt-1 min-h-24 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+
         </label>
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block text-sm font-semibold">
             {copy.primaryCtaLabel}
-            <input name="home_primary_cta_label" defaultValue={settings.home_primary_cta_label ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+            <input name="home_primary_cta_label" defaultValue={safeValue(settings.home_primary_cta_label)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
           </label>
 
           <label className="block text-sm font-semibold">
             {copy.primaryCtaPath}
-            <input name="home_primary_cta_path" defaultValue={settings.home_primary_cta_path ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+            <input name="home_primary_cta_path" defaultValue={safeValue(settings.home_primary_cta_path)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
           </label>
 
           <label className="block text-sm font-semibold">
             {copy.secondaryCtaLabel}
-            <input name="home_secondary_cta_label" defaultValue={settings.home_secondary_cta_label ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+            <input name="home_secondary_cta_label" defaultValue={safeValue(settings.home_secondary_cta_label)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
           </label>
 
           <label className="block text-sm font-semibold">
             {copy.secondaryCtaPath}
-            <input name="home_secondary_cta_path" defaultValue={settings.home_secondary_cta_path ?? ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+            <input name="home_secondary_cta_path" defaultValue={safeValue(settings.home_secondary_cta_path)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
           </label>
         </div>
 

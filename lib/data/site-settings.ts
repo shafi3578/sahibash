@@ -58,10 +58,8 @@ function normalizeNavigationLinks(input: unknown): NavigationLinkRecord[] | unde
         }
 
         const record = item as Record<string, unknown>;
-        const labelValue = record.label;
-        const pathValue = record.path;
-        const label = typeof labelValue === "string" ? labelValue.trim() : "";
-        const path = typeof pathValue === "string" ? pathValue.trim() : "";
+        const label = typeof record.label === "string" ? record.label.trim() : "";
+        const path = typeof record.path === "string" ? record.path.trim() : "";
 
         return label && path ? { label, path } : null;
       })
@@ -105,6 +103,10 @@ export function normalizeSiteSettings(input: Record<string, unknown>): Partial<S
   const homeSecondaryCtaPath = typeof input.home_secondary_cta_path === "string" ? input.home_secondary_cta_path.trim() : "";
   const navigationLinks = normalizeNavigationLinks(input.navigation_links);
   const stepUpWindowMinutes = Number(input.step_up_window_minutes ?? 0);
+  const baseNavigationLinks: NavigationLinkRecord[] = [
+    { label: "Listings", path: "/listings" },
+    { label: "Categories", path: "/categories" },
+  ];
 
   if (siteName) next.site_name = siteName;
   if (siteTagline) next.site_tagline = siteTagline;
@@ -143,11 +145,12 @@ export function resolvePublicSiteSettings(input?: Partial<SiteSettingsRecord>): 
     home_primary_cta_path: normalized.home_primary_cta_path ?? base.home_primary_cta_path,
     home_secondary_cta_label: normalized.home_secondary_cta_label ?? base.home_secondary_cta_label,
     home_secondary_cta_path: normalized.home_secondary_cta_path ?? base.home_secondary_cta_path,
-    navigation_links: normalized.navigation_links ?? [...base.navigation_links],
+    navigation_links: normalized.navigation_links ?? [...(base.navigation_links ?? [])],
     step_up_window_minutes: normalized.step_up_window_minutes ?? base.step_up_window_minutes,
   };
 }
 
 export function resolveSiteSettingsVersionSnapshot(input?: Partial<SiteSettingsRecord>): SiteSettingsRecord {
-  return resolvePublicSiteSettings(input ?? {});
+  const resolved = resolvePublicSiteSettings(input ?? {});
+  return { ...resolved, navigation_links: [...(resolved.navigation_links ?? [])] };
 }

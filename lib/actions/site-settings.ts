@@ -78,7 +78,7 @@ export async function restoreSiteSettingsVersionAction(formData: FormData) {
   });
 
   if (error || !data) {
-    throw new Error(error?.message ?? "Unable to restore site settings.");
+    throw new Error(error?.message ?? "Unable to restore site settings version.");
   }
 
   await recordAuditEvent({
