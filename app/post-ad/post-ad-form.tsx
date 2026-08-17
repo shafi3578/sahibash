@@ -792,52 +792,6 @@ export default function PostAdForm({
     });
   }
 
-<<<<<<< HEAD
-  const chooseRoot = useCallback(async (category: Category) => {
-    if (category.is_coming_soon) {
-      return;
-    }
-
-    setLoadingTree(true);
-    setSelectedRoot(category);
-    setFinalNode(null);
-    setDynamicFields([]);
-    setDynamicValues({});
-    setPostingConfig(null);
-    setVehicleSelection(EMPTY_VEHICLE_SELECTION);
-    setDamageParts(defaultDamageParts());
-
-    const root = await fetchRootNode(category.id);
-    if (!root) {
-      setPathNodes([]);
-      setCurrentOptions([]);
-      setLoadingTree(false);
-      return;
-    }
-
-    setPathNodes([root]);
-    const children = await fetchChildren(root.id);
-    setCurrentOptions(children);
-
-    if (children.length === 0) {
-      setFinalNode(root);
-      await Promise.all([fetchFields(root.id, root.path, category.slug), fetchPostingConfig(category.id)]);
-    }
-
-    setLoadingTree(false);
-  }, [fetchFields]);
-
-  useEffect(() => {
-    if (initialRootAppliedRef.current || !initialRootSlug || selectedRoot) return;
-    const initialRoot = activeCategories.find((category) => category.slug === initialRootSlug);
-    if (!initialRoot) return;
-    initialRootAppliedRef.current = true;
-    const timer = window.setTimeout(() => void chooseRoot(initialRoot), 0);
-    return () => window.clearTimeout(timer);
-  }, [activeCategories, chooseRoot, initialRootSlug, selectedRoot]);
-
-=======
->>>>>>> 9ede65b (Fix production build blockers)
   async function chooseNode(node: CategoryNode) {
     setLoadingTree(true);
     setDynamicValues({});
