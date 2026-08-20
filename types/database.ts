@@ -173,6 +173,7 @@ export type Listing = {
   negotiable: boolean;
   minimum_offer: number | null;
   status: ListingStatus;
+  approval_rejected_reason: string | null;
   featured: boolean;
   urgent: boolean;
   views_count: number;
