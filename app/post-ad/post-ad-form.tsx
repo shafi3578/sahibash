@@ -290,10 +290,13 @@ export default function PostAdForm({
   }, []);
 
   useEffect(() => {
-    if (!initialRootSlug || selectedRoot) return;
+    if (!initialRootSlug || selectedRoot || initialRootAppliedRef.current) return;
     const match = categories.find((category) => category.slug === initialRootSlug);
     if (match) {
-      void chooseRoot(match);
+      initialRootAppliedRef.current = true;
+      queueMicrotask(() => {
+        void chooseRoot(match);
+      });
     }
   }, [categories, chooseRoot, initialRootSlug, selectedRoot]);
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
