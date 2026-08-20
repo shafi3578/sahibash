@@ -7,6 +7,7 @@ import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
 import { labelForLocale } from "@/lib/listing-schema-config";
 import { toggleFavoriteAction } from "@/lib/actions/favorites";
 import { formatCurrencyAmount, formatDate } from "@/lib/i18n/format";
+import { getSourceTransparency } from "@/lib/inventory/provenance";
 
 export async function ListingCard({
   listing,
@@ -37,6 +38,7 @@ export async function ListingCard({
     return [{ key: field.key, label: labelForLocale(field.labels, locale), value: option ? labelForLocale(option.labels, locale) : typeof raw === "boolean" ? (raw ? t.search.yes : t.search.no) : String(raw) }];
   });
   const freshness = formatDate(listing.created_at, locale, { month: "short", day: "numeric" });
+  const sourceTransparency = getSourceTransparency(listing, locale);
   return (
     <article className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <form action={async () => { "use server"; await toggleFavoriteAction(listing.id); }} className="absolute end-2 top-2 z-10">
@@ -49,8 +51,11 @@ export async function ListingCard({
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-[var(--ink-2)]">{t.postAd.photos}</div>
           )}
-          {(isDormitory || isStudentSuitable || isWanted) ? (
+          {(sourceTransparency.isExternal || isDormitory || isStudentSuitable || isWanted) ? (
             <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+              {sourceTransparency.isExternal ? (
+                <span className="rounded-full bg-slate-900/85 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur">{sourceTransparency.sourceLabel}</span>
+              ) : null}
               {isWanted ? (
                 <span className="rounded-full bg-amber-600 px-2 py-1 text-[10px] font-semibold text-white">{t.listing.wantedAd}</span>
               ) : null}
@@ -68,6 +73,7 @@ export async function ListingCard({
         <Link href={listingHref}><h3 className="line-clamp-2 text-base font-semibold text-[var(--ink-1)]">{displayTitle}</h3></Link>
         <p className="text-lg font-bold text-[var(--accent)]">{formatCurrencyAmount(listing.price, listing.currency, locale)}</p>
         <p className="line-clamp-1 text-xs text-[var(--ink-2)]">{fallbackProvince}{listing.district ? ` · ${listing.district}` : ""} · {freshness}</p>
+        {sourceTransparency.needsAvailabilityWarning ? <p className="text-[11px] font-semibold text-amber-700">{sourceTransparency.freshnessLabel}</p> : null}
         {cardFields.length > 0 ? <div className="flex flex-wrap gap-1.5">{cardFields.slice(0,2).map((field) => <span key={field.key} className="rounded-full bg-[var(--surface-2)] px-2 py-1 text-[10px] text-[var(--ink-2)]">{field.value}</span>)}</div> : null}
         {showStatus ? <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">{listing.status}</p> : null}
       </div>

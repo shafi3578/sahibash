@@ -425,7 +425,7 @@ const vehiclesCars = createNode({
   sortOrder: 1,
 });
 
-const vehiclesMotorcycles = createNode({
+createNode({
   id: "vehicles_motorcycles",
   parentId: vehiclesRoot.id,
   slug: "motorcycles",

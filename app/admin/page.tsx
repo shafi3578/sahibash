@@ -26,6 +26,7 @@ export default async function AdminPage() {
       </div>
       <div className="mt-6 flex flex-wrap gap-2">
         <Link href={href("/admin/listings")} className="inline-block rounded-xl bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{ui.admin.listingApprovalQueue}</Link>
+        <Link href={href("/admin/inventory")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{locale === "fa" ? "موجودی و منابع" : locale === "ps" ? "موجودي او سرچینې" : "Inventory sources"}</Link>
         <Link href={href("/admin/search")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{ui.admin.searchAdmin}</Link>
         <Link href={href("/admin/analytics")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.analytics}</Link>
         <Link href={href("/admin/categories")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{ui.admin.categoryAdmin}</Link>

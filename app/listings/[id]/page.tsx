@@ -28,6 +28,8 @@ import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { ListingContactActions } from "@/components/listings/listing-contact-actions";
 import { ListingCard } from "@/components/listing-card";
 import { formatCurrencyAmount } from "@/lib/i18n/format";
+import { getSourceTransparency } from "@/lib/inventory/provenance";
+import { initiateListingClaimAction, recordInventoryContactEventAction } from "@/lib/actions/inventory";
 
 type NamedLocationRelation = { name?: string | null } | null;
 
@@ -169,6 +171,7 @@ export default async function ListingDetailPage({
 
   const safeSellerName = listing.contact_name || listing.profile?.full_name || t.listing.sellerFallback;
   const safeSellerPhone = listing.contact_phone || listing.profile?.phone || t.listing.notProvided;
+  const sourceTransparency = getSourceTransparency(listing, locale);
 
   const overviewRows = specView.basicRows.filter((row) => isMeaningfulValue(row.value));
   const displaySectionLabel = (group: string) => {
@@ -767,6 +770,47 @@ export default async function ListingDetailPage({
         ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-bold text-[var(--ink-1)]">{sourceTransparency.sourceLabel}</span>
+            <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold text-[var(--ink-2)]">{sourceTransparency.freshnessLabel}</span>
+          </div>
+          {sourceTransparency.isExternal ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+              <p className="font-semibold">
+                {locale === "fa"
+                  ? "این اعلان از منبع بیرونی یا شریک وارد شده و فروشنده هنوز به‌طور کامل در صاحباش تأیید نشده است."
+                  : locale === "ps"
+                    ? "دا اعلان له بهرنۍ یا شریکې سرچینې راغلی او پلورونکی لا په صاحباش کې بشپړ نه دی تایید شوی."
+                    : "This listing came from an external or partner source and the seller is not fully verified on Sahibash yet."}
+              </p>
+              {sourceTransparency.needsAvailabilityWarning ? (
+                <p className="mt-1">
+                  {locale === "fa"
+                    ? "لطفاً پیش از پرداخت یا سفر، موجودیت و جزئیات را دوباره تأیید کنید."
+                    : locale === "ps"
+                      ? "مهرباني وکړئ له پیسو ورکولو یا تګ مخکې شتون او معلومات بیا تایید کړئ."
+                      : "Please confirm availability and details before paying or traveling."}
+                </p>
+              ) : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {sourceTransparency.ownershipStatus !== "claimed" ? (
+                  <form action={async () => { "use server"; await initiateListingClaimAction(listing.id); }}>
+                    <button className="rounded-lg bg-[var(--ink-1)] px-3 py-2 text-xs font-bold text-white">
+                      {locale === "fa" ? "این اعلان من است" : locale === "ps" ? "دا زما اعلان دی" : "I am the owner"}
+                    </button>
+                  </form>
+                ) : null}
+                <form action={async () => { "use server"; await recordInventoryContactEventAction(listing.id, "remove_request_click", locale, { source: "listing_detail" }); }}>
+                  <button className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold text-[var(--ink-1)]">
+                    {locale === "fa" ? "درخواست حذف" : locale === "ps" ? "د لرې کولو غوښتنه" : "Request removal"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.sellerInformation}</h2>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <p><span className="text-[var(--ink-2)]">{t.listing.name}:</span> <span className="font-semibold">{safeSellerName}</span></p>
@@ -779,7 +823,7 @@ export default async function ListingDetailPage({
             <p className="mt-2 text-sm text-[var(--ink-2)]">{t.listing.minimumOffer}: {formatCurrencyAmount(listing.minimum_offer, listing.currency, locale)}</p>
           ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
-            {listing.contact_phone ? <ListingContactActions listingId={listing.id} title={displayTitle} phone={listing.contact_phone} locale={locale} /> : null}
+          {listing.contact_phone ? <ListingContactActions listingId={listing.id} title={displayTitle} phone={listing.contact_phone} locale={locale} canContact={sourceTransparency.canContact} isExternal={sourceTransparency.isExternal} /> : null}
             {!isOwner ? (
               <Link href={`/listings/${listing.id}?compose=1`} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
             ) : null}

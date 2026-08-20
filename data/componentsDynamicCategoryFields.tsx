@@ -2,17 +2,25 @@
 
 import React from "react";
 import {
-  FieldDef, LeafSubcategory, Lang, getLeafById, localizeDigits,
+  FieldDef, Lang, getLeafById,
 } from "@/data/electronics-categories";
+
+type DynamicFormValue = string | string[] | number | boolean | null;
 
 interface Props {
   leafId: string;                     // selected subcategory id
   lang: Lang;                         // current locale
-  values: Record<string, any>;        // your existing form state slice
-  onChange: (key: string, value: any) => void; // your existing setter
+  values: Record<string, unknown>;        // your existing form state slice
+  onChange: (key: string, value: DynamicFormValue) => void; // your existing setter
 }
 
 const OTHER_VALUE = "other";
+
+const toInputValue = (value: unknown): string => {
+  if (value === undefined || value === null) return "";
+  if (Array.isArray(value)) return value.join(", ");
+  return String(value);
+};
 
 export default function DynamicCategoryFields({ leafId, lang, values, onChange }: Props) {
   const leaf = getLeafById(leafId);
@@ -31,7 +39,8 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
   };
 
   const renderField = (field: FieldDef) => {
-    const value = values[field.key] ?? "";
+    const rawValue = values[field.key];
+    const value = toInputValue(rawValue);
     const label = field.labels[lang];
     const isOther = value === OTHER_VALUE;
 
@@ -57,7 +66,7 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
             {field.allowOther && isOther && (
               <input
                 type="text"
-                value={values[`${field.key}_other`] ?? ""}
+                value={toInputValue(values[`${field.key}_other`])}
                 onChange={(e) => onChange(`${field.key}_other`, e.target.value)}
                 placeholder={
                   lang === "en" ? "Enter manually" :
@@ -70,7 +79,7 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
       }
 
       case "cascading-select": {
-        const parentValue = values[field.dependsOn!] ?? "";
+        const parentValue = toInputValue(values[field.dependsOn!]);
         const options = field.optionsByParent?.[parentValue] ?? [];
         const showFreeText =
           isOther || (parentValue && options.length === 0) || parentValue === OTHER_VALUE;
@@ -103,7 +112,10 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
             {showFreeText && (
               <input
                 type="text"
-                value={values[`${field.key}_other`] ?? (options.length === 0 ? value : "")}
+                value={
+                  toInputValue(values[`${field.key}_other`]) ||
+                  (options.length === 0 ? value : "")
+                }
                 onChange={(e) =>
                   options.length === 0
                     ? onChange(field.key, e.target.value)
@@ -120,7 +132,7 @@ export default function DynamicCategoryFields({ leafId, lang, values, onChange }
       }
 
       case "multi-select": {
-        const selected: string[] = Array.isArray(value) ? value : [];
+        const selected: string[] = Array.isArray(rawValue) ? rawValue : [];
         return (
           <div key={field.key} className="form-field">
             <label>

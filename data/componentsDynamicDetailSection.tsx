@@ -8,7 +8,7 @@ import {
 interface Props {
   leafId: string;
   lang: Lang;
-  attributes: Record<string, any>; // saved ad attributes from API
+  attributes: Record<string, unknown>; // saved ad attributes from API
   features?: string[];             // saved feature keys
 }
 
@@ -16,12 +16,24 @@ export default function DynamicDetailSection({ leafId, lang, attributes, feature
   const leaf = getLeafById(leafId);
   if (!leaf) return null;
 
+  const formatRawValue = (value: unknown): string | null => {
+    if (value === undefined || value === null || value === "") return null;
+    if (Array.isArray(value)) return value.join(lang === "en" ? ", " : "، ");
+    if (typeof value === "boolean") {
+      return value
+        ? lang === "en" ? "Yes" : lang === "fa" ? "بلی" : "هو"
+        : lang === "en" ? "No" : lang === "fa" ? "نخیر" : "نه";
+    }
+    return String(value);
+  };
+
   const displayValue = (key: string): string | null => {
     const field = leaf.fields.find((f) => f.key === key);
     if (!field) return null;
     const raw = attributes[key];
     const other = attributes[`${key}_other`];
-    if (other) return other;
+    const otherDisplay = formatRawValue(other);
+    if (otherDisplay) return localizeDigits(otherDisplay, lang);
     if (raw === undefined || raw === null || raw === "") return null;
     if (Array.isArray(raw)) {
       return raw.map((v) => getOptionLabel(field, v, lang)).join(lang === "en" ? ", " : "، ");

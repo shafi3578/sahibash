@@ -1,5 +1,10 @@
 export type AppRole = "user" | "admin";
 export type ListingStatus = "pending" | "approved" | "rejected" | "sold" | "expired";
+export type ListingSourceType = "native" | "dealer_managed" | "partner_feed" | "seller_approved_import" | "scout_assisted" | "external_indexed" | "migrated_legacy";
+export type ListingOwnershipStatus = "unclaimed" | "claim_pending" | "claimed" | "partner_managed" | "staff_managed" | "disputed" | "removed" | "opted_out";
+export type ListingPublicationStatus = "draft" | "pending_review" | "published" | "hidden" | "archived" | "removed";
+export type ListingFreshnessStatus = "fresh" | "aging" | "stale" | "source_missing" | "seller_confirmed" | "sold_confirmed" | "expired";
+export type ListingProvenanceStatus = "trusted" | "authorized" | "permission_pending" | "low_confidence" | "blocked" | "opted_out";
 export type Currency = "AFN" | "USD";
 export type ReportStatus = "open" | "reviewed" | "dismissed" | "actioned";
 export type MessageStatus = "sent" | "delivered" | "read";
@@ -117,7 +122,7 @@ export type CategoryField = {
 
 export type Listing = {
   id: string;
-  user_id: string;
+  user_id: string | null;
   category_id: CategoryId;
   category_node_id: CategoryNodeId;
   vehicle_variant_id: number | null;
@@ -183,6 +188,27 @@ export type Listing = {
   approved_at: string | null;
   rejection_reason: string | null;
   archived_at: string | null;
+  seller_entity_id?: string | null;
+  source_type?: ListingSourceType;
+  ownership_status?: ListingOwnershipStatus;
+  publication_status?: ListingPublicationStatus;
+  freshness_status?: ListingFreshnessStatus;
+  provenance_status?: ListingProvenanceStatus;
+  source_platform?: string | null;
+  source_item_id?: string | null;
+  source_url?: string | null;
+  source_first_seen_at?: string | null;
+  source_last_seen_at?: string | null;
+  source_posted_at?: string | null;
+  permission_basis?: string | null;
+  permission_record_id?: string | null;
+  source_consent_at?: string | null;
+  provenance_confidence?: number;
+  allow_contact_display?: boolean;
+  noindex_external?: boolean;
+  source_payload_hash?: string | null;
+  canonical_duplicate_group_id?: string | null;
+  removed_public_at?: string | null;
 };
 
 export type ListingAttribute = {
