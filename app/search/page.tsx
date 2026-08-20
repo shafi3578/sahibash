@@ -19,6 +19,8 @@ import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { saveSearchAction } from "@/lib/actions/saved-searches";
+import { createWantedRequestAction } from "@/lib/actions/liquidity";
+import { wantedCopy } from "@/lib/liquidity/wanted";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -234,6 +236,73 @@ function FilterFields({
         return renderDynamicFilterInput(def, selected, options, t);
       })}
     </>
+  );
+}
+
+function FindItForMePanel({
+  params,
+  locale,
+  categoryPath,
+  categoryNodeId,
+}: {
+  params: Record<string, string | undefined>;
+  locale: Awaited<ReturnType<typeof getDictionary>>["locale"];
+  categoryPath?: string | null;
+  categoryNodeId?: number;
+}) {
+  const copy = wantedCopy(locale);
+  const defaultTitle =
+    params.q ||
+    (locale === "fa" ? "درخواست من" : locale === "ps" ? "زما غوښتنه" : "My request");
+
+  return (
+    <form action={createWantedRequestAction} className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="params" value={buildParamsFromRecord(params).toString()} />
+      {categoryNodeId ? <input type="hidden" name="categoryNodeId" value={String(categoryNodeId)} /> : null}
+      {categoryPath ? <input type="hidden" name="categoryPath" value={categoryPath} /> : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-emerald-950">{copy.title}</h2>
+          <p className="mt-1 max-w-2xl text-sm text-emerald-900">{copy.intro}</p>
+        </div>
+        <button className="min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white">
+          {copy.button}
+        </button>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
+        <label className="grid gap-1 text-sm font-semibold text-emerald-950">
+          {copy.name}
+          <input
+            name="title"
+            required
+            maxLength={120}
+            defaultValue={defaultTitle}
+            className="min-h-11 rounded-xl border border-emerald-200 bg-white px-3 text-sm text-[var(--ink-1)]"
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-emerald-950">
+          {copy.urgency}
+          <select name="urgency" defaultValue="flexible" className="min-h-11 rounded-xl border border-emerald-200 bg-white px-3 text-sm text-[var(--ink-1)]">
+            <option value="flexible">{copy.flexible}</option>
+            <option value="soon">{copy.soon}</option>
+            <option value="urgent">{copy.urgent}</option>
+          </select>
+        </label>
+      </div>
+      <fieldset className="mt-4 flex flex-wrap gap-3 text-sm text-emerald-950">
+        <legend className="mb-2 font-semibold">{copy.channels}</legend>
+        <label className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2">
+          <input type="checkbox" name="channels" value="in_app" defaultChecked /> {copy.inApp}
+        </label>
+        <label className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2">
+          <input type="checkbox" name="channels" value="email" /> {copy.email}
+        </label>
+        <label className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2">
+          <input type="checkbox" name="channels" value="whatsapp" /> {copy.whatsapp}
+        </label>
+      </fieldset>
+    </form>
   );
 }
 
@@ -552,6 +621,15 @@ export default async function SearchPage({
               />
             ))}
           </div>
+
+          {hasSearchSignal && listings.length <= 2 ? (
+            <FindItForMePanel
+              params={params}
+              locale={locale}
+              categoryPath={effectiveNode?.path}
+              categoryNodeId={effectiveCategoryNodeId}
+            />
+          ) : null}
 
           {listings.length === 0 ? (
             <p className="mt-6 rounded-xl border border-[var(--line)] bg-white p-4 text-sm text-[var(--ink-2)]">

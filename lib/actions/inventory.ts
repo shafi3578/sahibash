@@ -5,6 +5,7 @@ import { getCurrentUser, requireSuperAdministrator } from "@/lib/auth";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { assertSafeExternalUrl, candidateIdempotencyKey, normalizeAfghanistanPhone, normalizeInventoryText, normalizePriceToAfn } from "@/lib/inventory/normalization";
 import { scoreDuplicateCandidate, type DuplicateCandidate } from "@/lib/inventory/deduplication";
+import { recordDemandSignalAction } from "@/lib/actions/liquidity";
 
 export type InventoryContactEvent =
   | "phone_reveal"
@@ -40,6 +41,16 @@ export async function recordInventoryContactEventAction(
     locale,
     metadata,
   });
+
+  if (eventType === "phone_reveal" || eventType === "call_click" || eventType === "whatsapp_click") {
+    await recordDemandSignalAction({
+      signalType: "contact_action",
+      locale,
+      attributes: { eventType, listingId },
+      weight: eventType === "phone_reveal" ? 3 : 4,
+      source: "listing_contact",
+    });
+  }
 
   return { ok: true };
 }

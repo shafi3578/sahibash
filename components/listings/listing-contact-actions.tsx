@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { recordListingEngagementAction } from "@/lib/actions/engagement";
 import { recordInventoryContactEventAction } from "@/lib/actions/inventory";
+import { createShareOutputAction } from "@/lib/actions/liquidity";
 import type { AppLocale } from "@/lib/i18n/translations";
 
 const COPY={en:{reveal:"Reveal phone",call:"Call",whatsapp:"WhatsApp",share:"Share",copied:"Link copied",message:"Hello, I found your listing on Sahibash. Is it still available?",blocked:"Contact not available",external:"Confirm availability before sending money."},fa:{reveal:"نمایش شماره",call:"تماس",whatsapp:"واتساپ",share:"اشتراک",copied:"پیوند کاپی شد",message:"سلام، اعلان شما را در صاحباش دیدم. آیا هنوز موجود است؟",blocked:"تماس در دسترس نیست",external:"پیش از پرداخت، موجودیت را تأیید کنید."},ps:{reveal:"شمېره ښکاره کړئ",call:"زنګ",whatsapp:"واټس‌اپ",share:"شریکول",copied:"تړونی کاپي شو",message:"سلام، ستاسو اعلان مې په صاحباش کې ولید. آیا لا شته؟",blocked:"اړیکه نشته",external:"له پیسو ورکولو مخکې شتون تایید کړئ."}} as const;
@@ -15,8 +16,12 @@ export function ListingContactActions({listingId,title,phone,locale,canContact=t
  const whatsapp=`https://wa.me/${digits.replace(/^\+/,"")}?text=${encodeURIComponent(`${t.message} ${title}`)}`;
  async function share(){
   try {
-   if(navigator.share) await navigator.share({title,url:location.href});
-   else {await navigator.clipboard.writeText(location.href);setCopied(true);}
+   const output = await createShareOutputAction(listingId, "generic", locale);
+   const hasOutput = output.ok && "shareUrl" in output && "shareText" in output;
+   const url = hasOutput ? output.shareUrl : location.href;
+   const text = hasOutput ? output.shareText : `${title}\n${location.href}`;
+   if(navigator.share) await navigator.share({title,text,url});
+   else {await navigator.clipboard.writeText(text);setCopied(true);}
    track("share");
   } catch {
    // Closing the native share sheet is an expected user action.
