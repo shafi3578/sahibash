@@ -2,16 +2,16 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDictionary } from "@/lib/i18n/server";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { MobileSearchSheet } from "@/components/mobile-search-sheet";
 import { localizePath } from "@/lib/i18n/routing";
 import { getNavigationItems } from "@/lib/actions/navigation";
 import { getSiteSettings } from "@/lib/actions/site-settings";
 import { localizeNavigationLabel } from "@/lib/i18n/navigation-labels";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 
-function HeaderIcon({ name }: { name: "search" | "bell" | "settings" }) {
+function HeaderIcon({ name }: { name: "bell" | "settings" }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      {name === "search" ? <><circle cx="10.8" cy="10.8" r="6.4" /><path d="m16.2 16.2 4.1 4.1" /></> : null}
       {name === "bell" ? <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></> : null}
       {name === "settings" ? <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.4-.2-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V22h-4v-.4a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.2.1-2-3.4.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.5-1H3v-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 2-3.4.2.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V2h4v.4a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.2-.1 2 3.4-.1.1A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.5 1h.1v4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></> : null}
     </svg>
@@ -37,10 +37,10 @@ export async function SiteHeader() {
   const postAdCreatePath = "/post-ad/create?posting=sell";
   const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent(postAdCreatePath)}&reason=post`;
   const mobileLabels = locale === "fa"
-    ? { notifications: "اعلان‌ها", search: "جستجو", settings: "تنظیمات" }
+    ? { notifications: "اعلان‌ها", settings: "تنظیمات" }
     : locale === "ps"
-      ? { notifications: "خبرتیاوې", search: "لټون", settings: "تنظیمات" }
-      : { notifications: "Notifications", search: "Search", settings: "Settings" };
+      ? { notifications: "خبرتیاوې", settings: "تنظیمات" }
+      : { notifications: "Notifications", settings: "Settings" };
   let user: { id: string } | null = null;
   let canModerateListings = false;
   let canManageAdministratorArea = false;
@@ -90,9 +90,7 @@ export async function SiteHeader() {
             <Link href={user ? href("/dashboard/messages") : href("/login")} aria-label={mobileLabels.notifications} className="grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--ink-1)] lg:hidden">
               <HeaderIcon name="bell" />
             </Link>
-            <Link href={href("/search")} aria-label={mobileLabels.search} className="grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--ink-1)] lg:hidden">
-              <HeaderIcon name="search" />
-            </Link>
+            <MobileSearchSheet locale={locale} />
             <Link href={user ? href("/dashboard/settings") : href("/login")} aria-label={mobileLabels.settings} className="grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--ink-1)] lg:hidden">
               <HeaderIcon name="settings" />
             </Link>

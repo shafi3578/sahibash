@@ -98,6 +98,8 @@ type ListingFilters = {
   parking?: boolean;
   listingType?: "for_sale" | "wanted";
   postedWithin?: "24h" | "7d" | "30d";
+  limit?: number;
+  offset?: number;
 };
 
 function attachPreferredTranslation(
@@ -609,6 +611,10 @@ export async function getApprovedListings(
       await applyAttributeTextFilter("original_refurbished", filters?.originalRefurbished);
       await applyWantedOnlyFilter(filters?.listingType);
 
+      const requestedLimit = Math.min(Math.max(filters?.limit ?? 40, 1), 120);
+      const requestedOffset = Math.max(filters?.offset ?? 0, 0);
+      const queryLimit = Math.min(requestedLimit + requestedOffset, 120);
+
       let query = supabase
         .from("listings")
         .select(
@@ -622,7 +628,7 @@ export async function getApprovedListings(
         )
         .eq("status", "approved")
         .in("category_id", lifecycleCategoryIds)
-        .limit(120);
+        .limit(queryLimit);
 
       query = applyPublicListingQualityFilters(query);
 
@@ -819,10 +825,10 @@ export async function getApprovedListings(
         });
 
         scored.sort((a, b) => b.finalScore - a.finalScore);
-        return scored.map((item) => item.listing).slice(0, 40);
+        return scored.map((item) => item.listing).slice(requestedOffset, requestedOffset + requestedLimit);
       }
 
-      return translatedRows.slice(0, 40);
+      return translatedRows.slice(requestedOffset, requestedOffset + requestedLimit);
     } catch (error) {
       reportDataError("approved-listings.unexpected", error);
       return [];

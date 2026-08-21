@@ -5,6 +5,7 @@ import LoginPage from "@/app/login/page";
 import RegisterPage from "@/app/register/page";
 import ResetPasswordPage from "@/app/reset-password/page";
 import SearchPage from "@/app/search/page";
+import FeaturedPage from "@/app/featured/page";
 import PostAdPage from "@/app/post-ad/page";
 import PostAdCreatePage from "@/app/post-ad/create/page";
 import PostAdCreateNewPage from "@/app/post-ad/create-new/page";
@@ -77,7 +78,7 @@ export default async function LocaleCatchAllPage({
   const [first, second, third] = slug;
 
   if (slug.length === 0) {
-    return renderPage(HomePage);
+    return renderPage(HomePage, { searchParams });
   }
 
   if (first === "login" && slug.length === 1) {
@@ -94,6 +95,10 @@ export default async function LocaleCatchAllPage({
 
   if (first === "search" && slug.length === 1) {
     return renderPage(SearchPage, { searchParams });
+  }
+
+  if (first === "featured" && slug.length === 1) {
+    return renderPage(FeaturedPage);
   }
 
   if (first === "post-ad") {

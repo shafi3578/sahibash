@@ -12,9 +12,22 @@ import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatCurrencyAmount } from "@/lib/i18n/format";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
+}) {
   const { t, locale } = await getDictionary();
   const href = (path: string) => localizePath(path, locale);
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const pageValue = Array.isArray(resolvedSearchParams.page) ? resolvedSearchParams.page[0] : resolvedSearchParams.page;
+  const currentPage = Math.min(Math.max(Number.parseInt(pageValue ?? "1", 10) || 1, 1), 7);
+  const pageSize = 10;
+  const homeCopy = locale === "fa"
+    ? { allFeatured: "همه ویژه‌ها" }
+    : locale === "ps"
+      ? { allFeatured: "ټول ځانګړي" }
+      : { allFeatured: "All featured" };
   const postAdCreatePath = "/post-ad/create?posting=sell";
   const siteSettings = await getSiteSettings();
   const homepageSections = resolveHomepageSections(await getHomepageSections());
@@ -31,17 +44,18 @@ export default async function HomePage() {
   }
 
   const [listings, categories, mobileCategories] = await Promise.all([
-    getApprovedListings({ locale }),
+    getApprovedListings({ locale, limit: 70 }),
     getCategoriesWithStats(),
     getHomeCategoryNodes(),
   ]);
 
   const featured = listings.filter((l) => l.featured).slice(0, 4);
-  const latest = listings.slice(0, 8);
+  const latest = listings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const featuredRow = featured.length ? featured : latest.slice(0, 6);
+  const totalPages = Math.max(1, Math.min(7, Math.ceil(listings.length / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 px-0 pb-28 pt-0 sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[linear-gradient(180deg,#fff7ed_0%,#f8fafc_18%,#eef2ff_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
       <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#ffe08a_0,#f97316_22%,#0f172a_58%,#020617_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-sm">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
@@ -130,7 +144,7 @@ export default async function HomePage() {
       <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-3xl sm:border sm:shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:bg-gradient-to-r sm:from-amber-50 sm:to-white">
           {t.home.featuredListings}
-          <span className="rounded-full bg-[var(--brand)]/30 px-2 py-1 text-[10px] text-slate-700">Hot</span>
+          <Link href={href("/featured")} className="rounded-full bg-[var(--brand)]/30 px-2 py-1 text-[10px] text-slate-700">{homeCopy.allFeatured}</Link>
         </div>
         <div className="overflow-x-auto px-3 py-3 [scrollbar-width:none]">
           <div className="flex min-w-max gap-3">
@@ -160,6 +174,20 @@ export default async function HomePage() {
             })}
           </div>
         </div>
+        {totalPages > 1 ? (
+          <div className="flex items-center justify-center gap-2 border-t border-slate-100 bg-white px-3 py-4">
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+              <Link
+                key={page}
+                href={href(page === 1 ? "/" : `/?page=${page}`)}
+                aria-current={page === currentPage ? "page" : undefined}
+                className={`grid h-9 w-9 place-items-center rounded-full text-sm font-bold ${page === currentPage ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"}`}
+              >
+                {page}
+              </Link>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="overflow-hidden bg-white sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm">
