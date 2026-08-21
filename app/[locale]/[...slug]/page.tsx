@@ -40,6 +40,7 @@ import AdminCategoriesPage from "@/app/admin/categories/page";
 import AdminElectronicsPage from "@/app/admin/electronics/page";
 import AdminListingsPage from "@/app/admin/listings/page";
 import AdminDemandPage from "@/app/admin/demand/page";
+import AdminNetworkReadinessPage from "@/app/admin/network-readiness/page";
 import AdminSearchPage from "@/app/admin/search/page";
 import AdminRolesPage from "@/app/admin/roles/page";
 import AdminAuditPage from "@/app/admin/audit/page";
@@ -212,6 +213,8 @@ export default async function LocaleCatchAllPage({
           return renderPage(AdminListingsPage, { searchParams: resolvedSearchParams });
         case "demand":
           return renderPage(AdminDemandPage, { searchParams: resolvedSearchParams });
+        case "network-readiness":
+          return renderPage(AdminNetworkReadinessPage, { searchParams: resolvedSearchParams });
         case "search":
           return renderPage(AdminSearchPage, { searchParams: resolvedSearchParams });
         case "roles":
