@@ -7,6 +7,7 @@ import { localizePath } from "@/lib/i18n/routing";
 import { getNavigationItems } from "@/lib/actions/navigation";
 import { getSiteSettings } from "@/lib/actions/site-settings";
 import { localizeNavigationLabel } from "@/lib/i18n/navigation-labels";
+import { getLocalizedBrandName } from "@/lib/i18n/brand";
 
 async function signOutAction() {
   "use server";
@@ -21,6 +22,7 @@ async function signOutAction() {
 export async function SiteHeader() {
   const { locale, t } = await getDictionary();
   const siteSettings = await getSiteSettings();
+  const brandName = getLocalizedBrandName(locale, siteSettings.site_name);
   const navigationItems = await getNavigationItems();
   const href = (path: string) => localizePath(path, locale);
   const postAdCreatePath = "/post-ad/create?posting=sell";
@@ -59,7 +61,7 @@ export async function SiteHeader() {
     <>
       <header className="sticky top-0 z-30 border-b border-black/10 bg-[var(--brand)] text-[var(--ink-1)]">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4 lg:px-8">
-          <Link href={href("/")} className="shrink-0 font-display text-2xl font-bold sm:text-3xl">{siteSettings.site_name}</Link>
+          <Link href={href("/")} className="shrink-0 font-display text-2xl font-bold sm:text-3xl">{brandName}</Link>
           <nav className="hidden flex-1 items-center justify-center gap-2 lg:flex">
             {navigationItems.map((link) => (
               <Link key={`${link.id}-${link.path}`} href={href(link.path)} className="rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-sm font-semibold text-[var(--ink-1)]">

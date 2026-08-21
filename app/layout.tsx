@@ -10,14 +10,16 @@ import { PwaRegister } from "@/components/pwa-register";
 import { getCurrentUser } from "@/lib/auth";
 import { localeDirection, localeTag } from "@/lib/i18n/format";
 import { SITE_METADATA } from "@/lib/i18n/metadata";
+import { getLocalizedBrandName } from "@/lib/i18n/brand";
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteSettings = await getSiteSettings();
   const locale = await getCurrentLocale();
   const localizedMetadata = SITE_METADATA[locale];
+  const brandName = getLocalizedBrandName(locale, siteSettings.site_name);
 
   return {
-    title: `${siteSettings.site_name} | ${localizedMetadata.titleSuffix}`,
+    title: `${brandName} | ${localizedMetadata.titleSuffix}`,
     description: (locale === "en" ? siteSettings.site_tagline : null) || localizedMetadata.description,
     alternates: {
       languages: {

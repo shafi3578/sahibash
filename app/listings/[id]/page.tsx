@@ -32,6 +32,7 @@ import { getSourceTransparency } from "@/lib/inventory/provenance";
 import { initiateListingClaimAction, recordInventoryContactEventAction } from "@/lib/actions/inventory";
 
 type NamedLocationRelation = { name?: string | null } | null;
+const ENABLE_BUYER_VEHICLE_3D = false;
 
 function readAttributeValue(value: unknown, locale: "en" | "fa" | "ps") {
   if (typeof value === "string") return value;
@@ -270,7 +271,7 @@ export default async function ListingDetailPage({
     || "-";
   const vehicleMileageValue = attributeMap.get("mileage") || "-";
   const vehicleYearValue = attributeMap.get("year") || "-";
-  const vehicleModel3D = isVehicleListing ? selectVehicleModel3D({
+  const vehicleModel3D = ENABLE_BUYER_VEHICLE_3D && isVehicleListing ? selectVehicleModel3D({
     make: vehicleMakeValue,
     model: vehicleModelValue,
     year: vehicleYearValue,

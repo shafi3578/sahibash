@@ -41,12 +41,12 @@ export default async function HomePage() {
   const featuredRow = featured.length ? featured : latest.slice(0, 6);
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-4 px-0 pb-28 pt-4 sm:px-4 sm:pb-16 lg:px-6">
-      <section className="overflow-hidden border-y border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#1d4ed8_100%)] text-white sm:rounded-2xl sm:border sm:shadow-sm">
-        <div className="grid gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1.3fr_0.9fr] lg:px-8 lg:py-10">
+    <main className="mx-auto w-full max-w-7xl space-y-4 px-0 pb-28 pt-0 sm:px-4 sm:pb-16 sm:pt-4 lg:px-6">
+      <section className="overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#ffe08a_0,#f97316_22%,#0f172a_58%,#020617_100%)] text-white sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-sm">
+        <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/70">{siteSettings.site_tagline}</p>
-            <h1 className="mt-3 max-w-2xl font-display text-4xl font-bold leading-tight sm:text-5xl">
+            <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{siteSettings.site_tagline}</p>
+            <h1 className="mt-4 max-w-2xl font-display text-4xl font-black leading-tight sm:text-5xl">
               {siteSettings.home_hero_title}
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
@@ -63,12 +63,23 @@ export default async function HomePage() {
               ) : null}
             </div>
           </div>
-          <div className="grid gap-3 self-center sm:grid-cols-3 lg:grid-cols-1">
-            {(siteSettings.navigation_links ?? []).slice(0, 3).map((link) => (
-              <Link key={`${link.label}-${link.path}`} href={href(link.path)} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/15">
-                {link.label}
-              </Link>
-            ))}
+          <div className="grid grid-cols-3 gap-2 self-end lg:grid-cols-1">
+            {featuredRow.slice(0, 3).map((listing, index) => {
+              const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
+              const displayTitle = listing.translated_title || listing.title;
+              return (
+                <Link key={listing.id} href={href(`/listings/${listing.id}`)} className="group overflow-hidden rounded-3xl border border-white/15 bg-white/10 shadow-2xl backdrop-blur transition hover:-translate-y-1 hover:bg-white/15">
+                  <div className="relative h-28 bg-white/10 sm:h-36 lg:h-28">
+                    {image ? <Image src={image} alt={displayTitle} fill className="object-cover transition duration-500 group-hover:scale-105" sizes="(max-width: 1024px) 33vw, 320px" /> : null}
+                    <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-[10px] font-bold">#{index + 1}</span>
+                  </div>
+                  <div className="p-3">
+                    <p className="line-clamp-2 text-xs font-bold sm:text-sm">{displayTitle}</p>
+                    <p className="mt-1 text-xs font-semibold text-yellow-200">{formatCurrencyAmount(listing.price, listing.currency, locale)}</p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -116,9 +127,10 @@ export default async function HomePage() {
         <CategoryHomeList categories={mobileCategories} locale={locale} />
       </section>
 
-      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-3xl sm:border sm:shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-amber-50 to-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
           {t.home.featuredListings}
+          <span className="rounded-full bg-[var(--brand)]/30 px-2 py-1 text-[10px] text-slate-700">Hot</span>
         </div>
         <div className="overflow-x-auto px-3 py-3">
           <div className="flex min-w-max gap-3">
@@ -129,9 +141,9 @@ export default async function HomePage() {
                 <Link
                   key={listing.id}
                   href={href(`/listings/${listing.id}`)}
-                  className="w-44 shrink-0 overflow-hidden rounded-xl border border-slate-200"
+                  className="w-48 shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <div className="relative h-24 w-full bg-slate-100">
+                  <div className="relative h-32 w-full bg-slate-100">
                     {image ? (
                       <Image src={image} alt={displayTitle} fill className="object-cover" sizes="176px" />
                     ) : null}
@@ -149,8 +161,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-3xl sm:border sm:shadow-sm">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
           {t.home.latestListings}
         </div>
         <div className="divide-y divide-slate-200">
@@ -162,9 +174,9 @@ export default async function HomePage() {
               <Link
                 key={listing.id}
                 href={href(`/listings/${listing.id}`)}
-                className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-3 p-3"
+                className="grid grid-cols-[6rem_1fr] gap-3 p-3 transition hover:bg-amber-50/40 sm:grid-cols-[6rem_1fr_auto]"
               >
-                <div className="relative h-[5.5rem] w-[5.5rem] overflow-hidden rounded-md bg-slate-100">
+                <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-sm">
                   {image ? (
                     <Image src={image} alt={displayTitle} fill className="object-cover" sizes="88px" />
                   ) : null}
@@ -173,7 +185,7 @@ export default async function HomePage() {
                   <p className="line-clamp-2 text-base text-slate-800">{displayTitle}</p>
                   <p className="mt-1 line-clamp-1 text-sm text-slate-500">{province}</p>
                 </div>
-                <p className="shrink-0 text-xl font-semibold text-[#1967b1]">
+                <p className="col-span-2 shrink-0 text-lg font-bold text-[#1967b1] sm:col-span-1 sm:text-xl">
                   {formatCurrencyAmount(listing.price, listing.currency, locale)}
                 </p>
               </Link>

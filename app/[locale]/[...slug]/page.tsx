@@ -41,6 +41,7 @@ import AdminElectronicsPage from "@/app/admin/electronics/page";
 import AdminListingsPage from "@/app/admin/listings/page";
 import AdminDemandPage from "@/app/admin/demand/page";
 import AdminNetworkReadinessPage from "@/app/admin/network-readiness/page";
+import AdminVehicle3DPage from "@/app/admin/vehicle-3d/page";
 import AdminSearchPage from "@/app/admin/search/page";
 import AdminRolesPage from "@/app/admin/roles/page";
 import AdminAuditPage from "@/app/admin/audit/page";
@@ -215,6 +216,8 @@ export default async function LocaleCatchAllPage({
           return renderPage(AdminDemandPage, { searchParams: resolvedSearchParams });
         case "network-readiness":
           return renderPage(AdminNetworkReadinessPage, { searchParams: resolvedSearchParams });
+        case "vehicle-3d":
+          return renderPage(AdminVehicle3DPage, { searchParams: resolvedSearchParams });
         case "search":
           return renderPage(AdminSearchPage, { searchParams: resolvedSearchParams });
         case "roles":
