@@ -41,8 +41,8 @@ export default async function HomePage() {
   const featuredRow = featured.length ? featured : latest.slice(0, 6);
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-4 px-0 pb-28 pt-0 sm:px-4 sm:pb-16 sm:pt-4 lg:px-6">
-      <section className="overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#ffe08a_0,#f97316_22%,#0f172a_58%,#020617_100%)] text-white sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-sm">
+    <main className="mx-auto w-full max-w-7xl space-y-3 px-0 pb-28 pt-0 sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#ffe08a_0,#f97316_22%,#0f172a_58%,#020617_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-sm">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
             <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{siteSettings.site_tagline}</p>
@@ -101,7 +101,7 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      <section className="border-y border-slate-200 bg-white sm:rounded-2xl sm:border sm:shadow-sm">
+      <section className="hidden border-y border-slate-200 bg-white sm:block sm:rounded-2xl sm:border sm:shadow-sm">
         <form action={href("/search")} className="grid grid-cols-[1fr_auto] gap-2 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-4">
           <input
             name="q"
@@ -128,11 +128,11 @@ export default async function HomePage() {
       </section>
 
       <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-3xl sm:border sm:shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-amber-50 to-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:bg-gradient-to-r sm:from-amber-50 sm:to-white">
           {t.home.featuredListings}
           <span className="rounded-full bg-[var(--brand)]/30 px-2 py-1 text-[10px] text-slate-700">Hot</span>
         </div>
-        <div className="overflow-x-auto px-3 py-3">
+        <div className="overflow-x-auto px-3 py-3 [scrollbar-width:none]">
           <div className="flex min-w-max gap-3">
             {featuredRow.map((listing) => {
               const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
@@ -141,12 +141,13 @@ export default async function HomePage() {
                 <Link
                   key={listing.id}
                   href={href(`/listings/${listing.id}`)}
-                  className="w-48 shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="w-40 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-48 sm:rounded-3xl"
                 >
-                  <div className="relative h-32 w-full bg-slate-100">
+                  <div className="relative h-56 w-full bg-slate-100 sm:h-32">
                     {image ? (
-                      <Image src={image} alt={displayTitle} fill className="object-cover" sizes="176px" />
+                      <Image src={image} alt={displayTitle} fill className="object-cover" sizes="(max-width: 640px) 160px, 176px" />
                     ) : null}
+                    <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">Ad</span>
                   </div>
                   <div className="space-y-1 p-2">
                     <p className="line-clamp-2 text-sm font-medium text-slate-800">{displayTitle}</p>
@@ -161,11 +162,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-3xl sm:border sm:shadow-sm">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+      <section className="overflow-hidden bg-white sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm">
+        <div className="border-y border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:border-b sm:border-t-0 sm:bg-slate-50">
           {t.home.latestListings}
         </div>
-        <div className="divide-y divide-slate-200">
+        <div className="divide-y divide-slate-100 sm:divide-slate-200">
           {latest.map((listing) => {
             const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
             const displayTitle = listing.translated_title || listing.title;
@@ -174,18 +175,19 @@ export default async function HomePage() {
               <Link
                 key={listing.id}
                 href={href(`/listings/${listing.id}`)}
-                className="grid grid-cols-[6rem_1fr] gap-3 p-3 transition hover:bg-amber-50/40 sm:grid-cols-[6rem_1fr_auto]"
+                className="block p-0 transition hover:bg-amber-50/40 sm:grid sm:grid-cols-[6rem_1fr_auto] sm:gap-3 sm:p-3"
               >
-                <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-slate-100 shadow-sm">
+                <div className="relative aspect-video w-full overflow-hidden bg-slate-100 sm:h-24 sm:w-24 sm:rounded-2xl sm:shadow-sm">
                   {image ? (
-                    <Image src={image} alt={displayTitle} fill className="object-cover" sizes="88px" />
+                    <Image src={image} alt={displayTitle} fill className="object-cover" sizes="(max-width: 640px) 100vw, 88px" />
                   ) : null}
+                  <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">Sahibash</span>
                 </div>
-                <div className="min-w-0">
-                  <p className="line-clamp-2 text-base text-slate-800">{displayTitle}</p>
+                <div className="min-w-0 px-3 pb-2 pt-2 sm:px-0 sm:pb-0 sm:pt-0">
+                  <p className="line-clamp-2 text-base font-semibold text-slate-900 sm:font-normal sm:text-slate-800">{displayTitle}</p>
                   <p className="mt-1 line-clamp-1 text-sm text-slate-500">{province}</p>
                 </div>
-                <p className="col-span-2 shrink-0 text-lg font-bold text-[#1967b1] sm:col-span-1 sm:text-xl">
+                <p className="px-3 pb-4 text-lg font-bold text-[#1967b1] sm:col-span-1 sm:px-0 sm:pb-0 sm:text-xl">
                   {formatCurrencyAmount(listing.price, listing.currency, locale)}
                 </p>
               </Link>

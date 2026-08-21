@@ -24,34 +24,49 @@ const FALLBACK_HOME_ROWS = [
 ] as const;
 
 function CategoryIcon({ slug }: { slug: string }) {
-  const common = "h-7 w-7";
+  const common = "h-10 w-10";
   if (slug === "vehicles") {
     return (
       <svg viewBox="0 0 48 48" aria-hidden="true" className={common}>
-        <path fill="currentColor" d="M10 27h28l-3.1-8.4A5 5 0 0 0 30.2 15H17.8a5 5 0 0 0-4.7 3.6L10 27Zm4.2-3 1.7-4.5A2 2 0 0 1 17.8 18h12.4a2 2 0 0 1 1.9 1.5l1.7 4.5H14.2Z" />
-        <path fill="currentColor" d="M9 25h30a4 4 0 0 1 4 4v6a2 2 0 0 1-2 2h-3.2a4 4 0 0 1-7.6 0H17.8a4 4 0 0 1-7.6 0H7a2 2 0 0 1-2-2v-6a4 4 0 0 1 4-4Zm5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm20 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
+        <path fill="#2563eb" d="M5 30h22l-2.3-6.2A4 4 0 0 0 21 21H11a4 4 0 0 0-3.7 2.8L5 30Z" />
+        <path fill="#1d4ed8" d="M4 29h24a3 3 0 0 1 3 3v4H1v-4a3 3 0 0 1 3-3Z" />
+        <circle cx="8" cy="36" r="3" fill="#111827" />
+        <circle cx="24" cy="36" r="3" fill="#111827" />
+        <path fill="#f97316" d="M30 25h7l3 5h3v5h-2.4a3 3 0 0 1-5.2 0h-7.8a3 3 0 0 1-2.6 1.5V29a4 4 0 0 1 4-4Z" />
+        <circle cx="27" cy="35" r="2.4" fill="#111827" />
+        <circle cx="38" cy="35" r="2.4" fill="#111827" />
+        <path fill="#16a34a" d="M32 15a5 5 0 0 1 5 5h-4a2 2 0 0 0-2-2h-4v-3h5Z" />
+        <circle cx="27" cy="20" r="2.2" fill="#111827" />
+        <circle cx="38" cy="20" r="2.2" fill="#111827" />
       </svg>
     );
   }
   if (slug === "real-estate") {
     return (
       <svg viewBox="0 0 48 48" aria-hidden="true" className={common}>
-        <path fill="currentColor" d="M7 23.5 24 9l17 14.5-2.6 3.1-2.4-2V40H12V24.6l-2.4 2L7 23.5ZM17 36h5v-9h4v9h5V20.3l-7-6-7 6V36Z" />
+        <path fill="#f97316" d="M6 23 24 8l18 15-3 3-3-2.5V40H12V23.5L9 26l-3-3Z" />
+        <path fill="#fff7ed" d="M17 38h5V27h5v11h5V21l-8-6.8L17 21v17Z" />
+        <path fill="#2563eb" d="M16 18h6v5h-6v-5Zm10 0h6v5h-6v-5Z" />
       </svg>
     );
   }
   if (slug === "mobile-phones-tablets") {
     return (
       <svg viewBox="0 0 48 48" aria-hidden="true" className={common}>
-        <path fill="currentColor" d="M17 5h14a4 4 0 0 1 4 4v30a4 4 0 0 1-4 4H17a4 4 0 0 1-4-4V9a4 4 0 0 1 4-4Zm0 5v28h14V10H17Zm5 30h4v1h-4v-1Z" />
-        <path fill="currentColor" d="M20 13h8v3h-8v-3Zm0 6h8v3h-8v-3Z" opacity=".45" />
+        <rect x="14" y="5" width="20" height="38" rx="5" fill="#111827" />
+        <rect x="17" y="10" width="14" height="27" rx="2" fill="#38bdf8" />
+        <rect x="7" y="17" width="15" height="23" rx="4" fill="#a855f7" />
+        <rect x="10" y="21" width="9" height="14" rx="1.5" fill="#f5f3ff" />
+        <circle cx="24" cy="40" r="1.4" fill="#f8fafc" />
       </svg>
     );
   }
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className={common}>
-      <path fill="currentColor" d="M12 14h24a3 3 0 0 1 3 3v19a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3V17a3 3 0 0 1 3-3Zm2 6v14h20V20H14Z" />
-      <path fill="currentColor" d="M18 9h12v4H18V9Z" opacity=".55" />
+      <rect x="7" y="18" width="18" height="18" rx="4" fill="#22c55e" />
+      <rect x="22" y="11" width="18" height="24" rx="4" fill="#facc15" />
+      <path fill="#ef4444" d="M13 14h21v5H13z" />
+      <path fill="#0f172a" d="M13 24h8v8h-8zm14-6h7v12h-7z" opacity=".55" />
     </svg>
   );
 }
@@ -86,20 +101,20 @@ export async function CategoryHomeList({ categories, locale = "en" }: Props) {
   return (
     <div className="space-y-3">
       <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-2xl sm:border">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           {t.home.mainCategories}
+          <a href={localizePath("/categories", locale)} className="text-[var(--accent)]">{t.home.openCategoryBrowser}</a>
         </div>
         <div className="grid grid-cols-4 gap-2 p-3">
           {launchRows.slice(0, 4).map((category) => (
-            <a key={category.id} href={category.id > 0 ? localizePath(`/categories/${category.slug}?node=${category.id}`, locale) : localizePath(`/categories/${category.slug}`, locale)} className="group flex min-h-24 flex-col items-center justify-center gap-2 rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--brand)] hover:shadow-md">
-              <span aria-hidden="true" className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--brand)]/25 text-[var(--ink-1)] ring-1 ring-black/5 transition group-hover:scale-105">
+            <a key={category.id} href={localizePath("/categories", locale)} className="group flex min-h-24 flex-col items-center justify-center gap-2 rounded-3xl bg-white p-2 text-center transition active:bg-slate-100">
+              <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-2xl bg-slate-50 shadow-sm ring-1 ring-slate-200 transition group-hover:scale-105">
                 <CategoryIcon slug={category.slug} />
               </span>
               <span className="line-clamp-2 text-xs font-bold">{category.name}</span>
             </a>
           ))}
         </div>
-        <a href={localizePath("/categories", locale)} className="flex min-h-11 items-center justify-center border-t border-slate-200 text-sm font-semibold text-[var(--accent)]">{t.home.openCategoryBrowser}</a>
       </section>
 
       {comingSoonRows.length > 0 ? <p className="hidden text-xs text-slate-500 lg:block">{`${comingSoonRows.length} ${t.home.moreCategories} · ${t.home.comingSoon}`}</p> : null}
