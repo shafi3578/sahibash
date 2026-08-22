@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { AppLocale } from "@/lib/i18n/translations";
@@ -11,6 +11,14 @@ const COPY = {
   fa: { open: "جستجو", title: "جستجو در صاحبش", placeholder: "موتر، خانه، موبایل…", cancel: "لغو" },
   ps: { open: "لټون", title: "په صاحبش کې لټون", placeholder: "موټر، کور، موبایل…", cancel: "بندول" },
 } as const;
+
+type SearchSuggestion = {
+  type: "alias" | "category" | "location" | "listing" | "intent";
+  label: string;
+  subtitle?: string;
+  href: string;
+  value: string;
+};
 
 function SearchIcon() {
   return (
@@ -24,8 +32,40 @@ function SearchIcon() {
 export function MobileSearchSheet({ locale }: { locale: AppLocale }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const copy = COPY[locale];
+
+  useEffect(() => {
+    if (!open) return;
+
+    const controller = new AbortController();
+    const handle = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/search/autocomplete?locale=${encodeURIComponent(locale)}&q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = await response.json() as { suggestions?: SearchSuggestion[] };
+        setSuggestions(Array.isArray(payload.suggestions) ? payload.suggestions : []);
+      } catch {
+        if (!controller.signal.aborted) {
+          setSuggestions([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }, query.trim().length >= 3 ? 260 : 120);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(handle);
+    };
+  }, [locale, open, query]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,7 +98,30 @@ export function MobileSearchSheet({ locale }: { locale: AppLocale }) {
                 />
               </form>
             </div>
-            <p className="px-4 pb-2 pt-3 text-xs text-slate-500">{copy.title}</p>
+            <div className="px-1 pb-2 pt-3">
+              <p className="px-3 text-xs font-semibold text-slate-500">{loading ? "…" : copy.title}</p>
+              <div className="mt-2 max-h-[60vh] overflow-y-auto">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={`${suggestion.type}-${suggestion.href}-${suggestion.label}`}
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      router.push(suggestion.href);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-start transition active:bg-slate-100"
+                  >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-black uppercase text-slate-600">
+                      {suggestion.type.slice(0, 1)}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-slate-950">{suggestion.label}</span>
+                      {suggestion.subtitle ? <span className="block truncate text-xs text-slate-500">{suggestion.subtitle}</span> : null}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

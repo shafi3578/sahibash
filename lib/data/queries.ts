@@ -26,6 +26,7 @@ import type { AppLocale } from "@/lib/i18n/translations";
 import { buildSearchKeywordIndex, normalizeSearchText } from "@/lib/search/multilingual";
 import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
 import type { SearchRewriteClient } from "@/lib/search/rewrite";
+import { understandSearchQuery } from "@/lib/search/query-understanding";
 import { getSimpleCategoryConfig, getSimpleCategoryKind } from "@/lib/posting/simple-category-details";
 
 type ListingFilters = {
@@ -264,6 +265,7 @@ export async function getApprovedListings(
         categoryScope: null,
       });
       const searchVariants = rewriteContext.variants.slice(0, 20);
+      const understoodSearch = understandSearchQuery(filters?.search ?? "");
 
       if (searchVariants.length > 0) {
         const translationSearchClause = searchVariants
@@ -606,6 +608,9 @@ export async function getApprovedListings(
 
       await applyAttributeTextFilter("model", filters?.phoneModel);
       await applyAttributeTextFilter("storage", filters?.storage);
+      if (!filters?.storage && understoodSearch.storageGb) {
+        await applyAttributeTextFilter("storage", String(understoodSearch.storageGb));
+      }
       await applyAttributeTextFilter("ram", filters?.ram);
       await applyAttributeNumberFilter("battery_health", filters?.batteryHealthMin, undefined);
       await applyAttributeTextFilter("original_refurbished", filters?.originalRefurbished);
@@ -634,6 +639,11 @@ export async function getApprovedListings(
 
       if (filters?.province) {
         query = query.eq("province", filters.province);
+      } else if (understoodSearch.location?.province) {
+        const inferredProvince = understoodSearch.location.province.replace(/[(),%]/g, " ").trim();
+        if (inferredProvince) {
+          query = query.or(`province.ilike.%${inferredProvince}%,city.ilike.%${inferredProvince}%`);
+        }
       }
 
       if (filters?.district) {
@@ -692,6 +702,10 @@ export async function getApprovedListings(
 
       if (typeof filters?.yearMax === "number") {
         query = query.lte("vehicle_year", filters.yearMax);
+      }
+
+      if (typeof filters?.yearMin !== "number" && typeof filters?.yearMax !== "number" && understoodSearch.year) {
+        query = query.eq("vehicle_year", understoodSearch.year);
       }
 
       if (typeof filters?.oldVehicle === "boolean") {

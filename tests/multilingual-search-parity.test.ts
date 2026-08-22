@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildSearchKeywordIndex, expandSearchVariants, normalizeSearchText } from "@/lib/search/multilingual";
+import { understandSearchQuery } from "@/lib/search/query-understanding";
 
 type FixtureListing = {
   id: string;
@@ -130,4 +131,19 @@ test("Fielder variants return equivalent relevant listings", () => {
 test("Dari transliteration expands to useful Latin variants", () => {
   const variants = expandSearchVariants("فیلدر");
   assert.ok(variants.includes("fildr") || variants.includes("fielder"));
+});
+
+test("mixed vehicle searches detect exact year and Afghan location without fuzzy numeric rewrites", () => {
+  const understood = understandSearchQuery("fildr ۲۰۱۲ کابل");
+  assert.equal(understood.year, 2012);
+  assert.equal(understood.location?.province, "Kabul");
+  assert.equal(understood.productHints[0]?.canonical, "Toyota Fielder");
+  assert.ok(understood.tokens.includes("2012"));
+});
+
+test("phone searches detect storage numbers without treating model numbers as years", () => {
+  const understood = understandSearchQuery("ایفون ۱۳ ۲۵۶ کابل");
+  assert.equal(understood.year, null);
+  assert.equal(understood.storageGb, 256);
+  assert.equal(understood.location?.province, "Kabul");
 });
