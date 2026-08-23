@@ -30,6 +30,7 @@ import { ListingCard } from "@/components/listing-card";
 import { formatCurrencyAmount } from "@/lib/i18n/format";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
 import { initiateListingClaimAction, recordInventoryContactEventAction } from "@/lib/actions/inventory";
+import { localizePath } from "@/lib/i18n/routing";
 
 type NamedLocationRelation = { name?: string | null } | null;
 const ENABLE_BUYER_VEHICLE_3D = false;
@@ -82,6 +83,9 @@ export default async function ListingDetailPage({
   const currentUser = await getCurrentUser();
   const isOwner = currentUser?.id === listing.user_id;
   const callHref = `tel:${listing.contact_phone.replace(/[^\d+]/g, "")}`;
+  const listingHref = localizePath(`/listings/${listing.id}`, locale);
+  const composeHref = localizePath(`/listings/${listing.id}?compose=1`, locale);
+  const offerHref = localizePath(`/listings/${listing.id}?offerbox=1`, locale);
   const fields = await getCategoryFieldsWithOptions(listing.category_node_id);
   const configuredSchema = await getPublishedListingSchema(listing.category_node_id);
   const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
@@ -595,7 +599,7 @@ export default async function ListingDetailPage({
         </div>
       )}
       <div className="mb-4 flex items-center justify-between gap-3">
-        <Link href="/listings" className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold">
+        <Link href={localizePath("/listings", locale)} className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold">
           {t.listing.backToListings}
         </Link>
         <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-2)]">{categoryLabel || t.listing.category}</p>
@@ -826,10 +830,10 @@ export default async function ListingDetailPage({
           <div className="mt-4 flex flex-wrap gap-2">
           {listing.contact_phone ? <ListingContactActions listingId={listing.id} title={displayTitle} phone={listing.contact_phone} locale={locale} canContact={sourceTransparency.canContact} isExternal={sourceTransparency.isExternal} /> : null}
             {!isOwner ? (
-              <Link href={`/listings/${listing.id}?compose=1`} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
+              <Link href={composeHref} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
             ) : null}
             {!isOwner ? (
-              <Link href={`/listings/${listing.id}?offerbox=1`} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">{t.listing.offer}</Link>
+              <Link href={offerHref} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">{t.listing.offer}</Link>
             ) : null}
           </div>
         </section>
@@ -990,8 +994,8 @@ export default async function ListingDetailPage({
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
           <div className="mx-auto flex w-full max-w-5xl gap-2">
             {listing.contact_phone ? <a href={callHref} className="flex min-h-12 items-center rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">{t.listing.call}</a> : null}
-            <Link href={`/listings/${listing.id}?compose=1`} className="flex-1 rounded-lg bg-[var(--ink-1)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.message}</Link>
-            <Link href={`/listings/${listing.id}?offerbox=1`} className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.offer}</Link>
+            <Link href={composeHref} className="flex-1 rounded-lg bg-[var(--ink-1)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.message}</Link>
+            <Link href={offerHref} className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.offer}</Link>
           </div>
         </div>
       ) : null}
@@ -1001,7 +1005,7 @@ export default async function ListingDetailPage({
           <div className="w-full max-w-lg rounded-2xl bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg font-bold">{t.listing.sendMessage}</h3>
-              <Link href={`/listings/${listing.id}`} className="rounded px-2 py-1 text-sm text-[var(--ink-2)] hover:bg-[var(--surface-2)]">
+              <Link href={listingHref} className="rounded px-2 py-1 text-sm text-[var(--ink-2)] hover:bg-[var(--surface-2)]">
                 {t.listing.close}
               </Link>
             </div>
@@ -1027,7 +1031,7 @@ export default async function ListingDetailPage({
           <div className="w-full max-w-lg rounded-2xl bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg font-bold">{t.listing.sendYourOffer}</h3>
-              <Link href={`/listings/${listing.id}`} className="rounded px-2 py-1 text-sm text-[var(--ink-2)] hover:bg-[var(--surface-2)]">
+              <Link href={listingHref} className="rounded px-2 py-1 text-sm text-[var(--ink-2)] hover:bg-[var(--surface-2)]">
                 {t.listing.close}
               </Link>
             </div>

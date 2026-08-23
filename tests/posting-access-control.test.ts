@@ -12,11 +12,16 @@ const canonicalPostingForm = readFileSync(
 
 test("Protected posting paths are correctly detected", () => {
   const protectedPaths = [
+    "/dashboard",
     "/post-ad/create",
     "/post-ad/create-v2",
     "/post-ad/create-new",
     "/dashboard/my-ads",
     "/dashboard/my-listings",
+    "/dashboard/messages",
+    "/dashboard/settings",
+    "/dashboard/account-information",
+    "/dashboard/account-security",
     "/listings/create",
     "/listings/edit",
     "/listings/abc/edit",

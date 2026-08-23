@@ -2,23 +2,29 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
+import {
+  ACCOUNT_NAV_ITEMS,
+  isActiveAccountPath,
+  localizeAccountPath,
+  type AccountNavKey,
+} from "@/lib/account/navigation";
 
 export async function AccountMenu({ currentPath }: { currentPath: string }) {
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
-  const accountLinks = [
-    { href: "/dashboard/my-ads", label: ui.dashboard.myListings },
-    { href: "/dashboard/favorites", label: ui.dashboard.favoriteListings },
-    { href: "/dashboard/favorite-searches", label: ui.dashboard.favoriteSearches },
-    { href: "/dashboard/messages", label: ui.dashboard.messages },
-    { href: "/dashboard/questions", label: ui.dashboard.questionsAnswers },
-    { href: "/dashboard/offers", label: ui.dashboard.offers },
-    { href: "/dashboard/account-information", label: ui.dashboard.accountInformation },
-    { href: "/dashboard/account-security", label: ui.dashboard.accountSecurity },
-    { href: "/dashboard/settings", label: ui.dashboard.settings },
-    { href: "/dashboard/help", label: ui.dashboard.helpCenter },
-    { href: "/dashboard/privacy", label: ui.dashboard.privacyTerms },
-  ] as const;
+  const accountLabels: Record<AccountNavKey, string> = {
+    myListings: ui.dashboard.myListings,
+    favoriteListings: ui.dashboard.favoriteListings,
+    favoriteSearches: ui.dashboard.favoriteSearches,
+    messages: ui.dashboard.messages,
+    questionsAnswers: ui.dashboard.questionsAnswers,
+    offers: ui.dashboard.offers,
+    accountInformation: ui.dashboard.accountInformation,
+    accountSecurity: ui.dashboard.accountSecurity,
+    settings: ui.dashboard.settings,
+    helpCenter: ui.dashboard.helpCenter,
+    privacyTerms: ui.dashboard.privacyTerms,
+  };
 
   let newMessages = 0;
   let newOffers = 0;
@@ -65,23 +71,24 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
   return (
     <aside className="rounded-2xl border border-[var(--line)] bg-white p-3">
       <nav className="space-y-1">
-        {accountLinks.map((item) => {
-          const active = currentPath === item.href;
+        {ACCOUNT_NAV_ITEMS.map((item) => {
+          const active = isActiveAccountPath(currentPath, item.href);
+          const badge = "badge" in item ? item.badge : undefined;
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={localizeAccountPath(item.href, locale)}
               className={
                 active
                   ? "flex items-center justify-between rounded-lg bg-[var(--ink-1)] px-3 py-2 text-sm font-semibold text-white"
                   : "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold text-[var(--ink-1)] hover:bg-[var(--surface-2)]"
               }
             >
-              <span>{item.label}</span>
-              {item.href === "/dashboard/messages" && currentPath !== "/dashboard/messages" && newMessages > 0 ? (
+              <span>{accountLabels[item.key]}</span>
+              {badge === "messages" && !active && newMessages > 0 ? (
                 <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label={ui.dashboard.newMessagesBadge} />
               ) : null}
-              {item.href === "/dashboard/offers" && currentPath !== "/dashboard/offers" && newOffers > 0 ? (
+              {badge === "offers" && !active && newOffers > 0 ? (
                 <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label={ui.dashboard.newOffersBadge} />
               ) : null}
             </Link>

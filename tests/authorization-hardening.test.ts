@@ -9,7 +9,7 @@ const migration = readFileSync(
     process.cwd(),
     "supabase",
     "migrations",
-    "20260805043957_harden_roles_and_listing_promotions.sql",
+    "20260805044513_harden_roles_and_listing_promotions.sql",
   ),
   "utf8",
 );
@@ -19,7 +19,7 @@ const rlsHelperMigration = readFileSync(
     process.cwd(),
     "supabase",
     "migrations",
-    "20260805045737_restore_guarded_rls_helpers.sql",
+    "20260805045848_restore_guarded_rls_helpers.sql",
   ),
   "utf8",
 );
@@ -29,7 +29,7 @@ const advisorHardeningMigration = readFileSync(
     process.cwd(),
     "supabase",
     "migrations",
-    "20260805050542_database_advisor_hardening.sql",
+    "20260805050645_database_advisor_hardening.sql",
   ),
   "utf8",
 );

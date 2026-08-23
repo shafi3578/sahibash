@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { localizePath } from "@/lib/i18n/routing";
+import { buildLoginRedirectHref } from "@/lib/account/navigation";
 
 const LABELS = {
   en: { nav: "Mobile navigation", home: "Home", search: "Search", sell: "Sell", messages: "Messages", account: "Account" },
@@ -30,11 +31,11 @@ export function MobileBottomNav({ locale, authenticated }: { locale: AppLocale; 
   const text = LABELS[locale];
   const path = (value: string) => localizePath(value, locale);
   const sellPath = path("/post-ad/create?posting=sell");
-  const loginFor = (target: string) => `${path("/login")}?redirect=${encodeURIComponent(target)}&reason=post`;
+  const loginFor = (target: string, reason?: "post") => buildLoginRedirectHref({ targetPath: target, locale, reason });
   const items = [
     { label: text.home, href: path("/"), icon: "home" },
     { label: text.search, href: path("/search"), icon: "search" },
-    { label: text.sell, href: authenticated ? sellPath : loginFor("/post-ad/create?posting=sell"), icon: "sell", primary: true },
+    { label: text.sell, href: authenticated ? sellPath : loginFor("/post-ad/create?posting=sell", "post"), icon: "sell", primary: true },
     { label: text.messages, href: authenticated ? path("/dashboard/messages") : loginFor("/dashboard/messages"), icon: "messages" },
     { label: text.account, href: authenticated ? path("/dashboard") : path("/login"), icon: "account" },
   ];

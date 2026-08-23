@@ -5,6 +5,8 @@ import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath, normalizeLocaleInput } from "@/lib/i18n/routing";
 import { requiresStepUpAuth } from "@/lib/auth/step-up";
 import type { PermissionKey } from "@/lib/authorization";
+import { isPostAdPath } from "@/lib/auth/protected-routes";
+import { buildLoginRedirectHref, stripLocaleAndQuery } from "@/lib/account/navigation";
 
 type UserRole = "user" | "admin";
 
@@ -47,10 +49,18 @@ async function getCurrentPath() {
 
 function buildLoginRedirectPath(pathname: string | null, locale: string) {
   const normalizedLocale = normalizeLocaleInput(locale) ?? "fa";
-  const targetPath = pathname && pathname !== "/" ? pathname : "/post-ad";
-  const localizedTarget = localizePath(targetPath, normalizedLocale);
-  const loginPath = `/${normalizedLocale}/login`;
-  return `${loginPath}?redirect=${encodeURIComponent(localizedTarget)}&reason=post`;
+  const targetPath = pathname && pathname !== "/" ? pathname : "/dashboard";
+  const strippedTarget = stripLocaleAndQuery(targetPath);
+  return buildLoginRedirectHref({
+    targetPath,
+    locale: normalizedLocale,
+    reason: isPostAdPath(strippedTarget) ? "post" : undefined,
+  });
+}
+
+async function redirectToAccount(reason?: "security") {
+  const locale = await getCurrentLocale();
+  redirect(localizePath(reason ? `/dashboard?reason=${reason}` : "/dashboard", locale));
 }
 
 export async function getCurrentUser() {
@@ -110,7 +120,7 @@ export async function requirePermission(permission: PermissionKey) {
   const user = await requireUser();
   const stepUpWindowMinutes = await getConfiguredStepUpWindowMinutes();
   if (requiresStepUpAuth(user as Parameters<typeof requiresStepUpAuth>[0], stepUpWindowMinutes * 60 * 1000)) {
-    redirect("/dashboard?reason=security");
+    await redirectToAccount("security");
   }
 
   const supabase = await createSupabaseServerClient();
@@ -121,7 +131,7 @@ export async function requirePermission(permission: PermissionKey) {
   });
 
   if (error || data !== true) {
-    redirect("/dashboard");
+    await redirectToAccount();
   }
 
   return user;
@@ -131,7 +141,7 @@ export async function requireAdmin() {
   const user = await requireUser();
   const stepUpWindowMinutes = await getConfiguredStepUpWindowMinutes();
   if (requiresStepUpAuth(user as Parameters<typeof requiresStepUpAuth>[0], stepUpWindowMinutes * 60 * 1000)) {
-    redirect("/dashboard?reason=security");
+    await redirectToAccount("security");
   }
 
   const supabase = await createSupabaseServerClient();
@@ -141,7 +151,7 @@ export async function requireAdmin() {
   });
 
   if (error || data !== true) {
-    redirect("/dashboard");
+    await redirectToAccount();
   }
 
   return user;
@@ -151,7 +161,7 @@ export async function requireSuperAdministrator() {
   const user = await requireUser();
   const stepUpWindowMinutes = await getConfiguredStepUpWindowMinutes();
   if (requiresStepUpAuth(user as Parameters<typeof requiresStepUpAuth>[0], stepUpWindowMinutes * 60 * 1000)) {
-    redirect("/dashboard?reason=security");
+    await redirectToAccount("security");
   }
 
   const supabase = await createSupabaseServerClient();
@@ -160,7 +170,7 @@ export async function requireSuperAdministrator() {
   });
 
   if (error || data !== true) {
-    redirect("/dashboard");
+    await redirectToAccount();
   }
 
   return user;

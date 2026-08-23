@@ -16,8 +16,9 @@
     "test:inventory-provenance": "node --import tsx --test tests/inventory-provenance.test.ts",
     "test:liquidity": "node --import tsx --test tests/liquidity-foundation.test.ts",
     "test:network-readiness": "node --import tsx --test tests/network-readiness.test.ts",
+    "test:consumer-account": "node --import tsx --test tests/consumer-account-messaging.test.ts",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:i18n-parity && npm run test:search-parity && npm run test:posting-access && npm run test:smart-posting && npm run test:listing-schema && npm run test:security && npm run test:inventory-provenance && npm run test:liquidity && npm run test:network-readiness"
+    "test": "npm run test:i18n-parity && npm run test:search-parity && npm run test:posting-access && npm run test:smart-posting && npm run test:listing-schema && npm run test:security && npm run test:inventory-provenance && npm run test:liquidity && npm run test:network-readiness && npm run test:consumer-account"
   },
   "dependencies": {
     "@google/model-viewer": "^4.2.0",

@@ -6,12 +6,12 @@ import test from "node:test";
 const migrationsDirectory = join(process.cwd(), "supabase", "migrations");
 
 const taxonomyMigration = readFileSync(
-  join(migrationsDirectory, "20260804232750_taxonomy_specific_listing_schemas.sql"),
+  join(migrationsDirectory, "20260804233253_taxonomy_specific_listing_schemas.sql"),
   "utf8",
 );
 
 const refinementMigration = readFileSync(
-  join(migrationsDirectory, "20260804233424_refine_electronics_schema_families.sql"),
+  join(migrationsDirectory, "20260804233519_refine_electronics_schema_families.sql"),
   "utf8",
 );
 

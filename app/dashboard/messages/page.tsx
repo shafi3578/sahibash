@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import { formatDate } from "@/lib/i18n/format";
+import { buildMessageThreads } from "@/lib/messages/threading";
 
 export default async function MessagesPage() {
   const user = await requireUser();
@@ -19,36 +20,7 @@ export default async function MessagesPage() {
     .eq("recipient_user_id", user.id)
     .eq("status", "sent");
 
-  const messages = await getMyMessageThreads(user.id);
-
-  const grouped = new Map<string, typeof messages>();
-  for (const msg of messages) {
-    const otherId = msg.sender_user_id === user.id ? msg.recipient_user_id : msg.sender_user_id;
-    const key = `${msg.listing_id}:${otherId}`;
-    const list = grouped.get(key) ?? [];
-    list.push(msg);
-    grouped.set(key, list);
-  }
-
-  const threads = Array.from(grouped.entries()).map(([key, list]) => {
-    const [listingId, participantId] = key.split(":");
-    const sorted = [...list].sort((a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-    const unreadIncoming = sorted.filter(
-      (msg) => msg.recipient_user_id === user.id && msg.status === "sent"
-    );
-    const latestUnreadIncomingId = unreadIncoming[unreadIncoming.length - 1]?.id ?? null;
-
-    return {
-      listingId,
-      participantId,
-      messages: sorted,
-      unreadIncomingCount: unreadIncoming.length,
-      latestUnreadIncomingId,
-      lastAt: sorted[sorted.length - 1]?.created_at,
-    };
-  }).sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
+  const threads = buildMessageThreads(await getMyMessageThreads(user.id), user.id);
 
   return (
     <DashboardSection
