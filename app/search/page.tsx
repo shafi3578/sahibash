@@ -81,6 +81,25 @@ function buildParamsFromRecord(params: Record<string, string | undefined>): URLS
   return next;
 }
 
+function SearchHiddenFields({
+  params,
+  exclude,
+}: {
+  params: Record<string, string | undefined>;
+  exclude: readonly string[];
+}) {
+  const excluded = new Set(exclude);
+
+  return (
+    <>
+      {Object.entries(params).map(([key, value]) => {
+        if (!value || excluded.has(key)) return null;
+        return <input key={key} type="hidden" name={key} value={value} />;
+      })}
+    </>
+  );
+}
+
 function renderDynamicFilterInput(
   def: FilterDefinition,
   selected: string,
@@ -483,6 +502,23 @@ export default async function SearchPage({
       <p className="mt-2 text-sm text-[var(--ink-2)]">
         {t.search.subtitle}
       </p>
+
+      <form action={localizePath("/search", locale)} className="mt-4 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-sm lg:hidden">
+        <label className="sr-only" htmlFor="mobile-search-query">{t.search.searchListings}</label>
+        <div className="flex gap-2">
+          <input
+            id="mobile-search-query"
+            name="q"
+            defaultValue={params.q ?? ""}
+            placeholder={t.search.searchListings}
+            className="min-h-12 min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 text-base"
+          />
+          <button className="min-h-12 rounded-xl bg-[var(--ink-1)] px-4 text-sm font-bold text-white">
+            {t.home.searchButton}
+          </button>
+        </div>
+        <SearchHiddenFields params={params} exclude={["q", "mobileFilters"]} />
+      </form>
 
       {hasSearchSignal ? (
         <form action={saveSearchAction} className="mt-4 flex max-w-xl gap-2 rounded-xl border border-[var(--line)] bg-white p-2">

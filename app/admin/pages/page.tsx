@@ -10,7 +10,7 @@ import {
   saveStaticPageAction,
 } from "@/lib/actions/static-pages";
 import { getCurrentLocale } from "@/lib/i18n/server";
-import { localizePath } from "@/lib/i18n/routing";
+import { adminPath } from "@/lib/admin/routing";
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -19,7 +19,7 @@ type PageProps = {
 export default async function AdminStaticPagesPage({ searchParams }: PageProps) {
   await requirePermission("pages.view");
   const locale = await getCurrentLocale();
-  const href = (path: string) => localizePath(path, locale);
+  const href = (path: string) => adminPath(path);
   const params = searchParams ? await searchParams : {};
   const selectedKey = typeof params.page === "string" ? params.page : undefined;
   const snapshot = await getStaticPageAdminSnapshot(selectedKey);

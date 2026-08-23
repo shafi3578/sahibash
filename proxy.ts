@@ -5,6 +5,7 @@ import { LOCALE_COOKIE } from "@/lib/i18n/server";
 import { localizePath, normalizeLocaleInput, splitLocaleFromPath } from "@/lib/i18n/routing";
 import { getSupabaseEnv, hasSupabaseEnv } from "@/lib/supabase/env";
 import { isPostAdPath, isProtectedPostingPath } from "@/lib/auth/protected-routes";
+import { isAdminWebPath } from "@/lib/admin/routing";
 
 const EXCLUDED_PATH_PREFIXES = ["/api", "/_next", "/favicon.ico", "/robots.txt", "/sitemap.xml"];
 
@@ -47,6 +48,33 @@ export async function proxy(request: NextRequest) {
 
   if (isProxyExcludedPath(effectivePathname)) {
     return updateSession(request);
+  }
+
+  if (isAdminWebPath(originalPathname)) {
+    if (pathLocale) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = strippedPath;
+      redirectUrl.search = search;
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    const cookieLocale = normalizeLocaleInput(request.cookies.get(LOCALE_COOKIE)?.value);
+    const activeLocale = cookieLocale ?? resolveBrowserLocale(request.headers.get("accept-language"));
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-sahibash-locale", activeLocale);
+    requestHeaders.set("x-sahibash-path", `${originalPathname}${search}`);
+    requestHeaders.set("x-sahibash-admin-route", "1");
+
+    const response = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+
+    response.headers.set("x-sahibash-locale", activeLocale);
+    response.headers.set("x-sahibash-admin-route", "1");
+
+    return updateSession(request, response);
   }
 
   if (!pathLocale) {

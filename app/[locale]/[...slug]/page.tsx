@@ -33,20 +33,12 @@ import DashboardOffersPage from "@/app/dashboard/offers/page";
 import DashboardPrivacyPage from "@/app/dashboard/privacy/page";
 import DashboardQuestionsPage from "@/app/dashboard/questions/page";
 import DashboardSettingsPage from "@/app/dashboard/settings/page";
+import DashboardSafetyPage from "@/app/dashboard/safety/page";
+import DashboardSettingsAccountPage from "@/app/dashboard/settings/account/page";
+import DashboardSettingsLanguagePage from "@/app/dashboard/settings/language/page";
+import DashboardSettingsNotificationsPage from "@/app/dashboard/settings/notifications/page";
 import FavoritesPage from "@/app/favorites/page";
 import MyAdsPage from "@/app/my-ads/page";
-import AdminPage from "@/app/admin/page";
-import AdministratorPage from "@/app/administrator/page";
-import AdminCategoriesPage from "@/app/admin/categories/page";
-import AdminElectronicsPage from "@/app/admin/electronics/page";
-import AdminListingsPage from "@/app/admin/listings/page";
-import AdminDemandPage from "@/app/admin/demand/page";
-import AdminNetworkReadinessPage from "@/app/admin/network-readiness/page";
-import AdminVehicle3DPage from "@/app/admin/vehicle-3d/page";
-import AdminSearchPage from "@/app/admin/search/page";
-import AdminRolesPage from "@/app/admin/roles/page";
-import AdminAuditPage from "@/app/admin/audit/page";
-import AdminUsersPage from "@/app/admin/users/page";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getPublishedStaticPageBySlug } from "@/lib/data/static-pages";
 import type { AppLocale } from "@/lib/i18n/translations";
@@ -187,8 +179,20 @@ export default async function LocaleCatchAllPage({
           return renderPage(DashboardPrivacyPage, { searchParams: resolvedSearchParams });
         case "questions":
           return renderPage(DashboardQuestionsPage, { searchParams: resolvedSearchParams });
+        case "safety":
+          return renderPage(DashboardSafetyPage, { searchParams: resolvedSearchParams });
         case "settings":
           return renderPage(DashboardSettingsPage, { searchParams: resolvedSearchParams });
+      }
+    }
+    if (slug.length === 3 && second === "settings") {
+      switch (third) {
+        case "account":
+          return renderPage(DashboardSettingsAccountPage, { searchParams: resolvedSearchParams });
+        case "language":
+          return renderPage(DashboardSettingsLanguagePage, { searchParams: resolvedSearchParams });
+        case "notifications":
+          return renderPage(DashboardSettingsNotificationsPage, { searchParams: resolvedSearchParams });
       }
     }
   }
@@ -203,46 +207,6 @@ export default async function LocaleCatchAllPage({
 
   if (slug.length === 1 && (first === "privacy" || first === "terms" || first === "safety" || first === "contact")) {
     return <PublicInfoPage page={first} />;
-  }
-
-  if (first === "admin") {
-    if (slug.length === 1) {
-      return renderPage(AdminPage, { searchParams: resolvedSearchParams });
-    }
-    if (slug.length === 2) {
-      switch (second) {
-        case "categories":
-          return renderPage(AdminCategoriesPage, { searchParams: resolvedSearchParams });
-        case "electronics":
-          return renderPage(AdminElectronicsPage, { searchParams: resolvedSearchParams });
-        case "listings":
-          return renderPage(AdminListingsPage, { searchParams: resolvedSearchParams });
-        case "demand":
-          return renderPage(AdminDemandPage, { searchParams: resolvedSearchParams });
-        case "network-readiness":
-          return renderPage(AdminNetworkReadinessPage, { searchParams: resolvedSearchParams });
-        case "vehicle-3d":
-          return renderPage(AdminVehicle3DPage, { searchParams: resolvedSearchParams });
-        case "search":
-          return renderPage(AdminSearchPage, { searchParams: resolvedSearchParams });
-        case "roles":
-          return renderPage(AdminRolesPage, { searchParams: resolvedSearchParams });
-        case "audit":
-          return renderPage(AdminAuditPage, { searchParams: resolvedSearchParams });
-        case "users":
-          return renderPage(AdminUsersPage, { searchParams: resolvedSearchParams });
-      }
-    }
-  }
-
-  if (first === "administrator") {
-    if (slug.length === 1) {
-      return renderPage(AdministratorPage, { searchParams: resolvedSearchParams });
-    }
-    if (slug.length === 2 && second === "settings") {
-      const SettingsPage = (await import("@/app/administrator/settings/page")).default;
-      return renderPage(SettingsPage, { searchParams: resolvedSearchParams });
-    }
   }
 
   if (slug.length === 1) {

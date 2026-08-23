@@ -1,19 +1,18 @@
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDictionary } from "@/lib/i18n/server";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobileSearchSheet } from "@/components/mobile-search-sheet";
 import { localizePath } from "@/lib/i18n/routing";
 import { getNavigationItems } from "@/lib/actions/navigation";
 import { getSiteSettings } from "@/lib/actions/site-settings";
 import { localizeNavigationLabel } from "@/lib/i18n/navigation-labels";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
+import { getCurrentUser } from "@/lib/auth";
+import { buildLoginRedirectHref } from "@/lib/account/navigation";
 
-function HeaderIcon({ name }: { name: "bell" | "settings" }) {
+function HeaderIcon({ name }: { name: "bell" }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       {name === "bell" ? <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></> : null}
-      {name === "settings" ? <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.4-.2-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V22h-4v-.4a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.2.1-2-3.4.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.5-1H3v-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 2-3.4.2.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V2h4v.4a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.2-.1 2 3.4-.1.1A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.5 1h.1v4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></> : null}
     </svg>
   );
 }
@@ -21,6 +20,7 @@ function HeaderIcon({ name }: { name: "bell" | "settings" }) {
 async function signOutAction() {
   "use server";
   try {
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const supabase = await createSupabaseServerClient();
     await supabase.auth.signOut();
   } catch {
@@ -35,41 +35,13 @@ export async function SiteHeader() {
   const navigationItems = await getNavigationItems();
   const href = (path: string) => localizePath(path, locale);
   const postAdCreatePath = "/post-ad/create?posting=sell";
-  const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent(postAdCreatePath)}&reason=post`;
+  const guestPostAdHref = buildLoginRedirectHref({ targetPath: postAdCreatePath, locale, reason: "post" });
   const mobileLabels = locale === "fa"
-    ? { notifications: "اعلان‌ها", settings: "تنظیمات" }
+    ? { notifications: "اعلان‌ها" }
     : locale === "ps"
-      ? { notifications: "خبرتیاوې", settings: "تنظیمات" }
-      : { notifications: "Notifications", settings: "Settings" };
-  let user: { id: string } | null = null;
-  let canModerateListings = false;
-  let canManageAdministratorArea = false;
-
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
-
-    if (user) {
-      const [{ data: moderateData, error: moderateError }, { data: adminData, error: adminError }] = await Promise.all([
-        supabase.rpc("has_admin_permission", {
-          uid: user.id,
-          permission_key: "listings.moderate",
-        }),
-        supabase.rpc("has_admin_permission", {
-          uid: user.id,
-          permission_key: "roles.manage",
-        }),
-      ]);
-
-      canModerateListings = !moderateError && moderateData === true;
-      canManageAdministratorArea = !adminError && adminData === true;
-    }
-  } catch {
-    user = null;
-    canModerateListings = false;
-    canManageAdministratorArea = false;
-  }
+      ? { notifications: "خبرتیاوې" }
+      : { notifications: "Notifications" };
+  const user = await getCurrentUser();
 
   return (
     <>
@@ -84,26 +56,14 @@ export async function SiteHeader() {
             ))}
           </nav>
           <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
-            <div className="hidden lg:block">
-              <LanguageSwitcher locale={locale} label={t.header.language} />
-            </div>
             <Link href={user ? href("/dashboard/messages") : href("/login")} aria-label={mobileLabels.notifications} className="grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--ink-1)] lg:hidden">
               <HeaderIcon name="bell" />
             </Link>
             <MobileSearchSheet locale={locale} />
-            <Link href={user ? href("/dashboard/settings") : href("/login")} aria-label={mobileLabels.settings} className="grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--ink-1)] lg:hidden">
-              <HeaderIcon name="settings" />
-            </Link>
 
             <Link href={user ? href(postAdCreatePath) : guestPostAdHref} className="hidden whitespace-nowrap rounded-full bg-[var(--accent)] px-3 py-2 text-xs font-semibold leading-none text-white lg:inline-flex lg:text-sm">{t.header.postAd}</Link>
             {user ? (
               <>
-                {canModerateListings && (
-                  <Link href={href("/admin")} className="hidden whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">{t.header.admin}</Link>
-                )}
-                {canManageAdministratorArea && (
-                  <Link href={href("/administrator")} className="hidden whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:inline-flex sm:text-sm">{t.header.admin}</Link>
-                )}
                 <Link href={href("/dashboard")} className="hidden min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm lg:inline-flex">{t.header.myProfile}</Link>
                 <form action={signOutAction} className="hidden lg:block"><button className="min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm">{t.header.logout}</button></form>
               </>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
-import { localizePath } from "@/lib/i18n/routing";
+import { adminPath } from "@/lib/admin/routing";
 
 type CellRow = {
   category_id: number | null;
@@ -136,7 +136,7 @@ export default async function AdminNetworkReadinessPage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Link href={localizePath("/admin", locale)} className="text-sm font-semibold text-[var(--ink-2)]">
+      <Link href={adminPath("/admin")} className="text-sm font-semibold text-[var(--ink-2)]">
         ← {copy.back}
       </Link>
       <p className="mt-6 text-xs font-bold uppercase tracking-widest text-[var(--accent)]">Step 3</p>

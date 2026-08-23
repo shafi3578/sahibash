@@ -3,8 +3,8 @@ import { requirePermission } from "@/lib/auth";
 import { adminGetStatsAction } from "@/lib/actions/listings";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
-import { localizePath } from "@/lib/i18n/routing";
 import { ADMIN_CONTROL_COPY } from "@/lib/i18n/admin-control-copy";
+import { adminPath } from "@/lib/admin/routing";
 
 export default async function AdminPage() {
   await requirePermission("admins.view");
@@ -12,7 +12,7 @@ export default async function AdminPage() {
   const ui = getUiTranslations(locale);
   const copy = ADMIN_CONTROL_COPY[locale];
   const stats = await adminGetStatsAction();
-  const href = (path: string) => localizePath(path, locale);
+  const href = (path: string) => adminPath(path);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

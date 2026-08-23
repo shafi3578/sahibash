@@ -1,69 +1,44 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { DashboardSection } from "@/components/dashboard-section";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { saveNotificationPreferencesAction } from "@/lib/actions/notification-preferences";
-import { DASHBOARD_COPY } from "@/lib/i18n/dashboard-copy";
-
-const NOTIFICATION_FIELDS = [
-  "new_messages",
-  "listing_moderation",
-  "listing_expiry",
-  "saved_search_matches",
-  "saved_listing_changes",
-] as const;
-
-type NotificationField = (typeof NOTIFICATION_FIELDS)[number];
-type NotificationPreferences = Partial<Record<NotificationField, boolean>>;
+import { localizePath } from "@/lib/i18n/routing";
+import { ACCOUNT_EXPERIENCE_COPY } from "@/lib/account/copy";
 
 export default async function SettingsPage() {
-  const user = await requireUser();
+  await requireUser();
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
-  const copy = DASHBOARD_COPY[locale];
-  const supabase = await createSupabaseServerClient();
-  const { data: prefs } = await supabase
-    .from("notification_preferences")
-    .select(NOTIFICATION_FIELDS.join(","))
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const typedPrefs = (prefs ?? {}) as NotificationPreferences;
-  const notificationLabels: Record<NotificationField, string> = {
-    new_messages: copy.newMessages,
-    listing_moderation: copy.moderation,
-    listing_expiry: copy.expiry,
-    saved_search_matches: copy.searchMatches,
-    saved_listing_changes: copy.listingChanges,
-  };
+  const copy = ACCOUNT_EXPERIENCE_COPY[locale];
+
+  const settingCards = [
+    { title: copy.language, description: copy.languageDescription, href: "/dashboard/settings/language" },
+    { title: copy.notifications, description: copy.notificationsDescription, href: "/dashboard/settings/notifications" },
+    { title: copy.privacySecurity, description: copy.privacySecurityDescription, href: "/dashboard/account-security" },
+    { title: copy.accountManagement, description: copy.accountManagementDescription, href: "/dashboard/settings/account" },
+  ];
 
   return (
     <DashboardSection
       currentPath="/dashboard/settings"
       title={ui.dashboard.settings}
-      description={ui.dashboard.settingsDescription}
+      description={copy.settingsHubDescription}
     >
-      <div className="space-y-4">
-        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-          <p className="font-semibold text-[var(--ink-1)]">{ui.dashboard.settingsLanguageTitle}</p>
-          <p className="mt-1 text-sm text-[var(--ink-2)]">{ui.dashboard.settingsLanguageDescription}</p>
-        </div>
-        <form action={saveNotificationPreferencesAction} className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
-          <p className="font-semibold text-[var(--ink-1)]">{ui.dashboard.settingsNotificationsTitle}</p>
-          <p className="mt-1 text-sm text-[var(--ink-2)]">{ui.dashboard.settingsNotificationsDescription}</p>
-          <input type="hidden" name="locale" value={locale} />
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {NOTIFICATION_FIELDS.map((key) => (
-              <label key={key} className="flex min-h-11 items-center gap-3 rounded-lg border border-[var(--line)] bg-white px-3 text-sm">
-                <input type="checkbox" name={key} defaultChecked={typedPrefs[key] !== false} />
-                {notificationLabels[key]}
-              </label>
-            ))}
-          </div>
-          <button className="mt-4 min-h-11 rounded-lg bg-[var(--ink-1)] px-4 text-sm font-semibold text-white">
-            {copy.savePreferences}
-          </button>
-        </form>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {settingCards.map((card) => (
+          <Link key={card.href} href={localizePath(card.href, locale)} className="group rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4 transition hover:border-[var(--ink-1)] hover:bg-white">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-[var(--ink-1)]">{card.title}</h2>
+                <p className="mt-1 text-sm leading-6 text-[var(--ink-2)]">{card.description}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-bold text-[var(--ink-2)] group-hover:bg-[var(--ink-1)] group-hover:text-white">
+                {copy.open}
+              </span>
+            </div>
+          </Link>
+        ))}
       </div>
     </DashboardSection>
   );

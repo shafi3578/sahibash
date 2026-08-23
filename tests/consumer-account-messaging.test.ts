@@ -1,11 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
+  ACCOUNT_NAV_ITEMS,
   buildLoginRedirectHref,
   isActiveAccountPath,
   localizeAccountPath,
   stripLocaleAndQuery,
 } from "@/lib/account/navigation";
+import { adminPath, isAdminWebPath } from "@/lib/admin/routing";
 import {
   buildMessageThreads,
   isUuid,
@@ -37,6 +41,22 @@ test("account navigation localizes dashboard links and detects active localized 
   assert.equal(stripLocaleAndQuery("/en/dashboard/messages?compose=1"), "/dashboard/messages");
   assert.equal(isActiveAccountPath("/fa/dashboard/messages?thread=abc", "/dashboard/messages"), true);
   assert.equal(isActiveAccountPath("/ps/dashboard/settings", "/dashboard/messages"), false);
+});
+
+test("consumer account navigation has no admin entry points", () => {
+  const hrefs = ACCOUNT_NAV_ITEMS.map((item) => item.href);
+  assert.ok(hrefs.includes("/dashboard/safety"));
+  assert.ok(hrefs.includes("/dashboard/settings"));
+  assert.equal(hrefs.some((href) => href.startsWith("/admin") || href.startsWith("/administrator")), false);
+});
+
+test("admin routes stay web-only and are stripped from localized consumer paths", () => {
+  assert.equal(isAdminWebPath("/admin"), true);
+  assert.equal(isAdminWebPath("/admin/listings"), true);
+  assert.equal(isAdminWebPath("/fa/admin/listings"), true);
+  assert.equal(isAdminWebPath("/ps/administrator/settings"), true);
+  assert.equal(isAdminWebPath("/dashboard/admin"), false);
+  assert.equal(adminPath("/fa/admin/listings"), "/admin/listings");
 });
 
 test("login redirect helper keeps account redirects separate from posting intent", () => {
@@ -96,4 +116,27 @@ test("message threads group by listing and participant with unread counts", () =
   assert.equal(threads[1].participantId, otherUserId);
   assert.equal(threads[1].messages.length, 2);
   assert.equal(threads[1].latestUnreadIncomingId, "11111111-1111-4111-8111-111111111111");
+});
+
+test("localized catch-all exposes account subpages without embedding admin pages", () => {
+  const source = readFileSync(join(process.cwd(), "app", "[locale]", "[...slug]", "page.tsx"), "utf8");
+  assert.match(source, /DashboardSettingsLanguagePage/);
+  assert.match(source, /DashboardSettingsNotificationsPage/);
+  assert.match(source, /DashboardSettingsAccountPage/);
+  assert.match(source, /DashboardSafetyPage/);
+  assert.doesNotMatch(source, /@\/app\/admin\//);
+  assert.doesNotMatch(source, /@\/app\/administrator\//);
+});
+
+test("consumer header and messages keep settings and moderation in the right places", () => {
+  const headerSource = readFileSync(join(process.cwd(), "components", "site-header.tsx"), "utf8");
+  const messagesSource = readFileSync(join(process.cwd(), "app", "dashboard", "messages", "page.tsx"), "utf8");
+  const reportSource = readFileSync(join(process.cwd(), "lib", "actions", "reports.ts"), "utf8");
+
+  assert.doesNotMatch(headerSource, /LanguageSwitcher/);
+  assert.doesNotMatch(headerSource, /admin|administrator/i);
+  assert.match(messagesSource, /ThreadListingCard/);
+  assert.match(messagesSource, /reportConversationAction/);
+  assert.match(reportSource, /reporter_user_id/);
+  assert.doesNotMatch(reportSource, /(^|\n)\s*user_id:\s*user\.id/);
 });

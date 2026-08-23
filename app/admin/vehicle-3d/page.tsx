@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
 import { getCurrentLocale } from "@/lib/i18n/server";
-import { localizePath } from "@/lib/i18n/routing";
+import { adminPath } from "@/lib/admin/routing";
 import { VEHICLE_MODELS_3D } from "@/lib/vehicles/model-catalog";
 import { Vehicle3DManager } from "@/components/admin/vehicle-3d-manager";
 
@@ -73,7 +73,7 @@ export default async function AdminVehicle3DPage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      <Link href={localizePath("/admin", locale)} className="text-sm font-semibold text-[var(--ink-2)]">← {copy.back}</Link>
+      <Link href={adminPath("/admin")} className="text-sm font-semibold text-[var(--ink-2)]">← {copy.back}</Link>
       <div className="mt-6 rounded-3xl border border-[var(--line)] bg-white p-6 shadow-sm">
         <h1 className="mt-4 font-display text-3xl font-bold">{copy.title}</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ink-2)]">{copy.subtitle}</p>

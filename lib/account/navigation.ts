@@ -11,6 +11,7 @@ export type AccountNavKey =
   | "accountInformation"
   | "accountSecurity"
   | "settings"
+  | "safety"
   | "helpCenter"
   | "privacyTerms";
 
@@ -30,6 +31,7 @@ export const ACCOUNT_NAV_ITEMS = [
   { key: "accountInformation", href: "/dashboard/account-information" },
   { key: "accountSecurity", href: "/dashboard/account-security" },
   { key: "settings", href: "/dashboard/settings" },
+  { key: "safety", href: "/dashboard/safety" },
   { key: "helpCenter", href: "/dashboard/help" },
   { key: "privacyTerms", href: "/dashboard/privacy" },
 ] as const satisfies readonly AccountNavItem[];

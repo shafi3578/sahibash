@@ -2,20 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentLocale } from "@/lib/i18n/server";
-import { localizePath } from "@/lib/i18n/routing";
 import { requirePermission } from "@/lib/auth";
 import { recordAuditEvent } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeStaticPageDraft } from "@/lib/data/static-pages";
+import { adminPath } from "@/lib/admin/routing";
 
 function text(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-async function resolveAdminRedirect() {
-  const locale = await getCurrentLocale();
-  return localizePath("/admin/pages", locale);
+function resolveAdminRedirect() {
+  return adminPath("/admin/pages");
 }
 
 export async function saveStaticPageAction(formData: FormData) {
@@ -85,7 +83,7 @@ export async function saveStaticPageAction(formData: FormData) {
   });
 
   revalidatePath("/admin/pages");
-  redirect(await resolveAdminRedirect() + `?page=${encodeURIComponent(draft.page_key)}`);
+  redirect(resolveAdminRedirect() + `?page=${encodeURIComponent(draft.page_key)}`);
 }
 
 export async function publishStaticPageAction(formData: FormData) {
@@ -117,7 +115,7 @@ export async function publishStaticPageAction(formData: FormData) {
 
   revalidatePath("/admin/pages");
   revalidatePath("/");
-  redirect(await resolveAdminRedirect() + `?page=${encodeURIComponent(String(data.page_key))}`);
+  redirect(resolveAdminRedirect() + `?page=${encodeURIComponent(String(data.page_key))}`);
 }
 
 export async function restoreStaticPageVersionAction(formData: FormData) {
@@ -149,5 +147,5 @@ export async function restoreStaticPageVersionAction(formData: FormData) {
 
   revalidatePath("/admin/pages");
   revalidatePath("/");
-  redirect(await resolveAdminRedirect() + `?page=${encodeURIComponent(String(data.page_key))}`);
+  redirect(resolveAdminRedirect() + `?page=${encodeURIComponent(String(data.page_key))}`);
 }

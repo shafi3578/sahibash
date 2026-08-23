@@ -33,5 +33,7 @@ export async function saveNotificationPreferencesAction(formData: FormData) {
   }
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/settings/notifications");
   revalidatePath(localizePath("/dashboard/settings", locale));
+  revalidatePath(localizePath("/dashboard/settings/notifications", locale));
 }

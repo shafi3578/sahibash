@@ -8,7 +8,7 @@ import { CategoryNavigator } from "./category-navigator";
 import { getDictionary } from "@/lib/i18n/server";
 import { SCHEMA_BUILDER_COPY } from "@/lib/i18n/schema-builder-copy";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
-import { localizePath } from "@/lib/i18n/routing";
+import { adminPath } from "@/lib/admin/routing";
 
 type Params = Promise<{ node?: string; saved?: string; status_updated?: string }>;
 const labels = (value: string) => ({ en: value, fa: value, ps: value });
@@ -46,7 +46,7 @@ export default async function ListingSchemaAdminPage({ searchParams }: { searchP
   const localizedNodes = allNodes.map((node) => ({ ...node, id: Number(node.id), level: Number(node.level), name: localizeCategoryName({ locale, fallbackName: node.name, path: node.path }) }));
 
   return <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8" dir={locale === "en" ? "ltr" : "rtl"}>
-    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-3xl font-bold">{copy.title}</h1><p className="mt-1 text-[var(--ink-2)]">{copy.description}</p></div><Link href={localizePath("/admin/categories", locale)} className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm font-semibold">{copy.back}</Link></div>
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-3xl font-bold">{copy.title}</h1><p className="mt-1 text-[var(--ink-2)]">{copy.description}</p></div><Link href={adminPath("/admin/categories")} className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm font-semibold">{copy.back}</Link></div>
     {params.saved ? <p className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{copy.saved}</p> : null}
     {params.status_updated ? <p className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{copy.statusUpdated}</p> : null}
     <CategoryNavigator nodes={localizedNodes} selectedId={selectedId} locale={locale} />

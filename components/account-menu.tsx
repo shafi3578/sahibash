@@ -22,6 +22,7 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
     accountInformation: ui.dashboard.accountInformation,
     accountSecurity: ui.dashboard.accountSecurity,
     settings: ui.dashboard.settings,
+    safety: locale === "fa" ? "مرکز ایمنی" : locale === "ps" ? "د خوندیتوب مرکز" : "Safety Center",
     helpCenter: ui.dashboard.helpCenter,
     privacyTerms: ui.dashboard.privacyTerms,
   };
