@@ -7,16 +7,16 @@ This file records the current launch-readiness gate from the Phase 0 production 
 
 ## Phase 1 update
 
-Phase 1 has been implemented in the repository for:
+Phase 1 has been implemented, pushed, deployed, and applied to production for:
 
 - public listing data boundary;
 - phone reveal privacy;
 - super-admin MFA readiness visibility;
 - contact/audit event capture around reveal/contact actions.
 
-The application now reads public listing feeds/details through a safe selector and server-side sanitizer, keeps exact coordinates and phone values out of public payloads, moves seller-phone access behind a rate-limited server action, and adds a Supabase migration that removes broad public/authenticated raw-column grants from `public.listings`.
+The application now reads public listing feeds/details through a safe selector and server-side sanitizer, keeps exact coordinates and phone values out of public payloads, moves seller-phone access behind a rate-limited server action, and applies a Supabase migration that removes broad public/authenticated raw-column grants from `public.listings`.
 
-Production launch status remains **CONDITIONAL** until the Phase 1 code is deployed, the production Supabase migration is applied after backup/migration-state verification, and post-deploy browser/API checks prove the public REST boundary denies sensitive columns.
+Production launch status remains **CONDITIONAL** because super-admin MFA enrollment and authenticated multi-role E2E are still required. Post-deploy checks verified that public REST can still select safe listing columns, but anonymous selection of `contact_phone`, `latitude`, `longitude`, and `location_geog` is denied.
 
 ## Phase gate summary
 
@@ -26,10 +26,10 @@ Production launch status remains **CONDITIONAL** until the Phase 1 code is deplo
 | Authentication | READY WITH MINOR ISSUES | Auth code uses server `getUser()` and step-up helpers, but full multi-role E2E remains. |
 | Super Admin | CONDITIONAL | Code requires AAL2 and admin roles page now reports verified-factor readiness, but production super-admins still need verified MFA enrollment. |
 | Admin | READY WITH UNCERTAINTY | Admin routes are in the same app and server gates exist, but full authenticated E2E is not complete. |
-| RLS | CONDITIONAL | Phase 1 migration restricts raw listing column grants; production application is pending safe migration application/verification. |
-| Public privacy | CONDITIONAL | Public-safe selectors/sanitizers are implemented; direct REST denial must be verified after migration. |
-| Location privacy | CONDITIONAL | Server-side public location sanitization is implemented; direct REST denial must be verified after migration. |
-| Contact privacy | CONDITIONAL | Phone reveal is moved behind a server action with rate limiting/event capture; direct REST denial must be verified after migration. |
+| RLS | READY WITH E2E GAP | Phase 1 migration restricts raw listing column grants and REST denial is verified; cross-account E2E remains. |
+| Public privacy | READY WITH E2E GAP | Public-safe selectors/sanitizers are implemented and sensitive REST column selection is denied. |
+| Location privacy | READY WITH E2E GAP | Server-side public location sanitization is implemented and exact coordinate REST column selection is denied. |
+| Contact privacy | READY WITH E2E GAP | Phone reveal is behind a rate-limited audited server action; public HTML/REST pre-reveal exposure is blocked. |
 | Listings | READY WITH MAJOR ISSUE | Listings load, but public data boundary is unsafe. |
 | Search | NOT PHASE-VERIFIED | Later phase. |
 | Filters | NOT PHASE-VERIFIED | Later phase. |
@@ -57,8 +57,8 @@ Production launch status remains **CONDITIONAL** until the Phase 1 code is deplo
 - [x] Correct production public URL inspected: `https://sahibash.vercel.app`
 - [ ] Correct production Vercel project independently identified through Vercel API/CLI
 - [x] Correct production Supabase project proven from public production HTML: `sbtzkniuquewrtctsdpy`
-- [ ] Exact hidden coordinates cannot be retrieved publicly after production migration
-- [ ] Approximate location cannot leak internal exact coordinates after production migration
+- [x] Exact hidden coordinates cannot be retrieved publicly through direct REST column selection after production migration
+- [x] Approximate location cannot leak internal exact coordinates through public application payloads after production migration
 - [x] Public listing payload uses only intended application fields in server code
 - [x] Phone number is not intentionally rendered before reveal in the public detail UI
 - [x] Reveal Phone is rate limited through a controlled server boundary
@@ -73,12 +73,12 @@ Production launch status remains **CONDITIONAL** until the Phase 1 code is deplo
 
 ## Next recommendation
 
-Finish the Phase 1 production rollout:
+Finish the remaining launch-readiness gates:
 
-1. Deploy the Phase 1 application code.
-2. Apply `supabase/migrations/20260824124823_phase1_public_listing_privacy_boundary.sql` to production after backup/migration-state verification.
-3. Verify anonymous REST cannot select `contact_phone`, hidden coordinates, or `location_geog`.
-4. Enroll verified MFA factors for every super-administrator account and verify the admin readiness panel shows all ready.
-5. Run authenticated multi-role browser/E2E checks.
+1. Enroll verified MFA factors for every super-administrator account and verify the admin readiness panel shows all ready.
+2. Run authenticated multi-role browser/E2E checks.
+3. Prove role-escalation protections with controlled write tests.
+4. Verify admin audit rows are created for privileged admin actions.
+5. Continue performance advisor cleanup and production monitoring hardening.
 
 Do not move to AI, external inventory, or 100K production data until these blockers are fixed and verified.

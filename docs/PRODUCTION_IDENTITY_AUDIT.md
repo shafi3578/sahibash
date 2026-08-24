@@ -123,20 +123,25 @@ No Flutter source tree was identified in the current Next.js repository during t
 
 ## Phase 1 repair summary
 
-Phase 1 implements the first privacy/security repair set in code and migration form:
+Phase 1 implements and deploys the first privacy/security repair set:
 
 - Public listing feeds, favorites, and public detail reads now use a deliberate safe selector plus `sanitizePublicListingBoundary()` so sensitive columns are not passed to public UI surfaces.
 - Exact location internals and seller contact phone are preserved for owner/admin/server flows but removed from anonymous public payloads.
 - Seller phone is no longer rendered in the listing detail HTML before reveal; it is returned only by `revealListingPhoneAction()` after rate limit, listing-state, ownership/admin, and contact-display checks.
 - Phone reveal/contact actions are captured in `listing_contact_events`, with structured metadata marking the controlled server reveal boundary.
-- `public.listings` now has a migration to remove broad raw table grants and grant only intended public/authenticated columns while preserving service-role access.
+- `public.listings` now has an applied migration to remove broad raw table grants and grant only intended public/authenticated columns while preserving service-role access.
 - Admin roles now include a super-admin MFA readiness panel based on verified Supabase Auth MFA factors.
+
+Production proof completed:
+
+- Commit `cd43f16546b64f715a4ab7bd10be1c78490ab13e` was pushed to `origin/main`.
+- GitHub reports the Vercel check for commit `cd43f16546b64f715a4ab7bd10be1c78490ab13e` as successful.
+- Production migration `20260824124823_phase1_public_listing_privacy_boundary` is present in Supabase migration history.
+- Anonymous REST can select safe listing columns, but cannot select `contact_phone`, `latitude`, `longitude`, or `location_geog`.
+- Public pages `/en`, `/fa`, `/ps`, `/en/search`, and a real listing detail page return 200 with no visible 404/500.
 
 Remaining production proof required:
 
-- Deploy the Phase 1 application code.
-- Apply the Phase 1 Supabase migration to the production database after backup/migration-state verification.
-- Verify anonymous REST cannot select `contact_phone`, `latitude`, `longitude`, `location_geog`, or other sensitive listing columns.
 - Enroll and verify MFA factors for all super-administrator accounts.
 - Perform controlled multi-role E2E/role-escalation checks.
 
@@ -156,7 +161,7 @@ Anonymous Supabase REST test:
 | Select approved hidden listings with `latitude`, `longitude`, `location_geog`, `contact_phone` | 200 | 3 | `latitude`, `longitude`, `location_geog`, and `contact_phone` were selectable and non-null in returned rows |
 | Select approved approximate listings with same sensitive fields | 200 | 4 | coordinates were null in returned rows, but `contact_phone` was non-null |
 
-Conclusion: hidden exact coordinates were not protected at the Supabase REST API boundary during Phase 0. Phase 1 now includes application sanitization and a column-grant migration; production is conditional until the migration is applied and REST denial is verified.
+Conclusion: hidden exact coordinates were not protected at the Supabase REST API boundary during Phase 0. Phase 1 now includes application sanitization and an applied column-grant migration; anonymous REST denial is verified.
 
 ### 2. Contact phone privacy
 
@@ -164,7 +169,7 @@ CONDITIONAL.
 
 Anonymous Supabase REST can select `contact_phone` from approved listings. A public listing detail HTML check also contained the exact seller phone string before the user pressed “Reveal phone.”
 
-Conclusion: Phase 0 found “Reveal Phone” was only a UI reveal. Phase 1 now moves phone access behind a controlled server action with durable rate limiting and event tracking; production is conditional until deployment and post-migration REST checks are complete.
+Conclusion: Phase 0 found “Reveal Phone” was only a UI reveal. Phase 1 now moves phone access behind a controlled server action with durable rate limiting and event tracking; post-migration REST/HTML checks confirm the phone is not exposed before reveal.
 
 ### 3. Super Admin MFA / AAL2
 

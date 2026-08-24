@@ -1,12 +1,13 @@
 # Sahibash Security Audit
 
 Date: 2026-08-24
-Status: conditional; Phase 1 privacy-boundary controls are implemented, but production migration verification, super-admin MFA enrollment, full multi-role/staging verification, and performance-policy cleanup remain launch gates.
+Status: conditional; Phase 1 privacy-boundary controls are deployed and verified, but super-admin MFA enrollment, full multi-role/staging verification, and performance-policy cleanup remain launch gates.
 
-> Current supersession note, 2026-08-24: Phase 1 now implements a public-safe
+> Current supersession note, 2026-08-24: Phase 1 now deploys a public-safe
 > listing boundary, server-controlled phone reveal, and super-admin MFA
-> readiness reporting. Production status stays conditional until deployment,
-> migration application, and post-migration REST/browser verification are done.
+> readiness reporting. Post-migration REST checks verify sensitive listing
+> columns are no longer selectable anonymously. Production status stays
+> conditional until super-admin MFA enrollment and multi-role E2E are done.
 > See `docs/PRODUCTION_IDENTITY_AUDIT.md` and `docs/LAUNCH_READINESS.md`.
 
 ## Summary
@@ -138,9 +139,9 @@ Covered:
 
 P0:
 
-- Apply and verify the Phase 1 Supabase migration in production after backup/migration-state checks.
 - Enroll verified MFA factors for every super-administrator account.
 - Run authenticated multi-role E2E against staging or production-like identities.
+- Verify privileged admin actions create expected audit rows.
 
 P1:
 
