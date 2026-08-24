@@ -39,7 +39,7 @@ export function resolveBrowserLocale(acceptLanguage: string | null) {
     const locale = normalizeLocaleInput(language) ?? normalizeLocaleInput(language.split("-")[0]);
     if (locale) return locale;
   }
-  return "en" as const;
+  return "fa" as const;
 }
 
 export async function proxy(request: NextRequest) {

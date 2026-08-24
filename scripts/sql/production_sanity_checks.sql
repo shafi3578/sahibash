@@ -17,6 +17,81 @@ where status = 'approved'
   )
 order by created_at desc;
 
+-- 11) Category nodes and listings must belong to the same top-level category.
+select
+  l.id,
+  l.title,
+  l.category_id,
+  l.category_node_id,
+  cn.category_id as node_category_id,
+  cn.path
+from public.listings l
+left join public.category_nodes cn on cn.id = l.category_node_id
+where l.status = 'approved'
+  and cn.id is not null
+  and l.category_id is distinct from cn.category_id
+order by l.created_at desc;
+
+-- 12) Public phone/tablet listings must use the live mobile taxonomy.
+select
+  l.id,
+  l.title,
+  c.slug as category_slug,
+  cn.path
+from public.listings l
+left join public.categories c on c.id = l.category_id
+left join public.category_nodes cn on cn.id = l.category_node_id
+where l.status = 'approved'
+  and (
+    cn.path = 'phones-electronics'
+    or cn.path like 'phones-electronics/%'
+    or (
+      (l.title ~* '(iphone|samsung|galaxy|tablet|xiaomi|redmi|mobile|phone)')
+      and c.slug <> 'mobile-phones-tablets'
+    )
+  )
+order by l.created_at desc;
+
+-- 13) Rent-purpose listings must not sit under sale-only house nodes.
+select
+  l.id,
+  l.title,
+  cn.path
+from public.listings l
+join public.category_nodes cn on cn.id = l.category_node_id
+where l.status = 'approved'
+  and cn.path in ('real-estate/house-for-sale', 'real-estate/residential/for-sale/house')
+  and concat_ws(' ', l.title, l.description) ~* '(rent|کرایه|کرایي|اجاره)'
+order by l.created_at desc;
+
+-- 14) Pure land posting fields must not expose house/apartment fields.
+select
+  cn.path,
+  cf.field_key,
+  cf.is_required,
+  cf.is_active
+from public.category_nodes cn
+join public.category_fields cf on cf.category_node_id = cn.id
+where cn.path like 'real-estate/land%'
+  and cf.is_active is true
+  and cf.field_key in ('rooms','room','bedrooms','floor','total_floors','furnished','heating','bathroom_count','bathrooms','building_age','balcony','parking')
+order by cn.path, cf.display_order;
+
+-- 15) The four launch roots should be live; extra roots should be coming soon.
+select
+  slug,
+  name,
+  is_active,
+  is_coming_soon
+from public.categories
+where is_active is true
+  and (
+    (slug in ('vehicles','real-estate','mobile-phones-tablets','second-hand-items') and is_coming_soon is true)
+    or (slug not in ('vehicles','real-estate','mobile-phones-tablets','second-hand-items') and is_coming_soon is false)
+    or (slug = 'vehicles' and name <> 'Vehicles')
+  )
+order by display_order;
+
 -- 2) Featured listings must also be public/approved.
 select
   id,

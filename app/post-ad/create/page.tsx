@@ -1,5 +1,7 @@
 import { getPostingRootCategories } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
+import { getCurrentUser } from "@/lib/auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import PostAdForm from "../post-ad-form";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -22,6 +24,19 @@ export default async function PostAdCreatePage({
     getPostingRootCategories(),
     getDictionary(),
   ]);
+  const user = await getCurrentUser();
+  const sellerProfile = user
+    ? await (async () => {
+        const supabase = await createSupabaseServerClient();
+        const { data } = await supabase
+          .from("profiles")
+          .select("full_name, phone")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        return data ? { full_name: String(data.full_name ?? ""), phone: String(data.phone ?? "") } : null;
+      })()
+    : null;
 
   const initialListingType = "for_sale";
   const initialMode = posting === "quick" ? "quick" : "standard";
@@ -36,6 +51,7 @@ export default async function PostAdCreatePage({
         initialListingType={initialListingType}
         initialMode={initialMode}
         initialRootSlug={initialRootSlug}
+        sellerProfile={sellerProfile}
       />
     </main>
   );

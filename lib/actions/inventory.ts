@@ -53,6 +53,35 @@ function normalizeRevealPhone(phone: unknown) {
   return digits;
 }
 
+async function resolveRevealPhone(
+  supabase: TrustedSupabaseClient,
+  listing: {
+    user_id?: string | null;
+    source_type?: string | null;
+    contact_phone?: string | null;
+  }
+) {
+  const sourceType = String(listing.source_type ?? "native");
+
+  if ((sourceType === "native" || sourceType === "") && listing.user_id) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("phone")
+      .eq("id", listing.user_id)
+      .maybeSingle();
+    const profilePhone = normalizeRevealPhone((profile as { phone?: string | null } | null)?.phone);
+
+    if (profilePhone) {
+      return { phone: profilePhone, contactSource: "profile_phone" };
+    }
+  }
+
+  return {
+    phone: normalizeRevealPhone(listing.contact_phone),
+    contactSource: sourceType === "native" || sourceType === "" ? "legacy_listing_phone_fallback" : "source_listing_phone",
+  };
+}
+
 async function currentUserIsAdmin(supabase: TrustedSupabaseClient, userId?: string) {
   if (!userId) return false;
   const { data, error } = await supabase.rpc("is_admin", { uid: userId });
@@ -158,7 +187,7 @@ export async function revealListingPhoneAction(
     return { ok: false, message: "Contact not available.", statusCode: 403 };
   }
 
-  const phone = normalizeRevealPhone(listing.contact_phone);
+  const { phone, contactSource } = await resolveRevealPhone(supabase, listing);
   if (!phone) {
     return { ok: false, message: "Contact not available.", statusCode: 404 };
   }
@@ -175,6 +204,7 @@ export async function revealListingPhoneAction(
       actor_kind: user ? "authenticated" : "anonymous",
       is_owner: isOwner,
       is_admin: isAdmin,
+      contact_source: contactSource,
     },
   });
   if (contactAuditError) {

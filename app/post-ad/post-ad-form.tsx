@@ -17,6 +17,7 @@ import { getVehicleBranchFromPath, type VehicleBranchDefinition, type VehicleBra
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeActionMessage } from "@/lib/i18n/user-copy";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { localizePath } from "@/lib/i18n/routing";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
@@ -35,6 +36,10 @@ import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/post
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
 type PostMode = "standard" | "quick";
+type SellerProfileContact = {
+  full_name: string | null;
+  phone: string | null;
+};
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -71,6 +76,12 @@ type StoredLocation = {
   areaText: string;
   locationVisibility: "exact" | "approximate" | "province_district";
 };
+
+function maskSellerPhone(phone: string) {
+  const compact = phone.replace(/\s+/g, "");
+  if (compact.length <= 7) return compact;
+  return `${compact.slice(0, 5)}••••${compact.slice(-2)}`;
+}
 
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
@@ -228,11 +239,13 @@ export default function PostAdForm({
     initialListingType = "for_sale",
     initialMode = "standard",
     initialRootSlug = "",
+    sellerProfile = null,
   }: Props & {    t: Dictionary;
     locale: AppLocale;
     initialListingType?: "for_sale" | "for_rent" | "wanted";
     initialMode?: PostMode;
     initialRootSlug?: string;
+    sellerProfile?: SellerProfileContact | null;
   }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -272,13 +285,16 @@ export default function PostAdForm({
   const [vehicleSelection, setVehicleSelection] = useState<VehicleSelection>(EMPTY_VEHICLE_SELECTION);
   const initialRootAppliedRef = useRef(false);
   const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultDamageParts());
+  const sellerContactName = String(sellerProfile?.full_name ?? "").trim();
+  const sellerContactPhone = String(sellerProfile?.phone ?? "").trim();
+  const maskedSellerContactPhone = sellerContactPhone ? maskSellerPhone(sellerContactPhone) : "";
 
   const [core, setCore] = useState<CoreForm>({
     title: "",
     description: "",
     address_optional: "",
-    contact_phone: "",
-    contact_name: "",
+    contact_phone: sellerContactPhone,
+    contact_name: sellerContactName,
     contact_preferences: "",
     price: "",
     currency: "AFN",
@@ -510,6 +526,11 @@ export default function PostAdForm({
         descriptionMin: "توضیحات باید حداقل ۲۰ کاراکتر باشد.",
         invalidPrice: "لطفا قیمت معتبر وارد کنید.",
         contactPhoneRequired: "شماره تماس الزامی است.",
+        profileContactRequired: "برای نشر اعلان، نام و شماره موبایل خود را در تنظیمات حساب تکمیل کنید.",
+        profileContactTitle: "اطلاعات تماس فروشنده",
+        profileContactNote: "این نام و شماره از پروفایل شما گرفته می‌شود و در صفحه ثبت اعلان قابل تغییر نیست.",
+        editInSettings: "ویرایش در تنظیمات",
+        missingProfileContact: "نام یا شماره موبایل در پروفایل شما تکمیل نیست.",
         acceptRulesRequired: "برای ادامه باید قوانین ثبت اعلان را بپذیرید.",
         fieldRequiredSuffix: "الزامی است.",
         vehicleYearRequired: "سال وسیله نقلیه الزامی است.",
@@ -563,6 +584,11 @@ export default function PostAdForm({
         descriptionMin: "تفصیل باید لږ تر لږه ۲۰ توري ولري.",
         invalidPrice: "مهرباني وکړئ سم قیمت دننه کړئ.",
         contactPhoneRequired: "د اړیکې شمېره اړینه ده.",
+        profileContactRequired: "د اعلان خپرولو لپاره خپل نوم او موبایل شمېره د حساب په تنظیماتو کې بشپړ کړئ.",
+        profileContactTitle: "د پلورونکي د اړیکې معلومات",
+        profileContactNote: "دا نوم او شمېره ستاسو له پروفایل څخه اخیستل کېږي او د اعلان په فورمه کې نه بدلېږي.",
+        editInSettings: "په تنظیماتو کې سمون",
+        missingProfileContact: "ستاسو په پروفایل کې نوم یا موبایل شمېره نیمګړې ده.",
         acceptRulesRequired: "د دوام لپاره باید د اعلان قوانین ومنئ.",
         fieldRequiredSuffix: "اړین دی.",
         vehicleYearRequired: "د موټر کال اړین دی.",
@@ -615,6 +641,11 @@ export default function PostAdForm({
       descriptionMin: "Description must be at least 20 characters.",
       invalidPrice: "Please enter a valid price.",
       contactPhoneRequired: "Contact phone is required.",
+      profileContactRequired: "Complete your full name and mobile phone in Account Settings before publishing.",
+      profileContactTitle: "Seller contact",
+      profileContactNote: "This name and number come from your profile and cannot be changed inside the ad form.",
+      editInSettings: "Edit in Settings",
+      missingProfileContact: "Your profile name or mobile phone is missing.",
       acceptRulesRequired: "You must accept the posting rules to continue.",
       fieldRequiredSuffix: "is required.",
       vehicleYearRequired: "Vehicle year is required.",
@@ -1160,8 +1191,8 @@ export default function PostAdForm({
           title: String(details.title ?? ""),
           description: String(details.description ?? ""),
           address_optional: String(details.address_optional ?? ""),
-          contact_phone: String(details.contact_phone ?? ""),
-          contact_name: String(details.contact_name ?? ""),
+          contact_phone: sellerContactPhone,
+          contact_name: sellerContactName,
           contact_preferences: String(details.contact_preferences ?? ""),
           price: String(details.price ?? ""),
           currency: String(details.currency ?? "AFN") as "AFN" | "USD",
@@ -1198,7 +1229,11 @@ export default function PostAdForm({
 
   async function continueDraft() {
     if (pendingDraft?.core) {
-      setCore(pendingDraft.core);
+      setCore({
+        ...pendingDraft.core,
+        contact_phone: sellerContactPhone,
+        contact_name: sellerContactName,
+      });
     }
     if (pendingDraft?.dynamicValues) {
       setDynamicValues(pendingDraft.dynamicValues);
@@ -1278,8 +1313,6 @@ export default function PostAdForm({
           title: core.title,
           description: core.description,
           address_optional: core.address_optional,
-          contact_phone: core.contact_phone,
-          contact_name: core.contact_name,
           contact_preferences: core.contact_preferences,
           price: core.price,
           currency: core.currency,
@@ -1344,7 +1377,7 @@ export default function PostAdForm({
     if (!core.title || core.title.trim().length < 5) return postAdCopy.titleMin;
     if (!core.description || core.description.trim().length < 20) return postAdCopy.descriptionMin;
     if (!core.price || Number(core.price) <= 0) return postAdCopy.invalidPrice;
-    if (!core.contact_phone) return postAdCopy.contactPhoneRequired;
+    if (!sellerContactName || !sellerContactPhone) return postAdCopy.profileContactRequired;
     if (!core.rulesAccepted) return postAdCopy.acceptRulesRequired;
 
     if (usesSimpleCategoryFallback && simpleCategoryConfig) {
@@ -1561,8 +1594,8 @@ export default function PostAdForm({
     const submitLocationVisibility = locationVisibility === "province_district" ? "hidden" : locationVisibility;
     form.set("location_visibility", submitLocationVisibility);
     form.set("is_location_confirmed", locationMethod === "device" ? (locationConfirmed ? "true" : "false") : "true");
-    form.set("contact_phone", core.contact_phone);
-    form.set("contact_name", core.contact_name);
+    form.set("contact_phone", sellerContactPhone);
+    form.set("contact_name", sellerContactName);
     form.set("meeting_preference", core.contact_preferences);
     form.set("negotiable", core.negotiable ? "true" : "false");
     if (core.minimum_offer) form.set("minimum_offer", core.minimum_offer);
@@ -2212,12 +2245,26 @@ export default function PostAdForm({
                   {CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
                 </select>
               </label>
-              <label className="text-sm font-semibold">{t.postAd.contactPhone} <span className="text-red-600">*</span>
-                <input type="tel" inputMode="tel" autoComplete="tel" minLength={7} maxLength={20} required value={core.contact_phone} onChange={(event) => updateCore("contact_phone", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
-              </label>
-              <label className="text-sm font-semibold">{t.postAd.contactName}
-                <input autoComplete="name" maxLength={80} value={core.contact_name} onChange={(event) => updateCore("contact_name", event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10" />
-              </label>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm sm:col-span-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-bold text-emerald-950">{postAdCopy.profileContactTitle}</p>
+                    <p className="mt-1 text-emerald-900">
+                      {sellerContactName || postAdCopy.missingProfileContact}
+                      {sellerContactPhone ? ` • ${maskedSellerContactPhone}` : ""}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-emerald-800">{postAdCopy.profileContactNote}</p>
+                    {!sellerContactName || !sellerContactPhone ? (
+                      <p className="mt-2 text-xs font-semibold text-red-700">{postAdCopy.profileContactRequired}</p>
+                    ) : null}
+                  </div>
+                  <Link href={localizePath("/dashboard/settings/account", locale)} className="inline-flex rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800">
+                    {postAdCopy.editInSettings}
+                  </Link>
+                </div>
+                <input type="hidden" name="contact_phone" value={sellerContactPhone} />
+                <input type="hidden" name="contact_name" value={sellerContactName} />
+              </div>
               <label className="text-sm font-semibold sm:col-span-2">{t.postAd.contactPreferences}
                 <input value={core.contact_preferences} onChange={(event) => updateCore("contact_preferences", event.target.value)} placeholder={t.postAd.contactPreferencesPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>

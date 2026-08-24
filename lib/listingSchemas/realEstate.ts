@@ -1,5 +1,6 @@
 import type { ListingSchemaDefinition } from "./shared";
-import { firstMeaningfulText, localized, readAttributeValue, readListingValue } from "./shared";
+import { firstMeaningfulText, formatNumber, localized, readAttributeValue, readListingValue } from "./shared";
+import { formatAfghanLandAreaUnit, normalizeAfghanLandAreaUnit } from "@/lib/land-units";
 
 const sections = {
   summary: localized("Property Summary", "خلاصه ملک", "د ملک لنډیز"),
@@ -12,11 +13,16 @@ const sections = {
 };
 
 function isHouse(path: string) {
-  return path.includes("/houses") || path === "real-estate/houses";
+  return path.includes("/houses")
+    || path === "real-estate/houses"
+    || path.includes("house-for-")
+    || path.endsWith("/house");
 }
 
 function isApartment(path: string) {
-  return path.includes("/apartments");
+  return path.includes("/apartments")
+    || path.includes("apartment-for-")
+    || path.endsWith("/apartment");
 }
 
 function isLand(path: string) {
@@ -24,7 +30,11 @@ function isLand(path: string) {
 }
 
 function isCommercial(path: string) {
-  return path.includes("shops-commercial") || path.includes("/offices") || path.includes("/warehouses") || path.includes("commercial-property");
+  return path.includes("shops-commercial")
+    || path.includes("/commercial/")
+    || path.includes("/offices")
+    || path.includes("/warehouses")
+    || path.includes("commercial-property");
 }
 
 function isWarehouse(path: string) {
@@ -41,6 +51,32 @@ function supportsRooms(path: string) {
 
 function isStudentHousing(path: string) {
   return path.includes("room-house-for-students") || path.includes("/dormitory");
+}
+
+function formatLandSize(context: { attributes: Map<string, string>; locale: "en" | "fa" | "ps" }) {
+  const originalValue = firstMeaningfulText(
+    readAttributeValue(context.attributes, "area_original_value"),
+    readAttributeValue(context.attributes, "areaSize", "land_size", "area_size", "size_m2")
+  );
+  const originalUnit = normalizeAfghanLandAreaUnit(
+    readAttributeValue(context.attributes, "area_original_unit", "areaUnit", "area_unit", "land_size_unit")
+  );
+  const squareMeters = firstMeaningfulText(readAttributeValue(context.attributes, "area_sqm"));
+
+  if (originalValue && originalUnit) {
+    const primary = `${formatNumber(originalValue, context.locale)} ${formatAfghanLandAreaUnit(originalUnit, context.locale)}`;
+    if (squareMeters && originalUnit !== "sqm") {
+      return `${primary} (${formatNumber(squareMeters, context.locale)} ${formatAfghanLandAreaUnit("sqm", context.locale)})`;
+    }
+    return primary;
+  }
+
+  const fallback = firstMeaningfulText(readAttributeValue(context.attributes, "land_size", "area_size", "areaSize", "size_m2"));
+  if (fallback && squareMeters && fallback !== squareMeters) {
+    return `${formatNumber(fallback, context.locale)} (${formatNumber(squareMeters, context.locale)} ${formatAfghanLandAreaUnit("sqm", context.locale)})`;
+  }
+
+  return fallback ?? (squareMeters ? `${formatNumber(squareMeters, context.locale)} ${formatAfghanLandAreaUnit("sqm", context.locale)}` : null);
 }
 
 function propertyTypeLabel(contextPath: string, locale: "en" | "fa" | "ps"): string {
@@ -146,9 +182,9 @@ export const realEstateSchema: ListingSchemaDefinition = {
       sectionKey: "size",
       order: 5,
       highlight: true,
-      consumes: ["land_size", "area_size"],
+      consumes: ["land_size", "area_size", "areaSize", "area_original_value", "area_original_unit", "area_sqm", "size_m2"],
       resolve: (context) => {
-        const value = firstMeaningfulText(readAttributeValue(context.attributes, "land_size", "area_size"));
+        const value = formatLandSize(context);
         return value ? { key: "land_size", label: localized("Land Size", "مساحت زمین", "د ځمکې اندازه")[context.locale], value, sectionKey: "size" } : null;
       },
     },

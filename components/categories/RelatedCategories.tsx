@@ -2,6 +2,7 @@ import { CategoryRow } from "@/components/categories/CategoryRow";
 import type { CategoryNodeWithCount } from "@/lib/categories/getCategories";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { localizePath } from "@/lib/i18n/routing";
 
 type Props = {
   items: CategoryNodeWithCount[];
@@ -20,7 +21,7 @@ export async function RelatedCategories({ items }: Props) {
       {items.map((item) => (
         <CategoryRow
           key={item.id}
-          href={`/categories/${item.slug}?node=${item.id}`}
+          href={localizePath(`/categories/${item.slug}?node=${item.id}`, locale)}
           title={localizeCategoryName({
             locale,
             fallbackName: item.name,

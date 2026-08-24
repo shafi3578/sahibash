@@ -71,11 +71,11 @@ test("the locale switch endpoint bypasses locale-prefix enforcement", () => {
   assert.equal(isProxyExcludedPath("/search"), false);
 });
 
-test("browser locale detection prefers supported Afghan locales and safely falls back to English", () => {
+test("browser locale detection prefers supported Afghan locales and safely falls back to Dari", () => {
   assert.equal(resolveBrowserLocale("ps-AF,ps;q=0.9,en;q=0.8"), "ps");
   assert.equal(resolveBrowserLocale("fa-AF,fa;q=0.9"), "fa");
-  assert.equal(resolveBrowserLocale("de-DE,de;q=0.9"), "en");
-  assert.equal(resolveBrowserLocale(null), "en");
+  assert.equal(resolveBrowserLocale("de-DE,de;q=0.9"), "fa");
+  assert.equal(resolveBrowserLocale(null), "fa");
 });
 
 test("final category selection exposes a direct details action above mobile navigation", () => {

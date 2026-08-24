@@ -17,6 +17,22 @@ type ProfileRow = {
 type ServerAuthenticatedUser = Parameters<typeof requiresStepUpAuth>[0];
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
+const PRIVILEGED_READ_ONLY_PERMISSIONS = new Set<PermissionKey>([
+  "roles.view",
+  "admins.view",
+  "users.view",
+  "listings.view",
+  "categories.view",
+  "electronics.view",
+  "audit_logs.view",
+  "search.view",
+  "pages.view",
+]);
+
+function requiresPrivilegedMfa(permission: PermissionKey) {
+  return !permission.endsWith(".view") && !PRIVILEGED_READ_ONLY_PERMISSIONS.has(permission);
+}
+
 async function getCurrentPath() {
   try {
     const headerStore = await headers();
@@ -147,6 +163,10 @@ export async function requirePermission(permission: PermissionKey) {
 
   if (error || data !== true) {
     await redirectToAccount();
+  }
+
+  if (requiresPrivilegedMfa(permission)) {
+    await requireVerifiedAuthenticatorAssurance(supabase);
   }
 
   return user;

@@ -7,6 +7,10 @@ const migration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260824124823_phase1_public_listing_privacy_boundary.sql"),
   "utf8",
 );
+const childVisibilityMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260824195045_repair_public_listing_child_visibility.sql"),
+  "utf8",
+);
 
 const queries = readFileSync(join(process.cwd(), "lib", "data", "queries.ts"), "utf8");
 const contactActions = readFileSync(join(process.cwd(), "components", "listings", "listing-contact-actions.tsx"), "utf8");
@@ -28,6 +32,7 @@ test("listing Data API grants exclude private phone and exact location columns",
     const block = grantBlock(role);
     for (const sensitiveColumn of [
       "contact_phone",
+      "seller_entity_id",
       "address_text",
       "latitude",
       "longitude",
@@ -48,12 +53,23 @@ test("public listing queries use an explicit safe selector and sanitize returned
   );
 
   assert.doesNotMatch(publicSelector, /\bcontact_phone\b/i);
+  assert.doesNotMatch(publicSelector, /\bseller_entity_id\b/i);
   assert.doesNotMatch(publicSelector, /\blatitude\b/i);
   assert.doesNotMatch(publicSelector, /\blongitude\b/i);
   assert.doesNotMatch(publicSelector, /\baddress_text\b/i);
   assert.match(queries, /\.select\(PUBLIC_LISTING_SELECT(?:\s+as\s+string)?\)/);
   assert.match(queries, /sanitizePublicListingBoundaries/);
   assert.match(queries, /sanitizePublicListingBoundary\(listing\)/);
+});
+
+test("public listing child embeds use trusted visibility checks without exposing owner ids", () => {
+  assert.match(childVisibilityMigration, /create or replace function public\.can_read_listing_children/i);
+  assert.match(childVisibilityMigration, /security definer/i);
+  assert.match(childVisibilityMigration, /revoke all on function public\.can_read_listing_children\(uuid\) from public/i);
+  assert.match(childVisibilityMigration, /grant execute on function public\.can_read_listing_children\(uuid\) to anon, authenticated, service_role/i);
+  assert.match(childVisibilityMigration, /drop policy if exists listing_images_owner_or_admin_write/i);
+  assert.match(childVisibilityMigration, /drop policy if exists listing_attributes_owner_or_admin_write/i);
+  assert.match(childVisibilityMigration, /using \(public\.can_read_listing_children\(listing_id\)\)/i);
 });
 
 test("phone reveal is server-side, rate-limited, and audited", () => {
@@ -69,6 +85,8 @@ test("phone reveal is server-side, rate-limited, and audited", () => {
   assert.match(revealAction, /\.from\("listing_contact_events"\)\.insert/);
   assert.match(revealAction, /contactAuditError/);
   assert.match(revealAction, /privacy_boundary: "server_reveal"/);
+  assert.match(revealAction, /resolveRevealPhone/);
+  assert.match(revealAction, /contact_source: contactSource/);
 });
 
 test("contact audit rows cannot be forged directly by public clients", () => {

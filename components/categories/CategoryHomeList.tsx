@@ -12,7 +12,7 @@ type Props = {
 const FALLBACK_HOME_ROWS = [
   { slug: "vehicles", name: "Vehicles", subtitle: "Cars, motorcycles, and transport listings", icon: "car", is_coming_soon: false },
   { slug: "real-estate", name: "Real Estate", subtitle: "Houses, apartments, land, and commercial property", icon: "home", is_coming_soon: false },
-  { slug: "mobile-phones-tablets", name: "Phones & Electronics", subtitle: "Phones, tablets, and electronics deals", icon: "phone", is_coming_soon: false },
+  { slug: "mobile-phones-tablets", name: "Mobile Phones & Tablets", subtitle: "Phones and tablets for Afghanistan buyers", icon: "phone", is_coming_soon: false },
   { slug: "second-hand-items", name: "Second Hand", subtitle: "Used furniture, tools, home items, and more", icon: "box", is_coming_soon: false },
   { slug: "jobs", name: "Jobs", subtitle: "Full-time, part-time, and labor jobs", icon: "briefcase", is_coming_soon: true },
   { slug: "services", name: "Services", subtitle: "Repairs, transport, documents, and local help", icon: "wrench", is_coming_soon: true },
@@ -79,7 +79,7 @@ export async function CategoryHomeList({ categories, locale = "en" }: Props) {
         slug: category.slug,
         name: localizeCategoryName({
           locale,
-          fallbackName: category.slug === "mobile-phones-tablets" ? "Phones & Electronics" : category.name,
+          fallbackName: category.name,
           slug: category.slug,
         }),
         subtitle: localizeCategorySubtitle({ locale, fallbackSubtitle: category.subtitle, slug: category.slug }),
@@ -107,7 +107,7 @@ export async function CategoryHomeList({ categories, locale = "en" }: Props) {
         </div>
         <div className="grid grid-cols-4 gap-2 p-3">
           {launchRows.slice(0, 4).map((category) => (
-            <a key={category.id} href={localizePath("/categories", locale)} className="group flex min-h-24 flex-col items-center justify-center gap-2 rounded-3xl bg-white p-2 text-center transition active:bg-slate-100">
+            <a key={category.id} href={localizePath(`/categories/${category.slug}`, locale)} className="group flex min-h-24 flex-col items-center justify-center gap-2 rounded-3xl bg-white p-2 text-center transition active:bg-slate-100">
               <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-2xl bg-slate-50 shadow-sm ring-1 ring-slate-200 transition group-hover:scale-105">
                 <CategoryIcon slug={category.slug} />
               </span>

@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { normalizeAfghanistanPhone } from "@/lib/inventory/normalization";
+import { normalizeLocaleInput } from "@/lib/i18n/routing";
 
 export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -20,7 +22,17 @@ export async function signInAction(formData: FormData) {
 export async function signUpAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const fullName = String(formData.get("fullName") ?? "").trim();
+  const fullName = String(formData.get("fullName") ?? formData.get("full_name") ?? "").trim().replace(/\s+/g, " ");
+  const phone = normalizeAfghanistanPhone(formData.get("phone") ?? formData.get("mobilePhone"));
+  const preferredLanguage = normalizeLocaleInput(String(formData.get("preferred_language") ?? formData.get("locale") ?? "fa")) ?? "fa";
+
+  if (fullName.length < 2 || fullName.length > 80) {
+    return { ok: false, message: "Enter a valid full name." };
+  }
+
+  if (!phone.normalized) {
+    return { ok: false, message: "Enter a valid Afghanistan mobile number." };
+  }
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signUp({
@@ -29,6 +41,8 @@ export async function signUpAction(formData: FormData) {
     options: {
       data: {
         full_name: fullName,
+        phone: phone.normalized,
+        preferred_language: preferredLanguage,
       },
     },
   });

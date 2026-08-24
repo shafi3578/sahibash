@@ -494,7 +494,7 @@ function buildPropertyConfig(kind: "house" | "apartment" | "room" | "land" | "sh
   const commonFields: SimpleField[] = [
     { key: "purpose", label: { en: "Purpose", fa: "هدف", ps: "هدف" }, type: "select", required: true, options: optionValues(["For Sale", "For Rent", "Mortgage", "Lease"]) },
     { key: "areaSize", label: { en: "Area", fa: "مساحت", ps: "مساحت" }, type: "number", required: true, min: 0 },
-    { key: "areaUnit", label: { en: "Area Unit", fa: "واحد مساحت", ps: "د مساحت واحد" }, type: "select", required: true, options: optionValues(["sqm", "jerib", "biswa", "marla"]) },
+    { key: "areaUnit", label: { en: "Area Unit", fa: "واحد مساحت", ps: "د مساحت واحد" }, type: "select", required: true, options: optionValues(["sqm", "biswa", "jerib"]) },
     { key: "electricity", label: { en: "Electricity", fa: "برق", ps: "برېښنا" }, type: "select", options: optionValues(["Available", "Not Available", "Solar", "Generator"]) },
     { key: "water", label: { en: "Water", fa: "آب", ps: "اوبه" }, type: "select", options: optionValues(["Available", "Well", "Tanker", "Not Available"]) },
     { key: "documentType", label: { en: "Document Type", fa: "نوع سند", ps: "د سند ډول" }, type: "select", options: optionValues(["Title Deed", "Qabala", "Customary Document", "No Document", "Other"]) },
@@ -792,7 +792,8 @@ export function getSimpleCategoryKind(path: string | undefined, rootSlug?: strin
   if (normalizedRoot === "real-estate" || normalizedPath.startsWith("real-estate")) {
     if (/\bland\b/.test(normalizedPath)) return "land";
     if (/\bapartment/.test(normalizedPath)) return "apartment";
-    if (/\broom/.test(normalizedPath) || /student|dormitory|hostel/.test(normalizedPath)) return "room";
+    if (/student|dormitory|hostel/.test(normalizedPath)) return null;
+    if (/\broom/.test(normalizedPath)) return "room";
     if (/\bshop/.test(normalizedPath)) return "shop";
     if (/\boffice/.test(normalizedPath)) return "office";
     if (/\bwarehouse/.test(normalizedPath)) return "warehouse";

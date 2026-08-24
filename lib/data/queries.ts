@@ -64,6 +64,14 @@ type ListingFilters = {
   ownerType?: string;
   dormitoryGender?: string;
   maxDormitoryPrice?: number;
+  paymentPeriod?: string;
+  roomType?: string;
+  numberOfBedsMin?: number;
+  internet?: boolean;
+  water?: boolean;
+  electricity?: boolean;
+  mealsIncluded?: boolean;
+  security?: boolean;
   minLandSize?: number;
   maxLandSize?: number;
   vehicleType?: string;
@@ -207,7 +215,6 @@ const PUBLIC_LISTING_SELECT = `
   published_at,
   last_bumped_at,
   archived_at,
-  seller_entity_id,
   source_type,
   ownership_status,
   publication_status,
@@ -539,9 +546,21 @@ export async function getApprovedListings(
         const isRealEstateScope = scopedPath.startsWith("real-estate");
         const isStudentHousingScope =
           scopedPath === "real-estate/room-house-for-students"
-          || scopedPath.startsWith("real-estate/room-house-for-students/");
+          || scopedPath.startsWith("real-estate/room-house-for-students/")
+          || scopedPath === "real-estate/dormitory"
+          || scopedPath.startsWith("real-estate/dormitory/");
+        const hasStudentAttributeFilters = Boolean(
+          filters.paymentPeriod ||
+          filters.roomType ||
+          typeof filters.numberOfBedsMin === "number" ||
+          typeof filters.internet === "boolean" ||
+          typeof filters.water === "boolean" ||
+          typeof filters.electricity === "boolean" ||
+          typeof filters.mealsIncluded === "boolean" ||
+          typeof filters.security === "boolean"
+        );
 
-        if (isStudentHousingScope) {
+        if (isStudentHousingScope && !hasStudentAttributeFilters) {
           const { data: listingIds, error: listingIdsError } = await supabase.rpc("search_student_housing_listing_ids", {
             collection_node_id: filters.categoryNodeId,
             category_scope: filters.categoryScope === "exact" ? "exact" : "subtree",
@@ -623,7 +642,7 @@ export async function getApprovedListings(
             typeof filters.maxLandSize === "number"
           );
 
-          if (hasAdvancedRealEstateFilters) {
+          if (hasAdvancedRealEstateFilters && !hasStudentAttributeFilters) {
             const { data: listingIds, error: listingIdsError } = await supabase.rpc("search_real_estate_listing_ids", {
               root_category_node_id: filters.categoryNodeId,
               category_scope: filters.categoryScope === "exact" ? "exact" : "subtree",
@@ -703,6 +722,15 @@ export async function getApprovedListings(
 
       await applyAttributeNumberFilter("bathrooms", filters?.bathroomsMin, undefined);
       await applyAttributeBooleanFilter("parking", filters?.parking);
+      await applyAttributeTextFilter("payment_period", filters?.paymentPeriod);
+      await applyAttributeTextFilter("room_type", filters?.roomType);
+      await applyAttributeNumberFilter("number_of_beds", filters?.numberOfBedsMin, undefined);
+      await applyAttributeBooleanFilter("internet", filters?.internet);
+      await applyAttributeBooleanFilter("water", filters?.water);
+      await applyAttributeBooleanFilter("electricity", filters?.electricity);
+      await applyAttributeBooleanFilter("meals_included", filters?.mealsIncluded);
+      await applyAttributeBooleanFilter("security", filters?.security);
+      await applyAttributeNumberFilter("area_sqm", filters?.minLandSize, filters?.maxLandSize);
 
       await applyAttributeTextFilter("model", filters?.phoneModel);
       await applyAttributeTextFilter("storage", filters?.storage);

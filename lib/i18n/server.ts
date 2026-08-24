@@ -48,7 +48,7 @@ export async function getCurrentLocale(): Promise<AppLocale> {
     // fallback to default locale
   }
 
-  return "en";
+  return "fa";
 }
 
 export async function getDictionary() {

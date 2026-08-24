@@ -8,6 +8,7 @@ import { updateListingAction, uploadListingImageFormAction } from "@/lib/actions
 import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { CITIES, CURRENCIES } from "@/lib/constants/marketplace";
 import { getCurrentLocale } from "@/lib/i18n/server";
+import { localizePath } from "@/lib/i18n/routing";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import {
   getSimpleCategoryConfig,
@@ -16,6 +17,12 @@ import {
   labelFor,
   optionLabel,
 } from "@/lib/posting/simple-category-details";
+
+function maskSellerPhone(phone: string) {
+  const compact = phone.replace(/\s+/g, "");
+  if (compact.length <= 7) return compact;
+  return `${compact.slice(0, 5)}••••${compact.slice(-2)}`;
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -69,6 +76,30 @@ export default async function EditListingPage({ params }: PageProps) {
 
   // Fetch category fields
   const categoryFields = await getCategoryFieldsWithOptions(listing.category_node_id ?? listing.subcategory_id);
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, phone")
+    .eq("id", user.id)
+    .maybeSingle();
+  const sellerContactName = String(profile?.full_name ?? listing.contact_name ?? "").trim();
+  const sellerContactPhone = String(profile?.phone ?? listing.contact_phone ?? "").trim();
+  const profileContactCopy = locale === "fa"
+    ? {
+        note: "نام و شماره تماس از پروفایل شما گرفته می‌شود. برای تغییر آن به تنظیمات حساب بروید.",
+        missing: "نام یا شماره موبایل پروفایل شما کامل نیست.",
+        edit: "ویرایش در تنظیمات",
+      }
+    : locale === "ps"
+      ? {
+          note: "نوم او اړیکې شمېره ستاسو له پروفایل څخه اخیستل کېږي. د بدلون لپاره د حساب تنظیماتو ته لاړ شئ.",
+          missing: "ستاسو د پروفایل نوم یا موبایل شمېره نیمګړې ده.",
+          edit: "په تنظیماتو کې سمون",
+        }
+      : {
+          note: "Name and phone come from your profile. Change them in Account Settings.",
+          missing: "Your profile name or mobile phone is missing.",
+          edit: "Edit in Settings",
+        };
 
   const simpleCategoryKind = getSimpleCategoryKind(
     [listing.category?.slug, listing.subcategory?.slug].filter(Boolean).join("/"),
@@ -113,6 +144,16 @@ export default async function EditListingPage({ params }: PageProps) {
           <input type="hidden" name="category_id" value={listing.category_id} />
           <input type="hidden" name="category_node_id" value={listing.category_node_id ?? listing.subcategory_id} />
           <input type="hidden" name="subcategory_id" value={listing.subcategory_id} />
+          <input type="hidden" name="province" value={listing.province ?? ""} />
+          <input type="hidden" name="province_id" value={listing.province_id ?? ""} />
+          <input type="hidden" name="district_id" value={listing.district_id ?? ""} />
+          <input type="hidden" name="area_text" value={listing.address_text ?? listing.address_optional ?? ""} />
+          <input type="hidden" name="location_source" value={listing.location_source ?? "manual"} />
+          <input type="hidden" name="location_visibility" value={listing.location_visibility ?? "hidden"} />
+          <input type="hidden" name="is_location_confirmed" value={listing.is_location_confirmed ? "true" : "false"} />
+          {listing.latitude ? <input type="hidden" name="latitude" value={String(listing.latitude)} /> : null}
+          {listing.longitude ? <input type="hidden" name="longitude" value={String(listing.longitude)} /> : null}
+          {listing.location_accuracy ? <input type="hidden" name="location_accuracy" value={String(listing.location_accuracy)} /> : null}
         </div>
 
         {/* Basic Info */}
@@ -226,32 +267,21 @@ export default async function EditListingPage({ params }: PageProps) {
         {/* Contact Info */}
         <div className="rounded-lg border border-[var(--line)] bg-white p-6">
           <h2 className="mb-4 font-display text-lg font-bold">{ui.listingEdit.contactInformation}</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Name */}
-            <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.contactNameOptional}</label>
-              <input
-                type="text"
-                name="contact_name"
-                defaultValue={listing.contact_name || ""}
-                maxLength={80}
-                className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
-              />
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="font-bold text-emerald-950">
+                  {sellerContactName || profileContactCopy.missing}
+                  {sellerContactPhone ? ` • ${maskSellerPhone(sellerContactPhone)}` : ""}
+                </p>
+                <p className="mt-1 text-emerald-900">{profileContactCopy.note}</p>
+              </div>
+              <Link href={localizePath("/dashboard/settings/account", locale)} className="inline-flex rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800">
+                {profileContactCopy.edit}
+              </Link>
             </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-semibold text-[var(--ink-1)]">{ui.listingEdit.phone}</label>
-              <input
-                type="tel"
-                name="contact_phone"
-                defaultValue={listing.contact_phone}
-                required
-                minLength={7}
-                maxLength={20}
-                className="mt-2 w-full rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm"
-              />
-            </div>
+            <input type="hidden" name="contact_name" value={sellerContactName} />
+            <input type="hidden" name="contact_phone" value={sellerContactPhone} />
           </div>
         </div>
 

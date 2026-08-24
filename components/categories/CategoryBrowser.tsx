@@ -5,6 +5,7 @@ import type { CategoryNode } from "@/types/database";
 import type { CategoryNodeWithCount } from "@/lib/categories/getCategories";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { localizePath } from "@/lib/i18n/routing";
 
 type Props = {
   node: CategoryNode;
@@ -16,7 +17,7 @@ type Props = {
 
 export async function CategoryBrowser({ node, breadcrumb, childCategories, allCount, related }: Props) {
   const { t, locale } = await getDictionary();
-  const allHref = `/search?categoryNodeId=${node.id}&scope=subtree`;
+  const allHref = localizePath(`/search?categoryNodeId=${node.id}&scope=subtree`, locale);
   const localizedShowing = locale === "fa" ? "نمایش" : locale === "ps" ? "ښودل" : t.search.showing;
   const nodeName = localizeCategoryName({
     locale,
@@ -35,7 +36,7 @@ export async function CategoryBrowser({ node, breadcrumb, childCategories, allCo
         <div className="mt-2 flex flex-wrap gap-1 text-xs text-sky-100">
           {breadcrumb.map((item, idx) => (
             <span key={item.id} className="inline-flex items-center gap-1">
-              <Link href={`/categories/${item.slug}?node=${item.id}`} className="underline-offset-2 hover:underline">
+              <Link href={localizePath(`/categories/${item.slug}?node=${item.id}`, locale)} className="underline-offset-2 hover:underline">
                 {localizeCategoryName({
                   locale,
                   fallbackName: item.name,
@@ -62,7 +63,7 @@ export async function CategoryBrowser({ node, breadcrumb, childCategories, allCo
         {childCategories.map((item) => (
           <CategoryRow
             key={item.id}
-            href={item.has_children ? `/categories/${item.slug}?node=${item.id}` : `/search?categoryNodeId=${item.id}&scope=exact`}
+            href={item.has_children ? localizePath(`/categories/${item.slug}?node=${item.id}`, locale) : localizePath(`/search?categoryNodeId=${item.id}&scope=exact`, locale)}
             title={localizeCategoryName({
               locale,
               fallbackName: item.name,

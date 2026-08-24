@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { TRANSLATIONS, getSafeTranslations, type AppLocale } from "@/lib/i18n/translations";
 import { localizeAuthError } from "@/lib/i18n/user-copy";
+import { localizePath } from "@/lib/i18n/routing";
+import { normalizeAfghanistanPhone } from "@/lib/inventory/normalization";
 
 type Dictionary = (typeof TRANSLATIONS)["en"];
 
@@ -12,6 +14,7 @@ export function RegisterForm({ locale }: { locale: AppLocale }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,13 +25,26 @@ export function RegisterForm({ locale }: { locale: AppLocale }) {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    const cleanName = fullName.trim().replace(/\s+/g, " ");
+    const normalizedPhone = normalizeAfghanistanPhone(phone);
+
+    if (cleanName.length < 2 || cleanName.length > 80) {
+      setError(locale === "fa" ? "نام کامل معتبر وارد کنید." : locale === "ps" ? "مهرباني وکړئ معتبر بشپړ نوم ولیکئ." : "Enter a valid full name.");
+      return;
+    }
+
+    if (!normalizedPhone.normalized) {
+      setError(locale === "fa" ? "شماره موبایل افغانستان را به‌صورت معتبر وارد کنید." : locale === "ps" ? "د افغانستان معتبر موبایل شمېره ولیکئ." : "Enter a valid Afghanistan mobile number.");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const supabase = createSupabaseBrowserClient();
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: fullName } },
+        options: { data: { full_name: cleanName, phone: normalizedPhone.normalized, preferred_language: locale } },
       });
       if (signUpError) {
         setError(localizeAuthError(signUpError.message, locale));
@@ -36,7 +52,7 @@ export function RegisterForm({ locale }: { locale: AppLocale }) {
         return;
       }
       const redirectPath = searchParams.get("redirect") || searchParams.get("returnTo");
-      router.push(redirectPath && redirectPath.startsWith("/") ? redirectPath : "/post-ad");
+      router.push(redirectPath && redirectPath.startsWith("/") ? redirectPath : localizePath("/post-ad", locale));
       router.refresh();
     } catch {
       setError(dict.auth.supabaseMissing);
@@ -48,6 +64,7 @@ export function RegisterForm({ locale }: { locale: AppLocale }) {
     <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-[var(--line)] bg-white p-6">
       <h1 className="font-display text-2xl font-bold">{dict.auth.registerTitle}</h1>
       <label className="block text-sm font-semibold">{dict.auth.fullName}<input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2" /></label>
+      <label className="block text-sm font-semibold">{dict.auth.mobilePhone}<input type="tel" inputMode="tel" autoComplete="tel" required minLength={9} maxLength={20} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+93 7xx xxx xxx" className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2" /></label>
       <label className="block text-sm font-semibold">{dict.auth.email}<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2" /></label>
       <label className="block text-sm font-semibold">{dict.auth.password}
         <div className="mt-1 flex items-center gap-2">

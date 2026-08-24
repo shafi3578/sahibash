@@ -30,6 +30,11 @@ import { validateListingImage } from "@/lib/posting/image-validation";
 import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 import { shouldBlockPublicFixtureListing } from "@/lib/listings/fixture-guard";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
+import { normalizeAfghanistanPhone } from "@/lib/inventory/normalization";
+import {
+  convertAfghanLandAreaToSquareMeters,
+  normalizeAfghanLandAreaUnit,
+} from "@/lib/land-units";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -155,6 +160,60 @@ function toFormValueBoolean(value: FormDataEntryValue | null) {
   return text === "true" || text === "1" || text === "on" || text === "yes";
 }
 
+function buildCanonicalAreaRows(
+  formData: FormData,
+  categoryPath: string | null | undefined
+): ListingAttributeDraft[] {
+  const path = String(categoryPath ?? "").toLowerCase();
+  if (!path.startsWith("real-estate") || /dormitory|student|hostel/.test(path)) {
+    return [];
+  }
+
+  const originalValue = toFormValueText(
+    formData.get("areaSize") ?? formData.get("land_size") ?? formData.get("area_size") ?? formData.get("size_m2")
+  );
+  const originalUnit = normalizeAfghanLandAreaUnit(
+    formData.get("areaUnit") ?? formData.get("area_unit") ?? formData.get("land_size_unit") ?? "sqm"
+  );
+  const squareMeters = convertAfghanLandAreaToSquareMeters(originalValue, originalUnit ?? "sqm");
+
+  if (!originalValue || !originalUnit || squareMeters === null) {
+    return [];
+  }
+
+  const originalNumber = Number(String(originalValue).replace(/[٬,\s]/g, ""));
+
+  return [
+    {
+      category_field_id: null,
+      attribute_key: "area_original_value",
+      attribute_value_text: null,
+      attribute_value_number: Number.isFinite(originalNumber) ? originalNumber : null,
+      attribute_value_boolean: null,
+      attribute_value_json: null,
+      unit: originalUnit,
+    },
+    {
+      category_field_id: null,
+      attribute_key: "area_original_unit",
+      attribute_value_text: originalUnit,
+      attribute_value_number: null,
+      attribute_value_boolean: null,
+      attribute_value_json: null,
+      unit: null,
+    },
+    {
+      category_field_id: null,
+      attribute_key: "area_sqm",
+      attribute_value_text: null,
+      attribute_value_number: squareMeters,
+      attribute_value_boolean: null,
+      attribute_value_json: null,
+      unit: "sqm",
+    },
+  ];
+}
+
 function toAttributePayload(field: {
   id: number | null;
   field_key: string;
@@ -252,6 +311,35 @@ type ListingAttributeDraft = {
   attribute_value_json: string[] | null;
   unit: string | null;
 };
+
+type NativeSellerContact = {
+  fullName: string;
+  phone: string;
+};
+
+async function resolveNativeSellerContact(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string
+): Promise<{ ok: true; contact: NativeSellerContact } | { ok: false; message: string }> {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("full_name, phone")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !profile) {
+    return { ok: false, message: "Please complete your profile contact information in Account Settings before publishing." };
+  }
+
+  const fullName = String((profile as { full_name?: unknown }).full_name ?? "").trim().replace(/\s+/g, " ");
+  const phone = normalizeAfghanistanPhone((profile as { phone?: unknown }).phone);
+
+  if (fullName.length < 2 || !phone.normalized) {
+    return { ok: false, message: "Please complete your full name and Afghanistan mobile phone in Account Settings before publishing." };
+  }
+
+  return { ok: true, contact: { fullName, phone: phone.normalized } };
+}
 
 async function persistLockedListingSpecs(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -722,7 +810,11 @@ async function persistListingAttributes(
             attribute_value_number: bounded,
             attribute_value_boolean: null,
             attribute_value_json: null,
-            unit: field.key === "mileageKm" ? "Km" : null,
+            unit: field.key === "mileageKm"
+              ? "Km"
+              : field.key === "areaSize"
+                ? normalizeAfghanLandAreaUnit(formData.get("areaUnit")) ?? "sqm"
+                : null,
           }];
         }
 
@@ -757,10 +849,17 @@ async function persistListingAttributes(
         })
         .map(([key, value]) => toAttributePayload(fieldMap.get(key)!, value))
         .filter((row) => Boolean(row));
+  attributeRows.push(...buildCanonicalAreaRows(formData, categoryPath));
 
   if (replaceExisting) {
     if (simpleKind && !usesConfiguredSchema) {
-      const keys = Array.from(new Set([...allSimpleFieldKeys, ...simpleFieldKeys]));
+      const keys = Array.from(new Set([
+        ...allSimpleFieldKeys,
+        ...simpleFieldKeys,
+        "area_original_value",
+        "area_original_unit",
+        "area_sqm",
+      ]));
       if (keys.length > 0) {
         await supabase.from("listing_attributes").delete().eq("listing_id", listingId).in("attribute_key", keys);
       }
@@ -992,7 +1091,8 @@ async function buildListingPayload(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   userId: string,
   input: ListingInput,
-  formData: FormData
+  formData: FormData,
+  sellerContact: NativeSellerContact
 ) {
   const context = await resolveCategoryContext(supabase, input);
   if (!context) {
@@ -1139,8 +1239,8 @@ async function buildListingPayload(
       location_accuracy: Number.isFinite(locationAccuracy as number) ? Math.round(locationAccuracy as number) : null,
       location_visibility: locationVisibility,
       is_location_confirmed: true,
-      contact_phone: input.contact_phone,
-      contact_name: input.contact_name || null,
+      contact_phone: sellerContact.phone,
+      contact_name: sellerContact.fullName,
       negotiable: input.negotiable ?? false,
       minimum_offer: input.minimum_offer ?? null,
       featured: input.featured ?? false,
@@ -1258,7 +1358,12 @@ export async function createListingFormAction(formData: FormData): Promise<void>
     return;
   }
 
-  const listing = await buildListingPayload(supabase, user.id, input, formData);
+  const sellerContact = await resolveNativeSellerContact(supabase, user.id);
+  if (!sellerContact.ok) {
+    return;
+  }
+
+  const listing = await buildListingPayload(supabase, user.id, input, formData, sellerContact.contact);
   if (!listing) {
     return;
   }
@@ -1354,7 +1459,12 @@ export async function createListingAction(formData: FormData): Promise<{
     return { ok: false, message: locationGuard.message };
   }
 
-  const createdListing = await buildListingPayload(supabase, user.id, input, formData);
+  const sellerContact = await resolveNativeSellerContact(supabase, user.id);
+  if (!sellerContact.ok) {
+    return { ok: false, message: sellerContact.message };
+  }
+
+  const createdListing = await buildListingPayload(supabase, user.id, input, formData, sellerContact.contact);
   if (!createdListing) {
     return { ok: false, message: "Must select a category" };
   }
@@ -1457,7 +1567,12 @@ export async function updateListingAction(
     return { ok: false, message: vehicleGuard.message };
   }
 
-  const createdListing = await buildListingPayload(supabase, user.id, input, formData);
+  const sellerContact = await resolveNativeSellerContact(supabase, user.id);
+  if (!sellerContact.ok) {
+    return { ok: false, message: sellerContact.message };
+  }
+
+  const createdListing = await buildListingPayload(supabase, user.id, input, formData, sellerContact.contact);
   if (!createdListing) {
     return { ok: false, message: "Must select a category" };
   }

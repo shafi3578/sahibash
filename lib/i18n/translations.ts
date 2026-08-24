@@ -21,6 +21,7 @@ type TranslationTree = {
     loginTitle: string;
     registerTitle: string;
     fullName: string;
+    mobilePhone: string;
     email: string;
     password: string;
     signIn: string;
@@ -361,6 +362,7 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       loginTitle: "Login",
       registerTitle: "Register",
       fullName: "Full name",
+      mobilePhone: "Mobile phone",
       email: "Email",
       password: "Password",
       signIn: "Sign in",
@@ -751,6 +753,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       loginTitle: "ورود",
       registerTitle: "ثبت نام",
       fullName: "نام کامل",
+      mobilePhone: "شماره موبایل",
       email: "ایمیل",
       password: "رمز عبور",
       signIn: "ورود",
@@ -866,6 +869,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       loginTitle: "ننوتل",
       registerTitle: "راجسټر",
       fullName: "بشپړ نوم",
+      mobilePhone: "د موبایل شمېره",
       email: "ایمیل",
       password: "پاسورډ",
       signIn: "ننوتل",

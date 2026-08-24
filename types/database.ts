@@ -56,6 +56,8 @@ export type Profile = {
   province: string | null;
   avatar_url: string | null;
   preferred_language: LanguageCode;
+  phone_verification_status?: "unverified" | "verified" | "pending" | null;
+  phone_verified_at?: string | null;
   role: AppRole;
   created_at: string;
   updated_at: string;
