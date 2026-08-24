@@ -6,6 +6,7 @@ import type { AppLocale } from "@/lib/i18n/translations";
 import { assertSafeExternalUrl, candidateIdempotencyKey, normalizeAfghanistanPhone, normalizeInventoryText, normalizePriceToAfn } from "@/lib/inventory/normalization";
 import { scoreDuplicateCandidate, type DuplicateCandidate } from "@/lib/inventory/deduplication";
 import { recordDemandSignalAction } from "@/lib/actions/liquidity";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 export type InventoryContactEvent =
   | "phone_reveal"
@@ -25,6 +26,14 @@ export async function recordInventoryContactEventAction(
 ) {
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
+  const rateLimit = await consumeRateLimit({
+    scope: `inventory.contact.${eventType}`,
+    userId: user?.id ?? null,
+    maxRequests: 120,
+    windowSeconds: 10 * 60,
+  });
+  if (!rateLimit.allowed) return { ok: false, message: "Too many requests" };
+
   const { data: listing } = await supabase
     .from("listings")
     .select("id, source_type")
@@ -58,6 +67,14 @@ export async function recordInventoryContactEventAction(
 export async function initiateListingClaimAction(listingId: string) {
   const user = await getCurrentUser();
   if (!user) return { ok: false, message: "Authentication required", statusCode: 401 };
+
+  const rateLimit = await consumeRateLimit({
+    scope: "inventory.claim",
+    userId: user.id,
+    maxRequests: 10,
+    windowSeconds: 60 * 60,
+  });
+  if (!rateLimit.allowed) return { ok: false, message: "Too many requests", statusCode: 429 };
 
   const supabase = await createSupabaseServerClient();
   const { data: listing } = await supabase

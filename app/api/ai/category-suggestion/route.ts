@@ -3,6 +3,7 @@ import { InferenceClient } from "@huggingface/inference";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { mapSignalsToCategory } from "@/lib/ai/category-mapping";
 import { matchProductSpecsFromSignals } from "@/lib/ai/product-specs-matching";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 type Suggestion = {
   rootSlug: "real-estate" | "vehicles" | "mobile-phones-tablets" | "electronics-computers" | "home-furniture-appliances" | "clothing-personal-items" | "jobs" | "services" | "business-industry" | "farm-animals" | "education" | "sports-hobbies" | "other";
@@ -14,6 +15,7 @@ type Suggestion = {
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_URLS = 12;
+const MAX_IMAGE_URL_LENGTH = 2048;
 
 function parseImageUrls(raw: FormDataEntryValue | null): string[] {
   if (typeof raw !== "string" || !raw.trim()) return [];
@@ -27,10 +29,11 @@ function parseImageUrls(raw: FormDataEntryValue | null): string[] {
     throw new Error("INVALID_IMAGE_URLS");
   }
   return candidates.map((candidate) => {
-    const value = String(candidate);
+    const value = String(candidate).trim();
+    if (!value || value.length > MAX_IMAGE_URL_LENGTH) throw new Error("INVALID_IMAGE_URLS");
     const url = new URL(value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("INVALID_IMAGE_URLS");
-    return value;
+    if (url.protocol !== "https:" || url.username || url.password) throw new Error("INVALID_IMAGE_URLS");
+    return url.toString();
   });
 }
 
@@ -45,9 +48,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ suggestion: null, message: "Authentication required" }, { status: 401 });
     }
 
+    const rateLimit = await consumeRateLimit({
+      scope: "ai.category_suggestion",
+      userId: user.id,
+      maxRequests: 30,
+      windowSeconds: 60 * 60,
+    });
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ suggestion: null, message: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
     const key = process.env.HUGGINGFACE_API_KEY;
     if (!key) {
-      return NextResponse.json({ suggestion: null, message: "HUGGINGFACE_API_KEY is missing" }, { status: 200 });
+      return NextResponse.json({ suggestion: null, message: "AI suggestions are temporarily unavailable." }, { status: 200 });
     }
 
     const formData = await request.formData();

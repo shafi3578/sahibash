@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { isUuid, normalizeMessageBody } from "@/lib/messages/threading";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 export async function createReportAction(formData: FormData) {
   const user = await requireUser();
@@ -16,6 +17,14 @@ export async function createReportAction(formData: FormData) {
   if (!isUuid(listingId) || reason.length < 3) {
     return;
   }
+
+  const rateLimit = await consumeRateLimit({
+    scope: "report.listing",
+    userId: user.id,
+    maxRequests: 10,
+    windowSeconds: 60 * 60,
+  });
+  if (!rateLimit.allowed) return;
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("reports").insert({
@@ -43,6 +52,14 @@ export async function reportConversationAction(formData: FormData) {
   if (!isUuid(listingId) || !isUuid(participantUserId) || participantUserId === user.id) {
     return;
   }
+
+  const rateLimit = await consumeRateLimit({
+    scope: "report.conversation",
+    userId: user.id,
+    maxRequests: 10,
+    windowSeconds: 60 * 60,
+  });
+  if (!rateLimit.allowed) return;
 
   const supabase = await createSupabaseServerClient();
   const [outgoingThread, incomingThread] = await Promise.all([

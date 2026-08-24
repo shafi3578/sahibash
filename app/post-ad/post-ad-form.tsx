@@ -255,50 +255,6 @@ export default function PostAdForm({
   const [pathNodes, setPathNodes] = useState<CategoryNode[]>([]);
   const [currentOptions, setCurrentOptions] = useState<CategoryNode[]>([]);
 
-  const chooseRoot = useCallback(async (category: Category) => {
-    if (category.is_coming_soon) {
-      return;
-    }
-
-    setLoadingTree(true);
-    setSelectedRoot(category);
-    setFinalNode(null);
-    setDynamicFields([]);
-    setDynamicValues({});
-    setPostingConfig(null);
-    setVehicleSelection(EMPTY_VEHICLE_SELECTION);
-    setDamageParts(defaultDamageParts());
-
-    const root = await fetchRootNode(category.id);
-    if (!root) {
-      setPathNodes([]);
-      setCurrentOptions([]);
-      setLoadingTree(false);
-      return;
-    }
-
-    setPathNodes([root]);
-    const children = await fetchChildren(root.id);
-    setCurrentOptions(children);
-
-    if (children.length === 0) {
-      setFinalNode(root);
-      await Promise.all([fetchFields(root.id, root.path, category.slug), fetchPostingConfig(category.id)]);
-    }
-
-    setLoadingTree(false);
-  }, []);
-
-  useEffect(() => {
-    if (!initialRootSlug || selectedRoot || initialRootAppliedRef.current) return;
-    const match = categories.find((category) => category.slug === initialRootSlug);
-    if (match) {
-      initialRootAppliedRef.current = true;
-      queueMicrotask(() => {
-        void chooseRoot(match);
-      });
-    }
-  }, [categories, chooseRoot, initialRootSlug, selectedRoot]);
   const [finalNode, setFinalNode] = useState<CategoryNode | null>(null);
   const [dynamicFields, setDynamicFields] = useState<CategoryField[]>([]);
   const [usesPublishedSchema, setUsesPublishedSchema] = useState(false);
@@ -794,6 +750,51 @@ export default function PostAdForm({
       allow_video: Boolean((data as Record<string, unknown>).allow_video),
     });
   }
+
+  const chooseRoot = useCallback(async (category: Category) => {
+    if (category.is_coming_soon) {
+      return;
+    }
+
+    setLoadingTree(true);
+    setSelectedRoot(category);
+    setFinalNode(null);
+    setDynamicFields([]);
+    setDynamicValues({});
+    setPostingConfig(null);
+    setVehicleSelection(EMPTY_VEHICLE_SELECTION);
+    setDamageParts(defaultDamageParts());
+
+    const root = await fetchRootNode(category.id);
+    if (!root) {
+      setPathNodes([]);
+      setCurrentOptions([]);
+      setLoadingTree(false);
+      return;
+    }
+
+    setPathNodes([root]);
+    const children = await fetchChildren(root.id);
+    setCurrentOptions(children);
+
+    if (children.length === 0) {
+      setFinalNode(root);
+      await Promise.all([fetchFields(root.id, root.path, category.slug), fetchPostingConfig(category.id)]);
+    }
+
+    setLoadingTree(false);
+  }, [fetchFields]);
+
+  useEffect(() => {
+    if (!initialRootSlug || selectedRoot || initialRootAppliedRef.current) return;
+    const match = categories.find((category) => category.slug === initialRootSlug);
+    if (match) {
+      initialRootAppliedRef.current = true;
+      queueMicrotask(() => {
+        void chooseRoot(match);
+      });
+    }
+  }, [categories, chooseRoot, initialRootSlug, selectedRoot]);
 
   async function chooseNode(node: CategoryNode) {
     setLoadingTree(true);

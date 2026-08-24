@@ -14,6 +14,9 @@ type ProfileRow = {
   role: UserRole;
 };
 
+type ServerAuthenticatedUser = Parameters<typeof requiresStepUpAuth>[0];
+type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
 async function getCurrentPath() {
   try {
     const headerStore = await headers();
@@ -116,12 +119,24 @@ async function getConfiguredStepUpWindowMinutes() {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
 }
 
-export async function requirePermission(permission: PermissionKey) {
-  const user = await requireUser();
+async function requireFreshPrimaryAuthentication(user: ServerAuthenticatedUser) {
   const stepUpWindowMinutes = await getConfiguredStepUpWindowMinutes();
-  if (requiresStepUpAuth(user as Parameters<typeof requiresStepUpAuth>[0], stepUpWindowMinutes * 60 * 1000)) {
+  if (requiresStepUpAuth(user, stepUpWindowMinutes * 60 * 1000)) {
     await redirectToAccount("security");
   }
+}
+
+async function requireVerifiedAuthenticatorAssurance(supabase: SupabaseServerClient) {
+  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  if (error || data?.currentLevel !== "aal2") {
+    await redirectToAccount("security");
+  }
+}
+
+export async function requirePermission(permission: PermissionKey) {
+  const user = await requireUser();
+  await requireFreshPrimaryAuthentication(user);
 
   const supabase = await createSupabaseServerClient();
 
@@ -139,10 +154,7 @@ export async function requirePermission(permission: PermissionKey) {
 
 export async function requireAdmin() {
   const user = await requireUser();
-  const stepUpWindowMinutes = await getConfiguredStepUpWindowMinutes();
-  if (requiresStepUpAuth(user as Parameters<typeof requiresStepUpAuth>[0], stepUpWindowMinutes * 60 * 1000)) {
-    await redirectToAccount("security");
-  }
+  await requireFreshPrimaryAuthentication(user);
 
   const supabase = await createSupabaseServerClient();
 
@@ -159,11 +171,6 @@ export async function requireAdmin() {
 
 export async function requireSuperAdministrator() {
   const user = await requireUser();
-  const stepUpWindowMinutes = await getConfiguredStepUpWindowMinutes();
-  if (requiresStepUpAuth(user as Parameters<typeof requiresStepUpAuth>[0], stepUpWindowMinutes * 60 * 1000)) {
-    await redirectToAccount("security");
-  }
-
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("is_super_administrator", {
     uid: user.id,
@@ -172,6 +179,9 @@ export async function requireSuperAdministrator() {
   if (error || data !== true) {
     await redirectToAccount();
   }
+
+  await requireFreshPrimaryAuthentication(user);
+  await requireVerifiedAuthenticatorAssurance(supabase);
 
   return user;
 }

@@ -1,6 +1,7 @@
 'use server';
 
 import { type LocationVisibility } from '@/components/location/LocationPrivacy';
+import { sanitizePublicLocation } from '@/lib/location/privacy';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 type NearbyListingRow = {
@@ -8,8 +9,8 @@ type NearbyListingRow = {
   title: string;
   price: number | null;
   currency: string | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   location_visibility: string | null;
   location_accuracy: number | null;
   province_id: number | null;
@@ -109,6 +110,7 @@ export async function getNearbyListings(
       `
     )
     .eq('status', filters?.status || 'approved')
+    .in('location_visibility', ['exact', 'approximate'])
     .not('latitude', 'is', null)
     .not('longitude', 'is', null)
     .limit(filters?.limit || 50);
@@ -126,22 +128,27 @@ export async function getNearbyListings(
   const R = 6371; // Radius of earth in km
 
   const filteredListings = (data as NearbyListingRow[])
-    .map((listing): NearbyListingWithDistance => {
-      const dLat = deg2rad(listing.latitude - latitude);
-      const dLon = deg2rad(listing.longitude - longitude);
+    .flatMap((listing): NearbyListingWithDistance[] => {
+      const publicListing = sanitizePublicLocation(listing);
+      if (publicListing.latitude === null || publicListing.longitude === null) {
+        return [];
+      }
+
+      const dLat = deg2rad(publicListing.latitude - latitude);
+      const dLon = deg2rad(publicListing.longitude - longitude);
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(deg2rad(latitude)) *
-          Math.cos(deg2rad(listing.latitude)) *
+          Math.cos(deg2rad(publicListing.latitude)) *
           Math.sin(dLon / 2) *
           Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       const distance = R * c;
 
-      return {
-        ...listing,
+      return [{
+        ...publicListing,
         distance,
-      };
+      }];
     })
     .filter((listing) => listing.distance <= radiusKm)
     .sort((a, b) => a.distance - b.distance);
@@ -211,7 +218,7 @@ export async function getListingsByLocation(
     throw new Error(`Failed to fetch listings: ${error.message}`);
   }
 
-  return { listings: data || [], count: count || 0 };
+  return { listings: (data || []).map((listing) => sanitizePublicLocation(listing)), count: count || 0 };
 }
 
 /**
@@ -250,22 +257,7 @@ export async function getListingLocationInfo(listingId: string) {
     return null;
   }
 
-  // Hide exact coordinates based on visibility
-  let latitude = data.latitude;
-  let longitude = data.longitude;
-
-  if (data.location_visibility === 'approximate' && latitude && longitude) {
-    // Add random offset to approximate location (0-1 km radius)
-    const randomAngle = Math.random() * 2 * Math.PI;
-    const randomDistance = Math.random() * 1; // 1 km max
-    const latOffset = (randomDistance * Math.cos(randomAngle)) / 111; // 1 degree ~= 111 km
-    const lonOffset = (randomDistance * Math.sin(randomAngle)) / 111;
-    latitude = latitude + latOffset;
-    longitude = longitude + lonOffset;
-  } else if (data.location_visibility === 'hidden' || data.location_visibility === 'province_district') {
-    latitude = null;
-    longitude = null;
-  }
+  const publicLocation = sanitizePublicLocation(data);
 
   return {
     countryId: data.country_id,
@@ -275,9 +267,9 @@ export async function getListingLocationInfo(listingId: string) {
     provinceName: data.provinces?.[0]?.name,
     districtName: data.districts?.[0]?.name,
     areaName: data.areas?.[0]?.name,
-    addressText: (data.location_visibility !== 'hidden' && data.location_visibility !== 'province_district') ? data.address_text : null,
-    latitude,
-    longitude,
+    addressText: publicLocation.address_text,
+    latitude: publicLocation.latitude,
+    longitude: publicLocation.longitude,
     accuracy: data.location_accuracy,
     visibility: data.location_visibility,
   };

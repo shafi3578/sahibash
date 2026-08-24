@@ -7,6 +7,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 import type { AISuggestion } from "@/lib/posting/types";
 
 type SuggestionRequest = {
@@ -16,6 +18,52 @@ type SuggestionRequest = {
   sellingMethod?: string;
   photoUrls?: string[];
 };
+
+const MAX_TITLE_LENGTH = 120;
+const MAX_DESCRIPTION_LENGTH = 5000;
+const MAX_PHOTO_URLS = 12;
+const MAX_PHOTO_URL_LENGTH = 2048;
+
+function normalizeSuggestionRequest(input: unknown): SuggestionRequest | null {
+  if (!input || typeof input !== "object") return null;
+
+  const candidate = input as Partial<SuggestionRequest>;
+  const title = String(candidate.title ?? "").trim();
+  const description = String(candidate.description ?? "").trim();
+  const photoUrls = Array.isArray(candidate.photoUrls) ? candidate.photoUrls : [];
+
+  if (!title || !description) return null;
+  if (title.length > MAX_TITLE_LENGTH || description.length > MAX_DESCRIPTION_LENGTH) return null;
+  if (photoUrls.length > MAX_PHOTO_URLS) return null;
+
+  const safePhotoUrls = photoUrls.flatMap((rawUrl) => {
+    const value = String(rawUrl ?? "").trim();
+    if (!value || value.length > MAX_PHOTO_URL_LENGTH) return [];
+
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:" || url.username || url.password) return [];
+      return [url.toString()];
+    } catch {
+      return [];
+    }
+  });
+
+  if (safePhotoUrls.length !== photoUrls.length) return null;
+
+  return {
+    title,
+    description,
+    photoUrls: safePhotoUrls,
+    sellingMethod: typeof candidate.sellingMethod === "string" ? candidate.sellingMethod.slice(0, 80) : undefined,
+    location: candidate.location && typeof candidate.location === "object"
+      ? {
+          province: typeof candidate.location.province === "string" ? candidate.location.province.slice(0, 120) : undefined,
+          district: typeof candidate.location.district === "string" ? candidate.location.district.slice(0, 120) : undefined,
+        }
+      : undefined,
+  };
+}
 
 /**
  * Simple heuristic-based category suggestion
@@ -279,12 +327,37 @@ function suggestCategoryHeuristic(req: SuggestionRequest): AISuggestion | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const body: SuggestionRequest = await request.json();
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Authentication required", suggestion: null },
+        { status: 401 }
+      );
+    }
+
+    const rateLimit = await consumeRateLimit({
+      scope: "posting.category_suggestion",
+      userId: user.id,
+      maxRequests: 60,
+      windowSeconds: 60 * 60,
+    });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later.", suggestion: null },
+        { status: 429 }
+      );
+    }
+
+    const body = normalizeSuggestionRequest(await request.json());
 
     // Validate input
-    if (!body.title || !body.description) {
+    if (!body) {
       return NextResponse.json(
-        { error: "Title and description are required" },
+        { error: "Title and description are required", suggestion: null },
         { status: 400 }
       );
     }
@@ -303,8 +376,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ suggestion });
-  } catch (error) {
-    console.error("Category suggestion error:", error);
+  } catch {
     return NextResponse.json(
       { error: "Failed to generate suggestion" },
       { status: 500 }

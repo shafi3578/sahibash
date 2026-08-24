@@ -103,10 +103,6 @@ export function normalizeSiteSettings(input: Record<string, unknown>): Partial<S
   const homeSecondaryCtaPath = typeof input.home_secondary_cta_path === "string" ? input.home_secondary_cta_path.trim() : "";
   const navigationLinks = normalizeNavigationLinks(input.navigation_links);
   const stepUpWindowMinutes = Number(input.step_up_window_minutes ?? 0);
-  const baseNavigationLinks: NavigationLinkRecord[] = [
-    { label: "Listings", path: "/listings" },
-    { label: "Categories", path: "/categories" },
-  ];
 
   if (siteName) next.site_name = siteName;
   if (siteTagline) next.site_tagline = siteTagline;

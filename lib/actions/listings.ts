@@ -28,6 +28,8 @@ import {
 } from "@/lib/posting/electronics-dynamic";
 import { validateListingImage } from "@/lib/posting/image-validation";
 import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
+import { shouldBlockPublicFixtureListing } from "@/lib/listings/fixture-guard";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 const RESERVED_FORM_KEYS = new Set([
   "title",
@@ -1223,6 +1225,13 @@ function validatePostingLocationFormData(formData: FormData): { ok: true } | { o
 export async function createListingFormAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const rateLimit = await consumeRateLimit({
+    scope: "listing.create",
+    userId: user.id,
+    maxRequests: 12,
+    windowSeconds: 24 * 60 * 60,
+  });
+  if (!rateLimit.allowed) return;
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
@@ -1251,6 +1260,9 @@ export async function createListingFormAction(formData: FormData): Promise<void>
 
   const listing = await buildListingPayload(supabase, user.id, input, formData);
   if (!listing) {
+    return;
+  }
+  if (shouldBlockPublicFixtureListing(listing.payload)) {
     return;
   }
 
@@ -1307,6 +1319,15 @@ export async function createListingAction(formData: FormData): Promise<{
     return { ok: false, message: "Please log in or register to publish your ad.", statusCode: 401 };
   }
   const supabase = await createSupabaseServerClient();
+  const rateLimit = await consumeRateLimit({
+    scope: "listing.create",
+    userId: user.id,
+    maxRequests: 12,
+    windowSeconds: 24 * 60 * 60,
+  });
+  if (!rateLimit.allowed) {
+    return { ok: false, message: "Too many listing submissions. Please try again later.", statusCode: 429 };
+  }
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
@@ -1336,6 +1357,9 @@ export async function createListingAction(formData: FormData): Promise<{
   const createdListing = await buildListingPayload(supabase, user.id, input, formData);
   if (!createdListing) {
     return { ok: false, message: "Must select a category" };
+  }
+  if (shouldBlockPublicFixtureListing(createdListing.payload)) {
+    return { ok: false, message: "Production fixture or smoke-test listings cannot be published." };
   }
 
   const { data, error } = await insertListingWithSchemaFallback(supabase, createdListing.payload as Record<string, unknown>);
@@ -1511,7 +1535,7 @@ export async function updateListingStatusAction(
   status: "approved" | "rejected" | "pending" | "sold" | "expired",
   rejectionReason?: string
 ): Promise<{ ok: boolean; message: string }> {
-  await requirePermission("listings.moderate");
+  const moderator = await requirePermission("listings.moderate");
   const supabase = await createSupabaseServerClient();
 
   const payload: Record<string, string | undefined> = {
@@ -1519,7 +1543,21 @@ export async function updateListingStatusAction(
   };
 
   if (status === "approved") {
-    payload.approved_by = (await requireUser()).id;
+    const { data: listing, error: listingError } = await supabase
+      .from("listings")
+      .select("title, description, original_title, original_description")
+      .eq("id", listingId)
+      .single();
+
+    if (listingError || !listing) {
+      return { ok: false, message: "Listing not found" };
+    }
+
+    if (shouldBlockPublicFixtureListing(listing)) {
+      return { ok: false, message: "Production fixture or smoke-test listings cannot be approved." };
+    }
+
+    payload.approved_by = moderator.id;
   } else if (status === "rejected" && rejectionReason) {
     payload.approval_rejected_reason = rejectionReason;
   }

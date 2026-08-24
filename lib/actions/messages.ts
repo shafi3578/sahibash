@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { isUuid, isValidMessageBody, normalizeMessageBody } from "@/lib/messages/threading";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 function listingRedirect(listingId: string, locale: Awaited<ReturnType<typeof getCurrentLocale>>, status: string) {
   const targetPath = listingId && isUuid(listingId)
@@ -23,6 +24,16 @@ export async function sendListingMessageAction(formData: FormData): Promise<void
 
   if (!isUuid(listingId) || !isValidMessageBody(body)) {
     redirect(listingRedirect(listingId, locale, "invalid"));
+  }
+
+  const rateLimit = await consumeRateLimit({
+    scope: "message.send",
+    userId: user.id,
+    maxRequests: 20,
+    windowSeconds: 10 * 60,
+  });
+  if (!rateLimit.allowed) {
+    redirect(listingRedirect(listingId, locale, "rate-limited"));
   }
 
   const supabase = await createSupabaseServerClient();
@@ -66,6 +77,14 @@ export async function replyMessageAction(formData: FormData): Promise<void> {
 
   if (!isUuid(listingId) || !isUuid(recipientUserId) || !isValidMessageBody(body)) return;
   if (recipientUserId === user.id) return;
+
+  const rateLimit = await consumeRateLimit({
+    scope: "message.reply",
+    userId: user.id,
+    maxRequests: 60,
+    windowSeconds: 10 * 60,
+  });
+  if (!rateLimit.allowed) return;
 
   const [outgoingThread, incomingThread] = await Promise.all([
     supabase

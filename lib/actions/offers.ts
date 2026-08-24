@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 function toNumber(value: FormDataEntryValue | null): number {
   const n = Number(String(value ?? "0").replace(/,/g, ""));
@@ -20,6 +21,16 @@ export async function createOfferAction(formData: FormData): Promise<void> {
 
   if (!listingId || offeredPrice <= 0) {
     redirect(`/listings/${listingId}?offer=invalid`);
+  }
+
+  const rateLimit = await consumeRateLimit({
+    scope: "offer.create",
+    userId: user.id,
+    maxRequests: 20,
+    windowSeconds: 60 * 60,
+  });
+  if (!rateLimit.allowed) {
+    redirect(`/listings/${listingId}?offer=rate-limited`);
   }
 
   const { data: listing } = await supabase

@@ -44,6 +44,16 @@ const listingSchemaActions = readFileSync(
   "utf8",
 );
 
+const authModule = readFileSync(
+  join(process.cwd(), "lib", "auth.ts"),
+  "utf8",
+);
+
+const stepUpAuthModule = readFileSync(
+  join(process.cwd(), "lib", "auth", "step-up.ts"),
+  "utf8",
+);
+
 const schemaCategoryNavigator = readFileSync(
   join(process.cwd(), "app", "admin", "listing-schema", "category-navigator.tsx"),
   "utf8",
@@ -51,6 +61,11 @@ const schemaCategoryNavigator = readFileSync(
 
 const aiCategoryRoute = readFileSync(
   join(process.cwd(), "app", "api", "ai", "category-suggestion", "route.ts"),
+  "utf8",
+);
+
+const postingSuggestCategoryRoute = readFileSync(
+  join(process.cwd(), "app", "api", "posting", "suggest-category", "route.ts"),
   "utf8",
 );
 
@@ -119,12 +134,46 @@ test("schema builder category activation is super-admin-only and audited", () =>
   assert.equal(SCHEMA_BUILDER_COPY.en.activate, "Activate category");
 });
 
+test("authorization step-up does not trust user-editable metadata", () => {
+  assert.doesNotMatch(stepUpAuthModule, /user_metadata/i);
+  assert.match(stepUpAuthModule, /last_sign_in_at/);
+});
+
+test("super administrator gates require a verified current MFA assurance level", () => {
+  const superAdminGate = authModule.slice(authModule.indexOf("export async function requireSuperAdministrator"));
+
+  assert.match(authModule, /getAuthenticatorAssuranceLevel\(\)/);
+  assert.match(authModule, /data\?\.currentLevel !== "aal2"/);
+  assert.match(superAdminGate, /rpc\("is_super_administrator"/);
+  assert.match(superAdminGate, /await requireFreshPrimaryAuthentication\(user\)/);
+  assert.match(superAdminGate, /await requireVerifiedAuthenticatorAssurance\(supabase\)/);
+});
+
 test("paid AI category inference requires a user and bounds uploaded input", () => {
   assert.match(aiCategoryRoute, /if \(!user\)/);
   assert.match(aiCategoryRoute, /status: 401/);
   assert.match(aiCategoryRoute, /MAX_IMAGE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(aiCategoryRoute, /MAX_IMAGE_URL_LENGTH = 2048/);
   assert.match(aiCategoryRoute, /image\.type\.startsWith\("image\/"\)/);
+  assert.match(aiCategoryRoute, /url\.protocol !== "https:"/);
   assert.match(aiCategoryRoute, /title\.length > 120/);
   assert.match(aiCategoryRoute, /description\.length > 5000/);
+  assert.match(aiCategoryRoute, /AI suggestions are temporarily unavailable/);
+  assert.doesNotMatch(
+    aiCategoryRoute.slice(aiCategoryRoute.indexOf("if (!key)"), aiCategoryRoute.indexOf("const formData")),
+    /HUGGINGFACE_API_KEY/,
+  );
   assert.doesNotMatch(aiCategoryRoute, /error instanceof Error \? error\.message/);
+});
+
+test("posting category suggestion API is authenticated and bounded", () => {
+  assert.match(postingSuggestCategoryRoute, /supabase\.auth\.getUser\(\)/);
+  assert.match(postingSuggestCategoryRoute, /if \(!user\)/);
+  assert.match(postingSuggestCategoryRoute, /status: 401/);
+  assert.match(postingSuggestCategoryRoute, /MAX_TITLE_LENGTH = 120/);
+  assert.match(postingSuggestCategoryRoute, /MAX_DESCRIPTION_LENGTH = 5000/);
+  assert.match(postingSuggestCategoryRoute, /MAX_PHOTO_URLS = 12/);
+  assert.match(postingSuggestCategoryRoute, /MAX_PHOTO_URL_LENGTH = 2048/);
+  assert.match(postingSuggestCategoryRoute, /url\.protocol !== "https:"/);
+  assert.doesNotMatch(postingSuggestCategoryRoute, /console\.error\("Category suggestion error:", error\)/);
 });
