@@ -1,7 +1,13 @@
 # Sahibash Security Audit
 
 Date: 2026-08-24
-Status: conditional; important protections improved, but full multi-role/staging verification and performance-policy cleanup remain launch gates.
+Status: conditional; Phase 1 privacy-boundary controls are implemented, but production migration verification, super-admin MFA enrollment, full multi-role/staging verification, and performance-policy cleanup remain launch gates.
+
+> Current supersession note, 2026-08-24: Phase 1 now implements a public-safe
+> listing boundary, server-controlled phone reveal, and super-admin MFA
+> readiness reporting. Production status stays conditional until deployment,
+> migration application, and post-migration REST/browser verification are done.
+> See `docs/PRODUCTION_IDENTITY_AUDIT.md` and `docs/LAUNCH_READINESS.md`.
 
 ## Summary
 
@@ -19,6 +25,10 @@ Implemented in this pass:
 - Public location helper no longer uses random approximate offsets that can be averaged back to an exact point.
 - Listing image bucket hardening migration added to enforce app-equivalent MIME and size limits at Supabase Storage.
 - Durable per-user/IP rate-limit foundation added for posting, messaging, offers, reports, inventory contact/claim, and AI/category-suggestion flows.
+- Public listing feeds/details now use explicit safe selectors and server-side sanitization instead of returning raw listing rows.
+- Seller phone reveal now goes through a rate-limited server action that validates listing visibility/ownership/admin access and records contact/audit metadata before returning the phone.
+- A Supabase migration removes broad anonymous/authenticated raw-column grants from `public.listings`, denies public insert into `listing_contact_events`, and preserves privileged server access through `service_role`.
+- Admin roles UI now reports super-admin MFA readiness from verified Supabase Auth MFA factors.
 
 ## Supabase Auth
 
@@ -105,7 +115,7 @@ Required:
 
 Focused security suite:
 
-- `npm run test:security`: 26 passed, 0 failed.
+- `npm run test:security`: 31 passed, 0 failed.
 - `npm run typecheck`: passed.
 - `npm run lint`: passed, 0 errors, 0 warnings.
 - `npm run build`: passed.
@@ -119,12 +129,18 @@ Covered:
 - Fixture publication guard.
 - Storage bucket hardening migration shape.
 - Rate-limit migration and app integration coverage.
+- Public listing data-boundary selector/sanitizer coverage.
+- Phone reveal server-action privacy, rate-limit, and event-capture coverage.
+- Contact event public-insert revocation migration coverage.
+- Super-admin MFA readiness query coverage.
 
 ## Remaining P0/P1 security items
 
 P0:
 
-- Run authenticated multi-role E2E against staging.
+- Apply and verify the Phase 1 Supabase migration in production after backup/migration-state checks.
+- Enroll verified MFA factors for every super-administrator account.
+- Run authenticated multi-role E2E against staging or production-like identities.
 
 P1:
 

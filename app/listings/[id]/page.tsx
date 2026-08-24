@@ -82,7 +82,6 @@ export default async function ListingDetailPage({
 
   const currentUser = await getCurrentUser();
   const isOwner = currentUser?.id === listing.user_id;
-  const callHref = `tel:${listing.contact_phone.replace(/[^\d+]/g, "")}`;
   const listingHref = localizePath(`/listings/${listing.id}`, locale);
   const composeHref = localizePath(`/listings/${listing.id}?compose=1`, locale);
   const offerHref = localizePath(`/listings/${listing.id}?offerbox=1`, locale);
@@ -175,8 +174,15 @@ export default async function ListingDetailPage({
     });
 
   const safeSellerName = listing.contact_name || listing.profile?.full_name || t.listing.sellerFallback;
-  const safeSellerPhone = listing.contact_phone || listing.profile?.phone || t.listing.notProvided;
   const sourceTransparency = getSourceTransparency(listing, locale);
+  const hasContactPhone = Boolean(listing.public_contact_available ?? listing.contact_phone);
+  const phonePrivacyLabel = hasContactPhone
+    ? locale === "fa"
+      ? "برای دیدن شماره از دکمه نمایش شماره استفاده کنید"
+      : locale === "ps"
+        ? "د شمېرې لیدو لپاره د شمېره ښکاره کړئ تڼۍ وکاروئ"
+        : "Use Reveal phone to view the seller number"
+    : t.listing.notProvided;
 
   const overviewRows = specView.basicRows.filter((row) => isMeaningfulValue(row.value));
   const displaySectionLabel = (group: string) => {
@@ -819,7 +825,7 @@ export default async function ListingDetailPage({
           <h2 className="text-base font-bold">{t.listing.sellerInformation}</h2>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <p><span className="text-[var(--ink-2)]">{t.listing.name}:</span> <span className="font-semibold">{safeSellerName}</span></p>
-            <p><span className="text-[var(--ink-2)]">{t.listing.phone}:</span> <span className="font-semibold">{safeSellerPhone}</span></p>
+            <p><span className="text-[var(--ink-2)]">{t.listing.phone}:</span> <span className="font-semibold">{phonePrivacyLabel}</span></p>
             {sellerJoinedDate ? (
               <p><span className="text-[var(--ink-2)]">{t.listing.joined}:</span> <span className="font-semibold">{sellerJoinedDate}</span></p>
             ) : null}
@@ -828,7 +834,7 @@ export default async function ListingDetailPage({
             <p className="mt-2 text-sm text-[var(--ink-2)]">{t.listing.minimumOffer}: {formatCurrencyAmount(listing.minimum_offer, listing.currency, locale)}</p>
           ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
-          {listing.contact_phone ? <ListingContactActions listingId={listing.id} title={displayTitle} phone={listing.contact_phone} locale={locale} canContact={sourceTransparency.canContact} isExternal={sourceTransparency.isExternal} /> : null}
+          {hasContactPhone ? <ListingContactActions listingId={listing.id} title={displayTitle} locale={locale} canContact={sourceTransparency.canContact} isExternal={sourceTransparency.isExternal} hasPhone={hasContactPhone} /> : null}
             {!isOwner ? (
               <Link href={composeHref} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
             ) : null}
@@ -993,7 +999,6 @@ export default async function ListingDetailPage({
       {!isOwner ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
           <div className="mx-auto flex w-full max-w-5xl gap-2">
-            {listing.contact_phone ? <a href={callHref} className="flex min-h-12 items-center rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">{t.listing.call}</a> : null}
             <Link href={composeHref} className="flex-1 rounded-lg bg-[var(--ink-1)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.message}</Link>
             <Link href={offerHref} className="flex-1 rounded-lg bg-[var(--accent)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.offer}</Link>
           </div>

@@ -3,6 +3,11 @@
 Date: 2026-08-24
 Decision: CONDITIONAL
 
+> Current supersession note, 2026-08-24: the later Phase 0 audit in
+> `docs/PRODUCTION_IDENTITY_AUDIT.md` and `docs/LAUNCH_READINESS.md` found
+> P0 blockers in the correct production target `https://sahibash.vercel.app`.
+> Treat this report as historical until those blockers are fixed and verified.
+
 ## Executive summary
 
 Sahibash is closer to launch readiness after this pass, but it is not yet honest to claim unconditional 100/100 production readiness.

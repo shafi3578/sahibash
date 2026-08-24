@@ -12,6 +12,7 @@ import {
   adminFlagListingTranslationAction,
   adminUpdateListingTranslationAction,
 } from "@/lib/actions/translations";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
@@ -30,7 +31,7 @@ export default async function AdminListingsPage() {
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
   const moderationEntries = await getModerationEntries();
-  const supabase = await createSupabaseServerClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
   const { data: listings } = await supabase
     .from("listings")
     .select("*, listing_images(*), listing_translations(*)")

@@ -45,6 +45,7 @@ export type BridgeListingLike = {
   allow_contact_display?: boolean | null;
   source_last_seen_at?: string | null;
   contact_phone?: string | null;
+  public_contact_available?: boolean | null;
   status?: string | null;
 };
 
@@ -104,7 +105,11 @@ export function getSourceTransparency(listing: BridgeListingLike, locale: AppLoc
   const ownershipStatus = String(listing.ownership_status ?? (sourceType === "native" ? "claimed" : "unclaimed")) as ListingOwnershipStatus;
   const confidence = Number(listing.provenance_confidence ?? (sourceType === "native" ? 1 : 0.5));
   const isExternal = sourceType !== "native" && sourceType !== "migrated_legacy";
-  const canContact = listing.allow_contact_display !== false && Boolean(listing.contact_phone);
+  const hasContact =
+    typeof listing.public_contact_available === "boolean"
+      ? listing.public_contact_available
+      : Boolean(listing.contact_phone);
+  const canContact = listing.allow_contact_display !== false && hasContact;
   const needsAvailabilityWarning = isExternal && ["aging", "stale", "source_missing", "expired"].includes(freshnessStatus);
 
   return {

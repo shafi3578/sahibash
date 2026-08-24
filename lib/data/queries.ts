@@ -1,5 +1,9 @@
+import "server-only";
+
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth";
 import { reportDataError } from "@/lib/observability/data-errors";
 import type {
   ListingWithRelations,
@@ -28,6 +32,10 @@ import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
 import type { SearchRewriteClient } from "@/lib/search/rewrite";
 import { understandSearchQuery } from "@/lib/search/query-understanding";
 import { getSimpleCategoryConfig, getSimpleCategoryKind } from "@/lib/posting/simple-category-details";
+import {
+  sanitizePublicListingBoundaries,
+  sanitizePublicListingBoundary,
+} from "@/lib/listings/public-boundary";
 
 type ListingFilters = {
   locale?: AppLocale;
@@ -139,6 +147,112 @@ const PUBLIC_TEST_TEXT_PATTERNS = [
   "%for testing%",
   "%sample ad%",
 ];
+
+const PUBLIC_LISTING_SELECT = `
+  id,
+  category_id,
+  subcategory_id,
+  category_node_id,
+  vehicle_variant_id,
+  product_model_id,
+  vehicle_type,
+  vehicle_subtype,
+  vehicle_brand,
+  vehicle_model,
+  vehicle_year,
+  vehicle_is_manual,
+  vehicle_is_classic,
+  vehicle_is_custom,
+  vehicle_manual_specs,
+  suitable_for_students,
+  student_housing_type,
+  gender_allowed,
+  payment_period,
+  distance_to_university,
+  title,
+  description,
+  original_title,
+  original_description,
+  original_language,
+  original_locale,
+  price,
+  currency,
+  city,
+  country_id,
+  province_id,
+  district_id,
+  area_id,
+  province,
+  district,
+  neighborhood,
+  address_optional,
+  is_location_confirmed,
+  location_visibility,
+  video_url,
+  contact_name,
+  delivery_preference,
+  meeting_preference,
+  negotiable,
+  minimum_offer,
+  status,
+  featured,
+  urgent,
+  views_count,
+  favorites_count,
+  messages_count,
+  listing_score,
+  created_at,
+  updated_at,
+  expires_at,
+  published_at,
+  last_bumped_at,
+  archived_at,
+  seller_entity_id,
+  source_type,
+  ownership_status,
+  publication_status,
+  freshness_status,
+  provenance_status,
+  source_platform,
+  source_url,
+  source_last_seen_at,
+  source_posted_at,
+  provenance_confidence,
+  allow_contact_display,
+  noindex_external,
+  removed_public_at,
+  category:category_id(*),
+  category_node:category_node_id(*),
+  listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
+  listing_attributes(*)
+`;
+
+const LISTING_DETAIL_PRIVATE_SELECT = `
+  *,
+  category:category_id(*),
+  category_node:category_node_id(*),
+  listing_attributes(*),
+  listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
+  provinces!province_id(id, name, slug),
+  districts!district_id(id, name, slug),
+  areas!area_id(id, name, slug)
+`;
+
+const LISTING_DETAIL_PUBLIC_FALLBACK_SELECT = `
+  ${PUBLIC_LISTING_SELECT},
+  provinces!province_id(id, name, slug),
+  districts!district_id(id, name, slug),
+  areas!area_id(id, name, slug)
+`;
+
+async function getCurrentUserCanModerateListings(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string | undefined
+) {
+  if (!userId) return false;
+  const { data, error } = await supabase.rpc("is_admin", { uid: userId });
+  return !error && data === true;
+}
 
 function applyPublicListingQualityFilters<T>(query: T): T {
   let next = query as T & {
@@ -457,15 +571,7 @@ export async function getApprovedListings(
 
             let studentQuery = supabase
               .from("listings")
-              .select(
-                `
-                *,
-                category:category_id(*),
-                category_node:category_node_id(*),
-                listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
-                listing_attributes(*)
-              `
-              )
+              .select(PUBLIC_LISTING_SELECT as string)
               .eq("status", "approved")
               .in("category_id", lifecycleCategoryIds)
               .in("id", ids)
@@ -490,7 +596,7 @@ export async function getApprovedListings(
               return [];
             }
 
-            return (data as ListingWithRelations[]).slice(0, 40);
+            return sanitizePublicListingBoundaries(data as unknown as ListingWithRelations[]).slice(0, 40);
           }
         }
 
@@ -556,15 +662,7 @@ export async function getApprovedListings(
 
               let realEstateQuery = supabase
                 .from("listings")
-                .select(
-                  `
-                  *,
-                  category:category_id(*),
-                  category_node:category_node_id(*),
-                  listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
-                  listing_attributes(*)
-                `
-                )
+                .select(PUBLIC_LISTING_SELECT as string)
                 .eq("status", "approved")
                 .in("category_id", lifecycleCategoryIds)
                 .in("id", ids)
@@ -579,7 +677,7 @@ export async function getApprovedListings(
                 return [];
               }
 
-              return data as ListingWithRelations[];
+              return sanitizePublicListingBoundaries(data as unknown as ListingWithRelations[]);
             }
           }
         }
@@ -622,15 +720,7 @@ export async function getApprovedListings(
 
       let query = supabase
         .from("listings")
-        .select(
-          `
-          *,
-          category:category_id(*),
-          category_node:category_node_id(*),
-          listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
-          listing_attributes(*)
-        `
-        )
+        .select(PUBLIC_LISTING_SELECT as string)
         .eq("status", "approved")
         .in("category_id", lifecycleCategoryIds)
         .limit(queryLimit);
@@ -791,7 +881,7 @@ export async function getApprovedListings(
         return [];
       }
 
-      const rows = data as ListingWithRelations[];
+      const rows = sanitizePublicListingBoundaries(data as unknown as ListingWithRelations[]);
       const requestedLanguage = appLocaleToListingLanguage(filters?.locale ?? "en");
       const translationsByListingId = await getCompletedListingTranslations(
         supabase,
@@ -855,21 +945,14 @@ export async function getListingById(
 ): Promise<ListingWithRelations | null> {
   try {
     const supabase = await createSupabaseServerClient();
+    const currentUser = await getCurrentUser();
+    const canModerateListings = await getCurrentUserCanModerateListings(supabase, currentUser?.id);
+    const trustedSupabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : null;
+    const listingReadClient = trustedSupabase ?? supabase;
 
-    const { data, error } = await supabase
+    const { data, error } = await listingReadClient
       .from("listings")
-      .select(
-        `
-        *,
-        category:category_id(*),
-        category_node:category_node_id(*),
-        listing_attributes(*),
-        listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
-        provinces!province_id(id, name, slug),
-        districts!district_id(id, name, slug),
-        areas!area_id(id, name, slug)
-      `
-      )
+      .select((trustedSupabase ? LISTING_DETAIL_PRIVATE_SELECT : LISTING_DETAIL_PUBLIC_FALLBACK_SELECT) as string)
       .eq("id", id)
       .maybeSingle();
 
@@ -877,7 +960,14 @@ export async function getListingById(
       return null;
     }
 
-    const listing = data as ListingWithRelations;
+    const listing = data as unknown as ListingWithRelations;
+    const isOwner = Boolean(currentUser?.id && listing.user_id === currentUser.id);
+    const canReadPrivateListing = isOwner || canModerateListings;
+
+    if (listing.status !== "approved" && !canReadPrivateListing) {
+      return null;
+    }
+
     const requestedLanguage = appLocaleToListingLanguage(locale);
     const translationsByListingId = await getCompletedListingTranslations(
       supabase,
@@ -893,14 +983,16 @@ export async function getListingById(
     listing.translation_note = translated
       ? `Translated from ${listingLanguageLabel(originalLocale)}`
       : `Original language: ${listingLanguageLabel(originalLocale)}`;
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", listing.user_id)
-      .maybeSingle();
+    if (listing.user_id) {
+      const { data: profile } = await listingReadClient
+        .from("profiles")
+        .select("*")
+        .eq("id", listing.user_id)
+        .maybeSingle();
 
-    if (profile) {
-      listing.profile = profile;
+      if (profile) {
+        listing.profile = profile;
+      }
     }
 
     try {
@@ -1111,7 +1203,7 @@ export async function getListingById(
       listing.vehicle_damage = null;
     }
 
-    return listing;
+    return canReadPrivateListing ? listing : sanitizePublicListingBoundary(listing);
   } catch {
     return null;
   }
@@ -1254,7 +1346,7 @@ export async function getFilterDefinitionsForNode(
 
 export async function getUserListings(userId: string): Promise<ListingWithRelations[]> {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
 
     const { data, error } = await supabase
       .from("listings")
@@ -1444,15 +1536,16 @@ export async function getMyFavoriteListings(userId: string): Promise<ListingWith
 
   const { data: listings } = await supabase
     .from("listings")
-    .select("*, listing_images(*)")
+    .select(PUBLIC_LISTING_SELECT as string)
+    .eq("status", "approved")
     .in("id", ids)
     .order("created_at", { ascending: false });
 
-  return (listings as ListingWithImages[]) ?? [];
+  return sanitizePublicListingBoundaries((listings as unknown as ListingWithImages[]) ?? []) as ListingWithImages[];
 }
 
 export async function getListingWithOwnerStats(listingId: string, userId: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
 
   // Get listing with relations
   const { data: listing, error } = await supabase

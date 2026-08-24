@@ -1,3 +1,6 @@
+import "server-only";
+
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type AdminRoleSummary = {
@@ -33,6 +36,14 @@ export type AuditLogRow = {
   entity_id: string | null;
   safe_changes: Record<string, unknown> | null;
   created_at: string;
+};
+
+export type SuperAdminMfaReadinessRow = {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+  verified_factor_count: number;
+  is_ready: boolean;
 };
 
 export type RoleSummaryInput = {
@@ -206,4 +217,76 @@ export async function getAuditLogRows(
     ...row,
     safe_changes: row.safe_changes ?? null,
   }));
+}
+
+export async function getSuperAdminMfaReadinessRows(): Promise<SuperAdminMfaReadinessRow[]> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return [];
+  }
+
+  const supabase = createSupabaseAdmin();
+  const { data: superRole } = await supabase
+    .from("admin_roles")
+    .select("id")
+    .eq("name", "super_administrator")
+    .maybeSingle();
+
+  if (!superRole?.id) {
+    return [];
+  }
+
+  const { data: assignments } = await supabase
+    .from("admin_user_roles")
+    .select("user_id")
+    .eq("role_id", superRole.id);
+
+  const userIds = Array.from(new Set((assignments ?? []).map((row) => String(row.user_id)).filter(Boolean)));
+  if (userIds.length === 0) {
+    return [];
+  }
+
+  const [{ data: profiles }, { data: factors }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", userIds),
+    supabase
+      .schema("auth")
+      .from("mfa_factors")
+      .select("user_id, status")
+      .in("user_id", userIds)
+      .eq("status", "verified"),
+  ]);
+
+  const profileById = new Map(
+    (profiles ?? []).map((profile) => [
+      String(profile.id),
+      {
+        email: profile.email ?? null,
+        full_name: profile.full_name ?? null,
+      },
+    ])
+  );
+  const factorCountByUser = new Map<string, number>();
+
+  for (const factor of factors ?? []) {
+    const userId = String(factor.user_id ?? "");
+    if (!userId) continue;
+    factorCountByUser.set(userId, (factorCountByUser.get(userId) ?? 0) + 1);
+  }
+
+  return userIds
+    .map((userId) => {
+      const verifiedFactorCount = factorCountByUser.get(userId) ?? 0;
+      const profile = profileById.get(userId);
+
+      return {
+        user_id: userId,
+        email: profile?.email ?? null,
+        full_name: profile?.full_name ?? null,
+        verified_factor_count: verifiedFactorCount,
+        is_ready: verifiedFactorCount > 0,
+      };
+    })
+    .sort((a, b) => Number(a.is_ready) - Number(b.is_ready) || (a.email ?? a.user_id).localeCompare(b.email ?? b.user_id));
 }

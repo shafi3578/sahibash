@@ -5,19 +5,57 @@ import {
   adminCreateRoleAction,
   adminRemovePermissionFromRoleAction,
 } from "@/lib/actions/admin-rbac";
-import { getAdminPermissionRows, getAdminRoleRows } from "@/lib/data/admin-rbac";
+import { getAdminPermissionRows, getAdminRoleRows, getSuperAdminMfaReadinessRows } from "@/lib/data/admin-rbac";
 
 export default async function AdminRolesPage() {
   await requirePermission("roles.view");
-  const [roles, permissions] = await Promise.all([
+  const [roles, permissions, mfaReadiness] = await Promise.all([
     getAdminRoleRows(),
     getAdminPermissionRows(),
+    getSuperAdminMfaReadinessRows(),
   ]);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="font-display text-3xl font-bold">Admin roles</h1>
       <p className="mt-1 text-[var(--ink-2)]">Manage role assignments and permission groups.</p>
+
+      <section className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-xl font-bold">Super-admin MFA readiness</h2>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">
+              Every super administrator should have at least one verified MFA factor before launch.
+            </p>
+          </div>
+          <span className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-3 py-1 text-xs font-bold">
+            {mfaReadiness.filter((row) => row.is_ready).length}/{mfaReadiness.length} ready
+          </span>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--line)]">
+          {mfaReadiness.length === 0 ? (
+            <p className="p-3 text-sm text-[var(--ink-2)]">
+              MFA readiness data is unavailable. Confirm the server has the Supabase service-role key before launch verification.
+            </p>
+          ) : (
+            <div className="divide-y divide-[var(--line)]">
+              {mfaReadiness.map((row) => (
+                <div key={row.user_id} className="grid gap-2 p-3 text-sm md:grid-cols-[1fr_auto_auto] md:items-center">
+                  <div>
+                    <p className="font-semibold">{row.full_name || row.email || row.user_id}</p>
+                    <p className="text-xs text-[var(--ink-2)]">{row.email ?? row.user_id}</p>
+                  </div>
+                  <span className="text-xs text-[var(--ink-2)]">{row.verified_factor_count} verified factors</span>
+                  <span className={`rounded-full px-2 py-1 text-xs font-bold ${row.is_ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+                    {row.is_ready ? "Ready" : "Needs MFA"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4">

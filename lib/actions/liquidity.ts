@@ -113,14 +113,14 @@ export async function createShareOutputAction(listingId: string, channel: string
   const supabase = await createSupabaseServerClient();
   const { data: listing } = await supabase
     .from("listings")
-    .select("id,title,price,currency,province,district,user_id")
+    .select("id,title,price,currency,province,district")
     .eq("id", listingId)
     .maybeSingle();
 
   if (!listing) return { ok: false };
 
   const headerStore = await headers();
-  const origin = headerStore.get("origin") ?? "https://sahibash-three.vercel.app";
+  const origin = headerStore.get("origin") ?? "https://sahibash.vercel.app";
   const output = buildListingShareOutput(listing, locale, normalizeShareChannel(channel), origin);
 
   if (user) {

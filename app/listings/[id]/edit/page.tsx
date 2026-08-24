@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { updateListingAction, uploadListingImageFormAction } from "@/lib/actions/listings";
@@ -36,7 +37,7 @@ export default async function EditListingPage({ params }: PageProps) {
   const user = await getCurrentUser();
   if (!user) redirect(`/login?redirect=${encodeURIComponent(`/listings/${listingId}/edit`)}`);
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
 
   // Fetch listing with relations
   const { data: listing, error } = await supabase

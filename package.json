@@ -12,7 +12,7 @@
     "test:posting-access": "node --import tsx --test tests/posting-access-control.test.ts tests/listing-image-validation.test.ts tests/vehicle-model-catalog.test.ts",
     "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts",
     "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts tests/taxonomy-schema-migrations.test.ts",
-    "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/auth-step-up.test.ts tests/production-fixture-guard.test.ts tests/location-privacy.test.ts tests/production-sanity-sql.test.ts tests/storage-hardening.test.ts tests/rate-limit-foundation.test.ts tests/marketplace-ranking.test.ts",
+    "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/auth-step-up.test.ts tests/production-fixture-guard.test.ts tests/location-privacy.test.ts tests/production-sanity-sql.test.ts tests/storage-hardening.test.ts tests/rate-limit-foundation.test.ts tests/marketplace-ranking.test.ts tests/public-listing-boundary.test.ts",
     "test:inventory-provenance": "node --import tsx --test tests/inventory-provenance.test.ts",
     "test:liquidity": "node --import tsx --test tests/liquidity-foundation.test.ts",
     "test:network-readiness": "node --import tsx --test tests/network-readiness.test.ts",

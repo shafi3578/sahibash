@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { getCurrentUser, requireSuperAdministrator } from "@/lib/auth";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { assertSafeExternalUrl, candidateIdempotencyKey, normalizeAfghanistanPhone, normalizeInventoryText, normalizePriceToAfn } from "@/lib/inventory/normalization";
@@ -18,14 +19,55 @@ export type InventoryContactEvent =
   | "report_wrong_info"
   | "report_scam";
 
+type TrustedSupabaseClient =
+  | ReturnType<typeof createSupabaseAdmin>
+  | Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+type RevealListingPhoneResult =
+  | { ok: true; phone: string }
+  | { ok: false; message: string; statusCode?: number };
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function normalizeActionLocale(locale: AppLocale): AppLocale {
+  return locale === "en" || locale === "fa" || locale === "ps" ? locale : "fa";
+}
+
+async function createTrustedServerClient(): Promise<TrustedSupabaseClient> {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createSupabaseAdmin();
+  }
+
+  return createSupabaseServerClient();
+}
+
+function normalizeRevealPhone(phone: unknown) {
+  const raw = String(phone ?? "").trim();
+  const normalized = normalizeAfghanistanPhone(raw).normalized ?? raw;
+  const digits = normalized.replace(/[^\d+]/g, "");
+  if (digits.replace(/\D/g, "").length < 7) {
+    return null;
+  }
+  return digits;
+}
+
+async function currentUserIsAdmin(supabase: TrustedSupabaseClient, userId?: string) {
+  if (!userId) return false;
+  const { data, error } = await supabase.rpc("is_admin", { uid: userId });
+  return !error && data === true;
+}
+
 export async function recordInventoryContactEventAction(
   listingId: string,
   eventType: InventoryContactEvent,
   locale: AppLocale,
   metadata: Record<string, unknown> = {}
 ) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTrustedServerClient();
   const user = await getCurrentUser();
+  const safeLocale = normalizeActionLocale(locale);
   const rateLimit = await consumeRateLimit({
     scope: `inventory.contact.${eventType}`,
     userId: user?.id ?? null,
@@ -47,21 +89,111 @@ export async function recordInventoryContactEventAction(
     event_type: eventType,
     actor_user_id: user?.id ?? null,
     source_type: (listing as { source_type?: string }).source_type ?? "native",
-    locale,
+    locale: safeLocale,
     metadata,
   });
 
   if (eventType === "phone_reveal" || eventType === "call_click" || eventType === "whatsapp_click") {
-    await recordDemandSignalAction({
-      signalType: "contact_action",
-      locale,
-      attributes: { eventType, listingId },
-      weight: eventType === "phone_reveal" ? 3 : 4,
-      source: "listing_contact",
-    });
+    try {
+      await recordDemandSignalAction({
+        signalType: "contact_action",
+        locale: safeLocale,
+        attributes: { eventType, listingId },
+        weight: eventType === "phone_reveal" ? 3 : 4,
+        source: "listing_contact",
+      });
+    } catch {
+      // Contact audit logging should not fail because demand telemetry is unavailable.
+    }
   }
 
   return { ok: true };
+}
+
+export async function revealListingPhoneAction(
+  listingId: string,
+  locale: AppLocale
+): Promise<RevealListingPhoneResult> {
+  const safeListingId = String(listingId ?? "").trim();
+  const safeLocale = normalizeActionLocale(locale);
+
+  if (!isUuid(safeListingId)) {
+    return { ok: false, message: "Invalid listing.", statusCode: 400 };
+  }
+
+  const user = await getCurrentUser();
+  const rateLimit = await consumeRateLimit({
+    scope: "inventory.contact.phone_reveal",
+    userId: user?.id ?? null,
+    maxRequests: 20,
+    windowSeconds: 10 * 60,
+  });
+  if (!rateLimit.allowed) {
+    return { ok: false, message: "Too many requests. Please try again later.", statusCode: 429 };
+  }
+
+  const supabase = await createTrustedServerClient();
+  const { data: listing, error } = await supabase
+    .from("listings")
+    .select("id, user_id, status, source_type, publication_status, freshness_status, contact_phone, allow_contact_display")
+    .eq("id", safeListingId)
+    .maybeSingle();
+
+  if (error || !listing) {
+    return { ok: false, message: "Contact not available.", statusCode: 404 };
+  }
+
+  const isOwner = Boolean(user?.id && listing.user_id === user.id);
+  const isAdmin = await currentUserIsAdmin(supabase, user?.id);
+  const isPubliclyCallable =
+    listing.status === "approved"
+    && (listing.publication_status === null || listing.publication_status === "published")
+    && !["expired", "source_missing", "sold_confirmed"].includes(String(listing.freshness_status ?? "seller_confirmed"));
+
+  if (!isPubliclyCallable && !isOwner && !isAdmin) {
+    return { ok: false, message: "Contact not available.", statusCode: 403 };
+  }
+
+  if (listing.allow_contact_display === false && !isOwner && !isAdmin) {
+    return { ok: false, message: "Contact not available.", statusCode: 403 };
+  }
+
+  const phone = normalizeRevealPhone(listing.contact_phone);
+  if (!phone) {
+    return { ok: false, message: "Contact not available.", statusCode: 404 };
+  }
+
+  const { error: contactAuditError } = await supabase.from("listing_contact_events").insert({
+    listing_id: safeListingId,
+    event_type: "phone_reveal",
+    actor_user_id: user?.id ?? null,
+    source_type: listing.source_type ?? "native",
+    locale: safeLocale,
+    metadata: {
+      source: "listing_detail",
+      privacy_boundary: "server_reveal",
+      actor_kind: user ? "authenticated" : "anonymous",
+      is_owner: isOwner,
+      is_admin: isAdmin,
+    },
+  });
+  if (contactAuditError) {
+    return { ok: false, message: "Contact not available.", statusCode: 500 };
+  }
+
+  try {
+    await recordDemandSignalAction({
+      signalType: "contact_action",
+      locale: safeLocale,
+      attributes: { eventType: "phone_reveal", listingId: safeListingId },
+      weight: 3,
+      source: "listing_contact",
+    });
+  } catch {
+    // Phone reveal should remain available even if demand telemetry is temporarily unavailable.
+  }
+
+  return { ok: true, phone };
 }
 
 export async function initiateListingClaimAction(listingId: string) {
@@ -76,7 +208,7 @@ export async function initiateListingClaimAction(listingId: string) {
   });
   if (!rateLimit.allowed) return { ok: false, message: "Too many requests", statusCode: 429 };
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createTrustedServerClient();
   const { data: listing } = await supabase
     .from("listings")
     .select("id, source_type, ownership_status, contact_phone")

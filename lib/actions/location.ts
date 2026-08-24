@@ -2,6 +2,7 @@
 
 import { type LocationVisibility } from '@/components/location/LocationPrivacy';
 import { sanitizePublicLocation } from '@/lib/location/privacy';
+import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 type NearbyListingRow = {
@@ -18,7 +19,7 @@ type NearbyListingRow = {
   area_id: number | null;
   address_text: string | null;
   created_at: string;
-  user_id: string;
+  user_id: string | null;
   category_id: number | null;
 };
 
@@ -82,7 +83,7 @@ export async function getNearbyListings(
     limit?: number;
   }
 ) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
 
   // Using Haversine formula for distance calculation
   // cos(lat1) * cos(lat2) * cos(lon2-lon1) + sin(lat1) * sin(lat2)
@@ -147,6 +148,7 @@ export async function getNearbyListings(
 
       return [{
         ...publicListing,
+        user_id: null,
         distance,
       }];
     })
@@ -169,7 +171,7 @@ export async function getListingsByLocation(
     offset?: number;
   }
 ) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
 
   let query = supabase
     .from('listings')
@@ -218,14 +220,20 @@ export async function getListingsByLocation(
     throw new Error(`Failed to fetch listings: ${error.message}`);
   }
 
-  return { listings: (data || []).map((listing) => sanitizePublicLocation(listing)), count: count || 0 };
+  return {
+    listings: (data || []).map((listing) => ({
+      ...sanitizePublicLocation(listing),
+      user_id: null,
+    })),
+    count: count || 0,
+  };
 }
 
 /**
  * Get location information for a listing (respecting visibility)
  */
 export async function getListingLocationInfo(listingId: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
 
   const { data, error } = await supabase
     .from('listings')
@@ -270,7 +278,7 @@ export async function getListingLocationInfo(listingId: string) {
     addressText: publicLocation.address_text,
     latitude: publicLocation.latitude,
     longitude: publicLocation.longitude,
-    accuracy: data.location_accuracy,
+    accuracy: publicLocation.location_visibility === 'exact' ? data.location_accuracy : null,
     visibility: data.location_visibility,
   };
 }

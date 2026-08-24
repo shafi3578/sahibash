@@ -397,6 +397,7 @@ export type ListingWithRelations = Listing & {
   translated_description?: string;
   display_language?: ListingLanguageCode;
   translation_note?: string | null;
+  public_contact_available?: boolean;
 };
 
 export type ListingTranslation = {
