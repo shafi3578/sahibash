@@ -63,7 +63,7 @@ function buildLoginRedirectPath(pathname: string | null, locale: string) {
 
 async function redirectToAccount(reason?: "security") {
   const locale = await getCurrentLocale();
-  redirect(localizePath(reason ? `/dashboard?reason=${reason}` : "/dashboard", locale));
+  redirect(localizePath(reason ? `/dashboard/account-security?reason=${reason}` : "/dashboard", locale));
 }
 
 export async function getCurrentUser() {

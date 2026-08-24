@@ -131,6 +131,8 @@ Phase 1 implements and deploys the first privacy/security repair set:
 - Phone reveal/contact actions are captured in `listing_contact_events`, with structured metadata marking the controlled server reveal boundary.
 - `public.listings` now has an applied migration to remove broad raw table grants and grant only intended public/authenticated columns while preserving service-role access.
 - Admin roles now include a super-admin MFA readiness panel based on verified Supabase Auth MFA factors.
+- Account Security now includes a localized TOTP MFA enrollment/session-confirmation panel, and security redirects land there directly.
+- Privileged audit writes are now server-only, service-role-capable, and redacted before insertion.
 
 Production proof completed:
 
@@ -181,7 +183,7 @@ Production role/MFA count:
 - Super-admins with verified MFA factor: 0
 - Verified MFA factors for super-admins: 0
 
-Code inspection shows `requireSuperAdministrator()` checks `getAuthenticatorAssuranceLevel()` and requires `aal2`, which is good. Phase 1 adds an admin readiness panel for verified MFA factors. Production account state still does not satisfy the launch requirement until every super-admin has verified MFA enrolled.
+Code inspection shows `requireSuperAdministrator()` checks `getAuthenticatorAssuranceLevel()` and requires `aal2`, which is good. Phase 1 adds an admin readiness panel and an Account Security MFA setup/confirmation path. Production account state still does not satisfy the launch requirement until every super-admin has verified MFA enrolled.
 
 ### 4. Role escalation protection
 
@@ -215,7 +217,7 @@ Production `audit_logs` table exists with appropriate columns, but contains:
 - Total audit logs: 0
 - Privileged-like events: 0
 
-Some server actions call `recordAuditEvent`, but Phase 0 could not prove privileged production actions are consistently audited because no audit rows existed. Phase 1 adds structured contact/reveal event capture for phone privacy flows; privileged admin-audit coverage still needs controlled E2E proof.
+Some server actions call `recordAuditEvent`, but Phase 0 could not prove privileged production actions were consistently audited because no audit rows existed. Phase 1 adds structured contact/reveal event capture, a service-role-capable redacted audit writer, and MFA verification audit recording for admin users; privileged admin-audit rows still need controlled production E2E proof.
 
 ## Supabase advisors
 

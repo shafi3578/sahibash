@@ -1,13 +1,14 @@
 # Sahibash Security Audit
 
 Date: 2026-08-24
-Status: conditional; Phase 1 privacy-boundary controls are deployed and verified, but super-admin MFA enrollment, full multi-role/staging verification, and performance-policy cleanup remain launch gates.
+Status: conditional; Phase 1 privacy-boundary controls, MFA setup path, and audit writer hardening are implemented, but human super-admin MFA enrollment, full multi-role/staging verification, and performance-policy cleanup remain launch gates.
 
 > Current supersession note, 2026-08-24: Phase 1 now deploys a public-safe
-> listing boundary, server-controlled phone reveal, and super-admin MFA
-> readiness reporting. Post-migration REST checks verify sensitive listing
-> columns are no longer selectable anonymously. Production status stays
-> conditional until super-admin MFA enrollment and multi-role E2E are done.
+> listing boundary, server-controlled phone reveal, super-admin MFA setup
+> guidance, and redacted service-role-capable audit writes. Post-migration REST
+> checks verify sensitive listing columns are no longer selectable anonymously.
+> Production status stays conditional until human super-admin MFA enrollment and
+> multi-role E2E are done.
 > See `docs/PRODUCTION_IDENTITY_AUDIT.md` and `docs/LAUNCH_READINESS.md`.
 
 ## Summary
@@ -30,6 +31,9 @@ Implemented in this pass:
 - Seller phone reveal now goes through a rate-limited server action that validates listing visibility/ownership/admin access and records contact/audit metadata before returning the phone.
 - A Supabase migration removes broad anonymous/authenticated raw-column grants from `public.listings`, denies public insert into `listing_contact_events`, and preserves privileged server access through `service_role`.
 - Admin roles UI now reports super-admin MFA readiness from verified Supabase Auth MFA factors.
+- Account Security now provides localized TOTP MFA setup and session-confirmation flow for blocked admin users.
+- Super-admin AAL2/step-up failures now redirect directly to Account Security with a security reason instead of a generic dashboard.
+- Audit writes are server-only, can use the Supabase service role, redact unsafe safe-change fields, and report insert failures.
 
 ## Supabase Auth
 
@@ -116,7 +120,7 @@ Required:
 
 Focused security suite:
 
-- `npm run test:security`: 31 passed, 0 failed.
+- `npm run test:security`: 35 passed, 0 failed.
 - `npm run typecheck`: passed.
 - `npm run lint`: passed, 0 errors, 0 warnings.
 - `npm run build`: passed.
@@ -134,6 +138,8 @@ Covered:
 - Phone reveal server-action privacy, rate-limit, and event-capture coverage.
 - Contact event public-insert revocation migration coverage.
 - Super-admin MFA readiness query coverage.
+- Account Security MFA enrollment/confirmation flow coverage.
+- Audit writer service-role/redaction coverage.
 
 ## Remaining P0/P1 security items
 
@@ -141,11 +147,11 @@ P0:
 
 - Enroll verified MFA factors for every super-administrator account.
 - Run authenticated multi-role E2E against staging or production-like identities.
-- Verify privileged admin actions create expected audit rows.
+- Verify privileged admin actions create expected audit rows in production.
 
 P1:
 
 - Verify Supabase Auth redirect allowlist in dashboard.
 - Manually verify Supabase Auth password policy/leaked-password settings after billing changes.
-- Add structured security event logs with redaction.
+- Expand structured security event coverage beyond current MFA/contact/admin configuration paths.
 - Add WAF/bot/firewall rules appropriate for Vercel production.
