@@ -7,6 +7,7 @@ import { requiresStepUpAuth } from "@/lib/auth/step-up";
 import type { PermissionKey } from "@/lib/authorization";
 import { isPostAdPath } from "@/lib/auth/protected-routes";
 import { buildLoginRedirectHref, stripLocaleAndQuery } from "@/lib/account/navigation";
+import { hasVerifiedAuthenticatorAssurance, requiresPrivilegedMfa } from "@/lib/auth/mfa-authorization";
 
 type UserRole = "user" | "admin";
 
@@ -16,22 +17,6 @@ type ProfileRow = {
 
 type ServerAuthenticatedUser = Parameters<typeof requiresStepUpAuth>[0];
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
-
-const PRIVILEGED_READ_ONLY_PERMISSIONS = new Set<PermissionKey>([
-  "roles.view",
-  "admins.view",
-  "users.view",
-  "listings.view",
-  "categories.view",
-  "electronics.view",
-  "audit_logs.view",
-  "search.view",
-  "pages.view",
-]);
-
-function requiresPrivilegedMfa(permission: PermissionKey) {
-  return !permission.endsWith(".view") && !PRIVILEGED_READ_ONLY_PERMISSIONS.has(permission);
-}
 
 async function getCurrentPath() {
   try {
@@ -145,7 +130,7 @@ async function requireFreshPrimaryAuthentication(user: ServerAuthenticatedUser) 
 async function requireVerifiedAuthenticatorAssurance(supabase: SupabaseServerClient) {
   const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
-  if (error || data?.currentLevel !== "aal2") {
+  if (error || !hasVerifiedAuthenticatorAssurance(data?.currentLevel)) {
     await redirectToAccount("security");
   }
 }

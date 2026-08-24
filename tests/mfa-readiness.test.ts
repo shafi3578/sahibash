@@ -2,6 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  canUseAdminPermissionWithAssurance,
+  hasVerifiedAuthenticatorAssurance,
+  requiresPrivilegedMfa,
+} from "../lib/auth/mfa-authorization";
 
 const auth = readFileSync(join(process.cwd(), "lib", "auth.ts"), "utf8");
 const audit = readFileSync(join(process.cwd(), "lib", "audit.ts"), "utf8");
@@ -39,6 +44,50 @@ test("MFA audit action records only verified AAL2 admin events", () => {
   assert.match(accountSecurityAction, /is_super_administrator/);
   assert.match(accountSecurityAction, /currentLevel === "aal2"/);
   assert.match(accountSecurityAction, /recordAuditEvent/);
+});
+
+test("AAL1 super admin can view read-only admin pages but cannot mutate until AAL2", () => {
+  assert.equal(requiresPrivilegedMfa("roles.view"), false);
+  assert.equal(requiresPrivilegedMfa("roles.manage"), true);
+  assert.equal(hasVerifiedAuthenticatorAssurance("aal1"), false);
+  assert.equal(hasVerifiedAuthenticatorAssurance("aal2"), true);
+
+  assert.equal(
+    canUseAdminPermissionWithAssurance({
+      permission: "roles.view",
+      hasPermission: true,
+      currentLevel: "aal1",
+    }),
+    true,
+    "RBAC-authorized AAL1 super admin can view read-only admin pages",
+  );
+  assert.equal(
+    canUseAdminPermissionWithAssurance({
+      permission: "roles.manage",
+      hasPermission: true,
+      currentLevel: "aal1",
+    }),
+    false,
+    "RBAC-authorized AAL1 super admin cannot execute privileged mutations",
+  );
+  assert.equal(
+    canUseAdminPermissionWithAssurance({
+      permission: "roles.manage",
+      hasPermission: true,
+      currentLevel: "aal2",
+    }),
+    true,
+    "RBAC-authorized AAL2 super admin can execute permitted privileged mutations",
+  );
+  assert.equal(
+    canUseAdminPermissionWithAssurance({
+      permission: "roles.manage",
+      hasPermission: false,
+      currentLevel: "aal2",
+    }),
+    false,
+    "AAL2 never bypasses RBAC permission denial",
+  );
 });
 
 test("audit writer is server-only, service-role capable, and redacts unsafe changes", () => {

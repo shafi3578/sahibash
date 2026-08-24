@@ -21,6 +21,7 @@ const simpleDetails = readFileSync(join(process.cwd(), "lib", "posting", "simple
 const realEstateSchema = readFileSync(join(process.cwd(), "lib", "listingSchemas", "realEstate.ts"), "utf8");
 const queries = readFileSync(join(process.cwd(), "lib", "data", "queries.ts"), "utf8");
 const authModule = readFileSync(join(process.cwd(), "lib", "auth.ts"), "utf8");
+const mfaAuthorizationModule = readFileSync(join(process.cwd(), "lib", "auth", "mfa-authorization.ts"), "utf8");
 
 test("signup and account profile require profile-owned Afghanistan contact details", () => {
   assert.match(registerForm, /dict\.auth\.mobilePhone/);
@@ -90,7 +91,8 @@ test("Step 1 migration repairs taxonomy, land fields, public counts, and nearby 
 });
 
 test("privileged admin writes require MFA through the shared permission gate", () => {
-  assert.match(authModule, /function requiresPrivilegedMfa/);
-  assert.match(authModule, /!permission\.endsWith\("\.view"\)/);
+  assert.match(authModule, /requiresPrivilegedMfa\(permission\)/);
+  assert.match(mfaAuthorizationModule, /function requiresPrivilegedMfa/);
+  assert.match(mfaAuthorizationModule, /!permission\.endsWith\("\.view"\)/);
   assert.match(authModule, /await requireVerifiedAuthenticatorAssurance\(supabase\)/);
 });

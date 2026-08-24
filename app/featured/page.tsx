@@ -9,10 +9,10 @@ export default async function FeaturedPage() {
   const { locale, t } = await getDictionary();
   const href = (path: string) => localizePath(path, locale);
   const copy = locale === "fa"
-    ? { empty: "هنوز اعلان ویژه‌ای وجود ندارد." }
+    ? { empty: "هنوز اعلان ویژه‌ای وجود ندارد.", featured: "ویژه" }
     : locale === "ps"
-      ? { empty: "لا تر اوسه ځانګړی اعلان نشته." }
-      : { empty: "No featured ads yet." };
+      ? { empty: "لا تر اوسه ځانګړی اعلان نشته.", featured: "ځانګړی" }
+      : { empty: "No featured ads yet.", featured: "Featured" };
   const listings = (await getApprovedListings({ locale, limit: 80 })).filter((listing) => listing.featured);
 
   return (
@@ -29,7 +29,7 @@ export default async function FeaturedPage() {
             <Link key={listing.id} href={href(`/listings/${listing.id}`)} className="overflow-hidden bg-white shadow-sm sm:rounded-3xl sm:border sm:border-slate-200">
               <div className="relative aspect-video w-full bg-slate-100">
                 {image ? <Image src={image} alt={displayTitle} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 420px" /> : null}
-                <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">Featured</span>
+                <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">{copy.featured}</span>
               </div>
               <div className="p-3">
                 <p className="line-clamp-2 text-base font-bold text-slate-950">{displayTitle}</p>

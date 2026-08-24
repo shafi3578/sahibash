@@ -11,6 +11,10 @@ const childVisibilityMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260824195045_repair_public_listing_child_visibility.sql"),
   "utf8",
 );
+const finalHardeningMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260824201724_final_step1_security_location_hardening.sql"),
+  "utf8",
+);
 
 const queries = readFileSync(join(process.cwd(), "lib", "data", "queries.ts"), "utf8");
 const contactActions = readFileSync(join(process.cwd(), "components", "listings", "listing-contact-actions.tsx"), "utf8");
@@ -65,11 +69,14 @@ test("public listing queries use an explicit safe selector and sanitize returned
 test("public listing child embeds use trusted visibility checks without exposing owner ids", () => {
   assert.match(childVisibilityMigration, /create or replace function public\.can_read_listing_children/i);
   assert.match(childVisibilityMigration, /security definer/i);
-  assert.match(childVisibilityMigration, /revoke all on function public\.can_read_listing_children\(uuid\) from public/i);
-  assert.match(childVisibilityMigration, /grant execute on function public\.can_read_listing_children\(uuid\) to anon, authenticated, service_role/i);
-  assert.match(childVisibilityMigration, /drop policy if exists listing_images_owner_or_admin_write/i);
-  assert.match(childVisibilityMigration, /drop policy if exists listing_attributes_owner_or_admin_write/i);
-  assert.match(childVisibilityMigration, /using \(public\.can_read_listing_children\(listing_id\)\)/i);
+
+  assert.match(finalHardeningMigration, /create or replace function private\.can_read_listing_children/i);
+  assert.match(finalHardeningMigration, /security definer/i);
+  assert.match(finalHardeningMigration, /drop function if exists public\.can_read_listing_children\(uuid\)/i);
+  assert.match(finalHardeningMigration, /revoke all on function private\.can_read_listing_children\(uuid\) from public/i);
+  assert.match(finalHardeningMigration, /grant execute on function private\.can_read_listing_children\(uuid\) to anon, authenticated, service_role/i);
+  assert.match(finalHardeningMigration, /using \(private\.can_read_listing_children\(listing_id\)\)/i);
+  assert.doesNotMatch(finalHardeningMigration, /grant execute on function public\.can_read_listing_children/i);
 });
 
 test("phone reveal is server-side, rate-limited, and audited", () => {

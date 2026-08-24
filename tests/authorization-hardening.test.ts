@@ -49,6 +49,11 @@ const authModule = readFileSync(
   "utf8",
 );
 
+const mfaAuthorizationModule = readFileSync(
+  join(process.cwd(), "lib", "auth", "mfa-authorization.ts"),
+  "utf8",
+);
+
 const stepUpAuthModule = readFileSync(
   join(process.cwd(), "lib", "auth", "step-up.ts"),
   "utf8",
@@ -143,7 +148,8 @@ test("super administrator gates require a verified current MFA assurance level",
   const superAdminGate = authModule.slice(authModule.indexOf("export async function requireSuperAdministrator"));
 
   assert.match(authModule, /getAuthenticatorAssuranceLevel\(\)/);
-  assert.match(authModule, /data\?\.currentLevel !== "aal2"/);
+  assert.match(authModule, /hasVerifiedAuthenticatorAssurance\(data\?\.currentLevel\)/);
+  assert.match(mfaAuthorizationModule, /currentLevel === "aal2"/);
   assert.match(superAdminGate, /rpc\("is_super_administrator"/);
   assert.match(superAdminGate, /await requireFreshPrimaryAuthentication\(user\)/);
   assert.match(superAdminGate, /await requireVerifiedAuthenticatorAssurance\(supabase\)/);

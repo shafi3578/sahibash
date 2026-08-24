@@ -11,6 +11,49 @@ import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatCurrencyAmount } from "@/lib/i18n/format";
+import { getLocalizedBrandName } from "@/lib/i18n/brand";
+
+function getHomePageCopy(
+  locale: "en" | "fa" | "ps",
+  siteSettings: Awaited<ReturnType<typeof getSiteSettings>>
+) {
+  if (locale === "fa") {
+    return {
+      tagline: "بازار آنلاین افغانستان",
+      heroTitle: "اعلان‌های قابل اعتماد در سراسر افغانستان",
+      heroSubtitle: "خرید، فروش و جستجو با دسته‌بندی‌های محلی، فیلترهای دقیق و پشتیبانی دری و پشتو.",
+      primaryCta: "دیدن اعلان‌ها",
+      secondaryCta: "ثبت اعلان",
+      allFeatured: "همه ویژه‌ها",
+      adBadge: "اعلان",
+      brandBadge: "صاحبش",
+    };
+  }
+
+  if (locale === "ps") {
+    return {
+      tagline: "د افغانستان آنلاین بازار",
+      heroTitle: "په ټول افغانستان کې باوري اعلانونه",
+      heroSubtitle: "واخلئ، وپلورئ او د محلي کټګوریو، دقیقو فلټرونو او دري/پښتو ملاتړ سره اعلانونه ولټوئ.",
+      primaryCta: "اعلانونه وګورئ",
+      secondaryCta: "اعلان ثبت کړئ",
+      allFeatured: "ټول ځانګړي",
+      adBadge: "اعلان",
+      brandBadge: "صاحبش",
+    };
+  }
+
+  return {
+    tagline: siteSettings.site_tagline,
+    heroTitle: siteSettings.home_hero_title,
+    heroSubtitle: siteSettings.home_hero_subtitle,
+    primaryCta: siteSettings.home_primary_cta_label,
+    secondaryCta: siteSettings.home_secondary_cta_label,
+    allFeatured: "All featured",
+    adBadge: "Ad",
+    brandBadge: getLocalizedBrandName(locale, siteSettings.site_name),
+  };
+}
 
 export default async function HomePage({
   searchParams,
@@ -23,13 +66,9 @@ export default async function HomePage({
   const pageValue = Array.isArray(resolvedSearchParams.page) ? resolvedSearchParams.page[0] : resolvedSearchParams.page;
   const currentPage = Math.min(Math.max(Number.parseInt(pageValue ?? "1", 10) || 1, 1), 7);
   const pageSize = 10;
-  const homeCopy = locale === "fa"
-    ? { allFeatured: "همه ویژه‌ها" }
-    : locale === "ps"
-      ? { allFeatured: "ټول ځانګړي" }
-      : { allFeatured: "All featured" };
   const postAdCreatePath = "/post-ad/create?posting=sell";
   const siteSettings = await getSiteSettings();
+  const homeCopy = getHomePageCopy(locale, siteSettings);
   const homepageSections = resolveHomepageSections(await getHomepageSections());
   const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent(postAdCreatePath)}&reason=post`;
   let postAdHref = guestPostAdHref;
@@ -59,20 +98,20 @@ export default async function HomePage({
       <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#ffe08a_0,#f97316_22%,#0f172a_58%,#020617_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-sm">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
-            <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{siteSettings.site_tagline}</p>
+            <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{homeCopy.tagline}</p>
             <h1 className="mt-4 max-w-2xl font-display text-4xl font-black leading-tight sm:text-5xl">
-              {siteSettings.home_hero_title}
+              {homeCopy.heroTitle}
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
-              {siteSettings.home_hero_subtitle}
+              {homeCopy.heroSubtitle}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href={href(siteSettings.home_primary_cta_path ?? "/listings")} className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900">
-                {siteSettings.home_primary_cta_label}
+                {homeCopy.primaryCta}
               </Link>
               {siteSettings.home_secondary_cta_label && siteSettings.home_secondary_cta_path ? (
                 <Link href={href(siteSettings.home_secondary_cta_path)} className="rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur">
-                  {siteSettings.home_secondary_cta_label}
+                  {homeCopy.secondaryCta}
                 </Link>
               ) : null}
             </div>
@@ -161,7 +200,7 @@ export default async function HomePage({
                     {image ? (
                       <Image src={image} alt={displayTitle} fill className="object-cover" sizes="(max-width: 640px) 160px, 176px" />
                     ) : null}
-                    <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">Ad</span>
+                    <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">{homeCopy.adBadge}</span>
                   </div>
                   <div className="space-y-1 p-2">
                     <p className="line-clamp-2 text-sm font-medium text-slate-800">{displayTitle}</p>
@@ -209,7 +248,7 @@ export default async function HomePage({
                   {image ? (
                     <Image src={image} alt={displayTitle} fill className="object-cover" sizes="(max-width: 640px) 100vw, 88px" />
                   ) : null}
-                  <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">Sahibash</span>
+                  <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">{homeCopy.brandBadge}</span>
                 </div>
                 <div className="min-w-0 px-3 pb-2 pt-2 sm:px-0 sm:pb-0 sm:pt-0">
                   <p className="line-clamp-2 text-base font-semibold text-slate-900 sm:font-normal sm:text-slate-800">{displayTitle}</p>
