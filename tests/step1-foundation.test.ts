@@ -63,7 +63,7 @@ test("category navigation opens localized root browsers", () => {
 
 test("land units and dorm student filters are first-class and category-aware", () => {
   assert.match(simpleDetails, /optionValues\(\["sqm", "biswa", "jerib"\]\)/);
-  assert.match(simpleDetails, /student\|dormitory\|hostel[\s\S]*return null/);
+  assert.match(simpleDetails, /student\|dormitory\|hostel[\s\S]*return "dormitory"/);
   assert.match(realEstateSchema, /area_original_value/);
   assert.match(realEstateSchema, /area_sqm/);
   assert.match(queries, /paymentPeriod\?: string/);

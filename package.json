@@ -11,6 +11,7 @@
     "test:search-parity": "node --import tsx --test tests/multilingual-search-parity.test.ts",
     "test:posting-access": "node --import tsx --test tests/posting-access-control.test.ts tests/listing-image-validation.test.ts tests/vehicle-model-catalog.test.ts",
     "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts",
+    "test:step2-quick-post": "node --import tsx --test tests/simple-category-details.test.ts tests/step2-quick-post.test.ts",
     "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts tests/taxonomy-schema-migrations.test.ts",
     "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/auth-step-up.test.ts tests/production-fixture-guard.test.ts tests/location-privacy.test.ts tests/production-sanity-sql.test.ts tests/storage-hardening.test.ts tests/rate-limit-foundation.test.ts tests/marketplace-ranking.test.ts tests/public-listing-boundary.test.ts tests/mfa-readiness.test.ts tests/step1-foundation.test.ts",
     "test:mfa-live": "node --import tsx --test tests/live-mfa-e2e.test.ts",
@@ -19,7 +20,7 @@
     "test:network-readiness": "node --import tsx --test tests/network-readiness.test.ts",
     "test:consumer-account": "node --import tsx --test tests/consumer-account-messaging.test.ts",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:i18n-parity && npm run test:search-parity && npm run test:posting-access && npm run test:smart-posting && npm run test:listing-schema && npm run test:security && npm run test:inventory-provenance && npm run test:liquidity && npm run test:network-readiness && npm run test:consumer-account"
+    "test": "npm run test:i18n-parity && npm run test:search-parity && npm run test:posting-access && npm run test:smart-posting && npm run test:step2-quick-post && npm run test:listing-schema && npm run test:security && npm run test:inventory-provenance && npm run test:liquidity && npm run test:network-readiness && npm run test:consumer-account"
   },
   "dependencies": {
     "@google/model-viewer": "^4.2.0",

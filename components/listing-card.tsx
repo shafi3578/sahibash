@@ -6,8 +6,9 @@ import { localizePath } from "@/lib/i18n/routing";
 import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
 import { labelForLocale } from "@/lib/listing-schema-config";
 import { toggleFavoriteAction } from "@/lib/actions/favorites";
-import { formatCurrencyAmount, formatDate } from "@/lib/i18n/format";
+import { formatDate } from "@/lib/i18n/format";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
+import { formatListingPrice } from "@/lib/listings/price-display";
 
 export async function ListingCard({
   listing,
@@ -71,7 +72,7 @@ export async function ListingCard({
       </Link>
       <div className="space-y-1.5 p-3 sm:p-4">
         <Link href={listingHref}><h3 className="line-clamp-2 text-base font-semibold text-[var(--ink-1)]">{displayTitle}</h3></Link>
-        <p className="text-lg font-bold text-[var(--accent)]">{formatCurrencyAmount(listing.price, listing.currency, locale)}</p>
+        <p className="text-lg font-bold text-[var(--accent)]">{formatListingPrice(listing, locale, attributes)}</p>
         <p className="line-clamp-1 text-xs text-[var(--ink-2)]">{fallbackProvince}{listing.district ? ` · ${listing.district}` : ""} · {freshness}</p>
         {sourceTransparency.needsAvailabilityWarning ? <p className="text-[11px] font-semibold text-amber-700">{sourceTransparency.freshnessLabel}</p> : null}
         {cardFields.length > 0 ? <div className="flex flex-wrap gap-1.5">{cardFields.slice(0,2).map((field) => <span key={field.key} className="rounded-full bg-[var(--surface-2)] px-2 py-1 text-[10px] text-[var(--ink-2)]">{field.value}</span>)}</div> : null}

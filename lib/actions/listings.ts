@@ -50,6 +50,8 @@ const RESERVED_FORM_KEYS = new Set([
   "vehicle_variant_id",
   "damage_all_original",
   "damage_parts_json",
+  "posting_mode",
+  "price_mode",
   "price",
   "currency",
   "city",
@@ -128,6 +130,12 @@ const RESERVED_FORM_KEYS = new Set([
   "air_conditioning",
   "security",
   "contact_preferences",
+  "listing_purpose",
+  "rental_type",
+  "monthly_rent",
+  "gerawy_amount",
+  "land_lease_price",
+  "dormitory_fee",
 ]);
 
 const VEHICLE_META_FIELDS: Record<string, { type: "text" | "number" | "boolean"; label: string; unit?: string | null }> = {
@@ -158,6 +166,10 @@ function toFormValueText(value: FormDataEntryValue | null) {
 function toFormValueBoolean(value: FormDataEntryValue | null) {
   const text = toFormValueText(value).toLowerCase();
   return text === "true" || text === "1" || text === "on" || text === "yes";
+}
+
+function isQuickPostingMode(formData: FormData) {
+  return toFormValueText(formData.get("posting_mode")).toLowerCase() === "quick";
 }
 
 function buildCanonicalAreaRows(
@@ -537,6 +549,181 @@ async function persistVehicleMetaAttributes(
   });
 }
 
+const QUICK_POST_TEXT_ATTRIBUTES = [
+  "posting_mode",
+  "price_mode",
+  "listing_purpose",
+  "rental_type",
+  "payment_period",
+  "gender_allowed",
+  "room_type",
+  "student_housing_type",
+  "nearby_institution",
+  "rules",
+  "areaUnit",
+  "landType",
+  "documentType",
+  "owner_type",
+  "roadAccess",
+  "electricity",
+  "water",
+  "internet",
+  "hot_water",
+  "heating",
+  "meals_included",
+  "furnished",
+  "security",
+  "laundry",
+  "bathroom_type",
+  "condition",
+  "brand",
+  "make",
+  "model",
+  "color",
+  "storageGb",
+  "ramGb",
+  "warranty",
+  "accessories",
+  "repair_history",
+  "networkStatus",
+  "simType",
+  "fuelType",
+  "transmission",
+  "type",
+] as const;
+
+const QUICK_POST_NUMBER_ATTRIBUTES = [
+  "monthly_rent",
+  "gerawy_amount",
+  "land_lease_price",
+  "dormitory_fee",
+  "areaSize",
+  "students_per_room",
+  "number_of_beds",
+  "available_beds",
+  "distance_to_university",
+  "mileageKm",
+  "year",
+  "batteryHealth",
+  "bedrooms",
+  "bathrooms",
+  "rooms",
+  "floor",
+  "totalFloors",
+] as const;
+
+const QUICK_POST_BOOLEAN_ATTRIBUTES = [
+  "suitable_for_students",
+  "box_included",
+  "charger_included",
+  "negotiable",
+] as const;
+
+function parseQuickPostNumber(value: FormDataEntryValue | null) {
+  const text = toFormValueText(value)
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 1632))
+    .replace(/[٬,\s\u00A0\u202F]/g, "")
+    .replace(/٫/g, ".");
+  if (!text) return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function persistQuickPostMetaAttributes(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  listingId: string,
+  formData: FormData,
+  replaceExisting: boolean = false
+) {
+  const explicitQuickMode = isQuickPostingMode(formData);
+  type ListingAttributeUpsertRow = {
+    listing_id: string;
+    category_field_id: null;
+    attribute_key: string;
+    attribute_value_text: string | null;
+    attribute_value_number: number | null;
+    attribute_value_boolean: boolean | null;
+    attribute_value_json: null;
+    unit: string | null;
+  };
+
+  const rows: ListingAttributeUpsertRow[] = [];
+
+  for (const key of QUICK_POST_TEXT_ATTRIBUTES) {
+    const text = toFormValueText(formData.get(key));
+    if (!text) continue;
+    rows.push({
+      listing_id: listingId,
+      category_field_id: null,
+      attribute_key: key,
+      attribute_value_text: text,
+      attribute_value_number: null,
+      attribute_value_boolean: null,
+      attribute_value_json: null,
+      unit: null,
+    });
+  }
+
+  for (const key of QUICK_POST_NUMBER_ATTRIBUTES) {
+    const numberValue = parseQuickPostNumber(formData.get(key));
+    if (numberValue === null) continue;
+    rows.push({
+      listing_id: listingId,
+      category_field_id: null,
+      attribute_key: key,
+      attribute_value_text: null,
+      attribute_value_number: numberValue,
+      attribute_value_boolean: null,
+      attribute_value_json: null,
+      unit:
+        key === "areaSize"
+          ? normalizeAfghanLandAreaUnit(formData.get("areaUnit")) ?? "sqm"
+          : key === "distance_to_university"
+            ? "km"
+            : key === "mileageKm"
+              ? "Km"
+              : null,
+    });
+  }
+
+  for (const key of QUICK_POST_BOOLEAN_ATTRIBUTES) {
+    const raw = formData.get(key);
+    if (raw === null) continue;
+    rows.push({
+      listing_id: listingId,
+      category_field_id: null,
+      attribute_key: key,
+      attribute_value_text: null,
+      attribute_value_number: null,
+      attribute_value_boolean: toFormValueBoolean(raw),
+      attribute_value_json: null,
+      unit: null,
+    });
+  }
+
+  const trackedKeys = Array.from(new Set([
+    ...QUICK_POST_TEXT_ATTRIBUTES,
+    ...QUICK_POST_NUMBER_ATTRIBUTES,
+    ...QUICK_POST_BOOLEAN_ATTRIBUTES,
+  ]));
+
+  if (replaceExisting && trackedKeys.length > 0) {
+    const keysToDelete = explicitQuickMode ? trackedKeys : rows.map((row) => row.attribute_key);
+    if (keysToDelete.length > 0) {
+      await supabase.from("listing_attributes").delete().eq("listing_id", listingId).in("attribute_key", keysToDelete);
+    }
+  }
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  await supabase.from("listing_attributes").upsert(rows, {
+    onConflict: "listing_id,attribute_key",
+  });
+}
+
 async function persistListingCategoryPath(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   listingId: string,
@@ -707,6 +894,7 @@ async function persistListingAttributes(
   categoryPath: string | null | undefined,
   replaceExisting: boolean = false
 ) {
+  const quickMode = isQuickPostingMode(formData);
   const simpleKind = getSimpleCategoryKind(categoryPath ?? undefined, null);
   const simpleFieldKeys = new Set(getSimpleCategoryFieldKeys(simpleKind));
   const simpleConfig = getSimpleCategoryConfig(simpleKind);
@@ -728,7 +916,7 @@ async function persistListingAttributes(
 
   for (const field of configuredFields) {
     const value = toFormValueText(formData.get(field.field_key));
-    if (field.required && !value) throw new Error(`Missing required field: ${field.field_key}`);
+    if (field.required && !value && !quickMode) throw new Error(`Missing required field: ${field.field_key}`);
     if (value && field.field_type === "number" && !Number.isFinite(Number(value))) throw new Error(`Invalid number for ${field.field_key}`);
     if (value && field.field_type === "select" && field.options.length > 0 && !field.options.includes(value)) throw new Error(`Invalid option for ${field.field_key}`);
   }
@@ -1017,6 +1205,7 @@ async function validatePublishedPostingSchema(
   categoryNodeId: number,
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  const quickMode = isQuickPostingMode(formData);
   const { data } = await supabase
     .from("listing_schema_versions")
     .select("config")
@@ -1035,7 +1224,7 @@ async function validatePublishedPostingSchema(
     const labels = field.labels as Record<string, unknown> | undefined;
     const label = String(labels?.en ?? key.replace(/_/g, " "));
 
-    if (field.required === true && values.length === 0) {
+    if (field.required === true && values.length === 0 && !quickMode) {
       return { ok: false, message: `${label} is required.` };
     }
 
@@ -1172,8 +1361,14 @@ async function buildListingPayload(
   const path = context.categoryPath || "";
   const isRealEstate = path.startsWith("real-estate");
   const listingPurpose = toFormValueText(formData.get("listing_purpose")).toLowerCase();
-  const isRentListing = listingPurpose === "for rent";
-  const isDormitory = path === "real-estate/dormitory";
+  const priceMode = toFormValueText(formData.get("price_mode")).toLowerCase();
+  const rentalType = toFormValueText(formData.get("rental_type")).toLowerCase();
+  const isRentListing =
+    listingPurpose === "for rent"
+    || priceMode === "monthly_rent"
+    || priceMode === "gerawy_rahn"
+    || Boolean(rentalType);
+  const isDormitory = /dormitory|student|hostel/.test(path.toLowerCase());
 
   const normalizeChoice = (
     value: string,
@@ -1378,6 +1573,7 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   }
 
   await persistListingAttributes(supabase, data.id, listing.context.categoryNodeId, formData, listing.context.categoryPath);
+  await persistQuickPostMetaAttributes(supabase, data.id, formData);
   await persistElectronicsDynamicAttributes(supabase, data.id, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
@@ -1479,6 +1675,7 @@ export async function createListingAction(formData: FormData): Promise<{
   }
 
   await persistListingAttributes(supabase, data.id, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath);
+  await persistQuickPostMetaAttributes(supabase, data.id, formData);
   await persistElectronicsDynamicAttributes(supabase, data.id, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
@@ -1602,6 +1799,7 @@ export async function updateListingAction(
   }
 
   await persistListingAttributes(supabase, listingId, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath, true);
+  await persistQuickPostMetaAttributes(supabase, listingId, formData, true);
   await persistElectronicsDynamicAttributes(supabase, listingId, formData);
   await persistLockedListingSpecs(supabase, listingId, formData);
   await persistVehicleMetaAttributes(supabase, listingId, formData);

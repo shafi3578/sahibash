@@ -28,6 +28,7 @@ import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { ListingContactActions } from "@/components/listings/listing-contact-actions";
 import { ListingCard } from "@/components/listing-card";
 import { formatCurrencyAmount } from "@/lib/i18n/format";
+import { formatListingPrice } from "@/lib/listings/price-display";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
 import { initiateListingClaimAction, recordInventoryContactEventAction } from "@/lib/actions/inventory";
 import { localizePath } from "@/lib/i18n/routing";
@@ -641,7 +642,7 @@ export default async function ListingDetailPage({
               {t.listing.suitableForStudents}
             </p>
           ) : null}
-          <p className="mt-3 text-3xl font-bold text-[var(--accent)]">{formatCurrencyAmount(listing.price, listing.currency, locale)}</p>
+          <p className="mt-3 text-3xl font-bold text-[var(--accent)]">{formatListingPrice(listing, locale, attributeMap)}</p>
           <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-3 text-sm text-[var(--ink-2)] sm:grid-cols-2">
             {locationParts.length > 0 ? <p>{locationParts.join(" / ")}</p> : null}
             <p className="sm:text-right">{t.listing.posted}: {postedDate}</p>

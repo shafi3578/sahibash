@@ -2,6 +2,7 @@ import { getPostingRootCategories } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import QuickPostForm from "@/components/posting/QuickPostForm";
 import PostAdForm from "../post-ad-form";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -39,20 +40,30 @@ export default async function PostAdCreatePage({
     : null;
 
   const initialListingType = "for_sale";
-  const initialMode = posting === "quick" ? "quick" : "standard";
+  const initialMode = posting === "standard" ? "standard" : "quick";
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <h1 className="font-display text-3xl font-bold">{t.postAd.postAd}</h1>
-      <PostAdForm
-        categories={categories}
-        t={t}
-        locale={locale}
-        initialListingType={initialListingType}
-        initialMode={initialMode}
-        initialRootSlug={initialRootSlug}
-        sellerProfile={sellerProfile}
-      />
+      {initialMode === "quick" ? (
+        <QuickPostForm
+          categories={categories}
+          t={t}
+          locale={locale}
+          initialRootSlug={initialRootSlug}
+          sellerProfile={sellerProfile}
+        />
+      ) : (
+        <PostAdForm
+          categories={categories}
+          t={t}
+          locale={locale}
+          initialListingType={initialListingType}
+          initialMode={initialMode}
+          initialRootSlug={initialRootSlug}
+          sellerProfile={sellerProfile}
+        />
+      )}
     </main>
   );
 }

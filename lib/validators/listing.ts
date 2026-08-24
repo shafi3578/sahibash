@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CURRENCIES } from "@/lib/constants/marketplace";
 
 const currencyEnum = z.enum(CURRENCIES as unknown as ["AFN", "USD"]);
+const priceModeEnum = z.enum(["fixed", "contact", "monthly_rent", "gerawy_rahn", "dormitory_fee", "lease"]);
 
 const optionalText = z.string().trim().max(200).optional().or(z.literal(""));
 
@@ -45,7 +46,8 @@ export const listingSchema = z.object({
   category_node_id: localizedInt(z.number().int().positive("Must select a final category")).optional(),
   subcategory_id: localizedInt(z.number().int().positive("Must select a subcategory")).optional(),
   vehicle_variant_id: localizedInt(z.number().int().positive()).optional(),
-  price: localizedNumber(z.number().positive("Price must be greater than 0")),
+  price_mode: priceModeEnum.optional().default("fixed"),
+  price: localizedNumber(z.number().nonnegative("Price must be 0 or greater")),
   currency: currencyEnum,
   city: optionalText,
   province: z.string().trim().max(120).optional().or(z.literal("")),
@@ -80,6 +82,14 @@ export const listingSchema = z.object({
   vehicle_is_classic: z.coerce.boolean().optional().default(false),
   vehicle_is_custom: z.coerce.boolean().optional().default(false),
   vehicle_manual_specs_json: z.string().trim().optional().or(z.literal("")),
+}).superRefine((value, ctx) => {
+  if (value.price_mode !== "contact" && value.price <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["price"],
+      message: "Price must be greater than 0 unless contact-for-price is selected",
+    });
+  }
 });
 
 // Dynamic attributes based on category

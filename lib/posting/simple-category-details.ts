@@ -28,6 +28,7 @@ export type SimpleCategoryKind =
   | "house"
   | "apartment"
   | "room"
+  | "dormitory"
   | "land"
   | "shop"
   | "office"
@@ -86,6 +87,7 @@ const TEXT = {
   smartWatch: { en: "Smart Watch Details", fa: "جزئیات ساعت هوشمند", ps: "د هوښیار ساعت تفصیلات" },
   phoneAccessory: { en: "Phone Details", fa: "جزئیات موبایل", ps: "د موبایل تفصیلات" },
   property: { en: "Property Details", fa: "جزئیات ملکیت", ps: "د ملکیت تفصیلات" },
+  dormitory: { en: "Dormitory Details", fa: "جزئیات خوابگاه", ps: "د لیلیې تفصیلات" },
 } as const;
 
 const CAR_MAKES_MODELS: Record<string, string[]> = {
@@ -744,6 +746,76 @@ const FALLBACK_CONFIG: SimpleCategoryConfig = {
   ],
 };
 
+const DORMITORY_FEATURE_OPTIONS = optionValues([
+  "Wi-Fi",
+  "Hot Water",
+  "24-hour Electricity",
+  "Heating",
+  "Meals Included",
+  "Furnished",
+  "Security / Guard",
+  "Laundry",
+  "Private Bathroom",
+  "Near University",
+]);
+
+const DORMITORY_CONFIG: SimpleCategoryConfig = {
+  kind: "dormitory",
+  title: TEXT.dormitory,
+  emptyMaintenance: { en: "No dormitory notes available", fa: "یادداشت خوابگاه موجود نیست", ps: "د لیلیې یادښت نشته" },
+  maintenanceTitle: { en: "Rules and Notes", fa: "قوانین و یادداشت‌ها", ps: "اصول او یادښتونه" },
+  featureTitle: { en: "Dormitory Features", fa: "امکانات خوابگاه", ps: "د لیلیې اسانتیاوې" },
+  makeModels: {},
+  featureOptions: DORMITORY_FEATURE_OPTIONS,
+  topCards: [
+    { key: "dormitory_fee", label: { en: "Fee", fa: "فیس", ps: "فیس" } },
+    { key: "payment_period", label: { en: "Payment Period", fa: "دوره پرداخت", ps: "د پیسو دوره" } },
+    { key: "students_per_room", label: { en: "Students / Room", fa: "محصل در اتاق", ps: "زده کوونکي په کوټه کې" } },
+    { key: "gender_allowed", label: { en: "Gender", fa: "جنسیت مجاز", ps: "اجازه شوی جنس" } },
+  ],
+  rows: [
+    { key: "dormitory_fee", label: { en: "Fee Amount", fa: "مقدار فیس", ps: "د فیس اندازه" } },
+    { key: "payment_period", label: { en: "Payment Period", fa: "دوره پرداخت", ps: "د پیسو دوره" } },
+    { key: "gender_allowed", label: { en: "Gender Allowed", fa: "جنسیت مجاز", ps: "اجازه شوی جنس" } },
+    { key: "room_type", label: { en: "Room Type", fa: "نوع اتاق", ps: "د کوټې ډول" } },
+    { key: "students_per_room", label: { en: "Students per Room", fa: "تعداد محصل در اتاق", ps: "په هره کوټه کې زده کوونکي" } },
+    { key: "available_beds", label: { en: "Available Beds", fa: "بسترهای موجود", ps: "شته بسترونه" } },
+    { key: "internet", label: { en: "Internet / Wi-Fi", fa: "انترنت / وای‌فای", ps: "انټرنېټ / وای فای" } },
+    { key: "hot_water", label: { en: "Hot Water", fa: "آب گرم", ps: "ګرمې اوبه" } },
+    { key: "electricity", label: { en: "Electricity", fa: "برق", ps: "برېښنا" } },
+    { key: "heating", label: { en: "Heating", fa: "گرمایش", ps: "تودوخه" } },
+    { key: "meals_included", label: { en: "Meals Included", fa: "غذا شامل است", ps: "خواړه شامل دي" } },
+    { key: "furnished", label: { en: "Furnished", fa: "فرنیچر دارد", ps: "فرنیچر لري" } },
+    { key: "security", label: { en: "Security / Guard", fa: "امنیت / محافظ", ps: "امنیت / ساتونکی" } },
+    { key: "laundry", label: { en: "Laundry", fa: "لباس‌شویی", ps: "کالي مینځل" } },
+    { key: "bathroom_type", label: { en: "Bathroom", fa: "تشناب", ps: "تشناب" } },
+    { key: "nearby_institution", label: { en: "Nearby School / University", fa: "دانشگاه / مکتب نزدیک", ps: "نږدې پوهنتون / ښوونځی" } },
+    { key: "distance_to_university", label: { en: "Distance to Study", fa: "فاصله تا محل درس", ps: "د زده کړې ځای ته واټن" } },
+    { key: "rules", label: { en: "Rules / Curfew", fa: "قوانین / وقت برگشت", ps: "اصول / د راتګ وخت" } },
+  ],
+  fields: [
+    { key: "dormitory_fee", label: { en: "Fee Amount", fa: "مقدار فیس", ps: "د فیس اندازه" }, type: "number", required: true, min: 0 },
+    { key: "payment_period", label: { en: "Payment Period", fa: "دوره پرداخت", ps: "د پیسو دوره" }, type: "select", required: true, options: optionValues(["monthly", "semester", "yearly", "daily", "other"]) },
+    { key: "gender_allowed", label: { en: "Gender Allowed", fa: "جنسیت مجاز", ps: "اجازه شوی جنس" }, type: "select", required: true, options: optionValues(["male", "female", "family", "everyone"]) },
+    { key: "room_type", label: { en: "Room Type", fa: "نوع اتاق", ps: "د کوټې ډول" }, type: "select", required: true, options: optionValues(["shared", "private", "single", "bed_space", "other"]) },
+    { key: "students_per_room", label: { en: "Students per Room", fa: "تعداد محصل در اتاق", ps: "په هره کوټه کې زده کوونکي" }, type: "number", required: true, min: 1 },
+    { key: "available_beds", label: { en: "Available Beds / Spaces", fa: "بستر / جای خالی", ps: "شته بسترونه / ځایونه" }, type: "number", min: 0 },
+    { key: "internet", label: { en: "Internet / Wi-Fi", fa: "انترنت / وای‌فای", ps: "انټرنېټ / وای فای" }, type: "select", options: optionValues(["Available", "Not Available", "Unknown"]) },
+    { key: "hot_water", label: { en: "Hot Water", fa: "آب گرم", ps: "ګرمې اوبه" }, type: "select", options: optionValues(["Available", "Not Available", "Unknown"]) },
+    { key: "electricity", label: { en: "Electricity", fa: "برق", ps: "برېښنا" }, type: "select", options: optionValues(["24-hour", "Available", "Limited", "Not Available", "Unknown"]) },
+    { key: "heating", label: { en: "Heating", fa: "گرمایش", ps: "تودوخه" }, type: "select", options: optionValues(["Available", "Not Available", "Unknown"]) },
+    { key: "meals_included", label: { en: "Meals Included", fa: "غذا شامل است", ps: "خواړه شامل دي" }, type: "select", options: optionValues(["Yes", "No", "Optional"]) },
+    { key: "furnished", label: { en: "Bed / Wardrobe", fa: "بستر / الماری", ps: "بستر / المارۍ" }, type: "select", options: optionValues(["Yes", "No", "Partial"]) },
+    { key: "security", label: { en: "Security / Guard", fa: "امنیت / محافظ", ps: "امنیت / ساتونکی" }, type: "select", options: optionValues(["Yes", "No", "Unknown"]) },
+    { key: "laundry", label: { en: "Laundry", fa: "لباس‌شویی", ps: "کالي مینځل" }, type: "select", options: optionValues(["Available", "Not Available", "Nearby"]) },
+    { key: "bathroom_type", label: { en: "Bathroom", fa: "تشناب", ps: "تشناب" }, type: "select", options: optionValues(["shared", "private", "unknown"]) },
+    { key: "nearby_institution", label: { en: "Nearby School / University", fa: "دانشگاه / مکتب نزدیک", ps: "نږدې پوهنتون / ښوونځی" }, type: "text" },
+    { key: "distance_to_university", label: { en: "Distance to Study Place", fa: "فاصله تا محل درس", ps: "د زده کړې ځای ته واټن" }, type: "number", min: 0, unit: "km" },
+    { key: "rules", label: { en: "Rules / Curfew", fa: "قوانین / وقت برگشت", ps: "اصول / د راتګ وخت" }, type: "textarea" },
+    { key: "features", label: { en: "Features", fa: "امکانات", ps: "اسانتیاوې" }, type: "multiselect", options: DORMITORY_FEATURE_OPTIONS },
+  ],
+};
+
 const CONFIGS: Record<SimpleCategoryKind, SimpleCategoryConfig> = {
   car: CAR_CONFIG,
   motorcycle: MOTORCYCLE_CONFIG,
@@ -754,6 +826,7 @@ const CONFIGS: Record<SimpleCategoryKind, SimpleCategoryConfig> = {
   house: buildPropertyConfig("house"),
   apartment: buildPropertyConfig("apartment"),
   room: buildPropertyConfig("room"),
+  dormitory: DORMITORY_CONFIG,
   land: buildPropertyConfig("land"),
   shop: buildPropertyConfig("shop"),
   office: buildPropertyConfig("office"),
@@ -792,7 +865,7 @@ export function getSimpleCategoryKind(path: string | undefined, rootSlug?: strin
   if (normalizedRoot === "real-estate" || normalizedPath.startsWith("real-estate")) {
     if (/\bland\b/.test(normalizedPath)) return "land";
     if (/\bapartment/.test(normalizedPath)) return "apartment";
-    if (/student|dormitory|hostel/.test(normalizedPath)) return null;
+    if (/student|dormitory|hostel/.test(normalizedPath)) return "dormitory";
     if (/\broom/.test(normalizedPath)) return "room";
     if (/\bshop/.test(normalizedPath)) return "shop";
     if (/\boffice/.test(normalizedPath)) return "office";
