@@ -7,9 +7,13 @@ import { formatListingPrice } from "@/lib/listings/price-display";
 const quickPostForm = readFileSync(join(process.cwd(), "components", "posting", "QuickPostForm.tsx"), "utf8");
 const createPage = readFileSync(join(process.cwd(), "app", "post-ad", "create", "page.tsx"), "utf8");
 const listingActions = readFileSync(join(process.cwd(), "lib", "actions", "listings.ts"), "utf8");
+const listingQueries = readFileSync(join(process.cwd(), "lib", "data", "queries.ts"), "utf8");
 const listingValidator = readFileSync(join(process.cwd(), "lib", "validators", "listing.ts"), "utf8");
 const listingCard = readFileSync(join(process.cwd(), "components", "listing-card.tsx"), "utf8");
 const listingDetail = readFileSync(join(process.cwd(), "app", "listings", "[id]", "page.tsx"), "utf8");
+const homePage = readFileSync(join(process.cwd(), "app", "page.tsx"), "utf8");
+const featuredPage = readFileSync(join(process.cwd(), "app", "featured", "page.tsx"), "utf8");
+const detailSpecs = readFileSync(join(process.cwd(), "lib", "listings", "detailSpecs.ts"), "utf8");
 
 test("consumer create page defaults to the one-screen Quick Post but preserves the standard form", () => {
   assert.match(createPage, /import QuickPostForm/);
@@ -52,6 +56,13 @@ test("Quick Post resolves AI suggestions against canonical taxonomy instead of a
   assert.doesNotMatch(quickPostForm, /formData\.set\("category_node_id",\s*ai/i);
 });
 
+test("Quick Post exposes only Step 2 launch roots and maps unsupported item detections into second-hand", () => {
+  assert.match(quickPostForm, /const CATEGORY_ROOTS = \[[\s\S]*"vehicles",[\s\S]*"real-estate",[\s\S]*"mobile-phones-tablets",[\s\S]*"second-hand-items",[\s\S]*\] as const/);
+  assert.match(quickPostForm, /normalizeQuickPostRootSlug/);
+  assert.match(quickPostForm, /rootSlug === "electronics-computers" \|\| rootSlug === "home-furniture-appliances"/);
+  assert.match(listingActions, /"second-hand-items"/);
+});
+
 test("server validation relaxes configured required details only for quick mode", () => {
   assert.match(listingValidator, /priceModeEnum/);
   assert.match(listingValidator, /price_mode/);
@@ -81,9 +92,28 @@ test("Quick Post persists category-specific metadata for detail/search without d
   assert.match(listingActions, /isDormitory \|\| \(isRentListing && explicitSuitable\)/);
 });
 
+test("Quick Post preserves photo drafts and normalizes short publish titles", () => {
+  for (const marker of [
+    "QUICK_IMAGE_DB_NAME",
+    "persistQuickPostImages(images)",
+    "loadQuickPostImages()",
+    "clearQuickPostImages()",
+    "buildSuggestedQuickPostTitle",
+    "normalizeTitleCandidate",
+    "maxLength={120}",
+    "descriptionRequirement",
+    "titleTooShort",
+  ]) {
+    assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
 test("listing cards and detail pages use contextual price display", () => {
   assert.match(listingCard, /formatListingPrice\(listing, locale, attributes\)/);
   assert.match(listingDetail, /formatListingPrice\(listing, locale, attributeMap\)/);
+  assert.match(homePage, /formatListingPrice\(listing, locale\)/);
+  assert.match(featuredPage, /formatListingPrice\(listing, locale\)/);
+  assert.match(detailSpecs, /formatListingPrice\(listing, locale\)/);
 
   const contact = formatListingPrice({ price: 0, currency: "AFN", listing_attributes: [{ attribute_key: "price_mode", attribute_value_text: "contact" }] }, "en");
   assert.equal(contact, "Contact for price");
@@ -109,4 +139,13 @@ test("listing cards and detail pages use contextual price display", () => {
     ],
   }, "en");
   assert.equal(gerawy, "Gerawy/Rahn: 200,000 AFN + 3,000 AFN");
+});
+
+test("contact-for-price sentinel is excluded from public price filters and price sorting", () => {
+  assert.match(listingQueries, /hasPriceBoundaryFilter/);
+  assert.match(listingQueries, /hasPriceSort/);
+  assert.match(listingQueries, /shouldExcludeContactPriceSentinel/);
+  assert.match(listingQueries, /studentQuery = studentQuery\.gt\("price", 0\)/);
+  assert.match(listingQueries, /realEstateQuery = realEstateQuery\.gt\("price", 0\)/);
+  assert.match(listingQueries, /query = query\.gt\("price", 0\)/);
 });

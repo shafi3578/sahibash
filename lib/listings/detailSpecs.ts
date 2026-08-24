@@ -1,6 +1,7 @@
 import type { CategoryField, ListingAttribute, ListingWithRelations } from "@/types/database";
 import type { AppLocale } from "@/lib/i18n/translations";
-import { formatCurrencyAmount, formatDate, formatNumber } from "@/lib/i18n/format";
+import { formatDate, formatNumber } from "@/lib/i18n/format";
+import { formatListingPrice } from "@/lib/listings/price-display";
 
 type FieldMeta = {
   label: string;
@@ -188,7 +189,7 @@ export function buildListingSpecView(
         };
 
   const basicRows = [
-    { label: basicLabels.price, value: formatCurrencyAmount(listing.price, listing.currency, locale) },
+    { label: basicLabels.price, value: formatListingPrice(listing, locale) },
     { label: basicLabels.propertyType, value: listing.category_node?.name ?? "" },
     { label: basicLabels.listingType, value: grouped.property_details?.find((x) => x.key === "rental_type")?.value ?? "" },
     { label: basicLabels.listingDate, value: formatDate(listing.created_at, locale) },

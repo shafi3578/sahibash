@@ -1193,7 +1193,7 @@ async function ensureCategoryPostingAllowed(
     return { ok: false, message: "Must select a category" };
   }
 
-  if (!["vehicles", "real-estate", "mobile-phones-tablets"].includes(String(fallback.data.slug))) {
+  if (!["vehicles", "real-estate", "mobile-phones-tablets", "second-hand-items"].includes(String(fallback.data.slug))) {
     return { ok: false, message: "Posting in this category is not available yet." };
   }
 

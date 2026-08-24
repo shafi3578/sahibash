@@ -387,6 +387,9 @@ export async function getApprovedListings(
       });
       const searchVariants = rewriteContext.variants.slice(0, 20);
       const understoodSearch = understandSearchQuery(filters?.search ?? "");
+      const hasPriceBoundaryFilter = typeof filters?.minPrice === "number" || typeof filters?.maxPrice === "number";
+      const hasPriceSort = filters?.sort === "price_low" || filters?.sort === "price_high";
+      const shouldExcludeContactPriceSentinel = hasPriceBoundaryFilter || hasPriceSort;
 
       if (searchVariants.length > 0) {
         const translationSearchClause = searchVariants
@@ -598,6 +601,10 @@ export async function getApprovedListings(
 
             studentQuery = applyPublicListingQualityFilters(studentQuery);
 
+            if (shouldExcludeContactPriceSentinel) {
+              studentQuery = studentQuery.gt("price", 0);
+            }
+
             if (searchVariants.length > 0) {
               studentQuery = studentQuery.or(buildSearchOrClause(searchVariants, translatedSearchListingIds));
             }
@@ -690,6 +697,10 @@ export async function getApprovedListings(
 
               realEstateQuery = applyPublicListingQualityFilters(realEstateQuery);
 
+              if (shouldExcludeContactPriceSentinel) {
+                realEstateQuery = realEstateQuery.gt("price", 0);
+              }
+
               const { data, error } = await realEstateQuery;
 
               if (error || !data) {
@@ -754,6 +765,10 @@ export async function getApprovedListings(
         .limit(queryLimit);
 
       query = applyPublicListingQualityFilters(query);
+
+      if (shouldExcludeContactPriceSentinel) {
+        query = query.gt("price", 0);
+      }
 
       if (filters?.province) {
         query = query.eq("province", filters.province);

@@ -82,15 +82,26 @@ type AiResponse = {
 };
 
 const QUICK_DRAFT_KEY = "sahibash_quick_post_draft_v1";
+const QUICK_IMAGE_DB_NAME = "sahibash_quick_post_images_v1";
+const QUICK_IMAGE_STORE = "images";
 
 const CATEGORY_ROOTS = [
   "vehicles",
   "real-estate",
   "mobile-phones-tablets",
-  "electronics-computers",
-  "home-furniture-appliances",
   "second-hand-items",
 ] as const;
+
+type QuickRootSlug = (typeof CATEGORY_ROOTS)[number];
+
+type StoredQuickPostImage = {
+  id: string;
+  name: string;
+  type: string;
+  lastModified: number;
+  isPrimary: boolean;
+  blob: Blob;
+};
 
 const COPY = {
   en: {
@@ -103,7 +114,10 @@ const COPY = {
     remove: "Remove",
     description: "Describe what you are selling",
     descriptionPlaceholder: "Example: Toyota Corolla 2012, automatic, clean body, located in Kabul...",
+    descriptionRequirement: "At least 20 characters are required before publishing.",
     title: "Suggested title",
+    titleHint: "Keep it short and clear. Sahibash can generate one from your description.",
+    titleTooShort: "Title is too short; Sahibash will use a safe suggested title unless you edit it.",
     price: "Price",
     amount: "Amount",
     contactForPrice: "Contact for price",
@@ -156,7 +170,10 @@ const COPY = {
     remove: "حذف",
     description: "توضیح دهید چه چیزی را می‌فروشید",
     descriptionPlaceholder: "مثال: تویوتا کرولا ۲۰۱۲، اتومات، بدنه پاک، موقعیت کابل...",
+    descriptionRequirement: "برای نشر اعلان حداقل ۲۰ حرف لازم است.",
     title: "عنوان پیشنهادی",
+    titleHint: "کوتاه و واضح بنویسید. صاحباش می‌تواند از توضیح شما عنوان بسازد.",
+    titleTooShort: "عنوان بسیار کوتاه است؛ صاحباش در صورت نیاز یک عنوان مناسب می‌سازد.",
     price: "قیمت",
     amount: "مبلغ",
     contactForPrice: "قیمت به تماس",
@@ -209,7 +226,10 @@ const COPY = {
     remove: "لرې کول",
     description: "تشریح کړئ چې څه شی پلورئ",
     descriptionPlaceholder: "بېلګه: ټویوټا کرولا ۲۰۱۲، اتومات، پاک بدن، په کابل کې...",
+    descriptionRequirement: "د خپرولو لپاره لږ تر لږه ۲۰ توري اړین دي.",
     title: "وړاندیز شوی سرلیک",
+    titleHint: "لنډ او روښانه یې ولیکئ. صاحباش یې ستاسو له تشریح هم جوړولای شي.",
+    titleTooShort: "سرلیک ډېر لنډ دی؛ صاحباش به که اړتیا وي مناسب سرلیک وکاروي.",
     price: "بیه",
     amount: "اندازه",
     contactForPrice: "بیه په اړیکه",
@@ -365,6 +385,87 @@ function deriveTitle(description: string) {
   return "";
 }
 
+function normalizeTitleCandidate(value: string) {
+  const compact = value.replace(/\s+/g, " ").trim().slice(0, 120).trim();
+  return compact.length >= 5 ? compact : "";
+}
+
+function readDetailText(details: Record<string, DetailValue>, key: string) {
+  const value = details[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isQuickRootSlug(value: string): value is QuickRootSlug {
+  return CATEGORY_ROOTS.includes(value as QuickRootSlug);
+}
+
+function normalizeQuickPostRootSlug(value: string | null | undefined) {
+  const rootSlug = String(value ?? "").trim();
+  if (isQuickRootSlug(rootSlug)) return rootSlug;
+  if (rootSlug === "electronics-computers" || rootSlug === "home-furniture-appliances") {
+    return "second-hand-items";
+  }
+  return "";
+}
+
+function buildSuggestedQuickPostTitle({
+  enteredTitle,
+  description,
+  kind,
+  details,
+  categoryLabel,
+  provinceName,
+  districtName,
+  areaText,
+  transaction,
+  labels,
+}: {
+  enteredTitle: string;
+  description: string;
+  kind: QuickKind;
+  details: Record<string, DetailValue>;
+  categoryLabel: string;
+  provinceName?: string;
+  districtName?: string;
+  areaText: string;
+  transaction: "sale" | "rent" | "lease";
+  labels: { sale: string; rent: string; lease: string; listing: string; near: string };
+}) {
+  const manualTitle = normalizeTitleCandidate(enteredTitle);
+  if (manualTitle) return manualTitle;
+
+  const location = normalizeTitleCandidate(areaText)
+    || normalizeTitleCandidate(districtName ?? "")
+    || normalizeTitleCandidate(provinceName ?? "");
+  const actionLabel = transaction === "rent" ? labels.rent : transaction === "lease" ? labels.lease : labels.sale;
+  const make = readDetailText(details, "make") || readDetailText(details, "brand");
+  const model = readDetailText(details, "model");
+  const year = readDetailText(details, "year");
+  const storage = readDetailText(details, "storageGb") || readDetailText(details, "storage");
+  const itemType = readDetailText(details, "type") || categoryLabel;
+  const landType = readDetailText(details, "landType") || categoryLabel;
+  const institution = readDetailText(details, "nearby_institution");
+
+  const candidates = [
+    kind === "vehicle" ? [year, make, model].filter(Boolean).join(" ") : "",
+    kind === "phone" || kind === "tablet" ? [make, model, storage].filter(Boolean).join(" ") : "",
+    kind === "dormitory" ? [categoryLabel || labels.listing, institution ? `${labels.near} ${institution}` : "", location].filter(Boolean).join(" ") : "",
+    kind === "land" ? [landType, actionLabel, location].filter(Boolean).join(" ") : "",
+    kind === "housing" ? [categoryLabel || labels.listing, actionLabel, location].filter(Boolean).join(" ") : "",
+    kind === "second_hand" ? [itemType, make, model].filter(Boolean).join(" ") : "",
+    deriveTitle(description),
+    [categoryLabel || labels.listing, actionLabel].filter(Boolean).join(" "),
+    labels.listing,
+  ];
+
+  for (const candidate of candidates) {
+    const title = normalizeTitleCandidate(candidate);
+    if (title) return title;
+  }
+
+  return "Sahibash listing";
+}
+
 function maskSellerPhone(phone: string) {
   const compact = phone.replace(/\s+/g, "");
   if (compact.length <= 7) return compact;
@@ -459,6 +560,82 @@ async function optimizeImageForAI(file: File) {
   }
 }
 
+function openQuickPostImageDb() {
+  if (typeof indexedDB === "undefined") {
+    return Promise.reject(new Error("IndexedDB is not available."));
+  }
+
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(QUICK_IMAGE_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(QUICK_IMAGE_STORE)) {
+        db.createObjectStore(QUICK_IMAGE_STORE, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error("Could not open quick-post image draft store."));
+  });
+}
+
+async function persistQuickPostImages(images: StagedImage[]) {
+  if (typeof indexedDB === "undefined") return;
+  const db = await openQuickPostImageDb();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(QUICK_IMAGE_STORE, "readwrite");
+      const store = transaction.objectStore(QUICK_IMAGE_STORE);
+      store.clear();
+      for (const image of images.slice(0, 15)) {
+        store.put({
+          id: image.id,
+          name: image.file.name,
+          type: image.file.type,
+          lastModified: image.file.lastModified,
+          isPrimary: image.isPrimary,
+          blob: image.file,
+        } satisfies StoredQuickPostImage);
+      }
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Could not save quick-post image draft."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Could not save quick-post image draft."));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function loadQuickPostImages() {
+  if (typeof indexedDB === "undefined") return [] as StoredQuickPostImage[];
+  const db = await openQuickPostImageDb();
+  try {
+    return await new Promise<StoredQuickPostImage[]>((resolve, reject) => {
+      const transaction = db.transaction(QUICK_IMAGE_STORE, "readonly");
+      const request = transaction.objectStore(QUICK_IMAGE_STORE).getAll();
+      request.onsuccess = () => resolve((request.result ?? []) as StoredQuickPostImage[]);
+      request.onerror = () => reject(request.error ?? new Error("Could not load quick-post image draft."));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function clearQuickPostImages() {
+  if (typeof indexedDB === "undefined") return;
+  const db = await openQuickPostImageDb();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(QUICK_IMAGE_STORE, "readwrite");
+      transaction.objectStore(QUICK_IMAGE_STORE).clear();
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Could not clear quick-post image draft."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Could not clear quick-post image draft."));
+    });
+  } finally {
+    db.close();
+  }
+}
+
 function readDraftString(value: unknown) {
   return typeof value === "string" ? value : "";
 }
@@ -498,13 +675,14 @@ export default function QuickPostForm({
   const [suitableForStudents, setSuitableForStudents] = useState(false);
   const [details, setDetails] = useState<Record<string, DetailValue>>({});
   const [images, setImages] = useState<StagedImage[]>([]);
+  const imagesRef = useRef<StagedImage[]>([]);
   const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
   const [districtOptions, setDistrictOptions] = useState<DistrictOption[]>([]);
   const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
   const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
   const [areaText, setAreaText] = useState("");
-  const [selectedRootSlug, setSelectedRootSlug] = useState(initialRootSlug);
-  const [rootTouched, setRootTouched] = useState(Boolean(initialRootSlug));
+  const [selectedRootSlug, setSelectedRootSlug] = useState(() => normalizeQuickPostRootSlug(initialRootSlug));
+  const [rootTouched, setRootTouched] = useState(Boolean(normalizeQuickPostRootSlug(initialRootSlug)));
   const [selectedCategory, setSelectedCategory] = useState<CandidateNode | null>(null);
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [smartSuggestion, setSmartSuggestion] = useState<SmartPostingParseResult | null>(null);
@@ -528,7 +706,7 @@ export default function QuickPostForm({
 
   const rootChoices = useMemo(() => {
     const allowed = new Set(CATEGORY_ROOTS);
-    const primary = activeCategories.filter((category) => allowed.has(category.slug as (typeof CATEGORY_ROOTS)[number]));
+    const primary = activeCategories.filter((category) => allowed.has(category.slug as QuickRootSlug));
     return primary.length > 0 ? primary : activeCategories;
   }, [activeCategories]);
 
@@ -597,12 +775,16 @@ export default function QuickPostForm({
   }, []);
 
   useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  useEffect(() => {
     return () => {
-      for (const image of images) {
+      for (const image of imagesRef.current) {
         URL.revokeObjectURL(image.previewUrl);
       }
     };
-  }, [images]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -624,12 +806,42 @@ export default function QuickPostForm({
           setTransaction(readDraftString(local.transaction) === "rent" ? "rent" : readDraftString(local.transaction) === "lease" ? "lease" : "sale");
           setRahnGerawyEnabled(readDraftBoolean(local.rahnGerawyEnabled));
           setSuitableForStudents(readDraftBoolean(local.suitableForStudents));
-          setSelectedRootSlug(readDraftString(local.selectedRootSlug) || initialRootSlug);
+          setSelectedRootSlug(normalizeQuickPostRootSlug(readDraftString(local.selectedRootSlug) || initialRootSlug));
           setDetails(Object.fromEntries(Object.entries(nextDetails).map(([key, value]) => [key, typeof value === "boolean" ? value : readDraftString(value)])));
           const location = (local.location && typeof local.location === "object" ? local.location : {}) as Record<string, unknown>;
           setSelectedProvinceId(Number(location.provinceId) || null);
           setSelectedDistrictId(Number(location.districtId) || null);
           setAreaText(readDraftString(location.areaText));
+        }
+
+        const storedImages = await loadQuickPostImages().catch(() => []);
+        if (!cancelled && storedImages.length > 0) {
+          setImages((current) => {
+            for (const image of current) {
+              URL.revokeObjectURL(image.previewUrl);
+            }
+
+            const next = storedImages
+              .map((stored, index) => {
+                const file = new File([stored.blob], stored.name || `sahibash-photo-${index + 1}`, {
+                  type: stored.type || stored.blob.type || "image/jpeg",
+                  lastModified: stored.lastModified || Date.now(),
+                });
+                return {
+                  id: stored.id || createId(),
+                  file,
+                  previewUrl: URL.createObjectURL(file),
+                  isPrimary: Boolean(stored.isPrimary),
+                };
+              })
+              .slice(0, 15);
+
+            if (next.length > 0 && !next.some((image) => image.isPrimary)) {
+              next[0] = { ...next[0], isPrimary: true };
+            }
+
+            return next;
+          });
         }
 
         const serverDraft = await getMyActiveDraftAction();
@@ -650,7 +862,7 @@ export default function QuickPostForm({
         setTransaction(readDraftString(serverDetails.transaction) === "rent" ? "rent" : readDraftString(serverDetails.transaction) === "lease" ? "lease" : "sale");
         setRahnGerawyEnabled(readDraftBoolean(serverDetails.rahnGerawyEnabled));
         setSuitableForStudents(readDraftBoolean(serverDetails.suitableForStudents));
-        setSelectedRootSlug(readDraftString(serverCategory.rootSlug) || initialRootSlug);
+        setSelectedRootSlug(normalizeQuickPostRootSlug(readDraftString(serverCategory.rootSlug) || initialRootSlug));
         const nestedDetails = (serverDetails.details && typeof serverDetails.details === "object" ? serverDetails.details : {}) as Record<string, unknown>;
         setDetails(Object.fromEntries(Object.entries(nestedDetails).map(([key, value]) => [key, typeof value === "boolean" ? value : readDraftString(value)])));
         setSelectedProvinceId(Number(serverLocation.provinceId) || null);
@@ -667,6 +879,11 @@ export default function QuickPostForm({
       cancelled = true;
     };
   }, [initialRootSlug]);
+
+  useEffect(() => {
+    if (!draftLoaded) return;
+    void persistQuickPostImages(images).catch(() => undefined);
+  }, [draftLoaded, images]);
 
   useEffect(() => {
     async function loadProvinces() {
@@ -780,10 +997,8 @@ export default function QuickPostForm({
 
   const applySmartSuggestion = useCallback((suggestion: SmartPostingParseResult) => {
     setSmartSuggestion(suggestion);
-    const nextRoot = suggestion.categorySlug === "other" || suggestion.categorySlug === "wanted-request-ads"
-      ? ""
-      : suggestion.categorySlug;
-    if (nextRoot && !rootTouched && activeCategories.some((category) => category.slug === nextRoot)) {
+    const nextRoot = normalizeQuickPostRootSlug(suggestion.categorySlug);
+    if (nextRoot && !rootTouched && rootChoices.some((category) => category.slug === nextRoot)) {
       setSelectedCategory(null);
       setSelectedRootSlug(nextRoot);
     }
@@ -798,7 +1013,7 @@ export default function QuickPostForm({
     if (suggestion.storage) updateDetail("storageGb", suggestion.storage.replace(/GB/i, " GB").replace(/TB/i, " TB"));
     if (suggestion.ram) updateDetail("ramGb", suggestion.ram.replace(/GB/i, " GB"));
     if (suggestion.battery) updateDetail("batteryHealth", suggestion.battery.replace("%", ""));
-  }, [activeCategories, contactForPrice, priceAmount, rootTouched, updateDetail]);
+  }, [contactForPrice, priceAmount, rootChoices, rootTouched, updateDetail]);
 
   useEffect(() => {
     const meaningful = description.trim().length >= 20 || images.length > 0;
@@ -838,8 +1053,8 @@ export default function QuickPostForm({
         setAiStatus(json.suggestion || json.suggestedProduct ? "ready" : "unavailable");
         const rootFromProduct = json.suggestedProduct?.categoryPath?.split("/")[0] ?? "";
         const rootFromSuggestion = json.suggestion?.rootSlug ?? "";
-        const nextRoot = rootFromProduct || rootFromSuggestion;
-        if (nextRoot && !rootTouched && activeCategories.some((category) => category.slug === nextRoot)) {
+        const nextRoot = normalizeQuickPostRootSlug(rootFromProduct || rootFromSuggestion);
+        if (nextRoot && !rootTouched && rootChoices.some((category) => category.slug === nextRoot)) {
           setSelectedCategory(null);
           setSelectedRootSlug(nextRoot);
         }
@@ -855,7 +1070,7 @@ export default function QuickPostForm({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [activeCategories, applySmartSuggestion, description, images, rootTouched, title, updateDetail]);
+  }, [applySmartSuggestion, description, images, rootChoices, rootTouched, title, updateDetail]);
 
   useEffect(() => {
     if (!selectedRootSlug) {
@@ -974,10 +1189,27 @@ export default function QuickPostForm({
 
   function buildPublishFormData() {
     const formData = new FormData();
-    const resolvedTitle = title.trim() || deriveTitle(description) || "Sahibash listing";
     const submitPrice = priceValueForSubmit();
     const selectedProvince = provinceOptions.find((item) => item.id === selectedProvinceId);
     const selectedDistrict = districtOptions.find((item) => item.id === selectedDistrictId);
+    const resolvedTitle = buildSuggestedQuickPostTitle({
+      enteredTitle: title,
+      description,
+      kind: quickKind,
+      details,
+      categoryLabel,
+      provinceName: selectedProvince?.name,
+      districtName: selectedDistrict?.name,
+      areaText,
+      transaction,
+      labels: {
+        sale: c.forSale,
+        rent: c.forRent,
+        lease: c.forLease,
+        listing: categoryLabel || "Sahibash listing",
+        near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near",
+      },
+    });
 
     formData.set("posting_mode", "quick");
     formData.set("title", resolvedTitle);
@@ -1093,6 +1325,7 @@ export default function QuickPostForm({
         }
 
         window.localStorage.removeItem(QUICK_DRAFT_KEY);
+        await clearQuickPostImages().catch(() => undefined);
         if (draftId) await deleteMyDraftAction(draftId);
         setStatus(c.success);
         router.push(localizePath(`/listings/${result.listingId}/manage`, locale));
@@ -1216,24 +1449,48 @@ export default function QuickPostForm({
               const nextDescription = event.target.value;
               setDescription(nextDescription);
               if (!titleTouched) {
-                const nextTitle = deriveTitle(nextDescription);
+                const nextTitle = buildSuggestedQuickPostTitle({
+                  enteredTitle: "",
+                  description: nextDescription,
+                  kind: quickKind,
+                  details,
+                  categoryLabel,
+                  provinceName: provinceOptions.find((item) => item.id === selectedProvinceId)?.name,
+                  districtName: districtOptions.find((item) => item.id === selectedDistrictId)?.name,
+                  areaText,
+                  transaction,
+                  labels: {
+                    sale: c.forSale,
+                    rent: c.forRent,
+                    lease: c.forLease,
+                    listing: categoryLabel || "Sahibash listing",
+                    near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near",
+                  },
+                });
                 if (nextTitle) setTitle(nextTitle);
               }
             }}
             placeholder={c.descriptionPlaceholder}
             className="mt-2 min-h-40 w-full resize-y rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-base outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[var(--accent)]/15"
           />
+          <span className={`mt-1 block text-xs ${description.trim().length >= 20 ? "text-emerald-700" : "text-[var(--ink-2)]"}`}>
+            {description.trim().length}/20 · {c.descriptionRequirement}
+          </span>
         </label>
         <label className="mt-4 block text-sm font-bold">
           {c.title}
           <input
             value={title}
+            maxLength={120}
             onChange={(event) => {
               setTitleTouched(true);
               setTitle(event.target.value);
             }}
             className="mt-2 w-full rounded-2xl border border-[var(--line)] px-3 py-3 text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
           />
+          <span className={`mt-1 block text-xs ${title.trim().length > 0 && title.trim().length < 5 ? "text-amber-700" : "text-[var(--ink-2)]"}`}>
+            {title.trim().length > 0 && title.trim().length < 5 ? c.titleTooShort : c.titleHint}
+          </span>
         </label>
       </section>
 

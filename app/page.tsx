@@ -10,8 +10,8 @@ import { getApprovedListings } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { formatCurrencyAmount } from "@/lib/i18n/format";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
+import { formatListingPrice } from "@/lib/listings/price-display";
 
 function getHomePageCopy(
   locale: "en" | "fa" | "ps",
@@ -128,7 +128,7 @@ export default async function HomePage({
                   </div>
                   <div className="p-3">
                     <p className="line-clamp-2 text-xs font-bold sm:text-sm">{displayTitle}</p>
-                    <p className="mt-1 text-xs font-semibold text-yellow-200">{formatCurrencyAmount(listing.price, listing.currency, locale)}</p>
+                    <p className="mt-1 text-xs font-semibold text-yellow-200">{formatListingPrice(listing, locale)}</p>
                   </div>
                 </Link>
               );
@@ -205,7 +205,7 @@ export default async function HomePage({
                   <div className="space-y-1 p-2">
                     <p className="line-clamp-2 text-sm font-medium text-slate-800">{displayTitle}</p>
                     <p className="text-sm font-semibold text-[var(--accent)]">
-                      {formatCurrencyAmount(listing.price, listing.currency, locale)}
+                      {formatListingPrice(listing, locale)}
                     </p>
                   </div>
                 </Link>
@@ -255,7 +255,7 @@ export default async function HomePage({
                   <p className="mt-1 line-clamp-1 text-sm text-slate-500">{province}</p>
                 </div>
                 <p className="px-3 pb-4 text-lg font-bold text-[#1967b1] sm:col-span-1 sm:px-0 sm:pb-0 sm:text-xl">
-                  {formatCurrencyAmount(listing.price, listing.currency, locale)}
+                  {formatListingPrice(listing, locale)}
                 </p>
               </Link>
             );

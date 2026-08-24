@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getApprovedListings } from "@/lib/data/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
-import { formatCurrencyAmount } from "@/lib/i18n/format";
+import { formatListingPrice } from "@/lib/listings/price-display";
 
 export default async function FeaturedPage() {
   const { locale, t } = await getDictionary();
@@ -34,7 +34,7 @@ export default async function FeaturedPage() {
               <div className="p-3">
                 <p className="line-clamp-2 text-base font-bold text-slate-950">{displayTitle}</p>
                 <p className="mt-1 text-sm text-slate-500">{listing.province ?? listing.district ?? "-"}</p>
-                <p className="mt-2 text-lg font-black text-[#2563eb]">{formatCurrencyAmount(listing.price, listing.currency, locale)}</p>
+                <p className="mt-2 text-lg font-black text-[#2563eb]">{formatListingPrice(listing, locale)}</p>
               </div>
             </Link>
           );
