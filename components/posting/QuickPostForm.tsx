@@ -10,6 +10,9 @@ import { localizePath } from "@/lib/i18n/routing";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
+import LocationMapPicker from "@/components/location/LocationMapPicker";
+import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
+import { damageCondition, damagePartLabel, getNonOriginalVehicleDamageParts } from "@/lib/vehicles/damage-report";
 import type { Category, CategoryNode } from "@/types/database";
 
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -34,6 +37,9 @@ type CandidateNode = Pick<
 
 type ProvinceOption = { id: number; name: string };
 type DistrictOption = { id: number; name: string; province_id: number };
+type QuickStep = 1 | 2;
+type QuickLocationSource = "manual" | "device" | "map_pin";
+type QuickLocationVisibility = "exact" | "approximate" | "province_district" | "hidden";
 
 type StagedImage = {
   id: string;
@@ -105,19 +111,29 @@ type StoredQuickPostImage = {
 
 const COPY = {
   en: {
+    quickPost: "Quick Post",
+    stepOne: "Step 1 of 2",
+    stepTwo: "Step 2 of 2",
+    stepOneTitle: "Post your ad",
+    stepTwoTitle: "Confirm category and details",
     subtitle: "Photos, description, price and location. Sahibash fills the rest, and you can edit every suggestion.",
+    continue: "Continue",
+    back: "Back",
+    editStepOne: "Edit Step 1",
     photosTitle: "Add photos first",
     photosHint: "Camera or gallery. JPG, PNG, WebP or HEIC up to 10 MB each.",
     addPhotos: "+ Add photos",
     addMore: "Add more",
     primary: "Primary",
     remove: "Remove",
+    moveEarlier: "Move earlier",
+    moveLater: "Move later",
     description: "Describe what you are selling",
     descriptionPlaceholder: "Example: Toyota Corolla 2012, automatic, clean body, located in Kabul...",
     descriptionRequirement: "At least 20 characters are required before publishing.",
-    title: "Suggested title",
-    titleHint: "Keep it short and clear. Sahibash can generate one from your description.",
-    titleTooShort: "Title is too short; Sahibash will use a safe suggested title unless you edit it.",
+    title: "Title",
+    titleHint: "Keep it short and clear. Sahibash may suggest a better one later, but you stay in control.",
+    titleTooShort: "Add a little more detail to the title.",
     price: "Price",
     amount: "Amount",
     contactForPrice: "Contact for price",
@@ -133,14 +149,46 @@ const COPY = {
     dormFee: "Dormitory fee",
     landLeasePrice: "Lease price",
     location: "Location",
+    useCurrentLocation: "Use My Current Location",
+    currentLocationHint: "We use your device location only to help set this item's location. Confirm or edit it before publishing.",
+    detectingLocation: "Detecting location...",
+    detectedLocation: "Detected item location",
+    confirmLocation: "Use this location",
+    chooseManualLocation: "Choose manually",
+    gpsDenied: "Location permission was denied. You can continue by choosing manually.",
+    gpsUnavailable: "We could not detect your location right now. Choose manually or set a map pin.",
+    setOnMap: "Set on map",
+    hideMap: "Hide map",
+    mapPinSaved: "Map pin saved. Please confirm province and district.",
+    locationPrivacy: "Public location privacy",
+    privacyExact: "Exact map pin",
+    privacyApproximate: "Approximate area (recommended)",
+    privacyDistrict: "District / city only",
+    privacyHidden: "Hidden",
     province: "Province",
     district: "District / City",
     area: "Area or neighborhood (optional)",
     select: "Select",
     detected: "Sahibash detected",
     detectionHint: "Edit any chip. If detection is uncertain, choose one category.",
+    suggestionsTitle: "Suggested categories",
+    manualCategory: "Choose category manually",
     chooseCategory: "What category is this ad?",
+    chooseSubcategory: "Choose the exact subcategory",
+    selectedSubcategory: "Selected subcategory",
+    noSubcategories: "Choose a root category to load active subcategories.",
+    selected: "Selected",
+    suggested: "Suggested",
+    otherPossibilities: "Other possibilities",
+    additionalDetails: "Additional details",
     advanced: "Advanced details (optional)",
+    moreOptionalDetails: "+ More optional details",
+    hideOptionalDetails: "Hide optional details",
+    carDamageTitle: "Vehicle body condition",
+    carDamageHint: "Optional but very useful for car buyers. Tap a body part and choose Original, Painted, Repaired/Replaced, or Damaged.",
+    damageSummary: "Body condition summary",
+    noDamageSelected: "No painted, replaced, or damaged body parts selected.",
+    previewTitle: "Your listing preview",
     publish: "Publish",
     publishing: "Publishing...",
     saved: "Draft saved",
@@ -152,6 +200,7 @@ const COPY = {
     missingPrice: "Please enter a price or choose contact for price.",
     missingCategory: "Please choose a category so buyers can find it.",
     missingLocation: "Please choose province and district/city.",
+    locationMustConfirm: "Please confirm the item location before continuing.",
     missingContact: "Please complete your profile name and phone before publishing.",
     success: "Listing submitted for review.",
     suitableStudents: "Suitable for students",
@@ -161,19 +210,29 @@ const COPY = {
     exactHidden: "Public page shows province/district, not your exact address.",
   },
   fa: {
+    quickPost: "نشر سریع",
+    stepOne: "مرحله ۱ از ۲",
+    stepTwo: "مرحله ۲ از ۲",
+    stepOneTitle: "اعلان خود را ثبت کنید",
+    stepTwoTitle: "دسته و جزئیات را تایید کنید",
     subtitle: "عکس، توضیح، قیمت و موقعیت را وارد کنید. صاحباش بقیه را پیشنهاد می‌کند و شما هر مورد را ویرایش می‌کنید.",
+    continue: "ادامه",
+    back: "برگشت",
+    editStepOne: "ویرایش مرحله ۱",
     photosTitle: "اول عکس‌ها را اضافه کنید",
     photosHint: "از کمره یا گالری. JPG، PNG، WebP یا HEIC تا ۱۰ MB برای هر عکس.",
     addPhotos: "+ افزودن عکس",
     addMore: "افزودن بیشتر",
     primary: "اصلی",
     remove: "حذف",
+    moveEarlier: "جابه‌جایی به قبل",
+    moveLater: "جابه‌جایی به بعد",
     description: "توضیح دهید چه چیزی را می‌فروشید",
     descriptionPlaceholder: "مثال: تویوتا کرولا ۲۰۱۲، اتومات، بدنه پاک، موقعیت کابل...",
     descriptionRequirement: "برای نشر اعلان حداقل ۲۰ حرف لازم است.",
-    title: "عنوان پیشنهادی",
-    titleHint: "کوتاه و واضح بنویسید. صاحباش می‌تواند از توضیح شما عنوان بسازد.",
-    titleTooShort: "عنوان بسیار کوتاه است؛ صاحباش در صورت نیاز یک عنوان مناسب می‌سازد.",
+    title: "عنوان",
+    titleHint: "کوتاه و واضح بنویسید. صاحباش می‌تواند بعداً پیشنهاد بهتر بدهد، اما اختیار با شماست.",
+    titleTooShort: "کمی جزئیات بیشتر به عنوان اضافه کنید.",
     price: "قیمت",
     amount: "مبلغ",
     contactForPrice: "قیمت به تماس",
@@ -189,14 +248,46 @@ const COPY = {
     dormFee: "فیس خوابگاه",
     landLeasePrice: "قیمت اجاره",
     location: "موقعیت",
+    useCurrentLocation: "استفاده از موقعیت فعلی من",
+    currentLocationHint: "موقعیت دستگاه فقط برای تنظیم موقعیت همین جنس استفاده می‌شود. پیش از نشر آن را تایید یا ویرایش کنید.",
+    detectingLocation: "در حال تشخیص موقعیت...",
+    detectedLocation: "موقعیت جنس تشخیص شد",
+    confirmLocation: "استفاده از این موقعیت",
+    chooseManualLocation: "انتخاب دستی",
+    gpsDenied: "اجازه موقعیت داده نشد. می‌توانید دستی ادامه دهید.",
+    gpsUnavailable: "فعلاً نتوانستیم موقعیت را تشخیص دهیم. دستی انتخاب کنید یا پین نقشه بگذارید.",
+    setOnMap: "تعیین روی نقشه",
+    hideMap: "بستن نقشه",
+    mapPinSaved: "پین نقشه ذخیره شد. لطفاً ولایت و ولسوالی را تایید کنید.",
+    locationPrivacy: "حریم خصوصی موقعیت عمومی",
+    privacyExact: "پین دقیق نقشه",
+    privacyApproximate: "محدوده تقریبی (پیشنهادی)",
+    privacyDistrict: "فقط شهر / ولسوالی",
+    privacyHidden: "پنهان",
     province: "ولایت",
     district: "ولسوالی / شهر",
     area: "ناحیه یا محله (اختیاری)",
     select: "انتخاب",
     detected: "صاحباش تشخیص داد",
     detectionHint: "هر چیپ را ویرایش کنید. اگر تشخیص نامطمئن باشد، یک دسته را انتخاب کنید.",
+    suggestionsTitle: "دسته‌های پیشنهادی",
+    manualCategory: "انتخاب دستی دسته",
     chooseCategory: "این اعلان مربوط کدام دسته است؟",
+    chooseSubcategory: "زیر‌دسته دقیق را انتخاب کنید",
+    selectedSubcategory: "زیر‌دسته انتخاب‌شده",
+    noSubcategories: "برای بارگذاری زیر‌دسته‌ها، یک دسته اصلی انتخاب کنید.",
+    selected: "انتخاب‌شده",
+    suggested: "پیشنهادی",
+    otherPossibilities: "احتمال‌های دیگر",
+    additionalDetails: "جزئیات بیشتر",
     advanced: "جزئیات پیشرفته (اختیاری)",
+    moreOptionalDetails: "+ جزئیات اختیاری بیشتر",
+    hideOptionalDetails: "پنهان کردن جزئیات اختیاری",
+    carDamageTitle: "وضعیت بدنه موتر",
+    carDamageHint: "اختیاری است اما برای خریداران موتر بسیار مفید است. روی قطعه بدنه بزنید و وضعیت آن را انتخاب کنید.",
+    damageSummary: "خلاصه وضعیت بدنه",
+    noDamageSelected: "هیچ قطعه رنگ‌شده، تعویض‌شده یا آسیب‌دیده انتخاب نشده است.",
+    previewTitle: "پیش‌نمایش اعلان شما",
     publish: "نشر اعلان",
     publishing: "در حال نشر...",
     saved: "پیش‌نویس ذخیره شد",
@@ -208,6 +299,7 @@ const COPY = {
     missingPrice: "لطفاً قیمت را وارد کنید یا قیمت به تماس را انتخاب کنید.",
     missingCategory: "لطفاً یک دسته انتخاب کنید تا خریداران اعلان را پیدا کنند.",
     missingLocation: "لطفاً ولایت و ولسوالی/شهر را انتخاب کنید.",
+    locationMustConfirm: "لطفاً موقعیت جنس را پیش از ادامه تایید کنید.",
     missingContact: "لطفاً نام و شماره تماس پروفایل خود را تکمیل کنید.",
     success: "اعلان برای بررسی ارسال شد.",
     suitableStudents: "مناسب برای محصلین",
@@ -217,19 +309,29 @@ const COPY = {
     exactHidden: "در صفحه عمومی ولایت/ولسوالی نمایش داده می‌شود، نه آدرس دقیق شما.",
   },
   ps: {
+    quickPost: "چټک اعلان",
+    stepOne: "۱ له ۲ مرحلې",
+    stepTwo: "۲ له ۲ مرحلې",
+    stepOneTitle: "خپل اعلان ثبت کړئ",
+    stepTwoTitle: "کټګوري او تفصیلات تایید کړئ",
     subtitle: "انځورونه، تشریح، بیه او ځای ولیکئ. صاحبش پاتې معلومات وړاندیز کوي او تاسو هر وړاندیز سمولای شئ.",
+    continue: "دوام",
+    back: "شاته",
+    editStepOne: "۱مه مرحله سمول",
     photosTitle: "لومړی انځورونه زیات کړئ",
     photosHint: "له کمرې یا ګالري. JPG، PNG، WebP یا HEIC؛ هر انځور تر ۱۰ MB پورې.",
     addPhotos: "+ انځورونه زیات کړئ",
     addMore: "نور زیات کړئ",
     primary: "اصلي",
     remove: "لرې کول",
+    moveEarlier: "مخکې یوسئ",
+    moveLater: "وروسته یوسئ",
     description: "تشریح کړئ چې څه شی پلورئ",
     descriptionPlaceholder: "بېلګه: ټویوټا کرولا ۲۰۱۲، اتومات، پاک بدن، په کابل کې...",
     descriptionRequirement: "د خپرولو لپاره لږ تر لږه ۲۰ توري اړین دي.",
-    title: "وړاندیز شوی سرلیک",
-    titleHint: "لنډ او روښانه یې ولیکئ. صاحباش یې ستاسو له تشریح هم جوړولای شي.",
-    titleTooShort: "سرلیک ډېر لنډ دی؛ صاحباش به که اړتیا وي مناسب سرلیک وکاروي.",
+    title: "سرلیک",
+    titleHint: "لنډ او روښانه یې ولیکئ. صاحبش وروسته ښه وړاندیز کولای شي، خو اختیار ستاسو دی.",
+    titleTooShort: "سرلیک ته لږ نور تفصیل زیات کړئ.",
     price: "بیه",
     amount: "اندازه",
     contactForPrice: "بیه په اړیکه",
@@ -245,14 +347,46 @@ const COPY = {
     dormFee: "د لیلیې فیس",
     landLeasePrice: "د اجارې بیه",
     location: "ځای",
+    useCurrentLocation: "زما فعلي ځای وکاروئ",
+    currentLocationHint: "د وسیلې ځای یوازې د همدې توکي د ځای ټاکلو لپاره کارېږي. له خپرولو مخکې یې تایید یا سم کړئ.",
+    detectingLocation: "ځای موندل کېږي...",
+    detectedLocation: "د توکي ځای وموندل شو",
+    confirmLocation: "دا ځای وکاروئ",
+    chooseManualLocation: "لاسي انتخاب",
+    gpsDenied: "د ځای اجازه رد شوه. تاسو لاسي انتخاب سره ادامه ورکولای شئ.",
+    gpsUnavailable: "اوس ځای ونه موندل شو. لاسي انتخاب وکړئ یا د نقشې پین وټاکئ.",
+    setOnMap: "په نقشه کې وټاکئ",
+    hideMap: "نقشه پټه کړئ",
+    mapPinSaved: "د نقشې پین خوندي شو. مهرباني وکړئ ولایت او ولسوالي تایید کړئ.",
+    locationPrivacy: "د عامه ځای محرمیت",
+    privacyExact: "دقیق نقشه پین",
+    privacyApproximate: "نږدې سیمه (سپارښتنه)",
+    privacyDistrict: "یوازې ښار / ولسوالي",
+    privacyHidden: "پټ",
     province: "ولایت",
     district: "ولسوالي / ښار",
     area: "سیمه یا ګاونډ (اختیاري)",
     select: "وټاکئ",
     detected: "صاحبش وموندل",
     detectionHint: "هر چیپ سمولای شئ. که ډاډ کم وي، یوه کټګوري وټاکئ.",
+    suggestionsTitle: "وړاندیز شوې کټګورۍ",
+    manualCategory: "کټګوري لاسي وټاکئ",
     chooseCategory: "دا اعلان د کومې کټګورۍ دی؟",
+    chooseSubcategory: "دقیق فرعي کټګوري وټاکئ",
+    selectedSubcategory: "ټاکل شوې فرعي کټګوري",
+    noSubcategories: "د فرعي کټګوریو لپاره یوه اصلي کټګوري وټاکئ.",
+    selected: "ټاکل شوی",
+    suggested: "وړاندیز",
+    otherPossibilities: "نور احتمالونه",
+    additionalDetails: "نور تفصیلات",
     advanced: "پرمختللي تفصیلات (اختیاري)",
+    moreOptionalDetails: "+ نور اختیاري تفصیلات",
+    hideOptionalDetails: "اختیاري تفصیلات پټ کړئ",
+    carDamageTitle: "د موټر د بدنې حالت",
+    carDamageHint: "اختیاري دی خو د موټر پېرودونکو لپاره ډېر ګټور دی. د بدنې برخه وټاکئ او حالت یې وښایئ.",
+    damageSummary: "د بدنې حالت لنډیز",
+    noDamageSelected: "هیڅ رنګ شوی، بدل شوی یا زیانمنه برخه نه ده ټاکل شوې.",
+    previewTitle: "ستاسو د اعلان مخکتنه",
     publish: "اعلان خپور کړئ",
     publishing: "خپرېږي...",
     saved: "مسوده خوندي شوه",
@@ -264,6 +398,7 @@ const COPY = {
     missingPrice: "مهرباني وکړئ بیه ولیکئ یا بیه په اړیکه وټاکئ.",
     missingCategory: "مهرباني وکړئ کټګوري وټاکئ چې پېرودونکي یې ومومي.",
     missingLocation: "مهرباني وکړئ ولایت او ولسوالي/ښار وټاکئ.",
+    locationMustConfirm: "مهرباني وکړئ د توکي ځای له ادامه مخکې تایید کړئ.",
     missingContact: "مهرباني وکړئ د پروفایل نوم او ټیلیفون بشپړ کړئ.",
     success: "اعلان د بیاکتنې لپاره واستول شو.",
     suitableStudents: "د محصلینو لپاره مناسب",
@@ -644,6 +779,31 @@ function readDraftBoolean(value: unknown) {
   return value === true || value === "true" || value === "on" || value === "1";
 }
 
+function readDraftNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isQuickPostCarDamageCategory(rootSlug: string | null | undefined, path: string | null | undefined) {
+  const normalizedRoot = String(rootSlug ?? "").toLowerCase();
+  const normalizedPath = String(path ?? "").toLowerCase();
+  if (normalizedRoot !== "vehicles" && !normalizedPath.startsWith("vehicles")) return false;
+  if (!normalizedPath) return false;
+  if (/motorcycle|motorbike|scooter|rickshaw|bicycle|parts|accessories|truck|bus|van|agricultural/.test(normalizedPath)) {
+    return false;
+  }
+  return normalizedPath === "vehicles/cars" || normalizedPath.includes("/cars");
+}
+
+function moveImageInOrder(images: StagedImage[], id: string, direction: -1 | 1) {
+  const index = images.findIndex((image) => image.id === id);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= images.length) return images;
+  const next = [...images];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
 export default function QuickPostForm({
   categories,
   t,
@@ -656,10 +816,13 @@ export default function QuickPostForm({
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const aiCacheRef = useRef<Map<string, AiResponse>>(new Map());
+  const lastServerDraftSignatureRef = useRef("");
   const [isPending, startTransition] = useTransition();
   const c = COPY[locale] ?? COPY.en;
   const direction = locale === "en" ? "ltr" : "rtl";
 
+  const [step, setStep] = useState<QuickStep>(1);
+  const [publishRequestId, setPublishRequestId] = useState(() => createId());
   const [title, setTitle] = useState("");
   const [titleTouched, setTitleTouched] = useState(false);
   const [description, setDescription] = useState("");
@@ -681,12 +844,24 @@ export default function QuickPostForm({
   const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
   const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
   const [areaText, setAreaText] = useState("");
+  const [locationSource, setLocationSource] = useState<QuickLocationSource>("manual");
+  const [locationVisibility, setLocationVisibility] = useState<QuickLocationVisibility>("approximate");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationHint, setLocationHint] = useState<string | null>(null);
+  const [showMapPicker, setShowMapPicker] = useState(false);
   const [selectedRootSlug, setSelectedRootSlug] = useState(() => normalizeQuickPostRootSlug(initialRootSlug));
   const [rootTouched, setRootTouched] = useState(Boolean(normalizeQuickPostRootSlug(initialRootSlug)));
   const [selectedCategory, setSelectedCategory] = useState<CandidateNode | null>(null);
+  const [categoryCandidates, setCategoryCandidates] = useState<CandidateNode[]>([]);
+  const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [smartSuggestion, setSmartSuggestion] = useState<SmartPostingParseResult | null>(null);
   const [aiResponse, setAiResponse] = useState<AiResponse | null>(null);
+  const [damageParts, setDamageParts] = useState<DamagePart[]>(() => defaultDamageParts());
   const [aiStatus, setAiStatus] = useState<"idle" | "working" | "ready" | "unavailable">("idle");
   const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [isPublishing, setIsPublishing] = useState(false);
@@ -714,16 +889,21 @@ export default function QuickPostForm({
     () => activeCategories.find((category) => category.slug === selectedRootSlug) ?? null,
     [activeCategories, selectedRootSlug]
   );
+  const selectedCategoryId = selectedCategory?.id ?? null;
+  const selectedCategoryPath = selectedCategory?.path ?? null;
 
   const detectionText = `${title} ${description} ${Object.values(details).join(" ")}`;
   const quickKind = useMemo(
-    () => inferKind(selectedRootSlug, selectedCategory?.path, detectionText),
-    [selectedRootSlug, selectedCategory?.path, detectionText]
+    () => inferKind(selectedRootSlug, selectedCategoryPath, detectionText),
+    [selectedRootSlug, selectedCategoryPath, detectionText]
   );
   const isDormitory = quickKind === "dormitory";
   const isLand = quickKind === "land";
   const isHousing = quickKind === "housing";
   const isRentHousing = isHousing && transaction === "rent";
+  const showContextualPrice = step === 2 && Boolean(selectedCategory);
+  const isCarDamageEligible = isQuickPostCarDamageCategory(selectedRootSlug, selectedCategoryPath);
+  const nonOriginalDamageParts = useMemo(() => getNonOriginalVehicleDamageParts(damageParts), [damageParts]);
 
   const priceMode = useMemo(() => {
     if (contactForPrice) return "contact";
@@ -742,6 +922,18 @@ export default function QuickPostForm({
     if (quickKind === "housing") return HOUSING_FIELDS;
     return GENERAL_FIELDS;
   }, [quickKind]);
+
+  const priorityFieldKeys = useMemo(() => {
+    if (quickKind === "vehicle") return new Set(["make", "model", "year", "mileageKm", "transmission", "fuelType", "condition", "color"]);
+    if (quickKind === "phone" || quickKind === "tablet") return new Set(["brand", "model", "condition", "storageGb", "ramGb", "batteryHealth"]);
+    if (quickKind === "dormitory") return new Set(["payment_period", "gender_allowed", "room_type", "students_per_room", "available_beds", "internet", "hot_water"]);
+    if (quickKind === "land") return new Set(["landType", "areaSize", "areaUnit", "documentType", "roadAccess"]);
+    if (quickKind === "housing") return new Set(["rooms", "bedrooms", "bathrooms", "areaSize", "areaUnit", "furnished", "parking", "water", "electricity"]);
+    return new Set(["condition", "type", "brand", "model"]);
+  }, [quickKind]);
+
+  const primaryFields = useMemo(() => visibleFields.filter((field) => priorityFieldKeys.has(field.key)), [priorityFieldKeys, visibleFields]);
+  const optionalFields = useMemo(() => visibleFields.filter((field) => !priorityFieldKeys.has(field.key)), [priorityFieldKeys, visibleFields]);
 
   const categoryLabel = selectedCategory
     ? localizeCategoryName({
@@ -794,6 +986,8 @@ export default function QuickPostForm({
         if (localRaw) {
           const local = JSON.parse(localRaw) as Record<string, unknown>;
           const nextDetails = (local.details && typeof local.details === "object" ? local.details : {}) as Record<string, unknown>;
+          setStep(local.step === 2 ? 2 : 1);
+          if (readDraftString(local.publishRequestId)) setPublishRequestId(readDraftString(local.publishRequestId));
           setTitle(readDraftString(local.title));
           setDescription(readDraftString(local.description));
           setPriceAmount(readDraftString(local.priceAmount));
@@ -812,6 +1006,39 @@ export default function QuickPostForm({
           setSelectedProvinceId(Number(location.provinceId) || null);
           setSelectedDistrictId(Number(location.districtId) || null);
           setAreaText(readDraftString(location.areaText));
+          const nextVisibility = readDraftString(location.locationVisibility);
+          if (["exact", "approximate", "province_district", "hidden"].includes(nextVisibility)) {
+            setLocationVisibility(nextVisibility as QuickLocationVisibility);
+          }
+          const nextSource = readDraftString(location.locationSource);
+          if (["manual", "device", "map_pin"].includes(nextSource)) {
+            setLocationSource(nextSource as QuickLocationSource);
+          }
+          setLatitude(readDraftNumber(location.latitude));
+          setLongitude(readDraftNumber(location.longitude));
+          setLocationAccuracy(readDraftNumber(location.locationAccuracy));
+          setLocationConfirmed(readDraftBoolean(location.isConfirmed));
+          const localCategory = (local.selectedCategory && typeof local.selectedCategory === "object" ? local.selectedCategory : null) as Record<string, unknown> | null;
+          if (localCategory?.id && localCategory?.path) {
+            setSelectedCategory({
+              id: Number(localCategory.id),
+              category_id: Number(localCategory.category_id),
+              parent_id: localCategory.parent_id === null ? null : Number(localCategory.parent_id),
+              name: readDraftString(localCategory.name),
+              slug: readDraftString(localCategory.slug),
+              path: readDraftString(localCategory.path),
+              level: Number(localCategory.level) || 0,
+              display_order: Number(localCategory.display_order) || 0,
+              is_active: readDraftBoolean(localCategory.is_active ?? true),
+              is_leaf: readDraftBoolean(localCategory.is_leaf ?? true),
+            });
+          }
+          if (Array.isArray(local.damageParts)) {
+            const restoredDamage = local.damageParts
+              .filter((part): part is DamagePart => Boolean(part) && typeof part === "object" && "key" in part && "condition" in part)
+              .map((part) => ({ key: String(part.key), label: String(part.label ?? part.key), condition: String(part.condition) as DamagePart["condition"] }));
+            if (restoredDamage.length > 0) setDamageParts(restoredDamage);
+          }
         }
 
         const storedImages = await loadQuickPostImages().catch(() => []);
@@ -863,11 +1090,46 @@ export default function QuickPostForm({
         setRahnGerawyEnabled(readDraftBoolean(serverDetails.rahnGerawyEnabled));
         setSuitableForStudents(readDraftBoolean(serverDetails.suitableForStudents));
         setSelectedRootSlug(normalizeQuickPostRootSlug(readDraftString(serverCategory.rootSlug) || initialRootSlug));
+        const serverSelectedCategory = (serverCategory.selectedCategory && typeof serverCategory.selectedCategory === "object" ? serverCategory.selectedCategory : null) as Record<string, unknown> | null;
+        if (serverSelectedCategory?.id && serverSelectedCategory?.path) {
+          setSelectedCategory({
+            id: Number(serverSelectedCategory.id),
+            category_id: Number(serverSelectedCategory.category_id),
+            parent_id: serverSelectedCategory.parent_id === null ? null : Number(serverSelectedCategory.parent_id),
+            name: readDraftString(serverSelectedCategory.name),
+            slug: readDraftString(serverSelectedCategory.slug),
+            path: readDraftString(serverSelectedCategory.path),
+            level: Number(serverSelectedCategory.level) || 0,
+            display_order: Number(serverSelectedCategory.display_order) || 0,
+            is_active: readDraftBoolean(serverSelectedCategory.is_active ?? true),
+            is_leaf: readDraftBoolean(serverSelectedCategory.is_leaf ?? true),
+          });
+        }
         const nestedDetails = (serverDetails.details && typeof serverDetails.details === "object" ? serverDetails.details : {}) as Record<string, unknown>;
         setDetails(Object.fromEntries(Object.entries(nestedDetails).map(([key, value]) => [key, typeof value === "boolean" ? value : readDraftString(value)])));
+        setStep(serverDetails.step === 2 ? 2 : 1);
+        if (readDraftString(serverDetails.publishRequestId)) setPublishRequestId(readDraftString(serverDetails.publishRequestId));
         setSelectedProvinceId(Number(serverLocation.provinceId) || null);
         setSelectedDistrictId(Number(serverLocation.districtId) || null);
         setAreaText(readDraftString(serverLocation.areaText));
+        const serverVisibility = readDraftString(serverLocation.locationVisibility);
+        if (["exact", "approximate", "province_district", "hidden"].includes(serverVisibility)) {
+          setLocationVisibility(serverVisibility as QuickLocationVisibility);
+        }
+        const serverSource = readDraftString(serverLocation.locationSource);
+        if (["manual", "device", "map_pin"].includes(serverSource)) {
+          setLocationSource(serverSource as QuickLocationSource);
+        }
+        setLatitude(readDraftNumber(serverLocation.latitude));
+        setLongitude(readDraftNumber(serverLocation.longitude));
+        setLocationAccuracy(readDraftNumber(serverLocation.locationAccuracy));
+        setLocationConfirmed(readDraftBoolean(serverLocation.isConfirmed));
+        if (Array.isArray(serverDetails.damageParts)) {
+          const restoredDamage = serverDetails.damageParts
+            .filter((part): part is DamagePart => Boolean(part) && typeof part === "object" && "key" in part && "condition" in part)
+            .map((part) => ({ key: String(part.key), label: String(part.label ?? part.key), condition: String(part.condition) as DamagePart["condition"] }));
+          if (restoredDamage.length > 0) setDamageParts(restoredDamage);
+        }
       } catch {
         // Local draft corruption should not block posting.
       } finally {
@@ -919,6 +1181,8 @@ export default function QuickPostForm({
   useEffect(() => {
     if (!draftLoaded) return;
     const localDraft = {
+      step,
+      publishRequestId,
       title,
       description,
       priceAmount,
@@ -932,9 +1196,36 @@ export default function QuickPostForm({
       landLeasePrice,
       suitableForStudents,
       selectedRootSlug,
+      selectedCategory: selectedCategory
+        ? {
+            id: selectedCategory.id,
+            category_id: selectedCategory.category_id,
+            parent_id: selectedCategory.parent_id,
+            name: selectedCategory.name,
+            slug: selectedCategory.slug,
+            path: selectedCategory.path,
+            level: selectedCategory.level,
+            display_order: selectedCategory.display_order,
+            is_active: selectedCategory.is_active,
+            is_leaf: selectedCategory.is_leaf,
+          }
+        : null,
+      aiResponse,
+      smartSuggestion,
       details,
+      damageParts,
       photos: images.map((image) => ({ name: image.file.name, size: image.file.size, type: image.file.type })),
-      location: { provinceId: selectedProvinceId, districtId: selectedDistrictId, areaText },
+      location: {
+        provinceId: selectedProvinceId,
+        districtId: selectedDistrictId,
+        areaText,
+        locationSource,
+        locationVisibility,
+        latitude,
+        longitude,
+        locationAccuracy,
+        isConfirmed: locationConfirmed,
+      },
     };
     window.localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify(localDraft));
 
@@ -945,34 +1236,42 @@ export default function QuickPostForm({
       || Boolean(selectedRootSlug);
     if (!hasUsefulDraft) return;
 
+    const serverPayload = {
+      postingType: "quick" as const,
+      category: {
+        rootSlug: selectedRootSlug,
+        categoryNodeId: selectedCategory?.id ?? null,
+        categoryPath: selectedCategory?.path ?? null,
+        selectedCategory: localDraft.selectedCategory,
+      },
+      details: localDraft,
+      photos: localDraft.photos,
+      location: localDraft.location,
+      language: locale,
+    };
+    const serverSignature = JSON.stringify(serverPayload);
+    if (lastServerDraftSignatureRef.current === serverSignature) return;
+
     const timeout = window.setTimeout(() => {
+      if (lastServerDraftSignatureRef.current === serverSignature) return;
       setDraftStatus("saving");
-      void saveListingDraftAction({
-        postingType: "quick",
-        category: {
-          rootSlug: selectedRootSlug,
-          categoryNodeId: selectedCategory?.id ?? null,
-          categoryPath: selectedCategory?.path ?? null,
-        },
-        details: localDraft,
-        photos: localDraft.photos,
-        location: localDraft.location,
-        language: locale,
-      }).then((result) => {
+      void saveListingDraftAction(serverPayload).then((result) => {
         if (result.ok) {
+          lastServerDraftSignatureRef.current = serverSignature;
           setDraftId(result.draftId || draftId);
           setDraftStatus("saved");
         } else {
           setDraftStatus(result.statusCode === 401 ? "idle" : "error");
         }
       });
-    }, 1200);
+    }, 1000);
 
     return () => window.clearTimeout(timeout);
   }, [
     areaText,
     contactForPrice,
     currency,
+    damageParts,
     description,
     details,
     dormitoryFee,
@@ -981,18 +1280,29 @@ export default function QuickPostForm({
     gerawyAmount,
     images,
     landLeasePrice,
+    latitude,
+    locationAccuracy,
+    locationConfirmed,
+    locationSource,
+    locationVisibility,
+    longitude,
     locale,
     monthlyRent,
     priceAmount,
+    publishRequestId,
     rahnGerawyEnabled,
+    selectedCategory,
     selectedCategory?.id,
     selectedCategory?.path,
     selectedDistrictId,
     selectedProvinceId,
     selectedRootSlug,
     suitableForStudents,
+    step,
+    smartSuggestion,
     title,
     transaction,
+    aiResponse,
   ]);
 
   const applySmartSuggestion = useCallback((suggestion: SmartPostingParseResult) => {
@@ -1081,9 +1391,10 @@ export default function QuickPostForm({
     async function resolveCategory() {
       setCategoryLoading(true);
       const text = `${title} ${description} ${Object.values(details).join(" ")}`;
-      const kind = inferKind(selectedRootSlug, selectedCategory?.path, text);
+      const kind = inferKind(selectedRootSlug, selectedCategoryPath, text);
       const aiPath = aiResponse?.suggestedProduct?.categoryPath
         ?? (aiResponse?.suggestion?.pathSlugs?.length ? aiResponse.suggestion.pathSlugs.join("/") : null);
+      let exactNode: CandidateNode | null = null;
 
       try {
         if (aiResponse?.suggestedProduct?.categoryNodeId) {
@@ -1093,10 +1404,9 @@ export default function QuickPostForm({
             .eq("id", aiResponse.suggestedProduct.categoryNodeId)
             .eq("is_active", true)
             .maybeSingle();
-          const exactNode = exact as CandidateNode | null;
-          if (!cancelled && exactNode?.path?.startsWith(selectedRootSlug)) {
-            setSelectedCategory(exactNode);
-            return;
+          const resolvedExactNode = exact as CandidateNode | null;
+          if (resolvedExactNode?.path?.startsWith(selectedRootSlug)) {
+            exactNode = resolvedExactNode;
           }
         }
 
@@ -1107,14 +1417,27 @@ export default function QuickPostForm({
           .ilike("path", `${selectedRootSlug}%`)
           .order("level", { ascending: false })
           .order("display_order", { ascending: true })
-          .limit(100);
+          .limit(160);
 
         const nodes = ((data ?? []) as CandidateNode[]).filter((node) => node.path?.startsWith(selectedRootSlug));
-        const best = nodes
+        const ranked = nodes
           .map((node) => ({ node, score: scoreCategoryNode(node, kind, text, aiPath) }))
-          .sort((a, b) => b.score - a.score || b.node.level - a.node.level)[0]?.node ?? null;
+          .sort((a, b) => b.score - a.score || b.node.level - a.node.level || a.node.display_order - b.node.display_order)
+          .map((item) => item.node);
+        const choices = [
+          ...(exactNode ? [exactNode] : []),
+          ...ranked.filter((node) => node.id !== exactNode?.id),
+        ].filter((node, index, all) => all.findIndex((item) => item.id === node.id) === index);
+        const best = choices[0] ?? null;
 
-        if (!cancelled) setSelectedCategory(best);
+        if (!cancelled) {
+          setCategoryCandidates(choices.slice(0, 16));
+          if (exactNode || !rootTouched) {
+            setSelectedCategory(best);
+          } else if (selectedCategoryPath && !selectedCategoryPath.startsWith(selectedRootSlug)) {
+            setSelectedCategory(null);
+          }
+        }
       } finally {
         if (!cancelled) setCategoryLoading(false);
       }
@@ -1123,7 +1446,7 @@ export default function QuickPostForm({
     return () => {
       cancelled = true;
     };
-  }, [aiResponse, description, details, selectedCategory?.path, selectedRootSlug, supabase, title]);
+  }, [aiResponse, description, details, rootTouched, selectedCategoryId, selectedCategoryPath, selectedRootSlug, supabase, title]);
 
   const onPickFiles = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -1160,6 +1483,161 @@ export default function QuickPostForm({
     setImages((current) => current.map((image) => ({ ...image, isPrimary: image.id === id })));
   }, []);
 
+  const moveImage = useCallback((id: string, direction: -1 | 1) => {
+    setImages((current) => moveImageInOrder(current, id, direction));
+  }, []);
+
+  const confirmManualLocationIfReady = useCallback((provinceId: number | null, districtId: number | null) => {
+    setLocationSource((current) => current === "device" || current === "map_pin" ? current : "manual");
+    setLocationConfirmed(Boolean(provinceId && districtId));
+  }, []);
+
+  const handleUseCurrentLocation = useCallback(() => {
+    setLocationHint(null);
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationHint(c.gpsUnavailable);
+      setLocationSource("manual");
+      setLocationConfirmed(false);
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude);
+        setLongitude(position.coords.longitude);
+        setLocationAccuracy(Math.round(position.coords.accuracy));
+        setLocationSource("device");
+        setLocationVisibility((current) => current === "exact" || current === "hidden" ? current : "approximate");
+        setLocationConfirmed(false);
+        setLocationHint(c.currentLocationHint);
+        setIsDetectingLocation(false);
+      },
+      (geoError) => {
+        setLocationHint(geoError.code === 1 ? c.gpsDenied : c.gpsUnavailable);
+        setLocationSource("manual");
+        setLocationConfirmed(false);
+        setIsDetectingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, [c.currentLocationHint, c.gpsDenied, c.gpsUnavailable]);
+
+  const handleConfirmDetectedLocation = useCallback(() => {
+    if (!selectedProvinceId || !selectedDistrictId) {
+      setLocationHint(c.locationMustConfirm);
+      return;
+    }
+    setLocationConfirmed(true);
+    setLocationHint(c.detectedLocation);
+  }, [c.detectedLocation, c.locationMustConfirm, selectedDistrictId, selectedProvinceId]);
+
+  async function saveCurrentDraftNow(stepOverride: QuickStep = step) {
+    if (!draftLoaded) return draftId;
+    const localDraft = {
+      step: stepOverride,
+      publishRequestId,
+      title,
+      description,
+      priceAmount,
+      currency,
+      contactForPrice,
+      transaction,
+      rahnGerawyEnabled,
+      monthlyRent,
+      gerawyAmount,
+      dormitoryFee,
+      landLeasePrice,
+      suitableForStudents,
+      selectedRootSlug,
+      selectedCategory: selectedCategory
+        ? {
+            id: selectedCategory.id,
+            category_id: selectedCategory.category_id,
+            parent_id: selectedCategory.parent_id,
+            name: selectedCategory.name,
+            slug: selectedCategory.slug,
+            path: selectedCategory.path,
+            level: selectedCategory.level,
+            display_order: selectedCategory.display_order,
+            is_active: selectedCategory.is_active,
+            is_leaf: selectedCategory.is_leaf,
+          }
+        : null,
+      aiResponse,
+      smartSuggestion,
+      details,
+      damageParts,
+      photos: images.map((image) => ({ name: image.file.name, size: image.file.size, type: image.file.type })),
+      location: {
+        provinceId: selectedProvinceId,
+        districtId: selectedDistrictId,
+        areaText,
+        locationSource,
+        locationVisibility,
+        latitude,
+        longitude,
+        locationAccuracy,
+        isConfirmed: locationConfirmed,
+      },
+    };
+    window.localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify(localDraft));
+    const serverPayload = {
+      postingType: "quick" as const,
+      category: {
+        rootSlug: selectedRootSlug,
+        categoryNodeId: selectedCategory?.id ?? null,
+        categoryPath: selectedCategory?.path ?? null,
+        selectedCategory: localDraft.selectedCategory,
+      },
+      details: localDraft,
+      photos: localDraft.photos,
+      location: localDraft.location,
+      language: locale,
+    };
+    const serverSignature = JSON.stringify(serverPayload);
+    if (lastServerDraftSignatureRef.current === serverSignature) return draftId;
+    setDraftStatus("saving");
+    const result = await saveListingDraftAction(serverPayload);
+    if (result.ok) {
+      const nextDraftId = result.draftId || draftId;
+      lastServerDraftSignatureRef.current = serverSignature;
+      setDraftId(nextDraftId);
+      setDraftStatus("saved");
+      return nextDraftId;
+    } else {
+      setDraftStatus(result.statusCode === 401 ? "idle" : "error");
+    }
+    return draftId;
+  }
+
+  function validateStepOneBeforeContinue() {
+    if (description.trim().length < 20) return c.missingDescription;
+    const submitPrice = parseNumber(contactForPrice ? "0" : priceAmount);
+    if (!contactForPrice && (!submitPrice || submitPrice <= 0)) return c.missingPrice;
+    if (!selectedProvinceId || !selectedDistrictId) return c.missingLocation;
+    if (!locationConfirmed) return c.locationMustConfirm;
+    return null;
+  }
+
+  function goToStepTwo() {
+    const validationMessage = validateStepOneBeforeContinue();
+    if (validationMessage) {
+      setError(validationMessage);
+      return;
+    }
+    setError(null);
+    setStatus(null);
+    setStep(2);
+    void saveCurrentDraftNow(2);
+  }
+
+  function goBackToStepOne() {
+    setError(null);
+    setStatus(null);
+    setStep(1);
+  }
+
   function priceValueForSubmit() {
     if (contactForPrice) return "0";
     if (priceMode === "dormitory_fee") return dormitoryFee || priceAmount;
@@ -1175,6 +1653,7 @@ export default function QuickPostForm({
     if (description.trim().length < 20) return c.missingDescription;
     if (!selectedCategory) return c.missingCategory;
     if (!selectedProvinceId || !selectedDistrictId) return c.missingLocation;
+    if (!locationConfirmed) return c.locationMustConfirm;
     const submitPrice = parseNumber(priceValueForSubmit());
     if (!contactForPrice && (!submitPrice || submitPrice <= 0)) return c.missingPrice;
     return null;
@@ -1187,7 +1666,7 @@ export default function QuickPostForm({
     formData.set(key, text);
   }
 
-  function buildPublishFormData() {
+  function buildPublishFormData(savedDraftId = draftId) {
     const formData = new FormData();
     const submitPrice = priceValueForSubmit();
     const selectedProvince = provinceOptions.find((item) => item.id === selectedProvinceId);
@@ -1229,9 +1708,14 @@ export default function QuickPostForm({
     formData.set("province", selectedProvince?.name ?? "");
     formData.set("district", selectedDistrict?.name ?? "");
     formData.set("area_text", areaText.trim());
-    formData.set("location_source", "manual");
-    formData.set("location_visibility", "province_district");
-    formData.set("is_location_confirmed", "true");
+    formData.set("location_source", locationSource);
+    formData.set("location_visibility", locationVisibility);
+    formData.set("is_location_confirmed", locationConfirmed ? "true" : "false");
+    formData.set("publish_request_id", publishRequestId);
+    appendIfPresent(formData, "draft_id", savedDraftId);
+    appendIfPresent(formData, "latitude", latitude);
+    appendIfPresent(formData, "longitude", longitude);
+    appendIfPresent(formData, "location_accuracy", locationAccuracy);
     formData.set("negotiable", readDraftBoolean(details.negotiable) ? "true" : "false");
 
     if (priceMode === "monthly_rent") {
@@ -1285,6 +1769,11 @@ export default function QuickPostForm({
       appendIfPresent(formData, "color", details.color);
     }
 
+    if (isCarDamageEligible) {
+      formData.set("damage_parts_json", JSON.stringify(damageParts));
+      formData.set("damage_all_original", nonOriginalDamageParts.length === 0 ? "true" : "false");
+    }
+
     for (const [key, value] of Object.entries(details)) {
       appendIfPresent(formData, key, value);
     }
@@ -1305,7 +1794,8 @@ export default function QuickPostForm({
     setIsPublishing(true);
     startTransition(() => {
       void (async () => {
-        const formData = buildPublishFormData();
+        const savedDraftId = await saveCurrentDraftNow(2);
+        const formData = buildPublishFormData(savedDraftId);
         const result = await createListingAction(formData);
         if (!result.ok || !result.listingId) {
           setError(result.message);
@@ -1326,7 +1816,7 @@ export default function QuickPostForm({
 
         window.localStorage.removeItem(QUICK_DRAFT_KEY);
         await clearQuickPostImages().catch(() => undefined);
-        if (draftId) await deleteMyDraftAction(draftId);
+        if (savedDraftId || draftId) await deleteMyDraftAction(savedDraftId || draftId);
         setStatus(c.success);
         router.push(localizePath(`/listings/${result.listingId}/manage`, locale));
       })().catch((publishError) => {
@@ -1395,11 +1885,18 @@ export default function QuickPostForm({
   return (
     <div data-testid="quick-post-form" dir={direction} className="mt-6 space-y-4 pb-28">
       <section className="overflow-hidden rounded-[2rem] border border-[var(--line)] bg-gradient-to-br from-[#fff7ed] via-white to-[#eef7ff] p-4 shadow-sm sm:p-6">
-        <p className="text-sm font-semibold text-[var(--accent)]">Quick Post</p>
-        <h2 className="mt-1 font-display text-2xl font-bold text-[var(--ink-1)]">{c.photosTitle}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-[var(--accent)]">{c.quickPost}</p>
+          <p data-testid="quick-post-step-indicator" className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-[var(--ink-2)] shadow-sm">
+            {step === 1 ? c.stepOne : c.stepTwo}
+          </p>
+        </div>
+        <h2 className="mt-1 font-display text-2xl font-bold text-[var(--ink-1)]">{step === 1 ? c.stepOneTitle : c.stepTwoTitle}</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-2)]">{c.subtitle}</p>
       </section>
 
+      {step === 1 ? (
+        <>
       <section data-testid="quick-post-photos" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -1421,12 +1918,14 @@ export default function QuickPostForm({
         ) : (
           <div className="mt-4 space-y-3">
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {images.map((image) => (
+              {images.map((image, index) => (
                 <div key={image.id} className="relative aspect-square overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface-2)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={image.previewUrl} alt={image.file.name} className="h-full w-full object-cover" />
                   {image.isPrimary ? <span className="absolute left-1 top-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">{c.primary}</span> : null}
-                  <div className="absolute inset-x-1 bottom-1 flex justify-between gap-1">
+                  <div className="absolute inset-x-1 bottom-1 grid grid-cols-2 gap-1">
+                    <button type="button" aria-label={c.moveEarlier} onClick={() => moveImage(image.id, -1)} disabled={index === 0} className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold shadow disabled:opacity-50">{direction === "rtl" ? "›" : "‹"}</button>
+                    <button type="button" aria-label={c.moveLater} onClick={() => moveImage(image.id, 1)} disabled={index === images.length - 1} className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold shadow disabled:opacity-50">{direction === "rtl" ? "‹" : "›"}</button>
                     <button type="button" onClick={() => setPrimary(image.id)} className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold shadow">{c.primary}</button>
                     <button type="button" onClick={() => removeImage(image.id)} className="rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-red-600 shadow">{c.remove}</button>
                   </div>
@@ -1493,7 +1992,10 @@ export default function QuickPostForm({
           </span>
         </label>
       </section>
+        </>
+      ) : null}
 
+      {step === 2 ? (
       <section data-testid="quick-post-ai-chips" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -1527,6 +2029,8 @@ export default function QuickPostForm({
                 onClick={() => {
                   setRootTouched(true);
                   setSelectedCategory(null);
+                  setCategoryCandidates([]);
+                  setShowOptionalDetails(false);
                   setSelectedRootSlug(category.slug);
                 }}
                 className={`shrink-0 rounded-full border px-4 py-2 text-sm font-bold transition ${
@@ -1539,18 +2043,83 @@ export default function QuickPostForm({
               </button>
             ))}
           </div>
+          <div className="mt-4 grid gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--ink-2)]">{c.suggestionsTitle}</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {categoryCandidates.slice(0, 4).map((candidate, index) => {
+                  const isSelected = selectedCategory?.id === candidate.id;
+                  return (
+                    <button
+                      key={`suggested-${candidate.id}`}
+                      type="button"
+                      onClick={() => {
+                        setRootTouched(true);
+                        setSelectedCategory(candidate);
+                        setShowOptionalDetails(false);
+                      }}
+                      className={`rounded-2xl border px-3 py-3 text-start text-sm font-bold transition ${
+                        isSelected
+                          ? "border-[var(--accent)] bg-[var(--accent)] text-white shadow-sm"
+                          : "border-[var(--line)] bg-[var(--surface-2)] hover:bg-white"
+                      }`}
+                    >
+                      <span className="block text-[11px] uppercase tracking-[0.16em] opacity-75">
+                        {index === 0 ? c.suggested : c.otherPossibilities}
+                      </span>
+                      {localizeCategoryName({ locale, fallbackName: candidate.name, slug: candidate.slug, path: candidate.path })}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--ink-2)]">{c.manualCategory}</p>
+              {categoryCandidates.length > 0 ? (
+                <div className="mt-2 grid max-h-72 gap-2 overflow-y-auto rounded-2xl border border-[var(--line)] bg-white p-2 sm:grid-cols-2">
+                  {categoryCandidates.map((candidate) => {
+                    const isSelected = selectedCategory?.id === candidate.id;
+                    return (
+                      <button
+                        key={`manual-${candidate.id}`}
+                        type="button"
+                        onClick={() => {
+                          setRootTouched(true);
+                          setSelectedCategory(candidate);
+                          setShowOptionalDetails(false);
+                        }}
+                        className={`rounded-xl px-3 py-2 text-start text-sm font-semibold transition ${
+                          isSelected
+                            ? "bg-[var(--ink-1)] text-white"
+                            : "bg-[var(--surface-2)] text-[var(--ink-1)] hover:bg-white"
+                        }`}
+                      >
+                        {localizeCategoryName({ locale, fallbackName: candidate.name, slug: candidate.slug, path: candidate.path })}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-2 rounded-2xl bg-[var(--surface-2)] px-3 py-3 text-sm text-[var(--ink-2)]">
+                  {categoryLoading ? c.aiWorking : c.noSubcategories}
+                </p>
+              )}
+            </div>
+          </div>
           {categoryLabel ? (
             <p className="mt-2 text-xs font-semibold text-[var(--ink-2)]">
-              {categoryLoading ? c.aiWorking : categoryLabel}
+              {categoryLoading ? c.aiWorking : `${c.selectedSubcategory}: ${categoryLabel}`}
             </p>
           ) : null}
         </div>
       </section>
+      ) : null}
 
       <section data-testid="quick-post-price" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <h3 className="font-display text-lg font-bold">{c.price}</h3>
 
-        {(isHousing || isLand) && !contactForPrice ? (
+        {showContextualPrice && (isHousing || isLand) && !contactForPrice ? (
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => setTransaction("sale")} className={`rounded-full border px-4 py-2 text-sm font-bold ${transaction === "sale" ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--line)]"}`}>
               {c.forSale}
@@ -1568,7 +2137,7 @@ export default function QuickPostForm({
           </div>
         ) : null}
 
-        {isRentHousing && !contactForPrice ? (
+        {showContextualPrice && isRentHousing && !contactForPrice ? (
           <label className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-bold">
             <span>{c.rahnGerawy} <span className="text-xs text-[var(--ink-2)]">({c.keepOff})</span></span>
             <input name="rahn_gerawy_enabled" type="checkbox" checked={rahnGerawyEnabled} onChange={(event) => setRahnGerawyEnabled(event.target.checked)} className="h-5 w-5" />
@@ -1578,12 +2147,12 @@ export default function QuickPostForm({
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px]">
           {contactForPrice ? (
             <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-bold">{c.contactForPrice}</div>
-          ) : priceMode === "monthly_rent" ? (
+          ) : showContextualPrice && priceMode === "monthly_rent" ? (
             <label className="text-sm font-bold">
               {c.monthlyRent}
               <input type="number" value={monthlyRent} onChange={(event) => setMonthlyRent(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
             </label>
-          ) : priceMode === "gerawy_rahn" ? (
+          ) : showContextualPrice && priceMode === "gerawy_rahn" ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-bold">
                 {c.gerawyAmount}
@@ -1594,12 +2163,12 @@ export default function QuickPostForm({
                 <input type="number" value={monthlyRent} onChange={(event) => setMonthlyRent(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
               </label>
             </div>
-          ) : priceMode === "dormitory_fee" ? (
+          ) : showContextualPrice && priceMode === "dormitory_fee" ? (
             <label className="text-sm font-bold">
               {c.dormFee}
               <input type="number" value={dormitoryFee} onChange={(event) => setDormitoryFee(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
             </label>
-          ) : priceMode === "lease" ? (
+          ) : showContextualPrice && priceMode === "lease" ? (
             <label className="text-sm font-bold">
               {c.landLeasePrice}
               <input type="number" value={landLeasePrice} onChange={(event) => setLandLeasePrice(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
@@ -1624,7 +2193,7 @@ export default function QuickPostForm({
           {c.contactForPrice}
         </label>
 
-        {isRentHousing ? (
+        {showContextualPrice && isRentHousing ? (
           <label className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3 text-sm font-bold">
             <span>{c.suitableStudents} <span className="text-xs text-[var(--ink-2)]">({c.keepOff})</span></span>
             <input name="suitable_for_students" type="checkbox" checked={suitableForStudents} onChange={(event) => setSuitableForStudents(event.target.checked)} className="h-5 w-5" />
@@ -1636,10 +2205,81 @@ export default function QuickPostForm({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-display text-lg font-bold">{c.location}</h3>
-            <p className="mt-1 text-xs text-[var(--ink-2)]">{c.exactHidden}</p>
+            <p className="mt-1 text-xs text-[var(--ink-2)]">{c.currentLocationHint}</p>
           </div>
-          <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-bold text-[var(--ink-2)]">Privacy safe</span>
+          <span className={`rounded-full px-3 py-1 text-xs font-bold ${locationConfirmed ? "bg-emerald-50 text-emerald-700" : "bg-[var(--surface-2)] text-[var(--ink-2)]"}`}>
+            {locationConfirmed ? c.confirmLocation : c.locationMustConfirm}
+          </span>
         </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={handleUseCurrentLocation}
+            disabled={isDetectingLocation}
+            className="min-h-12 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
+          >
+            {isDetectingLocation ? c.detectingLocation : c.useCurrentLocation}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLocationSource("manual");
+              setLatitude(null);
+              setLongitude(null);
+              setLocationAccuracy(null);
+              setLocationConfirmed(Boolean(selectedProvinceId && selectedDistrictId));
+              setLocationHint(null);
+            }}
+            className="min-h-12 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-2)]"
+          >
+            {c.chooseManualLocation}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMapPicker((current) => !current)}
+            className="min-h-12 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-2)]"
+          >
+            {showMapPicker ? c.hideMap : c.setOnMap}
+          </button>
+        </div>
+
+        {locationHint ? (
+          <p className="mt-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 text-sm text-[var(--ink-2)]">
+            {locationHint}
+          </p>
+        ) : null}
+
+        {(latitude !== null && longitude !== null) ? (
+          <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+            <p className="font-bold">{c.detectedLocation}</p>
+            <p className="mt-1" dir="ltr">
+              {latitude.toFixed(6)}, {longitude.toFixed(6)}
+              {locationAccuracy !== null ? ` · ±${locationAccuracy}m` : ""}
+            </p>
+            <button type="button" onClick={handleConfirmDetectedLocation} className="mt-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white">
+              {c.confirmLocation}
+            </button>
+          </div>
+        ) : null}
+
+        {showMapPicker ? (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--line)]">
+            <LocationMapPicker
+              initialLocation={{ latitude: latitude ?? undefined, longitude: longitude ?? undefined, accuracy: locationAccuracy ?? undefined }}
+              onLocationSelected={(location) => {
+                setLatitude(location.latitude);
+                setLongitude(location.longitude);
+                setLocationAccuracy(location.accuracy ?? null);
+                setLocationSource("map_pin");
+                setLocationVisibility((current) => current === "hidden" ? current : "approximate");
+                setLocationConfirmed(Boolean(selectedProvinceId && selectedDistrictId));
+                setLocationHint(c.mapPinSaved);
+              }}
+            />
+          </div>
+        ) : null}
+
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-bold">
             {c.province}
@@ -1649,6 +2289,7 @@ export default function QuickPostForm({
                 const nextProvinceId = event.target.value ? Number(event.target.value) : null;
                 setSelectedProvinceId(nextProvinceId);
                 setSelectedDistrictId(null);
+                confirmManualLocationIfReady(nextProvinceId, null);
                 if (!nextProvinceId) setDistrictOptions([]);
               }}
               className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3"
@@ -1661,7 +2302,16 @@ export default function QuickPostForm({
           </label>
           <label className="text-sm font-bold">
             {c.district}
-            <select value={selectedDistrictId ?? ""} onChange={(event) => setSelectedDistrictId(event.target.value ? Number(event.target.value) : null)} disabled={!selectedProvinceId} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3 disabled:bg-[var(--surface-2)]">
+            <select
+              value={selectedDistrictId ?? ""}
+              onChange={(event) => {
+                const nextDistrictId = event.target.value ? Number(event.target.value) : null;
+                setSelectedDistrictId(nextDistrictId);
+                confirmManualLocationIfReady(selectedProvinceId, nextDistrictId);
+              }}
+              disabled={!selectedProvinceId}
+              className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3 disabled:bg-[var(--surface-2)]"
+            >
               <option value="">{c.select}</option>
               {districtOptions.map((district) => (
                 <option key={district.id} value={district.id}>{district.name}</option>
@@ -1672,26 +2322,158 @@ export default function QuickPostForm({
             {c.area}
             <input value={areaText} onChange={(event) => setAreaText(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
           </label>
+          <fieldset className="sm:col-span-2">
+            <legend className="text-sm font-bold">{c.locationPrivacy}</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-4">
+              {([
+                ["approximate", c.privacyApproximate],
+                ["province_district", c.privacyDistrict],
+                ["hidden", c.privacyHidden],
+                ["exact", c.privacyExact],
+              ] as const).map(([value, label]) => (
+                <label key={value} className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-bold transition ${locationVisibility === value ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--line)] bg-white text-[var(--ink-1)]"}`}>
+                  <input
+                    type="radio"
+                    name="location_visibility"
+                    value={value}
+                    checked={locationVisibility === value}
+                    onChange={() => setLocationVisibility(value)}
+                    className="h-4 w-4"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-[var(--ink-2)]">{c.exactHidden}</p>
+          </fieldset>
         </div>
       </section>
 
-      <details data-testid="quick-post-advanced-details" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
-        <summary className="cursor-pointer font-display text-lg font-bold">{c.advanced}</summary>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {visibleFields.map(renderField)}
-          {isRentHousing && suitableForStudents ? (
-            <>
-              {DORMITORY_FIELDS.filter((field) => ["gender_allowed", "nearby_institution", "distance_to_university", "furnished"].includes(field.key)).map(renderField)}
-            </>
+      {step === 2 ? (
+        <>
+          <section data-testid="quick-post-advanced-details" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-display text-lg font-bold">{c.additionalDetails}</h3>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">{selectedCategory ? categoryLabel : c.chooseSubcategory}</p>
+              </div>
+              {!selectedCategory ? <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">{c.missingCategory}</span> : null}
+            </div>
+
+            {selectedCategory ? (
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {primaryFields.map(renderField)}
+                  {isRentHousing && suitableForStudents
+                    ? DORMITORY_FIELDS
+                        .filter((field) => ["gender_allowed", "nearby_institution", "distance_to_university", "furnished"].includes(field.key))
+                        .map(renderField)
+                    : null}
+                </div>
+
+                {optionalFields.length > 0 ? (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowOptionalDetails((current) => !current)}
+                      className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2 text-sm font-black text-[var(--ink-1)]"
+                    >
+                      {showOptionalDetails ? c.hideOptionalDetails : c.moreOptionalDetails}
+                    </button>
+                    {showOptionalDetails ? (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        {optionalFields.map(renderField)}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          {isCarDamageEligible ? (
+            <section data-testid="quick-post-car-damage" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+              <h3 className="font-display text-lg font-bold">{c.carDamageTitle}</h3>
+              <p className="mt-1 text-sm leading-6 text-[var(--ink-2)]">{c.carDamageHint}</p>
+              <div className="mt-4">
+                <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} locale={locale} />
+              </div>
+              <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
+                <p className="text-sm font-black">{c.damageSummary}</p>
+                {nonOriginalDamageParts.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {nonOriginalDamageParts.map((part) => {
+                      const condition = damageCondition(part.condition);
+                      return (
+                        <span key={part.key} className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-bold text-[var(--ink-1)]">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: condition.color }} />
+                          {damagePartLabel(part.key, locale)} · {condition.labels[locale]}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-[var(--ink-2)]">{c.noDamageSelected}</p>
+                )}
+              </div>
+            </section>
           ) : null}
-        </div>
-      </details>
 
-      <section className="rounded-3xl border border-[var(--line)] bg-white p-4 text-sm text-[var(--ink-2)] shadow-sm sm:p-5">
-        <p className="font-semibold text-[var(--ink-1)]">{sellerContactName || "Profile contact"}</p>
-        <p className="mt-1">{maskedSellerContactPhone || c.missingContact}</p>
-        <p className="mt-2">{c.noOverride}</p>
-      </section>
+          <section data-testid="quick-post-review" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-display text-lg font-bold">{c.previewTitle}</h3>
+                <p className="mt-1 text-xs text-[var(--ink-2)]">{categoryLabel || c.missingCategory}</p>
+              </div>
+              <button type="button" onClick={goBackToStepOne} className="rounded-xl border border-[var(--line)] px-3 py-2 text-xs font-black">
+                {c.editStepOne}
+              </button>
+            </div>
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-[96px_1fr]">
+              <div className="aspect-square overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface-2)]">
+                {images[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={images.find((image) => image.isPrimary)?.previewUrl ?? images[0].previewUrl} alt={title || c.previewTitle} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-2xl">📷</div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="font-black text-[var(--ink-1)]">{title.trim() || buildSuggestedQuickPostTitle({
+                  enteredTitle: "",
+                  description,
+                  kind: quickKind,
+                  details,
+                  categoryLabel,
+                  provinceName: provinceOptions.find((item) => item.id === selectedProvinceId)?.name,
+                  districtName: districtOptions.find((item) => item.id === selectedDistrictId)?.name,
+                  areaText,
+                  transaction,
+                  labels: { sale: c.forSale, rent: c.forRent, lease: c.forLease, listing: categoryLabel || "Sahibash listing", near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near" },
+                })}</p>
+                <p className="mt-1 text-[var(--accent)]">{contactForPrice ? c.contactForPrice : `${priceValueForSubmit() || priceAmount || "—"} ${currency}`}</p>
+                <p className="mt-1 text-[var(--ink-2)]">
+                  {[provinceOptions.find((item) => item.id === selectedProvinceId)?.name, districtOptions.find((item) => item.id === selectedDistrictId)?.name, areaText].filter(Boolean).join(" • ") || c.missingLocation}
+                </p>
+                <p className="mt-2 line-clamp-3 text-[var(--ink-2)]">{description}</p>
+                {chips.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {chips.slice(0, 6).map((chip) => (
+                      <span key={`preview-${chip.key}`} className="rounded-full bg-[var(--surface-2)] px-2 py-0.5 text-xs font-semibold">{chip.value}</span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-[var(--line)] bg-white p-4 text-sm text-[var(--ink-2)] shadow-sm sm:p-5">
+            <p className="font-semibold text-[var(--ink-1)]">{sellerContactName || "Profile contact"}</p>
+            <p className="mt-1">{maskedSellerContactPhone || c.missingContact}</p>
+            <p className="mt-2">{c.noOverride}</p>
+          </section>
+        </>
+      ) : null}
 
       {error ? <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</p> : null}
       {status ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{status}</p> : null}
@@ -1701,14 +2483,29 @@ export default function QuickPostForm({
           <p className="hidden text-xs font-semibold text-[var(--ink-2)] sm:block">
             {draftStatus === "saving" ? c.saving : draftStatus === "saved" ? c.saved : ""}
           </p>
-          <button
-            type="button"
-            onClick={onPublish}
-            disabled={isPending || isPublishing}
-            className="min-h-12 flex-1 rounded-2xl bg-[var(--accent)] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:brightness-95 disabled:opacity-60"
-          >
-            {isPending || isPublishing ? c.publishing : c.publish}
-          </button>
+          {step === 2 ? (
+            <button type="button" onClick={goBackToStepOne} className="min-h-12 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-black">
+              {c.back}
+            </button>
+          ) : null}
+          {step === 1 ? (
+            <button
+              type="button"
+              onClick={goToStepTwo}
+              className="min-h-12 flex-1 rounded-2xl bg-[var(--accent)] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:brightness-95"
+            >
+              {c.continue}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onPublish}
+              disabled={isPending || isPublishing}
+              className="min-h-12 flex-1 rounded-2xl bg-[var(--accent)] px-5 py-3 text-sm font-black text-white shadow-sm transition hover:brightness-95 disabled:opacity-60"
+            >
+              {isPending || isPublishing ? c.publishing : c.publish}
+            </button>
+          )}
         </div>
       </div>
     </div>

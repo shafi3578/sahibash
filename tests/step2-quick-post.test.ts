@@ -15,7 +15,7 @@ const homePage = readFileSync(join(process.cwd(), "app", "page.tsx"), "utf8");
 const featuredPage = readFileSync(join(process.cwd(), "app", "featured", "page.tsx"), "utf8");
 const detailSpecs = readFileSync(join(process.cwd(), "lib", "listings", "detailSpecs.ts"), "utf8");
 
-test("consumer create page defaults to the one-screen Quick Post but preserves the standard form", () => {
+test("consumer create page defaults to the two-step Quick Post but preserves the standard form", () => {
   assert.match(createPage, /import QuickPostForm/);
   assert.match(createPage, /posting === "standard" \? "standard" : "quick"/);
   assert.match(createPage, /initialMode === "quick"/);
@@ -23,8 +23,10 @@ test("consumer create page defaults to the one-screen Quick Post but preserves t
   assert.match(createPage, /<PostAdForm/);
 });
 
-test("Quick Post includes the Step 2 one-screen core and existing draft/publish systems", () => {
+test("Quick Post is exactly two required steps and preserves existing draft/publish systems", () => {
   for (const marker of [
+    "type QuickStep = 1 | 2",
+    'data-testid="quick-post-step-indicator"',
     'data-testid="quick-post-form"',
     'data-testid="quick-post-photos"',
     'data-testid="quick-post-description"',
@@ -32,6 +34,7 @@ test("Quick Post includes the Step 2 one-screen core and existing draft/publish 
     'data-testid="quick-post-location"',
     'data-testid="quick-post-ai-chips"',
     'data-testid="quick-post-advanced-details"',
+    'data-testid="quick-post-review"',
     'name="contact_for_price"',
     'name="rahn_gerawy_enabled"',
     'name="suitable_for_students"',
@@ -43,6 +46,47 @@ test("Quick Post includes the Step 2 one-screen core and existing draft/publish 
     "parseSmartPostingText",
     "posting_mode",
     "price_mode",
+    "publish_request_id",
+    "draft_id",
+  ]) {
+    assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.match(quickPostForm, /onClick=\{goToStepTwo\}/);
+  assert.match(quickPostForm, /\{c\.continue\}/);
+  assert.match(quickPostForm, /step === 1 \? c\.stepOne : c\.stepTwo/);
+  assert.doesNotMatch(quickPostForm, /type QuickStep = 1 \| 2 \| 3/);
+});
+
+test("Step 1 collects universal seller information without category blocking", () => {
+  const stepOneGuard = quickPostForm.slice(
+    quickPostForm.indexOf("function validateStepOneBeforeContinue"),
+    quickPostForm.indexOf("function goToStepTwo")
+  );
+
+  assert.match(stepOneGuard, /description\.trim\(\)\.length < 20/);
+  assert.match(stepOneGuard, /contactForPrice/);
+  assert.match(stepOneGuard, /selectedProvinceId/);
+  assert.match(stepOneGuard, /locationConfirmed/);
+  assert.doesNotMatch(stepOneGuard, /missingCategory/);
+});
+
+test("Quick Post restores and autosaves complete local/server drafts with a 1-second debounce", () => {
+  for (const marker of [
+    "QUICK_DRAFT_KEY",
+    "QUICK_IMAGE_DB_NAME",
+    "publishRequestId",
+    "selectedCategory",
+    "aiResponse",
+    "smartSuggestion",
+    "damageParts",
+    "locationSource",
+    "locationVisibility",
+    "locationAccuracy",
+    "isConfirmed",
+    "lastServerDraftSignatureRef",
+    "window.setTimeout",
+    "}, 1000)",
+    "saveCurrentDraftNow(2)",
   ]) {
     assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -53,7 +97,42 @@ test("Quick Post resolves AI suggestions against canonical taxonomy instead of a
   assert.match(quickPostForm, /\.eq\("is_active", true\)/);
   assert.match(quickPostForm, /suggestedProduct\?\.categoryNodeId/);
   assert.match(quickPostForm, /scoreCategoryNode/);
+  assert.match(quickPostForm, /categoryCandidates\.slice\(0, 4\)/);
+  assert.match(quickPostForm, /setSelectedCategory\(candidate\)/);
   assert.doesNotMatch(quickPostForm, /formData\.set\("category_node_id",\s*ai/i);
+});
+
+test("Quick Post supports professional item location without exposing device GPS by default", () => {
+  for (const marker of [
+    "handleUseCurrentLocation",
+    "navigator.geolocation.getCurrentPosition",
+    "LocationMapPicker",
+    "locationSource",
+    "locationVisibility",
+    "privacyApproximate",
+    "province_district",
+    "hidden",
+    "formData.set(\"location_visibility\", locationVisibility)",
+    "formData.set(\"is_location_confirmed\", locationConfirmed ? \"true\" : \"false\")",
+  ]) {
+    assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
+test("Quick Post restores car-only 2D damage reporting and buyer detail visibility", () => {
+  for (const marker of [
+    "VehicleDamageDiagram",
+    "defaultDamageParts",
+    "isQuickPostCarDamageCategory",
+    'data-testid="quick-post-car-damage"',
+    "damage_parts_json",
+    "damage_all_original",
+  ]) {
+    assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.match(listingActions, /persistVehicleDamage\(supabase, data\.id, formData\)/);
+  assert.match(listingDetail, /VehicleDamageCard/);
+  assert.match(listingDetail, /vehicleDamageCardParts/);
 });
 
 test("Quick Post exposes only Step 2 launch roots and maps unsupported item detections into second-hand", () => {
@@ -90,6 +169,21 @@ test("Quick Post persists category-specific metadata for detail/search without d
   }
   assert.match(listingActions, /isDormitory = \/dormitory\|student\|hostel\//);
   assert.match(listingActions, /isDormitory \|\| \(isRentListing && explicitSuitable\)/);
+});
+
+test("Quick Post publish is idempotent through the existing listing draft", () => {
+  for (const marker of [
+    "getExistingQuickPublishedListingId",
+    "markQuickDraftPublished",
+    "readQuickPublishedListingId",
+    ".from(\"listing_drafts\")",
+    ".eq(\"user_id\", userId)",
+    "status: \"published\"",
+    "published_listing_id",
+    "publishRequestId",
+  ]) {
+    assert.match(listingActions, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
 });
 
 test("Quick Post preserves photo drafts and normalizes short publish titles", () => {

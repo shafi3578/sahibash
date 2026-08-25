@@ -52,6 +52,8 @@ const RESERVED_FORM_KEYS = new Set([
   "damage_all_original",
   "damage_parts_json",
   "posting_mode",
+  "draft_id",
+  "publish_request_id",
   "price_mode",
   "price",
   "currency",
@@ -171,6 +173,92 @@ function toFormValueBoolean(value: FormDataEntryValue | null) {
 
 function isQuickPostingMode(formData: FormData) {
   return toFormValueText(formData.get("posting_mode")).toLowerCase() === "quick";
+}
+
+function readQuickPublishedListingId(details: unknown, publishRequestId: string) {
+  if (!details || typeof details !== "object") return null;
+  const record = details as Record<string, unknown>;
+  const storedPublishRequestId = toFormValueText(record.publishRequestId as FormDataEntryValue | null);
+  const directListingId = toFormValueText(
+    (record.published_listing_id ?? record.quickPublishListingId) as FormDataEntryValue | null
+  );
+  if (directListingId && (!publishRequestId || !storedPublishRequestId || storedPublishRequestId === publishRequestId)) {
+    return directListingId;
+  }
+
+  const publish = record.publish;
+  if (publish && typeof publish === "object") {
+    const publishRecord = publish as Record<string, unknown>;
+    const nestedRequestId = toFormValueText(publishRecord.publishRequestId as FormDataEntryValue | null);
+    const nestedListingId = toFormValueText(publishRecord.listingId as FormDataEntryValue | null);
+    if (nestedListingId && (!publishRequestId || !nestedRequestId || nestedRequestId === publishRequestId)) {
+      return nestedListingId;
+    }
+  }
+
+  return null;
+}
+
+async function getExistingQuickPublishedListingId(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+  formData: FormData
+) {
+  if (!isQuickPostingMode(formData)) return null;
+  const draftId = toFormValueText(formData.get("draft_id"));
+  if (!draftId) return null;
+  const publishRequestId = toFormValueText(formData.get("publish_request_id"));
+
+  const { data } = await supabase
+    .from("listing_drafts")
+    .select("details, status")
+    .eq("id", draftId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!data || data.status !== "published") return null;
+  return readQuickPublishedListingId(data.details, publishRequestId);
+}
+
+async function markQuickDraftPublished(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+  formData: FormData,
+  listingId: string
+) {
+  if (!isQuickPostingMode(formData)) return;
+  const draftId = toFormValueText(formData.get("draft_id"));
+  if (!draftId) return;
+  const publishRequestId = toFormValueText(formData.get("publish_request_id"));
+
+  const { data } = await supabase
+    .from("listing_drafts")
+    .select("details")
+    .eq("id", draftId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const details = data?.details && typeof data.details === "object"
+    ? { ...(data.details as Record<string, unknown>) }
+    : {};
+
+  await supabase
+    .from("listing_drafts")
+    .update({
+      status: "published",
+      details: {
+        ...details,
+        published_listing_id: listingId,
+        publishRequestId,
+        publish: {
+          listingId,
+          publishRequestId,
+          publishedAt: new Date().toISOString(),
+        },
+      },
+    })
+    .eq("id", draftId)
+    .eq("user_id", userId);
 }
 
 function buildCanonicalAreaRows(
@@ -1628,6 +1716,15 @@ export async function createListingAction(formData: FormData): Promise<{
     return { ok: false, message: "Please log in or register to publish your ad.", statusCode: 401 };
   }
   const supabase = await createSupabaseServerClient();
+  const existingQuickListingId = await getExistingQuickPublishedListingId(supabase, user.id, formData);
+  if (existingQuickListingId) {
+    return {
+      ok: true,
+      message: "Listing created successfully",
+      listingId: existingQuickListingId,
+    };
+  }
+
   const rateLimit = await consumeRateLimit({
     scope: "listing.create",
     userId: user.id,
@@ -1717,6 +1814,7 @@ export async function createListingAction(formData: FormData): Promise<{
     originalLocale: createdListing.payload.original_locale,
   });
   await processPendingListingTranslationJobs(supabase, { listingId: data.id, limit: 3 });
+  await markQuickDraftPublished(supabase, user.id, formData, data.id);
 
   revalidatePath("/");
   revalidatePath("/listings");

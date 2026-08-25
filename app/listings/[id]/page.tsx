@@ -11,6 +11,7 @@ import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
 import { VehicleModelViewer } from "@/components/vehicles/VehicleModelViewer";
+import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
 import LocationCard from "@/components/location/LocationCard";
 import type { LocationVisibility } from "@/components/location/LocationCard";
 import { getDictionary } from "@/lib/i18n/server";
@@ -295,6 +296,11 @@ export default async function ListingDetailPage({
       condition: part.condition,
     }))
   );
+  const vehicleDamageCardParts = (listing.vehicle_damage?.vehicle_damage_parts ?? []).map((part) => ({
+    part_key: String(part.part_key ?? ""),
+    part_label: String(part.part_label ?? ""),
+    condition: String(part.condition ?? "original"),
+  }));
   const vehiclePlateNumberValue = attributeMap.get("plate_number")
     || attributeMap.get("license_plate")
     || attributeMap.get("vehicle_plate_number")
@@ -641,6 +647,9 @@ export default async function ListingDetailPage({
         <ListingGallery images={listing.listing_images ?? []} title={displayTitle} labels={galleryLabels} />
 
         {vehicleModel3D ? <VehicleModelViewer model={vehicleModel3D} locale={locale} damageParts={vehicleDamageParts} hasDamageReport={Boolean(listing.vehicle_damage)} /> : null}
+        {isVehicleListing && listing.vehicle_damage ? (
+          <VehicleDamageCard allOriginal={Boolean(listing.vehicle_damage.all_original)} parts={vehicleDamageCardParts} locale={locale} />
+        ) : null}
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           {isWanted ? (
