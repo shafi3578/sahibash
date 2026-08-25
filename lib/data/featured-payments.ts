@@ -238,9 +238,9 @@ export function getCampaignInstructions(config: FeaturedCampaignConfig, locale: 
 
 export function isFeaturedCurrentlyActive(listing: { featured?: boolean; featured_until?: string | null }) {
   if (!listing.featured) return false;
-  if (!listing.featured_until) return true;
+  if (!listing.featured_until) return false;
   const expiry = new Date(listing.featured_until);
-  return Number.isNaN(expiry.getTime()) || expiry > new Date();
+  return !Number.isNaN(expiry.getTime()) && expiry > new Date();
 }
 
 export async function getActiveFeaturedCampaignConfig(): Promise<FeaturedCampaignConfig | null> {

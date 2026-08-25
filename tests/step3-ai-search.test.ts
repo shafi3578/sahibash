@@ -10,6 +10,11 @@ const telemetry = readFileSync(join(root, "lib", "search", "telemetry.ts"), "utf
 const searchPage = readFileSync(join(root, "app", "search", "page.tsx"), "utf8");
 const listingAssistant = readFileSync(join(root, "components", "listings", "listing-ai-assistant.tsx"), "utf8");
 const listingActions = readFileSync(join(root, "lib", "actions", "listings.ts"), "utf8");
+const shadowModerationRecorder = readFileSync(join(root, "lib", "ai", "moderation.ts"), "utf8");
+const shadowModerationMigration = readFileSync(
+  join(root, "supabase", "migrations", "20260825103528_connect_ai_shadow_moderation_to_operations.sql"),
+  "utf8"
+);
 
 test("Sahibash AI parses Corolla in Kabul under 400000 into deterministic filters", () => {
   const parsed = parseSahibashAiSearch("a Corolla in Kabul under 400000", "en");
@@ -83,4 +88,20 @@ test("AI moderation is shadow-first and non-blocking", () => {
   assert.ok(blocked.reason_codes.some((code) => code.startsWith("prohibited_term")));
 
   assert.match(listingActions, /recordShadowModerationReview/);
+});
+
+test("AI shadow moderation persists into operational moderation surfaces without auto-rejecting", () => {
+  assert.match(shadowModerationRecorder, /ai_moderation_reviews/);
+  assert.match(shadowModerationRecorder, /listing_risk_signals/);
+  assert.match(shadowModerationRecorder, /listing_quality_signals/);
+  assert.match(shadowModerationRecorder, /moderation_workflow_entries/);
+  assert.match(shadowModerationRecorder, /entity_uuid:\s*input\.listingId/);
+  assert.match(shadowModerationRecorder, /source:\s*"ai_shadow_moderation"/);
+  assert.match(shadowModerationRecorder, /decision_suggestion !== "approve"/);
+  assert.doesNotMatch(shadowModerationRecorder, /\.from\("listings"\)\.update|status:\s*"rejected"|to_status:\s*"rejected"/);
+  assert.match(shadowModerationRecorder, /catch \{[\s\S]*never block the seller posting path/);
+
+  assert.match(shadowModerationMigration, /add column if not exists entity_uuid uuid/);
+  assert.match(shadowModerationMigration, /add column if not exists metadata jsonb/);
+  assert.match(shadowModerationMigration, /idx_moderation_workflow_entries_entity_uuid/);
 });

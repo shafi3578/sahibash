@@ -12,16 +12,24 @@ const performanceMigration = readFileSync(
   join(root, "supabase", "migrations", "20260825001557_index_step3_featured_ai_foreign_keys.sql"),
   "utf8"
 );
+const aal2BoundaryMigration = readFileSync(
+  join(root, "supabase", "migrations", "20260825072221_enforce_step3_payment_aal2_boundary.sql"),
+  "utf8"
+);
 const actions = readFileSync(join(root, "lib", "actions", "featured-payments.ts"), "utf8");
 const data = readFileSync(join(root, "lib", "data", "featured-payments.ts"), "utf8");
 const managePage = readFileSync(join(root, "app", "listings", "[id]", "manage", "page.tsx"), "utf8");
 const myAdsPage = readFileSync(join(root, "app", "dashboard", "my-ads", "page.tsx"), "utf8");
+const homePage = readFileSync(join(root, "app", "page.tsx"), "utf8");
+const featuredPage = readFileSync(join(root, "app", "featured", "page.tsx"), "utf8");
+const listingCard = readFileSync(join(root, "components", "listing-card.tsx"), "utf8");
 const adminQueuePage = readFileSync(join(root, "app", "admin", "featured-payments", "page.tsx"), "utf8");
 const superAdminPage = readFileSync(join(root, "app", "administrator", "promotions", "page.tsx"), "utf8");
 const authorization = readFileSync(join(root, "lib", "authorization.ts"), "utf8");
 const mfa = readFileSync(join(root, "lib", "auth", "mfa-authorization.ts"), "utf8");
 const listingActions = readFileSync(join(root, "lib", "actions", "listings.ts"), "utf8");
 const listingValidator = readFileSync(join(root, "lib", "validators", "listing.ts"), "utf8");
+const queries = readFileSync(join(root, "lib", "data", "queries.ts"), "utf8");
 
 test("Step 3 migration creates a dedicated private payment request domain", () => {
   assert.match(migration, /create table if not exists public\.promotion_campaign_configs/);
@@ -97,4 +105,77 @@ test("new payment permissions are typed and privileged writes require MFA", () =
   assert.match(mfa, /"ai\.view"/);
   assert.doesNotMatch(mfa, /"payments\.review"/);
   assert.doesNotMatch(mfa, /"payments\.configure"/);
+});
+
+test("payment review and configuration writes require AAL2 at the database boundary", () => {
+  assert.match(aal2BoundaryMigration, /create schema if not exists private/);
+  assert.match(aal2BoundaryMigration, /create or replace function private\.is_aal2\(\)/);
+  assert.match(aal2BoundaryMigration, /auth\.jwt\(\)\s*->>\s*'aal'[\s\S]*=\s*'aal2'/);
+  assert.match(aal2BoundaryMigration, /create or replace function private\.require_aal2\(\)/);
+  assert.match(aal2BoundaryMigration, /raise exception 'aal2 required' using errcode = '42501'/);
+  assert.match(aal2BoundaryMigration, /revoke all on function private\.is_aal2\(\) from public, anon, authenticated/);
+  assert.match(aal2BoundaryMigration, /revoke all on function private\.require_aal2\(\) from public, anon, authenticated/);
+
+  assert.match(
+    aal2BoundaryMigration,
+    /create policy promotion_payment_requests_admin_review[\s\S]*private\.is_aal2\(\)[\s\S]*payments\.review/
+  );
+  assert.match(
+    aal2BoundaryMigration,
+    /create policy promotion_campaign_configs_admin_update[\s\S]*private\.is_aal2\(\)[\s\S]*(payments\.configure|settings\.update)/
+  );
+  assert.match(
+    aal2BoundaryMigration,
+    /create policy listing_promotions_admin_update[\s\S]*private\.is_aal2\(\)[\s\S]*(listings\.feature|payments\.review)/
+  );
+});
+
+test("featured payment approval RPCs enforce RBAC plus AAL2 and are not anon executable", () => {
+  for (const functionName of ["approve_featured_payment_request", "reject_featured_payment_request"]) {
+    assert.match(
+      aal2BoundaryMigration,
+      new RegExp(`create or replace function public\\.${functionName}[\\s\\S]*has_admin_permission\\(v_actor, 'payments\\.review'\\)[\\s\\S]*perform private\\.require_aal2\\(\\)`)
+    );
+  }
+
+  assert.match(
+    aal2BoundaryMigration,
+    /revoke all on function public\.approve_featured_payment_request\(uuid, text\) from public, anon, authenticated/
+  );
+  assert.match(
+    aal2BoundaryMigration,
+    /grant execute on function public\.approve_featured_payment_request\(uuid, text\) to authenticated, service_role/
+  );
+  assert.match(
+    aal2BoundaryMigration,
+    /revoke all on function public\.reject_featured_payment_request\(uuid, text, text\) from public, anon, authenticated/
+  );
+  assert.match(
+    aal2BoundaryMigration,
+    /grant execute on function public\.reject_featured_payment_request\(uuid, text, text\) to authenticated, service_role/
+  );
+  assert.doesNotMatch(aal2BoundaryMigration, /grant execute on function public\.approve_featured_payment_request\(uuid, text\) to anon/i);
+  assert.doesNotMatch(aal2BoundaryMigration, /grant execute on function public\.reject_featured_payment_request\(uuid, text, text\) to anon/i);
+});
+
+test("seller proof submission remains allowed but cannot mutate privileged payment fields", () => {
+  assert.match(aal2BoundaryMigration, /v_is_reviewer_aal2 := v_is_reviewer and private\.is_aal2\(\)/);
+  assert.match(aal2BoundaryMigration, /if v_is_reviewer and not v_is_reviewer_aal2 then[\s\S]*aal2 required/);
+  assert.match(aal2BoundaryMigration, /if v_is_reviewer_aal2 then[\s\S]*return new/);
+  assert.match(aal2BoundaryMigration, /client can only submit proof for review/);
+  assert.match(aal2BoundaryMigration, /client cannot change configured payment terms/);
+  assert.match(aal2BoundaryMigration, /client cannot set review fields/);
+  assert.match(aal2BoundaryMigration, /client cannot set provider status/);
+  assert.match(actions, /\.update\(\{[\s\S]*status:\s*"pending_review"[\s\S]*receipt_storage_path[\s\S]*receipt_mime_type[\s\S]*receipt_file_size/);
+  assert.doesNotMatch(actions, /submitFeaturedPaymentProofAction[\s\S]*provider_status:\s*/);
+});
+
+test("featured display derives from a valid future featured_until, not the stale boolean alone", () => {
+  assert.match(data, /if \(!listing\.featured\) return false/);
+  assert.match(data, /if \(!listing\.featured_until\) return false/);
+  assert.match(data, /return !Number\.isNaN\(expiry\.getTime\(\)\) && expiry > new Date\(\)/);
+  assert.match(homePage, /listings\.filter\(\(listing\) => isFeaturedCurrentlyActive\(listing\)\)/);
+  assert.match(featuredPage, /\.filter\(\(listing\) => isFeaturedCurrentlyActive\(listing\)\)/);
+  assert.match(listingCard, /const isFeatured = isFeaturedCurrentlyActive\(listing\)/);
+  assert.doesNotMatch(queries, /featured[^\n]+order|order\([^\n]+featured/i);
 });
