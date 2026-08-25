@@ -9,6 +9,7 @@ import { toggleFavoriteAction } from "@/lib/actions/favorites";
 import { formatDate } from "@/lib/i18n/format";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
 import { formatListingPrice } from "@/lib/listings/price-display";
+import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 
 export async function ListingCard({
   listing,
@@ -27,6 +28,7 @@ export async function ListingCard({
   const isWanted = listingType === "wanted" || /\bwanted\b/i.test(displayTitle);
   const isDormitory = listing.category_node?.path === "real-estate/dormitory" || listing.category_node?.slug === "dormitory";
   const isStudentSuitable = Boolean(listing.suitable_for_students);
+  const isFeatured = isFeaturedCurrentlyActive(listing);
   const fallbackProvince = listing.province ?? listing.district ?? "-";
   const schemaVersion = listing.category_node?.id ? await getPublishedListingSchema(Number(listing.category_node.id)) : null;
   const attributes = new Map(((listing as ListingWithImages & { listing_attributes?: Array<Record<string, unknown>> }).listing_attributes ?? []).map((attribute) => [String(attribute.attribute_key), attribute]));
@@ -52,8 +54,13 @@ export async function ListingCard({
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-[var(--ink-2)]">{t.postAd.photos}</div>
           )}
-          {(sourceTransparency.isExternal || isDormitory || isStudentSuitable || isWanted) ? (
+          {(isFeatured || sourceTransparency.isExternal || isDormitory || isStudentSuitable || isWanted) ? (
             <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+              {isFeatured ? (
+                <span className="rounded-full bg-amber-500 px-2 py-1 text-[10px] font-black text-white shadow-sm">
+                  {locale === "fa" ? "ویژه" : locale === "ps" ? "ځانګړی" : "Featured"}
+                </span>
+              ) : null}
               {sourceTransparency.isExternal ? (
                 <span className="rounded-full bg-slate-900/85 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur">{sourceTransparency.sourceLabel}</span>
               ) : null}

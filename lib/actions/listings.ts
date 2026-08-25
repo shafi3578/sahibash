@@ -29,6 +29,7 @@ import {
 import { validateListingImage } from "@/lib/posting/image-validation";
 import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 import { shouldBlockPublicFixtureListing } from "@/lib/listings/fixture-guard";
+import { recordShadowModerationReview } from "@/lib/ai/moderation";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { normalizeAfghanistanPhone } from "@/lib/inventory/normalization";
 import {
@@ -1438,7 +1439,7 @@ async function buildListingPayload(
       contact_name: sellerContact.fullName,
       negotiable: input.negotiable ?? false,
       minimum_offer: input.minimum_offer ?? null,
-      featured: input.featured ?? false,
+      featured: false,
       status: "pending" as const,
       vehicle_type: toFormValueText(formData.get("vehicle_type")) || null,
       vehicle_subtype: toFormValueText(formData.get("vehicle_subtype")) || null,
@@ -1592,6 +1593,13 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   });
   await persistVehicleDamage(supabase, data.id, formData);
   await persistVehicleFeatures(supabase, data.id, formData);
+  await recordShadowModerationReview({
+    listingId: data.id,
+    title: listing.sourceTitle,
+    description: listing.sourceDescription,
+    price: Number(listing.payload.price ?? 0),
+    categoryPath: listing.context.categoryPath,
+  });
 
   await queueListingTranslationJobs(supabase, {
     listingId: data.id,
@@ -1694,6 +1702,13 @@ export async function createListingAction(formData: FormData): Promise<{
   });
   await persistVehicleDamage(supabase, data.id, formData);
   await persistVehicleFeatures(supabase, data.id, formData);
+  await recordShadowModerationReview({
+    listingId: data.id,
+    title: createdListing.sourceTitle,
+    description: createdListing.sourceDescription,
+    price: Number(createdListing.payload.price ?? 0),
+    categoryPath: createdListing.context.categoryPath,
+  });
 
   await queueListingTranslationJobs(supabase, {
     listingId: data.id,

@@ -7,9 +7,11 @@ import {
   deleteListingAction,
 } from "@/lib/actions/listings";
 import { getListingWithOwnerStats } from "@/lib/data/queries";
+import { getListingFeaturedPaymentSummary, isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
+import { FeaturedPromotionPanel } from "@/components/payments/featured-promotion-panel";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -45,8 +47,10 @@ export default async function ListingManagePage({ params }: PageProps) {
   }
 
   const { listing, stats, priceHistory } = data;
+  const featuredPaymentSummary = await getListingFeaturedPaymentSummary(listingId, user.id);
   const expiresAt = new Date(listing.expires_at);
   const isExpired = expiresAt < new Date();
+  const isFeaturedActive = isFeaturedCurrentlyActive(listing);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -95,7 +99,7 @@ export default async function ListingManagePage({ params }: PageProps) {
                 ? ui.listingManage.expired
                 : listing.status.toUpperCase()}
             </span>
-            {listing.featured && (
+            {isFeaturedActive && (
               <span className="rounded-full bg-blue-600 px-3 py-1 text-sm font-semibold text-white">
                 {ui.listingManage.featured}
               </span>
@@ -160,6 +164,15 @@ export default async function ListingManagePage({ params }: PageProps) {
 
         {/* Sidebar Actions */}
         <div className="space-y-4">
+          <FeaturedPromotionPanel
+            listingId={listingId}
+            listingTitle={listing.title}
+            listingStatus={listing.status}
+            listing={listing}
+            summary={featuredPaymentSummary}
+            locale={locale}
+          />
+
           {/* Edit Listing */}
           <Link
             href={`/listings/${listingId}/edit`}

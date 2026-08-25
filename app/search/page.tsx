@@ -9,10 +9,11 @@ import {
   getFilterDefinitionsForNode,
   type FilterDefinition,
 } from "@/lib/data/queries";
+import { parseSahibashAiSearch } from "@/lib/ai/search-parser";
 import { detectSearchIntent } from "@/lib/search/intent";
 import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
 import type { SearchRewriteClient } from "@/lib/search/rewrite";
-import { logSearchTelemetry } from "@/lib/search/telemetry";
+import { logAiSearchParseTelemetry, logSearchTelemetry } from "@/lib/search/telemetry";
 import { ListingCard } from "@/components/listing-card";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
@@ -332,16 +333,24 @@ export default async function SearchPage({
 }) {
   const { t, locale } = await getDictionary();
   const raw = await searchParams;
-  const params = Object.fromEntries(
+  const rawParams = Object.fromEntries(
     Object.entries(raw).map(([key, value]) => [key, pickFirst(value)])
   ) as Record<string, string | undefined>;
+  const aiParsed = parseSahibashAiSearch(rawParams.aiQuery ?? "", locale);
+  const params = aiParsed
+    ? {
+        ...rawParams,
+        ...aiParsed.params,
+      }
+    : rawParams;
 
   const categories = await getCategories();
   const intent = detectSearchIntent(params.q);
 
   const explicitCategoryNodeId = toNumber(params.categoryNodeId);
+  const aiIntentNode = aiParsed?.categoryPath ? await getCategoryNodeByPath(aiParsed.categoryPath) : null;
   const intentNode = intent ? await getCategoryNodeByPath(intent.categoryPath) : null;
-  const effectiveCategoryNodeId = explicitCategoryNodeId ?? intentNode?.id ?? undefined;
+  const effectiveCategoryNodeId = explicitCategoryNodeId ?? aiIntentNode?.id ?? intentNode?.id ?? undefined;
 
   const [filterDefinitions, effectiveNode, children, parentPath] = await Promise.all([
     getFilterDefinitionsForNode(effectiveCategoryNodeId),
@@ -491,10 +500,28 @@ export default async function SearchPage({
       })
     : "";
 
+  if (aiParsed) {
+    await logAiSearchParseTelemetry({
+      rawQuery: aiParsed.rawQuery,
+      normalizedQuery: aiParsed.normalizedQuery,
+      selectedLanguage: locale,
+      interpretedFilters: aiParsed.params,
+      chips: aiParsed.chips.map((chip) => ({
+        key: chip.key,
+        label: chip.label,
+        value: chip.value,
+        removeKeys: chip.removeKeys,
+      })),
+      resultCount: listings.length,
+      parserSource: aiParsed.parserSource,
+      confidence: aiParsed.confidence,
+    });
+  }
+
   const activeEntries = Object.entries(params).filter(
     ([key, value]) =>
       Boolean(value) &&
-      !["scope", "mobileFilters"].includes(key)
+      !["scope", "mobileFilters", "aiQuery"].includes(key)
   );
 
   const activeFilterCount = activeEntries.length;
@@ -503,6 +530,32 @@ export default async function SearchPage({
   openMobileFilterParams.set("mobileFilters", "1");
   const closeMobileFilterParams = buildParamsFromRecord(params);
   closeMobileFilterParams.delete("mobileFilters");
+  const aiCopy = locale === "fa"
+    ? {
+        title: "با هوش صاحبش پیدا کن",
+        subtitle: "مثلاً: «کرولا در کابل زیر ۴۰۰۰۰۰» — صاحبش آن را به فیلترهای دقیق تبدیل می‌کند.",
+        placeholder: "مثلاً کرولا در کابل زیر 400000",
+        button: "جستجوی هوشمند",
+        interpreted: "برداشت صاحبش",
+        confidence: "اعتماد",
+      }
+    : locale === "ps"
+      ? {
+          title: "له صاحبش AI سره یې پیدا کړئ",
+          subtitle: "لکه: «Corolla په کابل کې تر 400000 کم» — صاحبش یې دقیقو فلټرونو ته اړوي.",
+          placeholder: "لکه Corolla in Kabul under 400000",
+          button: "هوښیار لټون",
+          interpreted: "د صاحبش برداشت",
+          confidence: "باور",
+        }
+      : {
+          title: "Find It With Sahibash AI",
+          subtitle: "Example: “a Corolla in Kabul under 400000” — Sahibash turns it into exact filters.",
+          placeholder: "a Corolla in Kabul under 400000",
+          button: "AI search",
+          interpreted: "Sahibash understood",
+          confidence: "Confidence",
+        };
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 pb-28 sm:px-6 lg:px-8 lg:pb-8">
@@ -510,6 +563,53 @@ export default async function SearchPage({
       <p className="mt-2 text-sm text-[var(--ink-2)]">
         {t.search.subtitle}
       </p>
+
+      <section className="mt-4 rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-black text-indigo-950">{aiCopy.title}</p>
+            <p className="mt-1 text-sm text-indigo-900">{aiCopy.subtitle}</p>
+          </div>
+          <form action={localizePath("/search", locale)} className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] lg:max-w-2xl">
+            <label className="sr-only" htmlFor="ai-search-query">{aiCopy.title}</label>
+            <input
+              id="ai-search-query"
+              name="aiQuery"
+              defaultValue={rawParams.aiQuery ?? ""}
+              placeholder={aiCopy.placeholder}
+              maxLength={240}
+              className="min-h-12 rounded-2xl border border-indigo-100 bg-white px-4 text-base shadow-sm"
+            />
+            <button className="min-h-12 rounded-2xl bg-indigo-700 px-5 text-sm font-black text-white shadow-sm hover:bg-indigo-800">
+              {aiCopy.button}
+            </button>
+          </form>
+        </div>
+        {aiParsed ? (
+          <div className="mt-3 rounded-2xl border border-indigo-100 bg-white p-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span className="font-bold text-slate-950">{aiCopy.interpreted}</span>
+              <span>{aiCopy.confidence}: {Math.round(aiParsed.confidence * 100)}%</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {aiParsed.chips.map((chip) => {
+                const next = buildParamsFromRecord(params);
+                next.delete("aiQuery");
+                for (const key of chip.removeKeys) next.delete(key);
+                return (
+                  <a
+                    key={`${chip.key}-${chip.value}`}
+                    href={buildUrlWithParams(next, locale)}
+                    className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-950"
+                  >
+                    {chip.label}: {chip.value} ×
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <form action={localizePath("/search", locale)} className="mt-4 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-sm lg:hidden">
         <label className="sr-only" htmlFor="mobile-search-query">{t.search.searchListings}</label>

@@ -16,7 +16,23 @@ export type NotificationType =
   | "listing_expiring"
   | "listing_message"
   | "listing_offer"
+  | "featured_payment_review"
+  | "featured_approved"
+  | "featured_rejected"
+  | "featured_expiring"
+  | "listing_changes_required"
+  | "claim_accepted"
+  | "claim_rejected"
+  | "wanted_match"
   | "system";
+export type PromotionPaymentProvider = "hesabpay";
+export type PromotionPaymentRequestStatus =
+  | "pending_payment"
+  | "pending_review"
+  | "approved"
+  | "rejected"
+  | "expired"
+  | "cancelled";
 export type LanguageCode = "en" | "fa" | "ps";
 export type ListingLanguageCode = "en" | "fa-AF" | "ps-AF";
 export type ListingTranslationStatus = "pending" | "completed" | "failed" | "stale" | "needs_review";
@@ -177,6 +193,7 @@ export type Listing = {
   status: ListingStatus;
   approval_rejected_reason: string | null;
   featured: boolean;
+  featured_until?: string | null;
   urgent: boolean;
   views_count: number;
   favorites_count: number;
@@ -361,8 +378,62 @@ export type ListingPromotion = {
   starts_at: string;
   ends_at: string | null;
   created_by: string;
+  payment_request_id?: string | null;
   created_at: string;
   metadata: Record<string, unknown>;
+};
+
+export type PromotionCampaignConfig = {
+  id: string;
+  key: string;
+  promotion_type: PromotionType;
+  name_en: string;
+  name_fa: string;
+  name_ps: string;
+  amount: number;
+  currency: "AFN";
+  duration_days: number;
+  provider: PromotionPaymentProvider;
+  payment_method: string | null;
+  merchant_reference: string | null;
+  instructions_en: string;
+  instructions_fa: string;
+  instructions_ps: string;
+  qr_storage_path: string | null;
+  is_active: boolean;
+  metadata: Record<string, unknown>;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PromotionPaymentRequest = {
+  id: string;
+  listing_id: string;
+  user_id: string;
+  promotion_type: PromotionType;
+  campaign_config_id: string;
+  amount: number;
+  currency: "AFN";
+  provider: PromotionPaymentProvider;
+  payment_method: string | null;
+  merchant_reference: string | null;
+  transaction_reference: string | null;
+  receipt_storage_path: string | null;
+  receipt_mime_type: string | null;
+  receipt_file_size: number | null;
+  provider_status: string | null;
+  status: PromotionPaymentRequestStatus;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  admin_note: string | null;
+  rejection_reason: string | null;
+  expires_at: string;
+  idempotency_key: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Notification = {

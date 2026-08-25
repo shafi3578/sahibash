@@ -26,6 +26,10 @@ export default async function AdministratorPage() {
           <p className="text-sm font-semibold">{copy.siteSettings}</p>
           <p className="mt-1 text-sm text-[var(--ink-2)]">{copy.settingsDescription}</p>
         </Link>
+        <Link href={href("/administrator/promotions")} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+          <p className="text-sm font-semibold">{locale === "fa" ? "پرداخت و اعلان ویژه" : locale === "ps" ? "تادیه او ځانګړی اعلان" : "Payments & Featured"}</p>
+          <p className="mt-1 text-sm text-[var(--ink-2)]">{locale === "fa" ? "قیمت، مدت، مراجع HesabPay و آمادگی AI را مدیریت کنید." : locale === "ps" ? "بیه، موده، د HesabPay مراجع او د AI چمتووالی اداره کړئ." : "Manage price, duration, HesabPay references, and AI launch readiness."}</p>
+        </Link>
         <Link href={href("/admin/categories")} className="rounded-2xl border border-[var(--line)] bg-white p-4 shadow-sm">
           <p className="text-sm font-semibold">{copy.categoriesSchemas}</p>
           <p className="mt-1 text-sm text-[var(--ink-2)]">{copy.categoriesDescription}</p>

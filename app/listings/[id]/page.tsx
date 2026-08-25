@@ -27,6 +27,7 @@ import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { ListingContactActions } from "@/components/listings/listing-contact-actions";
 import { ListingCard } from "@/components/listing-card";
+import { ListingAiAssistant, type ListingAiFact } from "@/components/listings/listing-ai-assistant";
 import { formatCurrencyAmount } from "@/lib/i18n/format";
 import { formatListingPrice } from "@/lib/listings/price-display";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
@@ -431,6 +432,31 @@ export default async function ListingDetailPage({
         }))
         .filter((section) => section.rows.length > 0)
     : dedupedSections;
+  const aiFactLabels = locale === "fa"
+    ? { price: "قیمت", location: "موقعیت", category: "دسته‌بندی", seller: "فروشنده" }
+    : locale === "ps"
+      ? { price: "بیه", location: "ځای", category: "کټګوري", seller: "پلورونکی" }
+      : { price: "Price", location: "Location", category: "Category", seller: "Seller" };
+  const aiAssistantFacts: ListingAiFact[] = [
+    {
+      key: "price",
+      label: aiFactLabels.price,
+      value: formatListingPrice(listing, locale, attributeMap as Map<string, unknown>),
+    },
+    {
+      key: "location",
+      label: aiFactLabels.location,
+      value: locationParts.length > 0 ? locationParts.join(", ") : null,
+    },
+    { key: "category", label: aiFactLabels.category, value: categoryLabel || null },
+    { key: "seller", label: aiFactLabels.seller, value: safeSellerName || null },
+    ...cleanedVehicleMetricRows.slice(0, 4).map((row) => ({ key: `vehicle_metric_${row.label}`, label: row.label, value: row.value })),
+    ...cleanedVehicleDetailRows.slice(0, 6).map((row) => ({ key: `vehicle_detail_${row.key}`, label: row.label, value: row.value })),
+    ...filteredOverviewRows.slice(0, 5).map((row) => ({ key: `overview_${row.label}`, label: row.label, value: row.value })),
+    ...filteredDedupedSections
+      .flatMap((section) => section.rows.map((row) => ({ key: `detail_${row.key}`, label: row.label, value: row.value })))
+      .slice(0, 8),
+  ];
   const localizeDigits = (value: string) => {
     if (locale === "en") return value;
     const localeCode = locale === "fa" ? "fa-AF" : "ps-AF";
@@ -863,6 +889,8 @@ export default async function ListingDetailPage({
             }}
           />
         )}
+
+        <ListingAiAssistant locale={locale} facts={aiAssistantFacts} isOwner={Boolean(isOwner)} />
 
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.description}</h2>

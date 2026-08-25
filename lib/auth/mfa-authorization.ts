@@ -12,6 +12,10 @@ const PRIVILEGED_READ_ONLY_PERMISSIONS = new Set<PermissionKey>([
   "audit_logs.view",
   "search.view",
   "pages.view",
+  "payments.view",
+  "ai.view",
+  "system.health.view",
+  "business_sellers.view",
 ]);
 
 export function requiresPrivilegedMfa(permission: PermissionKey) {

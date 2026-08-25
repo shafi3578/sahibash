@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createHash } from "node:crypto";
 
 function sanitizeText(value: string | null | undefined) {
   return String(value ?? "").trim();
@@ -55,5 +56,37 @@ export async function recordSearchTelemetryClick(telemetryId: string | null | un
     });
   } catch {
     // Non-blocking analytics operation.
+  }
+}
+
+export async function logAiSearchParseTelemetry(args: {
+  rawQuery: string;
+  normalizedQuery: string;
+  selectedLanguage: string;
+  interpretedFilters: Record<string, string>;
+  chips: Array<Record<string, string | string[]>>;
+  resultCount: number;
+  parserSource: "deterministic" | "llm" | "hybrid";
+  confidence: number;
+}) {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const normalized = sanitizeText(args.normalizedQuery || args.rawQuery).slice(0, 240);
+    if (!normalized) return;
+
+    await supabase.from("ai_search_parse_events").insert({
+      actor_user_id: userData.user?.id ?? null,
+      locale: sanitizeText(args.selectedLanguage) || "fa",
+      raw_query_hash: createHash("sha256").update(normalized).digest("hex"),
+      parser_source: args.parserSource,
+      confidence: Math.max(0, Math.min(1, Number(args.confidence) || 0)),
+      interpreted_filters: args.interpretedFilters,
+      chips: args.chips,
+      result_count: Math.max(0, Number(args.resultCount) || 0),
+      zero_result: Number(args.resultCount) === 0,
+    });
+  } catch {
+    // Non-blocking telemetry. Never break search rendering.
   }
 }

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getApprovedListings } from "@/lib/data/queries";
+import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { formatListingPrice } from "@/lib/listings/price-display";
@@ -13,7 +14,7 @@ export default async function FeaturedPage() {
     : locale === "ps"
       ? { empty: "لا تر اوسه ځانګړی اعلان نشته.", featured: "ځانګړی" }
       : { empty: "No featured ads yet.", featured: "Featured" };
-  const listings = (await getApprovedListings({ locale, limit: 80 })).filter((listing) => listing.featured);
+  const listings = (await getApprovedListings({ locale, limit: 80 })).filter((listing) => isFeaturedCurrentlyActive(listing));
 
   return (
     <main className="mx-auto w-full max-w-7xl bg-[#f7f8fb] px-0 pb-28 sm:bg-transparent sm:px-4 sm:pb-16 lg:px-6">

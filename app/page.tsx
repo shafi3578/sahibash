@@ -7,6 +7,7 @@ import { getHomeCategoryNodes } from "@/lib/categories/getCategories";
 import { getCategoriesWithStats } from "@/lib/data/listings";
 import { resolveHomepageSections } from "@/lib/data/homepage-sections";
 import { getApprovedListings } from "@/lib/data/queries";
+import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -88,7 +89,7 @@ export default async function HomePage({
     getHomeCategoryNodes(),
   ]);
 
-  const featured = listings.filter((l) => l.featured).slice(0, 4);
+  const featured = listings.filter((listing) => isFeaturedCurrentlyActive(listing)).slice(0, 4);
   const latest = listings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const featuredRow = featured.length ? featured : latest.slice(0, 6);
   const totalPages = Math.max(1, Math.min(7, Math.ceil(listings.length / pageSize)));

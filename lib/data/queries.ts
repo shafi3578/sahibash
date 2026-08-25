@@ -204,6 +204,7 @@ const PUBLIC_LISTING_SELECT = `
   minimum_offer,
   status,
   featured,
+  featured_until,
   urgent,
   views_count,
   favorites_count,

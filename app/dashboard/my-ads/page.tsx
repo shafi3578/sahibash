@@ -7,7 +7,9 @@ import {
   updateListingStatusAction,
   uploadListingImageFormAction,
 } from "@/lib/actions/listings";
+import { requestFeaturedPromotionAction } from "@/lib/actions/featured-payments";
 import { getMyListings } from "@/lib/data/queries";
+import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import { formatDate as formatLocalizedDate, formatNumber } from "@/lib/i18n/format";
@@ -138,6 +140,13 @@ export default async function MyAdsPage({
             </div>
 
             <div className="flex flex-wrap gap-2">
+              {(listing.status === "pending" || listing.status === "approved") && !isFeaturedCurrentlyActive(listing) ? (
+                <form action={requestFeaturedPromotionAction.bind(null, listing.id)}>
+                  <button className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white">
+                    {locale === "fa" ? "ویژه‌سازی" : locale === "ps" ? "ځانګړی کول" : "Make Featured"}
+                  </button>
+                </form>
+              ) : null}
               <form
                 action={async () => {
                   "use server";

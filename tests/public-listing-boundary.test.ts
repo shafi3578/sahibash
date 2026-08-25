@@ -15,6 +15,10 @@ const finalHardeningMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260824201724_final_step1_security_location_hardening.sql"),
   "utf8",
 );
+const featuredUntilGrantMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260825002333_grant_step3_featured_until_public_select.sql"),
+  "utf8",
+);
 
 const queries = readFileSync(join(process.cwd(), "lib", "data", "queries.ts"), "utf8");
 const contactActions = readFileSync(join(process.cwd(), "components", "listings", "listing-contact-actions.tsx"), "utf8");
@@ -64,6 +68,18 @@ test("public listing queries use an explicit safe selector and sanitize returned
   assert.match(queries, /\.select\(PUBLIC_LISTING_SELECT(?:\s+as\s+string)?\)/);
   assert.match(queries, /sanitizePublicListingBoundaries/);
   assert.match(queries, /sanitizePublicListingBoundary\(listing\)/);
+});
+
+test("featured expiry stays publicly readable without widening listing grants", () => {
+  const publicSelector = queries.slice(
+    queries.indexOf("const PUBLIC_LISTING_SELECT"),
+    queries.indexOf("const LISTING_DETAIL_PRIVATE_SELECT"),
+  );
+
+  assert.match(publicSelector, /\bfeatured_until\b/);
+  assert.match(featuredUntilGrantMigration, /grant select \(featured_until\) on public\.listings to anon/i);
+  assert.match(featuredUntilGrantMigration, /grant select \(featured_until\) on public\.listings to authenticated/i);
+  assert.doesNotMatch(featuredUntilGrantMigration, /contact_phone|address_text|latitude|longitude|location_geog/i);
 });
 
 test("public listing child embeds use trusted visibility checks without exposing owner ids", () => {

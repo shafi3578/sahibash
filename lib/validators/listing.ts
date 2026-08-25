@@ -69,7 +69,6 @@ export const listingSchema = z.object({
   contact_name: z.string().trim().min(2).max(80).optional().or(z.literal("")),
   negotiable: z.coerce.boolean().optional().default(false),
   minimum_offer: z.preprocess(parseLocalizedNumber, z.number().positive("Minimum offer must be > 0").optional()),
-  featured: z.coerce.boolean().optional().default(false),
   vehicle_type: z.string().trim().max(80).optional().or(z.literal("")),
   vehicle_subtype: z.string().trim().max(120).optional().or(z.literal("")),
   vehicle_brand: z.string().trim().max(120).optional().or(z.literal("")),
