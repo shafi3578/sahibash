@@ -48,6 +48,13 @@ export async function sendListingMessageAction(formData: FormData): Promise<void
     redirect(listingRedirect(listingId, locale, "error"));
   }
 
+  const { data: blockedRows } = await supabase
+    .from("user_blocks")
+    .select("blocker_user_id")
+    .or(`and(blocker_user_id.eq.${user.id},blocked_user_id.eq.${listing.user_id}),and(blocker_user_id.eq.${listing.user_id},blocked_user_id.eq.${user.id})`)
+    .limit(1);
+  if (blockedRows && blockedRows.length > 0) redirect(listingRedirect(listingId, locale, "error"));
+
   const { error } = await supabase.from("messages").insert({
     listing_id: listing.id,
     sender_user_id: user.id,
@@ -108,6 +115,13 @@ export async function replyMessageAction(formData: FormData): Promise<void> {
   if (!outgoingThread.data && !incomingThread.data) {
     return;
   }
+
+  const { data: blockedRows } = await supabase
+    .from("user_blocks")
+    .select("blocker_user_id")
+    .or(`and(blocker_user_id.eq.${user.id},blocked_user_id.eq.${recipientUserId}),and(blocker_user_id.eq.${recipientUserId},blocked_user_id.eq.${user.id})`)
+    .limit(1);
+  if (blockedRows && blockedRows.length > 0) return;
 
   const { error } = await supabase.from("messages").insert({
     listing_id: listingId,

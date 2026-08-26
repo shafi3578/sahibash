@@ -50,6 +50,15 @@ test("consumer account navigation has no admin entry points", () => {
   assert.equal(hrefs.some((href) => href.startsWith("/admin") || href.startsWith("/administrator")), false);
 });
 
+test("social safety actions and messaging enforce block boundaries", () => {
+  const social = readFileSync(join(process.cwd(), "lib", "actions", "social.ts"), "utf8");
+  const messages = readFileSync(join(process.cwd(), "lib", "actions", "messages.ts"), "utf8");
+  assert.match(social, /followUserAction/);
+  assert.match(social, /blockUserAction/);
+  assert.match(social, /user_blocks/);
+  assert.match(messages, /user_blocks/);
+});
+
 test("admin routes stay web-only and are stripped from localized consumer paths", () => {
   assert.equal(isAdminWebPath("/admin"), true);
   assert.equal(isAdminWebPath("/admin/listings"), true);
