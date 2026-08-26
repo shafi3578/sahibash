@@ -225,10 +225,11 @@ export default async function HomePage({
           {t.home.latestListings}
         </div>
         <div className="divide-y divide-slate-100 sm:divide-slate-200">
-          {latest.map((listing) => {
+          {latest.map((listing, index) => {
             const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
             const displayTitle = listing.translated_title || listing.title;
             const province = listing.province ?? listing.district ?? "-";
+            const isLikelyLcpImage = index === 0 && Boolean(image);
             return (
               <Link
                 key={listing.id}
@@ -237,7 +238,15 @@ export default async function HomePage({
               >
                 <div className="relative aspect-video w-full overflow-hidden bg-slate-100 sm:h-24 sm:w-24 sm:rounded-2xl sm:shadow-sm">
                   {image ? (
-                    <Image src={image} alt={displayTitle} fill className="object-cover" sizes="(max-width: 640px) 100vw, 88px" />
+                    <Image
+                      src={image}
+                      alt={displayTitle}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 639px) 100vw, 96px"
+                      loading={isLikelyLcpImage ? "eager" : undefined}
+                      fetchPriority={isLikelyLcpImage ? "high" : undefined}
+                    />
                   ) : null}
                   <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">{homeCopy.brandBadge}</span>
                 </div>
