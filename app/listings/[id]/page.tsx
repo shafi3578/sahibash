@@ -211,12 +211,9 @@ export default async function ListingDetailPage({
   const sourceTransparency = getSourceTransparency(listing, locale);
   const hasContactPhone = Boolean(listing.public_contact_available ?? listing.contact_phone);
   const phonePrivacyLabel = hasContactPhone
-    ? locale === "fa"
-      ? "برای دیدن شماره از دکمه نمایش شماره استفاده کنید"
-      : locale === "ps"
-        ? "د شمېرې لیدو لپاره د شمېره ښکاره کړئ تڼۍ وکاروئ"
-        : "Use Reveal phone to view the seller number"
+    ? locale === "fa" ? "تماس در دسترس است" : locale === "ps" ? "اړیکه شته" : "Contact available"
     : t.listing.notProvided;
+  const whatsappEnabled = Boolean((listing as unknown as { whatsapp_enabled?: boolean }).whatsapp_enabled);
 
   const overviewRows = specView.basicRows.filter((row) => isMeaningfulValue(row.value));
   const displaySectionLabel = (group: string) => {
@@ -901,7 +898,7 @@ export default async function ListingDetailPage({
             <p className="mt-2 text-sm text-[var(--ink-2)]">{t.listing.minimumOffer}: {formatCurrencyAmount(listing.minimum_offer, listing.currency, locale)}</p>
           ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
-          {hasContactPhone ? <ListingContactActions listingId={listing.id} title={displayTitle} locale={locale} canContact={sourceTransparency.canContact} isExternal={sourceTransparency.isExternal} hasPhone={hasContactPhone} /> : null}
+          {hasContactPhone ? <ListingContactActions listingId={listing.id} title={displayTitle} locale={locale} canContact={sourceTransparency.canContact} isExternal={sourceTransparency.isExternal} hasPhone={hasContactPhone} whatsappEnabled={whatsappEnabled} /> : null}
             {!isOwner ? (
               <Link href={composeHref} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
             ) : null}
