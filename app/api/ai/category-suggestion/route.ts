@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { mapSignalsToCategory } from "@/lib/ai/category-mapping";
 import { matchProductSpecsFromSignals } from "@/lib/ai/product-specs-matching";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
+import { requestGatewayCategorySuggestion } from "@/lib/ai/gateway";
 
 type Suggestion = {
   rootSlug: "real-estate" | "vehicles" | "mobile-phones-tablets" | "electronics-computers" | "home-furniture-appliances" | "clothing-personal-items" | "jobs" | "services" | "business-industry" | "farm-animals" | "education" | "sports-hobbies" | "other";
@@ -89,6 +90,14 @@ export async function POST(request: Request) {
     }
 
     let labels: Array<{ label: string; score: number }> = [];
+    const { data: leafRows } = await supabase
+      .from("category_nodes")
+      .select("path")
+      .eq("is_active", true)
+      .eq("is_leaf", true)
+      .limit(500);
+    const allowedLeafPaths = (leafRows ?? []).map((row) => String((row as { path?: string }).path ?? "")).filter(Boolean);
+    const gatewaySuggestion = await requestGatewayCategorySuggestion({ title, description, allowedPaths: allowedLeafPaths });
     if (image instanceof File) {
       const client = new InferenceClient(key);
       const output = await client.imageClassification({
@@ -112,12 +121,21 @@ export async function POST(request: Request) {
       labels,
     });
 
-    const suggestion = mapSignalsToCategory({
+    const mappedSuggestion = mapSignalsToCategory({
       title,
       description,
       labels,
       specsMatch,
     }) as Suggestion | null;
+    const suggestion = gatewaySuggestion
+      ? ({
+          rootSlug: gatewaySuggestion.pathSlugs[0] as Suggestion["rootSlug"],
+          pathSlugs: gatewaySuggestion.pathSlugs,
+          label: gatewaySuggestion.pathSlugs.join(" > "),
+          reason: gatewaySuggestion.reason,
+          confidence: gatewaySuggestion.confidence,
+        } satisfies Suggestion)
+      : mappedSuggestion;
 
     let suggestedCategoryNodeId: number | null = null;
     if (suggestion) {
