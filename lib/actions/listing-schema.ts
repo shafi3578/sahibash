@@ -6,6 +6,7 @@ import { requireSuperAdministrator } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeListingSchemaConfig } from "@/lib/listing-schema-config";
 import { recordAuditEvent } from "@/lib/audit";
+import { revalidatePublicTaxonomyCache } from "@/lib/cache/public-cache";
 
 export async function publishListingSchemaAction(formData: FormData) {
   await requireSuperAdministrator();
@@ -24,6 +25,7 @@ export async function publishListingSchemaAction(formData: FormData) {
     schema_config: config,
   });
   if (error) throw new Error(error.message);
+  revalidatePublicTaxonomyCache();
   revalidatePath("/admin/listing-schema");
   revalidatePath("/post-ad");
   revalidatePath("/search");
@@ -85,6 +87,7 @@ export async function updateSchemaCategoryStatusAction(formData: FormData) {
     });
   }
 
+  revalidatePublicTaxonomyCache();
   revalidatePath("/admin/listing-schema");
   revalidatePath("/admin/categories");
   revalidatePath("/post-ad");

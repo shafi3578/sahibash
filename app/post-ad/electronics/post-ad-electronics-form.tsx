@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
 import { CURRENCIES, AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { TRANSLATIONS } from "@/lib/i18n/translations";
 import DynamicCategoryFields from "@/data/componentsDynamicCategoryFields";
 import { getLeafById } from "@/data/electronics-categories";
@@ -58,6 +57,13 @@ type StagedImage = { file: File; previewUrl: string; isPrimary: boolean };
 
 type ProvinceOption = { id: number; name: string };
 type DistrictOption = { id: number; name: string; province_id: number };
+type LocationApiOption = {
+  id: number | string;
+  province_id?: number | string;
+  name?: string | null;
+  name_en?: string | null;
+};
+type LocationApiResponse<T> = { success?: boolean; data?: T[] };
 type LocationMethod = "device" | "manual" | null;
 
 type Props = {
@@ -80,6 +86,32 @@ const REPAIR_HISTORY_OPTIONS = [
   "Unknown",
 ];
 const NETWORK_REGISTERED_OPTIONS = ["Registered", "Not Registered", "Unknown"];
+
+function readLocationOptionName(option: LocationApiOption) {
+  return String(option.name ?? option.name_en ?? "").trim();
+}
+
+function toProvinceOption(option: LocationApiOption): ProvinceOption | null {
+  const id = Number(option.id);
+  const name = readLocationOptionName(option);
+  return Number.isFinite(id) && name ? { id, name } : null;
+}
+
+function toDistrictOption(option: LocationApiOption): DistrictOption | null {
+  const id = Number(option.id);
+  const provinceId = Number(option.province_id);
+  const name = readLocationOptionName(option);
+  return Number.isFinite(id) && Number.isFinite(provinceId) && name
+    ? { id, province_id: provinceId, name }
+    : null;
+}
+
+async function fetchLocationOptions<T extends LocationApiOption>(url: string) {
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as LocationApiResponse<T>;
+  return payload.success && Array.isArray(payload.data) ? payload.data : [];
+}
 
 function optionsByType(options: ElectronicsOption[], type: string) {
   return options
@@ -286,15 +318,11 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
   }
 
   async function loadDistricts(provinceId: number) {
-    const supabase = createSupabaseBrowserClient();
-    const { data } = await supabase
-      .from("districts")
-      .select("id, name, province_id")
-      .eq("province_id", provinceId)
-      .eq("is_active", true)
-      .order("name", { ascending: true });
-
-    const rows = (data ?? []) as DistrictOption[];
+    const rows = (await fetchLocationOptions(
+      `/api/location/districts?province_id=${encodeURIComponent(String(provinceId))}`
+    ))
+      .map(toDistrictOption)
+      .filter((row): row is DistrictOption => Boolean(row));
     setDistrictOptions(rows);
     return rows;
   }
@@ -396,17 +424,14 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
     let active = true;
 
     const loadProvinces = async () => {
-      const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase
-        .from("provinces")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
+      const data = await fetchLocationOptions("/api/location/provinces");
 
       if (!active) return;
 
-      const normalizedRows = ((data ?? []) as Array<{ id: number; name: string }>)
-        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(String(row.name)) }));
+      const normalizedRows = data
+        .map(toProvinceOption)
+        .filter((row): row is ProvinceOption => Boolean(row))
+        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(row.name) }));
 
       const whitelist = AFGHAN_PROVINCES.map((name) => ({
         name,

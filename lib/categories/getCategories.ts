@@ -1,5 +1,8 @@
 import { cache } from "react";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache/public-cache";
+import { withDataTiming } from "@/lib/observability/performance";
+import { createSupabasePublicServerClient } from "@/lib/supabase/public";
 import {
   ACTIVE_HOME_CATEGORY_SLUGS,
   COMING_SOON_HOME_CATEGORY_SLUGS,
@@ -7,7 +10,7 @@ import {
   RELATED_CATEGORIES,
 } from "@/lib/categories/categoryTree";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
-import { getCategoryCounts, getCategoryListingCount } from "@/lib/categories/getCategoryCounts";
+import { getCategoryCounts } from "@/lib/categories/getCategoryCounts";
 import type { CategoryNode } from "@/types/database";
 import { reportDataError } from "@/lib/observability/data-errors";
 
@@ -31,6 +34,8 @@ type RootCategoryState = {
   display_order: number;
 };
 
+const CATEGORY_NODE_PUBLIC_SELECT = "id, category_id, parent_id, name, slug, level, path, display_order, sort_order, is_active, created_at, updated_at, description, icon, is_leaf";
+
 function toRootState(row: Record<string, unknown>): RootCategoryState {
   return {
     id: Number(row.id),
@@ -43,39 +48,80 @@ function toRootState(row: Record<string, unknown>): RootCategoryState {
   };
 }
 
-async function getRootCategoryStates(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
-): Promise<RootCategoryState[]> {
-  const lifecycle = await supabase
-    .from("categories")
-    .select("id, slug, name, is_active, is_coming_soon, launch_date, display_order")
-    .eq("is_active", true)
-    .order("display_order", { ascending: true });
+const getRootCategoryStates = unstable_cache(
+  async (): Promise<RootCategoryState[]> => {
+    const supabase = createSupabasePublicServerClient();
+    const lifecycle = await withDataTiming(
+      "root_category_states",
+      async () => supabase
+        .from("categories")
+        .select("id, slug, name, is_active, is_coming_soon, launch_date, display_order")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true }),
+      { cache: "shared" }
+    );
 
-  if (!lifecycle.error && lifecycle.data) {
-    return (lifecycle.data as Record<string, unknown>[]).map(toRootState);
+    if (!lifecycle.error && lifecycle.data) {
+      return (lifecycle.data as Record<string, unknown>[]).map(toRootState);
+    }
+
+    const fallback = await supabase
+      .from("categories")
+      .select("id, slug, name, is_active, display_order")
+      .eq("is_active", true)
+      .order("display_order", { ascending: true });
+
+    if (fallback.error || !fallback.data) {
+      return [];
+    }
+
+    return (fallback.data as Record<string, unknown>[]).map((row) => ({
+      id: Number(row.id),
+      slug: String(row.slug),
+      name: String(row.name),
+      is_active: Boolean(row.is_active),
+      is_coming_soon: !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(String(row.slug) as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
+      launch_date: null,
+      display_order: Number(row.display_order ?? 0),
+    }));
+  },
+  ["sahibash-root-category-states"],
+  {
+    revalidate: 3600,
+    tags: [PUBLIC_CACHE_TAGS.categoryTaxonomy],
   }
+);
 
-  const fallback = await supabase
-    .from("categories")
-    .select("id, slug, name, is_active, display_order")
-    .eq("is_active", true)
-    .order("display_order", { ascending: true });
+const getActiveCategoryNodes = unstable_cache(
+  async (): Promise<CategoryNode[]> => {
+    const supabase = createSupabasePublicServerClient();
+    const { data, error } = await withDataTiming(
+      "active_category_nodes",
+      async () => supabase
+        .from("category_nodes")
+        .select(CATEGORY_NODE_PUBLIC_SELECT)
+        .eq("is_active", true)
+        .order("level", { ascending: true })
+        .order("sort_order", { ascending: true }),
+      { cache: "shared" }
+    );
 
-  if (fallback.error || !fallback.data) {
-    return [];
+    if (error || !data) {
+      if (error) reportDataError("category-nodes.cached-select", error);
+      return [];
+    }
+
+    return (data as Record<string, unknown>[])
+      .map(castNode)
+      .filter((node) => !isDeprecatedCategoryPath(node.path))
+      .sort(sortNodes);
+  },
+  ["sahibash-active-category-nodes"],
+  {
+    revalidate: 3600,
+    tags: [PUBLIC_CACHE_TAGS.categoryTaxonomy],
   }
-
-  return (fallback.data as Record<string, unknown>[]).map((row) => ({
-    id: Number(row.id),
-    slug: String(row.slug),
-    name: String(row.name),
-    is_active: Boolean(row.is_active),
-    is_coming_soon: !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(String(row.slug) as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
-    launch_date: null,
-    display_order: Number(row.display_order ?? 0),
-  }));
-}
+);
 
 function castNode(row: Record<string, unknown>): CategoryNode {
   return {
@@ -104,26 +150,15 @@ function sortNodes(a: CategoryNode, b: CategoryNode) {
 }
 
 export const getHomeCategoryNodes = cache(async (): Promise<CategoryNodeWithCount[]> => {
-  const supabase = await createSupabaseServerClient();
-  const counts = await getCategoryCounts(null);
-  const categoryStates = await getRootCategoryStates(supabase);
+  const [counts, categoryStates, activeNodes] = await Promise.all([
+    getCategoryCounts(null),
+    getRootCategoryStates(),
+    getActiveCategoryNodes(),
+  ]);
   const categoryStateById = new Map(categoryStates.map((item) => [item.id, item]));
 
-  const { data, error } = await supabase
-    .from("category_nodes")
-    .select("*")
-    .is("parent_id", null)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error || !data) {
-    if (error) reportDataError("home-category-nodes.select", error);
-    return [];
-  }
-
-  const allNodes = (data as Record<string, unknown>[])
-    .map(castNode)
-    .filter((node) => !isDeprecatedCategoryPath(node.path))
+  const allNodes = activeNodes
+    .filter((node) => node.parent_id === null)
     .sort(sortNodes)
     .map((node) => {
       const state = categoryStateById.get(node.category_id);
@@ -166,66 +201,17 @@ export const getRootCategoryLaunchState = cache(async (slug: string): Promise<{
   launchDate: string | null;
   rootNode: CategoryNode | null;
 } | null> => {
-  const supabase = await createSupabaseServerClient();
+  const [categoryStates, activeNodes] = await Promise.all([
+    getRootCategoryStates(),
+    getActiveCategoryNodes(),
+  ]);
+  const categoryRow = categoryStates.find((category) => category.slug === slug) ?? null;
 
-  const lifecycle = await supabase
-    .from("categories")
-    .select("id, slug, name, is_active, is_coming_soon, launch_date")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  let categoryRow: {
-    id: number;
-    slug: string;
-    name: string;
-    is_active: boolean;
-    is_coming_soon: boolean;
-    launch_date: string | null;
-  } | null = null;
-
-  if (!lifecycle.error && lifecycle.data) {
-    categoryRow = {
-      id: Number((lifecycle.data as Record<string, unknown>).id),
-      slug: String((lifecycle.data as Record<string, unknown>).slug),
-      name: String((lifecycle.data as Record<string, unknown>).name),
-      is_active: Boolean((lifecycle.data as Record<string, unknown>).is_active),
-      is_coming_soon: Boolean((lifecycle.data as Record<string, unknown>).is_coming_soon),
-      launch_date: (lifecycle.data as Record<string, unknown>).launch_date
-        ? String((lifecycle.data as Record<string, unknown>).launch_date)
-        : null,
-    };
-  } else {
-    const fallback = await supabase
-      .from("categories")
-      .select("id, slug, name, is_active")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (fallback.error || !fallback.data) {
-      return null;
-    }
-
-    categoryRow = {
-      id: Number((fallback.data as Record<string, unknown>).id),
-      slug: String((fallback.data as Record<string, unknown>).slug),
-      name: String((fallback.data as Record<string, unknown>).name),
-      is_active: Boolean((fallback.data as Record<string, unknown>).is_active),
-      is_coming_soon: !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(slug as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
-      launch_date: null,
-    };
-  }
-
-  if (!categoryRow.is_active) {
+  if (!categoryRow?.is_active) {
     return null;
   }
 
-  const { data: rootNodeData } = await supabase
-    .from("category_nodes")
-    .select("*")
-    .eq("category_id", categoryRow.id)
-    .is("parent_id", null)
-    .eq("is_active", true)
-    .maybeSingle();
+  const rootNode = activeNodes.find((node) => node.category_id === categoryRow.id && node.parent_id === null) ?? null;
 
   return {
     categoryId: categoryRow.id,
@@ -233,7 +219,7 @@ export const getRootCategoryLaunchState = cache(async (slug: string): Promise<{
     categoryName: categoryRow.name,
     isComingSoon: categoryRow.is_coming_soon,
     launchDate: categoryRow.launch_date,
-    rootNode: rootNodeData ? castNode(rootNodeData as Record<string, unknown>) : null,
+    rootNode,
   };
 });
 
@@ -244,74 +230,27 @@ export const getCategoryNodeBySlugOrId = cache(async ({
   slug: string;
   nodeId?: number | null;
 }): Promise<CategoryNode | null> => {
-  const supabase = await createSupabaseServerClient();
+  const activeNodes = await getActiveCategoryNodes();
 
   if (nodeId) {
-    const { data, error } = await supabase
-      .from("category_nodes")
-      .select("*")
-      .eq("id", nodeId)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (!error && data) {
-      const parsed = castNode(data as Record<string, unknown>);
-      if (isDeprecatedCategoryPath(parsed.path)) {
-        return null;
-      }
+    const parsed = activeNodes.find((node) => node.id === nodeId) ?? null;
+    if (parsed) {
       return parsed;
     }
   }
 
-  const { data, error } = await supabase
-    .from("category_nodes")
-    .select("*")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .order("level", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  const parsed = castNode(data as Record<string, unknown>);
-  if (isDeprecatedCategoryPath(parsed.path)) {
-    return null;
-  }
-  return parsed;
+  return activeNodes
+    .filter((node) => node.slug === slug)
+    .sort((left, right) => left.level - right.level || sortNodes(left, right))[0] ?? null;
 });
 
 export const getCategoryChildrenWithCounts = cache(async (parentNodeId: number): Promise<CategoryNodeWithCount[]> => {
-  const supabase = await createSupabaseServerClient();
-  const counts = await getCategoryCounts(parentNodeId);
-
-  const { data, error } = await supabase
-    .from("category_nodes")
-    .select("*")
-    .eq("parent_id", parentNodeId)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error || !data) return [];
-
-  const childNodes = (data as Record<string, unknown>[])
-    .map(castNode)
-    .filter((node) => !isDeprecatedCategoryPath(node.path))
-    .sort(sortNodes);
-
-  const childIds = childNodes.map((node) => node.id);
-  const { data: grandchildren } = childIds.length
-    ? await supabase
-        .from("category_nodes")
-        .select("parent_id")
-        .in("parent_id", childIds)
-        .eq("is_active", true)
-    : { data: [] as Array<{ parent_id: number | null }> };
-
-  const parentsWithChildren = new Set(
-    ((grandchildren as Array<{ parent_id: number | null }> | null) ?? [])
-      .map((row) => row.parent_id)
-      .filter((id): id is number => typeof id === "number")
-  );
+  const [counts, activeNodes] = await Promise.all([
+    getCategoryCounts(null),
+    getActiveCategoryNodes(),
+  ]);
+  const childNodes = activeNodes.filter((node) => node.parent_id === parentNodeId).sort(sortNodes);
+  const parentsWithChildren = new Set(activeNodes.map((node) => node.parent_id).filter((id): id is number => typeof id === "number"));
 
   return childNodes
     .map((node) => ({
@@ -325,21 +264,11 @@ export const getCategoryChildrenWithCounts = cache(async (parentNodeId: number):
 });
 
 export const getCategoryBreadcrumb = cache(async (node: CategoryNode): Promise<CategoryNode[]> => {
-  const supabase = await createSupabaseServerClient();
+  const activeNodes = await getActiveCategoryNodes();
   const parts = node.path.split("/");
 
-  const { data, error } = await supabase
-    .from("category_nodes")
-    .select("*")
-    .eq("is_active", true)
-    .in("slug", parts)
-    .order("level", { ascending: true });
-
-  if (error || !data) return [node];
-
   const byPath = new Map<string, CategoryNode>();
-  for (const row of data as Record<string, unknown>[]) {
-    const parsed = castNode(row);
+  for (const parsed of activeNodes.filter((entry) => parts.includes(entry.slug))) {
     byPath.set(parsed.path, parsed);
   }
 
@@ -355,28 +284,22 @@ export const getCategoryBreadcrumb = cache(async (node: CategoryNode): Promise<C
 });
 
 export const getRelatedCategories = cache(async (node: CategoryNode): Promise<CategoryNodeWithCount[]> => {
-  const supabase = await createSupabaseServerClient();
   const root = node.path.split("/")[0] ?? node.slug;
   const relatedPaths = RELATED_CATEGORIES[root] ?? [];
   if (relatedPaths.length === 0) return [];
 
+  const [activeNodes, counts] = await Promise.all([
+    getActiveCategoryNodes(),
+    getCategoryCounts(null),
+  ]);
   const result: CategoryNodeWithCount[] = [];
   for (const path of relatedPaths) {
-    const { data, error } = await supabase
-      .from("category_nodes")
-      .select("*")
-      .eq("path", path)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (error || !data) continue;
-
-    const parsed = castNode(data as Record<string, unknown>);
-    const count = await getCategoryListingCount(parsed.id);
+    const parsed = activeNodes.find((entry) => entry.path === path);
+    if (!parsed) continue;
 
     result.push({
       ...parsed,
-      count,
+      count: counts.get(parsed.id) ?? 0,
       subtitle: parsed.description ?? null,
       icon: ((parsed as CategoryNode & { icon?: string | null }).icon ?? null),
       is_leaf: ((parsed as CategoryNode & { is_leaf?: boolean }).is_leaf ?? false),

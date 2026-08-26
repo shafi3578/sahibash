@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { localizePath } from "@/lib/i18n/routing";
 import { buildLoginRedirectHref } from "@/lib/account/navigation";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const LABELS = {
   en: { nav: "Mobile navigation", home: "Home", search: "Search", sell: "Sell", messages: "Messages", account: "Account" },
@@ -26,12 +28,34 @@ function NavIcon({ name, active = false }: { name: string; active?: boolean }) {
   );
 }
 
-export function MobileBottomNav({ locale, authenticated }: { locale: AppLocale; authenticated: boolean }) {
+export function MobileBottomNav({ locale, initialAuthenticated = false }: { locale: AppLocale; initialAuthenticated?: boolean }) {
+  const [authenticated, setAuthenticated] = useState(initialAuthenticated);
   const pathname = usePathname();
   const text = LABELS[locale];
   const path = (value: string) => localizePath(value, locale);
   const sellPath = path("/post-ad/create?posting=sell");
   const loginFor = (target: string, reason?: "post") => buildLoginRedirectHref({ targetPath: target, locale, reason });
+
+  useEffect(() => {
+    let mounted = true;
+    const supabase = createSupabaseBrowserClient();
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) {
+        setAuthenticated(Boolean(data.session?.user));
+      }
+    });
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthenticated(Boolean(session?.user));
+    });
+
+    return () => {
+      mounted = false;
+      subscription.subscription.unsubscribe();
+    };
+  }, []);
+
   const items = [
     { label: text.home, href: path("/"), icon: "home" },
     { label: text.search, href: path("/search"), icon: "search" },

@@ -1,10 +1,14 @@
 import "server-only";
 
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { createSupabasePublicServerClient } from "@/lib/supabase/public";
 import { getCurrentUser } from "@/lib/auth";
 import { reportDataError } from "@/lib/observability/data-errors";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache/public-cache";
+import { withDataTiming } from "@/lib/observability/performance";
 import type {
   ListingWithRelations,
   ListingWithImages,
@@ -156,6 +160,25 @@ const PUBLIC_TEST_TEXT_PATTERNS = [
   "%sample ad%",
 ];
 
+const PUBLIC_CARD_ATTRIBUTE_KEYS = [
+  "price_mode",
+  "monthly_rent",
+  "gerawy_amount",
+  "dormitory_fee",
+  "land_lease_price",
+  "payment_period",
+  "listing_type",
+  "listing_purpose",
+  "rental_type",
+  "condition",
+  "mileage",
+  "year",
+  "storage",
+  "ram",
+  "rooms",
+  "area_sqm",
+] as const;
+
 const PUBLIC_LISTING_SELECT = `
   id,
   category_id,
@@ -229,10 +252,10 @@ const PUBLIC_LISTING_SELECT = `
   allow_contact_display,
   noindex_external,
   removed_public_at,
-  category:category_id(*),
-  category_node:category_node_id(*),
-  listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
-  listing_attributes(*)
+  category:category_id(id, name, slug, description, display_order, is_active, is_coming_soon, launch_date, created_at, updated_at),
+  category_node:category_node_id(id, category_id, parent_id, name, slug, level, path, display_order, sort_order, is_leaf, is_active, description, icon, created_at, updated_at),
+  listing_images(id, listing_id, image_url:public_url, public_url, is_primary, sort_order),
+  listing_attributes(id, listing_id, category_field_id, attribute_key, attribute_value_text, attribute_value_number, attribute_value_boolean, attribute_value_json, unit)
 `;
 
 const LISTING_DETAIL_PRIVATE_SELECT = `
@@ -338,11 +361,30 @@ export type FilterDefinition = {
   is_active: boolean;
 };
 
+const getCachedSimpleApprovedListings = unstable_cache(
+  async (filters?: ListingFilters) => loadApprovedListings(filters),
+  ["sahibash-simple-approved-listings"],
+  {
+    revalidate: 30,
+    tags: [PUBLIC_CACHE_TAGS.publicListingFeed],
+  }
+);
+
 export async function getApprovedListings(
   filters?: ListingFilters
 ): Promise<ListingWithRelations[]> {
+  if (!hasExpensiveDynamicListingFilters(filters)) {
+    return getCachedSimpleApprovedListings(filters);
+  }
+
+  return loadApprovedListings(filters);
+}
+
+async function loadApprovedListings(
+  filters?: ListingFilters
+): Promise<ListingWithRelations[]> {
     try {
-      const supabase = await createSupabaseServerClient();
+      const supabase = createSupabasePublicServerClient();
 
       const lifecycleCategoryIds = await (async () => {
         const lifecycle = await supabase
@@ -592,13 +634,13 @@ export async function getApprovedListings(
               return [];
             }
 
-            let studentQuery = supabase
+            let studentQuery = applyPublicListingEmbedLimits(supabase
               .from("listings")
               .select(PUBLIC_LISTING_SELECT as string)
               .eq("status", "approved")
               .in("category_id", lifecycleCategoryIds)
               .in("id", ids)
-              .limit(120);
+              .limit(120));
 
             studentQuery = applyPublicListingQualityFilters(studentQuery);
 
@@ -618,7 +660,11 @@ export async function getApprovedListings(
               studentQuery = studentQuery.order("created_at", { ascending: false });
             }
 
-            const { data, error } = await studentQuery;
+            const { data, error } = await withDataTiming(
+              "approved_listings.student_housing",
+              async () => studentQuery,
+              { limit: 120, category_node_id: filters.categoryNodeId ?? null }
+            );
             if (error || !data) {
               return [];
             }
@@ -687,14 +733,14 @@ export async function getApprovedListings(
                 return [];
               }
 
-              let realEstateQuery = supabase
+              let realEstateQuery = applyPublicListingEmbedLimits(supabase
                 .from("listings")
                 .select(PUBLIC_LISTING_SELECT as string)
                 .eq("status", "approved")
                 .in("category_id", lifecycleCategoryIds)
                 .in("id", ids)
                 .order("created_at", { ascending: false })
-                .limit(40);
+                .limit(40));
 
               realEstateQuery = applyPublicListingQualityFilters(realEstateQuery);
 
@@ -702,7 +748,11 @@ export async function getApprovedListings(
                 realEstateQuery = realEstateQuery.gt("price", 0);
               }
 
-              const { data, error } = await realEstateQuery;
+              const { data, error } = await withDataTiming(
+                "approved_listings.real_estate",
+                async () => realEstateQuery,
+                { limit: 40, category_node_id: filters.categoryNodeId ?? null }
+              );
 
               if (error || !data) {
                 return [];
@@ -758,12 +808,12 @@ export async function getApprovedListings(
       const requestedOffset = Math.max(filters?.offset ?? 0, 0);
       const queryLimit = Math.min(requestedLimit + requestedOffset, 120);
 
-      let query = supabase
+      let query = applyPublicListingEmbedLimits(supabase
         .from("listings")
         .select(PUBLIC_LISTING_SELECT as string)
         .eq("status", "approved")
         .in("category_id", lifecycleCategoryIds)
-        .limit(queryLimit);
+        .limit(queryLimit));
 
       query = applyPublicListingQualityFilters(query);
 
@@ -918,7 +968,18 @@ export async function getApprovedListings(
         query = query.order("created_at", { ascending: false });
       }
 
-      const { data, error } = await query;
+      const { data, error } = await withDataTiming(
+        "approved_listings.feed",
+        async () => query,
+        {
+          limit: queryLimit,
+          offset: requestedOffset,
+          cacheable: !hasExpensiveDynamicListingFilters(filters),
+          category_id: filters?.categoryId ?? null,
+          category_node_id: filters?.categoryNodeId ?? null,
+          has_search: Boolean(filters?.search?.trim()),
+        }
+      );
 
       if (error || !data) {
         if (error) reportDataError("approved-listings.select", error);
@@ -1013,34 +1074,34 @@ export async function getListingById(
     }
 
     const requestedLanguage = appLocaleToListingLanguage(locale);
-    const translationsByListingId = await getCompletedListingTranslations(
+    const translationsPromise = getCompletedListingTranslations(
       supabase,
       [listing.id],
       requestedLanguage
-    );
-    const translated = translationsByListingId[listing.id];
-    const originalLocale = (listing.original_locale as ListingLanguageCode | null) ?? "en";
-
-    listing.translated_title = translated?.title ?? listing.title;
-    listing.translated_description = translated?.description ?? listing.description;
-    listing.display_language = translated ? requestedLanguage : originalLocale;
-    listing.translation_note = translated
-      ? `Translated from ${listingLanguageLabel(originalLocale)}`
-      : `Original language: ${listingLanguageLabel(originalLocale)}`;
-    if (listing.user_id) {
-      const { data: profile } = await listingReadClient
-        .from("profiles")
-        .select("*")
-        .eq("id", listing.user_id)
-        .maybeSingle();
-
-      if (profile) {
-        listing.profile = profile;
+    ).catch(() => ({} as Record<string, { title: string; description: string }>));
+    const profilePromise = (async () => {
+      if (!listing.user_id) {
+        return null;
       }
-    }
 
-    try {
-      if (listing.vehicle_variant_id) {
+      try {
+        const { data } = await listingReadClient
+          .from("profiles")
+          .select("*")
+          .eq("id", listing.user_id)
+          .maybeSingle();
+
+        return data ?? null;
+      } catch {
+        return null;
+      }
+    })();
+    const vehicleVariantPromise = (async () => {
+      if (!listing.vehicle_variant_id) {
+        return null;
+      }
+
+      try {
         let vehicleVariant = null;
         try {
           const result = await supabase
@@ -1193,15 +1254,13 @@ export async function getListingById(
             : null;
         }
 
-        listing.vehicle_variant = vehicleVariant ?? null;
-      } else {
-        listing.vehicle_variant = null;
+        return vehicleVariant ?? null;
+      } catch {
+        return null;
       }
-    } catch {
-      listing.vehicle_variant = null;
-    }
-
-    try {
+    })();
+    const vehicleFeaturesPromise = (async () => {
+      try {
       const { data: vehicleFeatures } = await supabase
         .from("listing_vehicle_features")
         .select(
@@ -1230,22 +1289,54 @@ export async function getListingById(
         )
         .eq("listing_id", listing.id);
 
-      listing.vehicle_features = (vehicleFeatures as unknown as ListingVehicleFeature[]) ?? [];
-    } catch {
-      listing.vehicle_features = [];
-    }
+        return (vehicleFeatures as unknown as ListingVehicleFeature[]) ?? [];
+      } catch {
+        return [];
+      }
+    })();
 
-    // Fetch vehicle damage (fails silently if table not yet created)
-    try {
-      const { data: damage } = await supabase
-        .from("vehicle_damage_reports")
-        .select("*, vehicle_damage_parts(*)")
-        .eq("listing_id", listing.id)
-        .maybeSingle();
-      listing.vehicle_damage = damage ?? null;
-    } catch {
-      listing.vehicle_damage = null;
+    const vehicleDamagePromise = (async () => {
+      try {
+        const { data } = await supabase
+          .from("vehicle_damage_reports")
+          .select("*, vehicle_damage_parts(*)")
+          .eq("listing_id", listing.id)
+          .maybeSingle();
+
+        return data ?? null;
+      } catch {
+        return null;
+      }
+    })();
+
+    const [
+      translationsByListingId,
+      profile,
+      vehicleVariant,
+      vehicleFeatures,
+      vehicleDamage,
+    ] = await Promise.all([
+      translationsPromise,
+      profilePromise,
+      vehicleVariantPromise,
+      vehicleFeaturesPromise,
+      vehicleDamagePromise,
+    ]);
+    const translated = translationsByListingId[listing.id];
+    const originalLocale = (listing.original_locale as ListingLanguageCode | null) ?? "en";
+
+    listing.translated_title = translated?.title ?? listing.title;
+    listing.translated_description = translated?.description ?? listing.description;
+    listing.display_language = translated ? requestedLanguage : originalLocale;
+    listing.translation_note = translated
+      ? `Translated from ${listingLanguageLabel(originalLocale)}`
+      : `Original language: ${listingLanguageLabel(originalLocale)}`;
+    if (profile) {
+      listing.profile = profile;
     }
+    listing.vehicle_variant = vehicleVariant;
+    listing.vehicle_features = vehicleFeatures;
+    listing.vehicle_damage = vehicleDamage;
 
     return canReadPrivateListing ? listing : sanitizePublicListingBoundary(listing);
   } catch {
@@ -1253,22 +1344,162 @@ export async function getListingById(
   }
 }
 
+function applyPublicListingEmbedLimits<T>(query: T): T {
+  type EmbeddedQuery = {
+    order: (column: string, options?: { ascending?: boolean; referencedTable?: string; foreignTable?: string }) => EmbeddedQuery;
+    limit: (count: number, options?: { referencedTable?: string; foreignTable?: string }) => EmbeddedQuery;
+    in: (column: string, values: readonly string[]) => EmbeddedQuery;
+  };
+
+  const shaped = query as EmbeddedQuery;
+
+  return shaped
+    .order("is_primary", { referencedTable: "listing_images", ascending: false })
+    .order("sort_order", { referencedTable: "listing_images", ascending: true })
+    .limit(1, { referencedTable: "listing_images" })
+    .in("listing_attributes.attribute_key", [...PUBLIC_CARD_ATTRIBUTE_KEYS]) as T;
+}
+
+function hasExpensiveDynamicListingFilters(filters?: ListingFilters) {
+  if (!filters) return false;
+  return Boolean(
+    filters.search?.trim()
+    || filters.minPrice !== undefined
+    || filters.maxPrice !== undefined
+    || filters.propertyType
+    || filters.rentalType
+    || typeof filters.suitableForStudents === "boolean"
+    || filters.genderSuitable
+    || typeof filters.distanceToUniversityMax === "number"
+    || typeof filters.photosOnly === "boolean"
+    || typeof filters.minMonthlyRent === "number"
+    || typeof filters.maxMonthlyRent === "number"
+    || typeof filters.minGerawyAmount === "number"
+    || typeof filters.maxGerawyAmount === "number"
+    || typeof filters.minRooms === "number"
+    || typeof filters.furnished === "boolean"
+    || filters.ownerType
+    || filters.dormitoryGender
+    || typeof filters.maxDormitoryPrice === "number"
+    || filters.paymentPeriod
+    || filters.roomType
+    || typeof filters.numberOfBedsMin === "number"
+    || typeof filters.internet === "boolean"
+    || typeof filters.water === "boolean"
+    || typeof filters.electricity === "boolean"
+    || typeof filters.mealsIncluded === "boolean"
+    || typeof filters.security === "boolean"
+    || typeof filters.minLandSize === "number"
+    || typeof filters.maxLandSize === "number"
+    || filters.vehicleType
+    || filters.vehicleBrand
+    || filters.vehicleModel
+    || typeof filters.yearMin === "number"
+    || typeof filters.yearMax === "number"
+    || typeof filters.kmMin === "number"
+    || typeof filters.kmMax === "number"
+    || filters.fuelType
+    || filters.transmission
+    || filters.bodyType
+    || filters.engineCapacity
+    || filters.color
+    || filters.sellerType
+    || filters.warranty
+    || typeof filters.exchange === "boolean"
+    || filters.plateStatus
+    || filters.customsStatus
+    || filters.importedFrom
+    || filters.condition
+    || filters.accidentStatus
+    || typeof filters.oldVehicle === "boolean"
+    || typeof filters.importedVehicle === "boolean"
+    || typeof filters.rebuiltVehicle === "boolean"
+    || typeof filters.customVehicle === "boolean"
+    || typeof filters.documentsAvailable === "boolean"
+    || typeof filters.engineSwapped === "boolean"
+    || typeof filters.olderThan1980 === "boolean"
+    || typeof filters.honda70 === "boolean"
+    || filters.engineCc
+    || filters.rickshawType
+    || filters.passengerCapacity
+    || filters.cargoCapacity
+    || filters.phoneModel
+    || filters.storage
+    || filters.ram
+    || typeof filters.batteryHealthMin === "number"
+    || filters.originalRefurbished
+    || filters.listingType
+    || filters.postedWithin
+  );
+}
+
 export async function getSimilarListings(listing: ListingWithRelations, locale: AppLocale = "en", limit = 4): Promise<ListingWithRelations[]> {
-  const candidates = await getApprovedListings({locale,categoryId:Number(listing.category_id),province:listing.province ?? undefined,sort:"newest"});
-  const basePrice=Number(listing.price)||0;
-  return candidates.filter(item=>item.id!==listing.id).map(item=>{
-    const price=Number(item.price)||0; const priceDistance=basePrice>0?Math.abs(price-basePrice)/basePrice:1;
-    const locationScore=item.district&&item.district===listing.district?2:item.province===listing.province?1:0;
-    return {item,score:locationScore+Math.max(0,1-priceDistance)};
-  }).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.item);
+  try {
+    const supabase = createSupabasePublicServerClient();
+    const requestedLanguage = appLocaleToListingLanguage(locale);
+    const candidateLimit = Math.min(Math.max(limit * 6, 12), 30);
+
+    let query = applyPublicListingEmbedLimits(supabase
+      .from("listings")
+      .select(PUBLIC_LISTING_SELECT as string)
+      .eq("status", "approved")
+      .eq("category_id", Number(listing.category_id))
+      .neq("id", listing.id)
+      .order("created_at", { ascending: false })
+      .limit(candidateLimit));
+
+    query = applyPublicListingQualityFilters(query);
+
+    if (listing.province) {
+      query = query.eq("province", listing.province);
+    }
+
+    const { data, error } = await withDataTiming(
+      "similar_listings.feed",
+      async () => query,
+      {
+        limit: candidateLimit,
+        category_id: listing.category_id ?? null,
+        has_province: Boolean(listing.province),
+      }
+    );
+
+    if (error || !data) {
+      if (error) reportDataError("similar-listings.select", error);
+      return [];
+    }
+
+    const rows = sanitizePublicListingBoundaries(data as unknown as ListingWithRelations[]);
+    const translationsByListingId = await getCompletedListingTranslations(
+      supabase,
+      rows.map((row) => row.id),
+      requestedLanguage
+    );
+    const candidates = attachPreferredTranslation(rows, translationsByListingId, requestedLanguage);
+    const basePrice = Number(listing.price) || 0;
+
+    return candidates
+      .map((item) => {
+        const price = Number(item.price) || 0;
+        const priceDistance = basePrice > 0 ? Math.abs(price - basePrice) / basePrice : 1;
+        const locationScore = item.district && item.district === listing.district ? 2 : item.province === listing.province ? 1 : 0;
+        return { item, score: locationScore + Math.max(0, 1 - priceDistance) };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((entry) => entry.item);
+  } catch (error) {
+    reportDataError("similar-listings.unexpected", error);
+    return [];
+  }
 }
 
 export async function getCategoryNodeByPath(path: string): Promise<CategoryNode | null> {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicServerClient();
     const { data, error } = await supabase
       .from("category_nodes")
-      .select("*")
+      .select("id, category_id, parent_id, name, slug, level, path, display_order, is_active, created_at, updated_at")
       .eq("path", path)
       .maybeSingle();
 
@@ -1287,11 +1518,11 @@ export async function getFilterDefinitionsForNode(
   locale: AppLocale = "en"
 ): Promise<FilterDefinition[]> {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicServerClient();
 
     const { data: globalDefs } = await supabase
       .from("filter_definitions")
-      .select("*")
+      .select("id, category_node_id, filter_key, filter_label, filter_type, options, source_table, source_column, sort_order, is_active")
       .is("category_node_id", null)
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
@@ -1309,7 +1540,7 @@ export async function getFilterDefinitionsForNode(
 
     const { data: scopedDefs } = await supabase
       .from("filter_definitions")
-      .select("*")
+      .select("id, category_node_id, filter_key, filter_label, filter_type, options, source_table, source_column, sort_order, is_active")
       .in("category_node_id", scopedIds)
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
@@ -1417,13 +1648,12 @@ export async function getUserListings(userId: string): Promise<ListingWithRelati
   }
 }
 
-export const getCategories = cache(async (): Promise<Category[]> => {
-  try {
-    const supabase = await createSupabaseServerClient();
-
+const getCachedLaunchCategories = unstable_cache(
+  async (): Promise<Category[]> => {
+    const supabase = createSupabasePublicServerClient();
     const { data, error } = await supabase
       .from("categories")
-      .select("*")
+      .select("id, name, slug, description, display_order, is_active, is_coming_soon, launch_date, created_at, updated_at")
       .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS])
       .order("display_order", { ascending: true });
 
@@ -1432,6 +1662,17 @@ export const getCategories = cache(async (): Promise<Category[]> => {
     }
 
     return data as Category[];
+  },
+  ["sahibash-launch-categories"],
+  {
+    revalidate: 3600,
+    tags: [PUBLIC_CACHE_TAGS.categoryTaxonomy],
+  }
+);
+
+export const getCategories = cache(async (): Promise<Category[]> => {
+  try {
+    return getCachedLaunchCategories();
   } catch {
     return [];
   }
@@ -1439,32 +1680,11 @@ export const getCategories = cache(async (): Promise<Category[]> => {
 
 export const getPostingRootCategories = cache(async (): Promise<Category[]> => {
   try {
-    const supabase = await createSupabaseServerClient();
-
-    const lifecycle = await supabase
-      .from("categories")
-      .select("*")
-      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS])
-      .order("display_order", { ascending: true });
-
-    if (!lifecycle.error && lifecycle.data) {
-      return lifecycle.data as Category[];
-    }
-
-    const fallback = await supabase
-      .from("categories")
-      .select("*")
-      .in("slug", [...ACTIVE_HOME_CATEGORY_SLUGS])
-      .order("display_order", { ascending: true });
-
-    if (fallback.error || !fallback.data) {
-      return [];
-    }
-
-    return (fallback.data as Category[]).map((category) => ({
+    const categories = await getCachedLaunchCategories();
+    return categories.map((category) => ({
       ...category,
       is_coming_soon: !LAUNCH_ACTIVE_CATEGORY_SLUGS.includes(category.slug as (typeof LAUNCH_ACTIVE_CATEGORY_SLUGS)[number]),
-      launch_date: null,
+      launch_date: category.launch_date ?? null,
     }));
   } catch {
     return [];
@@ -1474,11 +1694,11 @@ export const getPostingRootCategories = cache(async (): Promise<Category[]> => {
 export const getSubcategoriesByCategory = cache(
   async (categoryId: number): Promise<Subcategory[]> => {
     try {
-      const supabase = await createSupabaseServerClient();
+      const supabase = createSupabasePublicServerClient();
 
       const { data, error } = await supabase
         .from("category_nodes")
-        .select("*")
+        .select("id, category_id, parent_id, name, slug, level, path, display_order, is_active, created_at, updated_at")
         .eq("category_id", categoryId)
         .is("parent_id", null)
         .order("display_order", { ascending: true });
@@ -1496,11 +1716,11 @@ export const getSubcategoriesByCategory = cache(
 
 export async function getCategoryNodeById(categoryNodeId: number): Promise<CategoryNode | null> {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicServerClient();
 
     const { data, error } = await supabase
       .from("category_nodes")
-      .select("*")
+      .select("id, category_id, parent_id, name, slug, level, path, display_order, is_active, created_at, updated_at")
       .eq("id", categoryNodeId)
       .maybeSingle();
 
@@ -1516,11 +1736,11 @@ export async function getCategoryNodeById(categoryNodeId: number): Promise<Categ
 
 export async function getCategoryChildren(categoryNodeId: number): Promise<CategoryNode[]> {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicServerClient();
 
     const { data, error } = await supabase
       .from("category_nodes")
-      .select("*")
+      .select("id, category_id, parent_id, name, slug, level, path, display_order, is_active, created_at, updated_at")
       .eq("parent_id", categoryNodeId)
       .eq("is_active", true)
       .order("display_order", { ascending: true });
@@ -1537,7 +1757,7 @@ export async function getCategoryChildren(categoryNodeId: number): Promise<Categ
 
 export async function getCategoryPath(categoryNodeId: number): Promise<CategoryNode[]> {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabasePublicServerClient();
 
     const { data, error } = await supabase
       .from("category_nodes")
@@ -1578,12 +1798,12 @@ export async function getMyFavoriteListings(userId: string): Promise<ListingWith
     return [];
   }
 
-  const { data: listings } = await supabase
+  const { data: listings } = await applyPublicListingEmbedLimits(supabase
     .from("listings")
     .select(PUBLIC_LISTING_SELECT as string)
     .eq("status", "approved")
     .in("id", ids)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false }));
 
   return sanitizePublicListingBoundaries((listings as unknown as ListingWithImages[]) ?? []) as ListingWithImages[];
 }
@@ -1654,11 +1874,11 @@ export async function getListingWithOwnerStats(listingId: string, userId: string
 }
 
 export async function getCategoryFieldsWithOptions(categoryNodeId: number): Promise<CategoryField[]> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicServerClient();
 
   const orderedBySort = await supabase
     .from("category_fields")
-    .select("*")
+    .select("id, category_node_id, field_key, field_label, field_type, is_required, options_json, unit, display_order, sort_order, group_key, visibility_rules, validation_rules, is_filterable, is_active, created_at, updated_at")
     .eq("category_node_id", categoryNodeId)
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
@@ -1670,7 +1890,7 @@ export async function getCategoryFieldsWithOptions(categoryNodeId: number): Prom
 
   const { data, error } = await supabase
     .from("category_fields")
-    .select("*")
+    .select("id, category_node_id, field_key, field_label, field_type, is_required, options_json, unit, display_order, sort_order, group_key, visibility_rules, validation_rules, is_filterable, is_active, created_at, updated_at")
     .eq("category_node_id", categoryNodeId)
     .eq("is_active", true)
     .order("display_order", { ascending: true });

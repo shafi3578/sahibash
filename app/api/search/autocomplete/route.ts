@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 import { localizePath } from "@/lib/i18n/routing";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { normalizeSearchText } from "@/lib/search/multilingual";
 import { understandSearchQuery } from "@/lib/search/query-understanding";
+import { createSupabasePublicServerClient } from "@/lib/supabase/public";
+import { getPublicProvinces } from "@/lib/location/reference-data";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache/public-cache";
 
 type SuggestionType = "alias" | "category" | "location" | "listing" | "intent";
 
@@ -14,8 +17,17 @@ type Suggestion = {
   href: string;
   value: string;
 };
+type SearchAliasRow = {
+  canonical_term: string;
+  aliases: string[] | null;
+  category_scope: string | null;
+};
 
 const SUPPORTED_LOCALES = new Set(["en", "fa", "ps"]);
+const AUTOCOMPLETE_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+  "CDN-Cache-Control": "public, s-maxage=300, stale-while-revalidate=1800",
+};
 
 function resolveLocale(value: string | null): AppLocale {
   return SUPPORTED_LOCALES.has(value ?? "") ? (value as AppLocale) : "en";
@@ -42,6 +54,49 @@ function localizedName(row: Record<string, unknown>, locale: AppLocale) {
   return String(row[`name_${locale}`] ?? row.name_en ?? row.name ?? row.slug ?? "").trim();
 }
 
+const getAutocompleteReference = unstable_cache(
+  async () => {
+    const supabase = createSupabasePublicServerClient();
+    const [categoriesRes, nodesRes, provinces] = await Promise.all([
+      supabase.from("categories").select("id, name, slug, display_order").eq("is_active", true).order("display_order", { ascending: true }).limit(20),
+      supabase.from("category_nodes").select("id, name, slug, path, level, display_order").eq("is_active", true).order("display_order", { ascending: true }).limit(120),
+      getPublicProvinces(),
+    ]);
+
+    return {
+      categories: (categoriesRes.data ?? []) as Array<Record<string, unknown>>,
+      nodes: (nodesRes.data ?? []) as Array<Record<string, unknown>>,
+      provinces: provinces as unknown as Array<Record<string, unknown>>,
+    };
+  },
+  ["search-autocomplete-reference"],
+  {
+    revalidate: 3600,
+    tags: [
+      PUBLIC_CACHE_TAGS.categoryTaxonomy,
+      PUBLIC_CACHE_TAGS.locationReference,
+      PUBLIC_CACHE_TAGS.searchReference,
+    ],
+  }
+);
+
+const getAutocompleteAliases = unstable_cache(
+  async (locale: AppLocale): Promise<SearchAliasRow[]> => {
+    const supabase = createSupabasePublicServerClient();
+    const { data, error } = await supabase
+      .from("search_alias_dictionary")
+      .select("canonical_term, aliases, language, category_scope")
+      .eq("is_active", true)
+      .in("language", ["multi", locale])
+      .limit(1000);
+
+    if (error) return [];
+    return (data ?? []) as SearchAliasRow[];
+  },
+  ["search-autocomplete-aliases"],
+  { revalidate: 3600, tags: [PUBLIC_CACHE_TAGS.searchReference] }
+);
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const locale = resolveLocale(url.searchParams.get("locale"));
@@ -52,17 +107,7 @@ export async function GET(request: Request) {
   const suggestions: Suggestion[] = [];
 
   try {
-    const supabase = await createSupabaseServerClient();
-
-    const [categoriesRes, nodesRes, provincesRes] = await Promise.all([
-      supabase.from("categories").select("id, name, slug, display_order").eq("is_active", true).order("display_order", { ascending: true }).limit(20),
-      supabase.from("category_nodes").select("id, name, slug, path, level, display_order").eq("is_active", true).order("display_order", { ascending: true }).limit(120),
-      supabase.from("provinces").select("id, name, name_en, name_fa, name_ps, slug, aliases, sort_order").eq("is_active", true).order("sort_order", { ascending: true }).limit(40),
-    ]);
-
-    const categories = (categoriesRes.data ?? []) as Array<Record<string, unknown>>;
-    const nodes = (nodesRes.data ?? []) as Array<Record<string, unknown>>;
-    const provinces = (provincesRes.data ?? []) as Array<Record<string, unknown>>;
+    const { categories, nodes, provinces } = await getAutocompleteReference();
 
     if (normalized.length <= 1) {
       for (const category of categories.slice(0, 4)) {
@@ -75,7 +120,10 @@ export async function GET(request: Request) {
           value: label,
         });
       }
-      return NextResponse.json({ query: rawQuery, normalized, suggestions: uniqueSuggestions(suggestions, 8) });
+      return NextResponse.json(
+        { query: rawQuery, normalized, suggestions: uniqueSuggestions(suggestions, 8) },
+        { headers: AUTOCOMPLETE_CACHE_HEADERS }
+      );
     }
 
     for (const product of understood.productHints) {
@@ -88,14 +136,21 @@ export async function GET(request: Request) {
       });
     }
 
-    const aliasRes = await supabase
-      .from("search_alias_dictionary")
-      .select("canonical_term, aliases, language, category_scope")
-      .eq("is_active", true)
-      .in("language", ["multi", locale])
-      .limit(1000);
+    const likeTerm = cleanLikeTerm(rawQuery).split(" ").find((term) => term.length >= 4);
+    const aliasPromise = getAutocompleteAliases(locale);
+    const listingPromise = likeTerm
+      ? createSupabasePublicServerClient()
+          .from("listings")
+          .select("id, title, price, currency, province, district, vehicle_brand, vehicle_model")
+          .eq("status", "approved")
+          .or(`title.ilike.%${likeTerm}%,vehicle_brand.ilike.%${likeTerm}%,vehicle_model.ilike.%${likeTerm}%,province.ilike.%${likeTerm}%,district.ilike.%${likeTerm}%`)
+          .order("created_at", { ascending: false })
+          .limit(5)
+      : Promise.resolve({ data: [] });
 
-    for (const row of (aliasRes.data ?? []) as Array<{ canonical_term: string; aliases: string[] | null; category_scope: string | null }>) {
+    const [aliasRes, listingRes] = await Promise.all([aliasPromise, listingPromise]);
+
+    for (const row of aliasRes) {
       const terms = [row.canonical_term, ...(row.aliases ?? [])];
       const normalizedTerms = terms.map((term) => normalizeSearchText(term)).filter(Boolean);
       if (!normalizedTerms.some((term) => term.includes(normalized) || normalized.includes(term))) {
@@ -157,16 +212,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const likeTerm = cleanLikeTerm(rawQuery).split(" ").find((term) => term.length >= 3);
     if (likeTerm) {
-      const listingRes = await supabase
-        .from("listings")
-        .select("id, title, price, currency, province, district, vehicle_brand, vehicle_model")
-        .eq("status", "approved")
-        .or(`title.ilike.%${likeTerm}%,vehicle_brand.ilike.%${likeTerm}%,vehicle_model.ilike.%${likeTerm}%,province.ilike.%${likeTerm}%,district.ilike.%${likeTerm}%`)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
       for (const listing of (listingRes.data ?? []) as Array<Record<string, unknown>>) {
         const label = String(listing.title ?? "");
         suggestions.push({
@@ -179,7 +225,10 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ query: rawQuery, normalized, suggestions: uniqueSuggestions(suggestions) });
+    return NextResponse.json(
+      { query: rawQuery, normalized, suggestions: uniqueSuggestions(suggestions) },
+      { headers: AUTOCOMPLETE_CACHE_HEADERS }
+    );
   } catch {
     return NextResponse.json({ query: rawQuery, normalized, suggestions: [] });
   }

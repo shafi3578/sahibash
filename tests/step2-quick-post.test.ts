@@ -122,7 +122,7 @@ test("Quick Post supports professional item location without exposing device GPS
 test("Quick Post restores car-only 2D damage reporting and buyer detail visibility", () => {
   for (const marker of [
     "VehicleDamageDiagram",
-    "defaultDamageParts",
+    "defaultVehicleDamageParts",
     "isQuickPostCarDamageCategory",
     'data-testid="quick-post-car-damage"',
     "damage_parts_json",

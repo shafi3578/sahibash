@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeCategorySchemaProfileFromFormData } from "@/lib/data/category-schema";
+import { revalidatePublicTaxonomyCache } from "@/lib/cache/public-cache";
 
 export async function saveCategorySchemaProfileAction(formData: FormData) {
   await requirePermission("categories.update");
@@ -24,6 +25,7 @@ export async function saveCategorySchemaProfileAction(formData: FormData) {
     throw new Error(error.message);
   }
 
+  revalidatePublicTaxonomyCache();
   revalidatePath("/admin/categories");
   redirect("/admin/categories");
 }
@@ -44,6 +46,7 @@ export async function deleteCategorySchemaProfileAction(formData: FormData) {
     throw new Error(error.message);
   }
 
+  revalidatePublicTaxonomyCache();
   revalidatePath("/admin/categories");
   redirect("/admin/categories");
 }

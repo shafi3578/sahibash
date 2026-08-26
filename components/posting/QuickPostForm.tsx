@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
@@ -10,9 +11,7 @@ import { localizePath } from "@/lib/i18n/routing";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
-import LocationMapPicker from "@/components/location/LocationMapPicker";
-import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
-import { damageCondition, damagePartLabel, getNonOriginalVehicleDamageParts } from "@/lib/vehicles/damage-report";
+import { damageCondition, damagePartLabel, defaultVehicleDamageParts, getNonOriginalVehicleDamageParts, type DamagePart } from "@/lib/vehicles/damage-report";
 import type { Category, CategoryNode } from "@/types/database";
 
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -30,6 +29,33 @@ type QuickPostProps = {
   sellerProfile?: SellerProfileContact | null;
 };
 
+type LocationMapPickerProps = {
+  onLocationSelected: (location: { latitude: number; longitude: number; accuracy?: number }) => void;
+  initialLocation?: { latitude?: number; longitude?: number; accuracy?: number };
+};
+
+type VehicleDamageDiagramProps = {
+  value: DamagePart[];
+  onChange: (parts: DamagePart[]) => void;
+  locale?: AppLocale;
+};
+
+const LocationMapPicker = dynamic<LocationMapPickerProps>(
+  () => import("@/components/location/LocationMapPicker"),
+  {
+    ssr: false,
+    loading: () => <div className="h-32 animate-pulse rounded-2xl bg-[var(--surface-2)]" aria-hidden="true" />,
+  }
+);
+
+const VehicleDamageDiagram = dynamic<VehicleDamageDiagramProps>(
+  () => import("@/components/vehicles/VehicleDamageDiagram").then((mod) => mod.VehicleDamageDiagram),
+  {
+    ssr: false,
+    loading: () => <div className="h-72 animate-pulse rounded-2xl bg-[var(--surface-2)]" aria-hidden="true" />,
+  }
+);
+
 type CandidateNode = Pick<
   CategoryNode,
   "id" | "category_id" | "parent_id" | "name" | "slug" | "path" | "level" | "display_order" | "is_active" | "is_leaf"
@@ -37,6 +63,13 @@ type CandidateNode = Pick<
 
 type ProvinceOption = { id: number; name: string };
 type DistrictOption = { id: number; name: string; province_id: number };
+type LocationApiOption = {
+  id: number | string;
+  province_id?: number | string;
+  name?: string | null;
+  name_en?: string | null;
+};
+type LocationApiResponse<T> = { success?: boolean; data?: T[] };
 type QuickStep = 1 | 2;
 type QuickLocationSource = "manual" | "device" | "map_pin";
 type QuickLocationVisibility = "exact" | "approximate" | "province_district" | "hidden";
@@ -59,6 +92,32 @@ type QuickKind =
   | "general";
 
 type DetailValue = string | boolean;
+
+function readLocationOptionName(option: LocationApiOption) {
+  return String(option.name ?? option.name_en ?? "").trim();
+}
+
+function toProvinceOption(option: LocationApiOption): ProvinceOption | null {
+  const id = Number(option.id);
+  const name = readLocationOptionName(option);
+  return Number.isFinite(id) && name ? { id, name } : null;
+}
+
+function toDistrictOption(option: LocationApiOption): DistrictOption | null {
+  const id = Number(option.id);
+  const provinceId = Number(option.province_id);
+  const name = readLocationOptionName(option);
+  return Number.isFinite(id) && Number.isFinite(provinceId) && name
+    ? { id, province_id: provinceId, name }
+    : null;
+}
+
+async function fetchLocationOptions<T extends LocationApiOption>(url: string) {
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as LocationApiResponse<T>;
+  return payload.success && Array.isArray(payload.data) ? payload.data : [];
+}
 
 type QuickField = {
   key: string;
@@ -861,7 +920,7 @@ export default function QuickPostForm({
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [smartSuggestion, setSmartSuggestion] = useState<SmartPostingParseResult | null>(null);
   const [aiResponse, setAiResponse] = useState<AiResponse | null>(null);
-  const [damageParts, setDamageParts] = useState<DamagePart[]>(() => defaultDamageParts());
+  const [damageParts, setDamageParts] = useState<DamagePart[]>(() => defaultVehicleDamageParts());
   const [aiStatus, setAiStatus] = useState<"idle" | "working" | "ready" | "unavailable">("idle");
   const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [isPublishing, setIsPublishing] = useState(false);
@@ -1149,14 +1208,13 @@ export default function QuickPostForm({
 
   useEffect(() => {
     async function loadProvinces() {
-      const { data } = await supabase
-        .from("provinces")
-        .select("id, name")
-        .order("name", { ascending: true });
-      setProvinceOptions((data ?? []) as ProvinceOption[]);
+      const data = (await fetchLocationOptions("/api/location/provinces"))
+        .map(toProvinceOption)
+        .filter((row): row is ProvinceOption => Boolean(row));
+      setProvinceOptions(data);
     }
     void loadProvinces();
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     if (!selectedProvinceId) {
@@ -1165,18 +1223,18 @@ export default function QuickPostForm({
 
     let cancelled = false;
     async function loadDistricts() {
-      const { data } = await supabase
-        .from("districts")
-        .select("id, name, province_id")
-        .eq("province_id", selectedProvinceId)
-        .order("name", { ascending: true });
-      if (!cancelled) setDistrictOptions((data ?? []) as DistrictOption[]);
+      const data = (await fetchLocationOptions(
+        `/api/location/districts?province_id=${encodeURIComponent(String(selectedProvinceId))}`
+      ))
+        .map(toDistrictOption)
+        .filter((row): row is DistrictOption => Boolean(row));
+      if (!cancelled) setDistrictOptions(data);
     }
     void loadDistricts();
     return () => {
       cancelled = true;
     };
-  }, [selectedProvinceId, supabase]);
+  }, [selectedProvinceId]);
 
   useEffect(() => {
     if (!draftLoaded) return;

@@ -4,13 +4,11 @@ import { CategoryHomeList } from "@/components/categories/CategoryHomeList";
 import { getHomepageSections } from "@/lib/actions/homepage-sections";
 import { getSiteSettings } from "@/lib/actions/site-settings";
 import { getHomeCategoryNodes } from "@/lib/categories/getCategories";
-import { getCategoriesWithStats } from "@/lib/data/listings";
 import { resolveHomepageSections } from "@/lib/data/homepage-sections";
 import { getApprovedListings } from "@/lib/data/queries";
 import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 import { formatListingPrice } from "@/lib/listings/price-display";
 
@@ -61,31 +59,23 @@ export default async function HomePage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
 }) {
-  const { t, locale } = await getDictionary();
+  const dictionaryPromise = getDictionary();
+  const siteSettingsPromise = getSiteSettings();
+  const homepageSectionsPromise = getHomepageSections();
+  const { t, locale } = await dictionaryPromise;
   const href = (path: string) => localizePath(path, locale);
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const pageValue = Array.isArray(resolvedSearchParams.page) ? resolvedSearchParams.page[0] : resolvedSearchParams.page;
   const currentPage = Math.min(Math.max(Number.parseInt(pageValue ?? "1", 10) || 1, 1), 7);
   const pageSize = 10;
   const postAdCreatePath = "/post-ad/create?posting=sell";
-  const siteSettings = await getSiteSettings();
+  const siteSettings = await siteSettingsPromise;
   const homeCopy = getHomePageCopy(locale, siteSettings);
-  const homepageSections = resolveHomepageSections(await getHomepageSections());
-  const guestPostAdHref = `${href("/login")}?redirect=${encodeURIComponent(postAdCreatePath)}&reason=post`;
-  let postAdHref = guestPostAdHref;
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      postAdHref = href(postAdCreatePath);
-    }
-  } catch {
-    postAdHref = guestPostAdHref;
-  }
+  const homepageSections = resolveHomepageSections(await homepageSectionsPromise);
+  const postAdHref = href(postAdCreatePath);
 
-  const [listings, categories, mobileCategories] = await Promise.all([
+  const [listings, mobileCategories] = await Promise.all([
     getApprovedListings({ locale, limit: 70 }),
-    getCategoriesWithStats(),
     getHomeCategoryNodes(),
   ]);
 
@@ -278,9 +268,9 @@ export default async function HomePage({
           >
             {t.home.openCategoryBrowser}
           </Link>
-          {categories.length > 0 ? (
+          {mobileCategories.length > 0 ? (
             <Link
-              href={href(`/categories/${categories[0].slug}`)}
+              href={href(`/categories/${mobileCategories[0].slug}`)}
               className="inline-flex rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
             >
               {t.home.mainCategories}

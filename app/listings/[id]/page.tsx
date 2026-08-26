@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getListingById, getSimilarListings } from "@/lib/data/queries";
 import Link from "next/link";
@@ -37,6 +38,31 @@ import { localizePath } from "@/lib/i18n/routing";
 
 type NamedLocationRelation = { name?: string | null } | null;
 const ENABLE_BUYER_VEHICLE_3D = false;
+type ListingDetail = NonNullable<Awaited<ReturnType<typeof getListingById>>>;
+type ListingDetailLocale = Awaited<ReturnType<typeof getDictionary>>["locale"];
+
+async function SimilarListingsSection({
+  listing,
+  locale,
+}: {
+  listing: ListingDetail;
+  locale: ListingDetailLocale;
+}) {
+  if (listing.status !== "approved") return null;
+
+  const similarListings = await getSimilarListings(listing, locale, 4);
+  if (similarListings.length === 0) return null;
+
+  return (
+    <section className="mt-8 border-t border-[var(--line)] pt-6">
+      <h2 className="font-display text-2xl font-bold">{locale === "fa" ? "اعلان‌های مشابه" : locale === "ps" ? "ورته اعلانونه" : "Similar listings"}</h2>
+      <p className="mt-1 text-sm text-[var(--ink-2)]">{locale === "fa" ? "بر اساس دسته‌بندی، موقعیت و محدوده قیمت" : locale === "ps" ? "د کټګورۍ، ځای او بیې له مخې" : "Based on category, location, and price range"}</p>
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {similarListings.map((item) => <ListingCard key={item.id} listing={item} />)}
+      </div>
+    </section>
+  );
+}
 
 function readAttributeValue(value: unknown, locale: "en" | "fa" | "ps") {
   if (typeof value === "string") return value;
@@ -71,8 +97,10 @@ export default async function ListingDetailPage({
   const qp = await searchParams;
   const listing = await getListingById(id, locale);
   if (!listing) notFound();
-  const similarListings = listing.status === "approved" ? await getSimilarListings(listing, locale, 4) : [];
-  await recordSearchTelemetryClick(qp.st, id);
+  const telemetryPromise = recordSearchTelemetryClick(qp.st, id);
+  const currentUserPromise = getCurrentUser();
+  const fieldsPromise = getCategoryFieldsWithOptions(listing.category_node_id);
+  const configuredSchemaPromise = getPublishedListingSchema(listing.category_node_id);
   const viewerLanguageCode = appLocaleToListingLanguage(locale);
   const showOriginal = qp.view === "original";
   const translationUnavailable = !showOriginal && viewerLanguageCode !== listing.display_language;
@@ -83,13 +111,16 @@ export default async function ListingDetailPage({
     ? (listing.original_description || listing.description)
     : (listing.translated_description || listing.description);
 
-  const currentUser = await getCurrentUser();
+  const [currentUser, fields, configuredSchema] = await Promise.all([
+    currentUserPromise,
+    fieldsPromise,
+    configuredSchemaPromise,
+    telemetryPromise.then(() => null),
+  ]);
   const isOwner = currentUser?.id === listing.user_id;
   const listingHref = localizePath(`/listings/${listing.id}`, locale);
   const composeHref = localizePath(`/listings/${listing.id}?compose=1`, locale);
   const offerHref = localizePath(`/listings/${listing.id}?offerbox=1`, locale);
-  const fields = await getCategoryFieldsWithOptions(listing.category_node_id);
-  const configuredSchema = await getPublishedListingSchema(listing.category_node_id);
   const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
   const dynamicLeafId = attrs.find((item) => item.attribute_key === ELECTRONICS_DYNAMIC_LEAF_KEY)?.attribute_value_text ?? null;
   const dynamicAttributes = attrs.reduce<Record<string, unknown>>((acc, item) => {
@@ -1028,11 +1059,9 @@ export default async function ListingDetailPage({
         </div>
       ) : null}
 
-      {similarListings.length > 0 ? <section className="mt-8 border-t border-[var(--line)] pt-6">
-        <h2 className="font-display text-2xl font-bold">{locale === "fa" ? "اعلان‌های مشابه" : locale === "ps" ? "ورته اعلانونه" : "Similar listings"}</h2>
-        <p className="mt-1 text-sm text-[var(--ink-2)]">{locale === "fa" ? "بر اساس دسته‌بندی، موقعیت و محدوده قیمت" : locale === "ps" ? "د کټګورۍ، ځای او بیې له مخې" : "Based on category, location, and price range"}</p>
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">{similarListings.map(item=><ListingCard key={item.id} listing={item}/>)}</div>
-      </section> : null}
+      <Suspense fallback={null}>
+        <SimilarListingsSection listing={listing} locale={locale} />
+      </Suspense>
 
       {!isOwner ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">

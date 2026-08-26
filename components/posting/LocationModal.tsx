@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/client";
 import type { LocationData } from "@/lib/posting/types";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { AFGHAN_PROVINCES, getProvinceLabel } from "@/lib/constants/marketplace";
 
 type LocationModalProps = {
@@ -13,6 +12,26 @@ type LocationModalProps = {
   initialLocation?: LocationData;
   locale: string;
 };
+
+type LocationApiOption = {
+  id: number | string;
+  name?: string | null;
+  name_en?: string | null;
+};
+type LocationApiResponse<T> = { success?: boolean; data?: T[] };
+
+function toLocationOption(option: LocationApiOption) {
+  const id = Number(option.id);
+  const name = String(option.name ?? option.name_en ?? "").trim();
+  return Number.isFinite(id) && name ? { id, name } : null;
+}
+
+async function fetchLocationOptions<T extends LocationApiOption>(url: string) {
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as LocationApiResponse<T>;
+  return payload.success && Array.isArray(payload.data) ? payload.data : [];
+}
 
 export function LocationModal({
   isOpen,
@@ -35,14 +54,9 @@ export function LocationModal({
   useEffect(() => {
     const loadProvinces = async () => {
       try {
-        const supabase = createSupabaseBrowserClient();
-        const { data } = await supabase
-          .from("provinces")
-          .select("id, name")
-          .eq("is_active", true)
-          .order("name", { ascending: true });
-
-        const dbRows = (data ?? []) as Array<{ id: number; name: string }>;
+        const dbRows = (await fetchLocationOptions("/api/location/provinces"))
+          .map(toLocationOption)
+          .filter((row): row is { id: number; name: string } => Boolean(row));
         const normalizedRows = dbRows.map((row) => ({
           ...row,
           normalized: row.name.trim().toLowerCase(),
@@ -72,15 +86,13 @@ export function LocationModal({
       }
 
       try {
-        const supabase = createSupabaseBrowserClient();
-        const { data } = await supabase
-          .from("districts")
-          .select("id, name")
-          .eq("province_id", Number(provinceId))
-          .eq("is_active", true)
-          .order("name", { ascending: true });
+        const rows = (await fetchLocationOptions(
+          `/api/location/districts?province_id=${encodeURIComponent(String(provinceId))}`
+        ))
+          .map(toLocationOption)
+          .filter((row): row is { id: number; name: string } => Boolean(row));
 
-        setDistricts((data ?? []) as Array<{ id: number; name: string }>);
+        setDistricts(rows);
       } catch (error) {
         console.error("Failed to load districts:", error);
         setDistricts([]);

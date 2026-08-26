@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { recordAuditEvent } from "@/lib/audit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicServerClient } from "@/lib/supabase/public";
+import { PUBLIC_CACHE_TAGS, revalidatePublicChromeCache } from "@/lib/cache/public-cache";
+import { unstable_cache } from "next/cache";
 import {
   normalizeSiteSettings,
   resolvePublicSiteSettings,
@@ -53,9 +56,9 @@ export async function saveSiteSettingsAction(formData: FormData) {
     safeChanges: { ...payload, change_summary: changeSummary || null },
   });
 
+  revalidatePublicChromeCache();
   revalidatePath("/administrator/settings");
   revalidatePath("/administrator");
-  revalidatePath("/");
   redirect("/administrator");
 }
 
@@ -89,21 +92,38 @@ export async function restoreSiteSettingsVersionAction(formData: FormData) {
     safeChanges: { version_id: versionId, change_summary: changeSummary || null },
   });
 
+  revalidatePublicChromeCache();
   revalidatePath("/administrator/settings");
   revalidatePath("/administrator");
-  revalidatePath("/");
   redirect("/administrator/settings");
 }
 
-export async function getSiteSettings() {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("site_settings")
-    .select("id, site_name, site_tagline, contact_email, contact_phone, default_locale, home_hero_title, home_hero_subtitle, home_primary_cta_label, home_primary_cta_path, home_secondary_cta_label, home_secondary_cta_path, navigation_links, step_up_window_minutes, updated_at")
-    .eq("id", 1)
-    .single();
+const getCachedSiteSettingsRow = unstable_cache(
+  async () => {
+    const supabase = createSupabasePublicServerClient();
+    const { data, error } = await supabase
+      .from("site_settings")
+      .select("id, site_name, site_tagline, contact_email, contact_phone, default_locale, home_hero_title, home_hero_subtitle, home_primary_cta_label, home_primary_cta_path, home_secondary_cta_label, home_secondary_cta_path, navigation_links, step_up_window_minutes, updated_at")
+      .eq("id", 1)
+      .single();
 
-  if (error || !data) {
+    if (error || !data) {
+      return null;
+    }
+
+    return data;
+  },
+  ["sahibash-site-settings"],
+  {
+    revalidate: 3600,
+    tags: [PUBLIC_CACHE_TAGS.siteSettings],
+  }
+);
+
+export async function getSiteSettings() {
+  const data = await getCachedSiteSettingsRow();
+
+  if (!data) {
     return {
       ...resolvePublicSiteSettings(),
       updated_at: null,

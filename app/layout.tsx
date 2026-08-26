@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentLocale } from "@/lib/i18n/server";
@@ -8,14 +10,15 @@ import { getSiteSettings } from "@/lib/actions/site-settings";
 import "./globals.css";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { PwaRegister } from "@/components/pwa-register";
-import { getCurrentUser } from "@/lib/auth";
 import { localeDirection, localeTag } from "@/lib/i18n/format";
 import { SITE_METADATA } from "@/lib/i18n/metadata";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const siteSettings = await getSiteSettings();
-  const locale = await getCurrentLocale();
+  const [siteSettings, locale] = await Promise.all([
+    getSiteSettings(),
+    getCurrentLocale(),
+  ]);
   const localizedMetadata = SITE_METADATA[locale];
   const brandName = getLocalizedBrandName(locale, siteSettings.site_name);
 
@@ -32,19 +35,18 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const dynamic = "force-dynamic";
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await getCurrentLocale();
-  const headerStore = await headers();
+  const [locale, headerStore] = await Promise.all([
+    getCurrentLocale(),
+    headers(),
+  ]);
   const isAdminRoute = headerStore.get("x-sahibash-admin-route") === "1";
   const dir = localeDirection(locale);
   const htmlLang = localeTag(locale);
-  const user = isAdminRoute ? null : await getCurrentUser();
   return (
     <html
       lang={htmlLang}
@@ -58,7 +60,9 @@ export default async function RootLayout({
         {isAdminRoute ? null : <SiteHeader />}
         {children}
         {isAdminRoute ? null : <SiteFooter />}
-        {isAdminRoute ? null : <MobileBottomNav locale={locale} authenticated={Boolean(user)} />}
+        {isAdminRoute ? null : <MobileBottomNav locale={locale} />}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

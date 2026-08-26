@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicServerClient } from "@/lib/supabase/public";
+import { PUBLIC_CACHE_TAGS, revalidatePublicChromeCache } from "@/lib/cache/public-cache";
 import { normalizeNavigationItem } from "@/lib/data/navigation";
 
 export async function saveNavigationItemAction(formData: FormData) {
@@ -29,8 +32,8 @@ export async function saveNavigationItemAction(formData: FormData) {
     throw new Error(error.message);
   }
 
+  revalidatePublicChromeCache();
   revalidatePath("/administrator/settings");
-  revalidatePath("/");
   redirect("/administrator/settings");
 }
 
@@ -48,21 +51,32 @@ export async function deleteNavigationItemAction(formData: FormData) {
     throw new Error(error.message);
   }
 
+  revalidatePublicChromeCache();
   revalidatePath("/administrator/settings");
-  revalidatePath("/");
   redirect("/administrator/settings");
 }
 
-export async function getNavigationItems() {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("navigation_items")
-    .select("id, label, path, parent_id, sort_order, is_enabled, created_at, updated_at")
-    .order("sort_order", { ascending: true });
+const getCachedNavigationItems = unstable_cache(
+  async () => {
+    const supabase = createSupabasePublicServerClient();
+    const { data, error } = await supabase
+      .from("navigation_items")
+      .select("id, label, path, parent_id, sort_order, is_enabled, created_at, updated_at")
+      .order("sort_order", { ascending: true });
 
-  if (error) {
-    return [];
+    if (error) {
+      return [];
+    }
+
+    return data ?? [];
+  },
+  ["sahibash-navigation-items"],
+  {
+    revalidate: 3600,
+    tags: [PUBLIC_CACHE_TAGS.navigation],
   }
+);
 
-  return data ?? [];
+export async function getNavigationItems() {
+  return getCachedNavigationItems();
 }

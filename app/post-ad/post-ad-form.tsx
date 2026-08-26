@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
 import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
@@ -11,8 +12,7 @@ import {
   VehicleSmartSelector,
   type VehicleSelection,
 } from "@/components/vehicles/VehicleSmartSelector";
-import { VehicleDamageDiagram, defaultDamageParts, type DamagePart } from "@/components/vehicles/VehicleDamageDiagram";
-import { shouldShowVehicleDamageDiagram } from "@/lib/vehicles/damage-report";
+import { defaultVehicleDamageParts, shouldShowVehicleDamageDiagram, type DamagePart } from "@/lib/vehicles/damage-report";
 import { getVehicleBranchFromPath, type VehicleBranchDefinition, type VehicleBranchKey } from "@/data/catalog/vehicles";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeActionMessage } from "@/lib/i18n/user-copy";
@@ -32,6 +32,20 @@ import {
   shouldUseSimpleCategoryFallback,
 } from "@/lib/posting/simple-category-details";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
+
+type VehicleDamageDiagramProps = {
+  value: DamagePart[];
+  onChange: (parts: DamagePart[]) => void;
+  locale?: AppLocale;
+};
+
+const VehicleDamageDiagram = dynamic<VehicleDamageDiagramProps>(
+  () => import("@/components/vehicles/VehicleDamageDiagram").then((mod) => mod.VehicleDamageDiagram),
+  {
+    ssr: false,
+    loading: () => <div className="h-72 animate-pulse rounded-xl bg-[var(--surface-2)]" aria-hidden="true" />,
+  }
+);
 
 type Props = { categories: Category[] };
 type Dictionary = (typeof TRANSLATIONS)["en"];
@@ -69,6 +83,13 @@ type CoreForm = {
 
 type ProvinceOption = { id: number; name: string };
 type DistrictOption = { id: number; name: string; province_id: number };
+type LocationApiOption = {
+  id: number | string;
+  province_id?: number | string;
+  name?: string | null;
+  name_en?: string | null;
+};
+type LocationApiResponse<T> = { success?: boolean; data?: T[] };
 type LocationMethod = "device" | "manual" | null;
 type StoredLocation = {
   provinceId: number;
@@ -85,6 +106,32 @@ function maskSellerPhone(phone: string) {
 
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
+
+function readLocationOptionName(option: LocationApiOption) {
+  return String(option.name ?? option.name_en ?? "").trim();
+}
+
+function toProvinceOption(option: LocationApiOption): ProvinceOption | null {
+  const id = Number(option.id);
+  const name = readLocationOptionName(option);
+  return Number.isFinite(id) && name ? { id, name } : null;
+}
+
+function toDistrictOption(option: LocationApiOption): DistrictOption | null {
+  const id = Number(option.id);
+  const provinceId = Number(option.province_id);
+  const name = readLocationOptionName(option);
+  return Number.isFinite(id) && Number.isFinite(provinceId) && name
+    ? { id, province_id: provinceId, name }
+    : null;
+}
+
+async function fetchLocationOptions<T extends LocationApiOption>(url: string) {
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as LocationApiResponse<T>;
+  return payload.success && Array.isArray(payload.data) ? payload.data : [];
+}
 
 const LOCATION_DYNAMIC_KEYS = new Set([
   "city",
@@ -284,7 +331,7 @@ export default function PostAdForm({
 
   const [vehicleSelection, setVehicleSelection] = useState<VehicleSelection>(EMPTY_VEHICLE_SELECTION);
   const initialRootAppliedRef = useRef(false);
-  const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultDamageParts());
+  const [damageParts, setDamageParts] = useState<DamagePart[]>(defaultVehicleDamageParts());
   const sellerContactName = String(sellerProfile?.full_name ?? "").trim();
   const sellerContactPhone = String(sellerProfile?.phone ?? "").trim();
   const maskedSellerContactPhone = sellerContactPhone ? maskSellerPhone(sellerContactPhone) : "";
@@ -794,7 +841,7 @@ export default function PostAdForm({
     setDynamicValues({});
     setPostingConfig(null);
     setVehicleSelection(EMPTY_VEHICLE_SELECTION);
-    setDamageParts(defaultDamageParts());
+    setDamageParts(defaultVehicleDamageParts());
 
     const root = await fetchRootNode(category.id);
     if (!root) {
@@ -840,7 +887,7 @@ export default function PostAdForm({
     if (children.length === 0) {
       setFinalNode(node);
       setVehicleSelection(EMPTY_VEHICLE_SELECTION);
-      setDamageParts(defaultDamageParts());
+      setDamageParts(defaultVehicleDamageParts());
       await Promise.all([fetchFields(node.id, node.path, rootSlug), fetchPostingConfig(node.category_id)]);
     } else {
       setFinalNode(null);
@@ -921,17 +968,14 @@ export default function PostAdForm({
     let active = true;
 
     const loadProvinces = async () => {
-      const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase
-        .from("provinces")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
+      const data = await fetchLocationOptions("/api/location/provinces");
 
       if (!active) return;
 
-      const normalizedRows = ((data ?? []) as Array<{ id: number; name: string }>)
-        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(String(row.name)) }));
+      const normalizedRows = data
+        .map(toProvinceOption)
+        .filter((row): row is ProvinceOption => Boolean(row))
+        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(row.name) }));
 
       const whitelist = AFGHAN_PROVINCES.map((name) => ({
         name,
@@ -964,19 +1008,17 @@ export default function PostAdForm({
         return;
       }
 
-      const supabase = createSupabaseBrowserClient();
-      const { data } = await supabase
-        .from("districts")
-        .select("id, name, province_id")
-        .eq("province_id", selectedProvinceId)
-        .eq("is_active", true)
-        .order("name", { ascending: true });
+      const data = (await fetchLocationOptions(
+        `/api/location/districts?province_id=${encodeURIComponent(String(selectedProvinceId))}`
+      ))
+        .map(toDistrictOption)
+        .filter((row): row is DistrictOption => Boolean(row));
 
       if (!active) return;
-      setDistrictOptions((data ?? []) as DistrictOption[]);
+      setDistrictOptions(data);
       setSelectedDistrictId((prev) => {
         if (!prev) return null;
-        return (data ?? []).some((row) => Number((row as { id: number }).id) === prev) ? prev : null;
+        return data.some((row) => row.id === prev) ? prev : null;
       });
     };
 
@@ -1023,15 +1065,13 @@ export default function PostAdForm({
           setSelectedProvinceId(matchedProvince.id);
 
           if (districtHint) {
-            const supabase = createSupabaseBrowserClient();
-            const { data: districtsForProvince } = await supabase
-              .from("districts")
-              .select("id, name, province_id")
-              .eq("province_id", matchedProvince.id)
-              .eq("is_active", true)
-              .order("name", { ascending: true });
+            const districtsForProvince = (await fetchLocationOptions(
+              `/api/location/districts?province_id=${encodeURIComponent(String(matchedProvince.id))}`
+            ))
+              .map(toDistrictOption)
+              .filter((row): row is DistrictOption => Boolean(row));
 
-            const matchedDistrict = ((districtsForProvince ?? []) as DistrictOption[]).find(
+            const matchedDistrict = districtsForProvince.find(
               (option) => normalizeLocationName(option.name) === normalizeLocationName(districtHint)
             );
 

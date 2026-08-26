@@ -6,9 +6,11 @@ import { localizeNavigationLabel } from "@/lib/i18n/navigation-labels";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 
 export async function SiteFooter() {
-  const { t, locale } = await getDictionary();
-  const siteSettings = await getSiteSettings();
-  const navigationItems = await getNavigationItems();
+  const [{ t, locale }, siteSettings, navigationItems] = await Promise.all([
+    getDictionary(),
+    getSiteSettings(),
+    getNavigationItems(),
+  ]);
   const brandName = getLocalizedBrandName(locale, siteSettings.site_name || t.footer.platform);
 
   return (

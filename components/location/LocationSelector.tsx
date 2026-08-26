@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 
 interface Province {
   id: number;
@@ -35,6 +34,28 @@ interface LocationSelectorProps {
   initialAddress?: string;
 }
 
+type LocationApiOption = {
+  id: number | string;
+  name?: string | null;
+  name_en?: string | null;
+  slug?: string | null;
+};
+type LocationApiResponse<T> = { success?: boolean; data?: T[] };
+
+function toLocationOption(option: LocationApiOption) {
+  const id = Number(option.id);
+  const name = String(option.name ?? option.name_en ?? '').trim();
+  const slug = String(option.slug ?? '').trim();
+  return Number.isFinite(id) && name ? { id, name, slug } : null;
+}
+
+async function fetchLocationOptions<T extends LocationApiOption>(url: string) {
+  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!response.ok) return [];
+  const payload = (await response.json()) as LocationApiResponse<T>;
+  return payload.success && Array.isArray(payload.data) ? payload.data : [];
+}
+
 export default function LocationSelector({
   onLocationSelect,
   initialProvince,
@@ -61,30 +82,22 @@ export default function LocationSelector({
 
   const [loading, setLoading] = useState(true);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   // Load provinces on mount
   useEffect(() => {
     const loadProvinces = async () => {
-      const { data, error } = await supabase
-        .from('provinces')
-        .select('id, name, slug')
-        .eq('is_active', true)
-        .order('sort_order');
-
-      if (error) {
+      try {
+        const rows = (await fetchLocationOptions('/api/location/provinces'))
+          .map(toLocationOption)
+          .filter((row): row is Province => Boolean(row));
+        setProvinces(rows);
+      } catch (error) {
         console.error('Error loading provinces:', error);
-      } else if (data) {
-        setProvinces(data as Province[]);
       }
       setLoading(false);
     };
 
     loadProvinces();
-  }, [supabase]);
+  }, []);
 
   // Load districts when province changes
   useEffect(() => {
@@ -97,25 +110,23 @@ export default function LocationSelector({
         return;
       }
 
-      const { data, error } = await supabase
-        .from('districts')
-        .select('id, name, slug')
-        .eq('province_id', selectedProvince)
-        .eq('is_active', true)
-        .order('sort_order');
-
-      if (error) {
-        console.error('Error loading districts:', error);
-      } else if (data) {
-        setDistricts(data as District[]);
+      try {
+        const rows = (await fetchLocationOptions(
+          `/api/location/districts?province_id=${encodeURIComponent(String(selectedProvince))}`
+        ))
+          .map(toLocationOption)
+          .filter((row): row is District => Boolean(row));
+        setDistricts(rows);
         setSelectedDistrict(null);
         setAreas([]);
         setSelectedArea(null);
+      } catch (error) {
+        console.error('Error loading districts:', error);
       }
     };
 
     loadDistricts();
-  }, [selectedProvince, supabase]);
+  }, [selectedProvince]);
 
   // Load areas when district changes
   useEffect(() => {
@@ -126,23 +137,21 @@ export default function LocationSelector({
         return;
       }
 
-      const { data, error } = await supabase
-        .from('areas')
-        .select('id, name, slug')
-        .eq('district_id', selectedDistrict)
-        .eq('is_active', true)
-        .order('sort_order');
-
-      if (error) {
-        console.error('Error loading areas:', error);
-      } else if (data) {
-        setAreas(data as Area[]);
+      try {
+        const rows = (await fetchLocationOptions(
+          `/api/location/areas?province_id=${encodeURIComponent(String(selectedProvince))}&district_id=${encodeURIComponent(String(selectedDistrict))}`
+        ))
+          .map(toLocationOption)
+          .filter((row): row is Area => Boolean(row));
+        setAreas(rows);
         setSelectedArea(null);
+      } catch (error) {
+        console.error('Error loading areas:', error);
       }
     };
 
     loadAreas();
-  }, [selectedDistrict, supabase]);
+  }, [selectedDistrict, selectedProvince]);
 
   // Notify parent of location changes
   useEffect(() => {

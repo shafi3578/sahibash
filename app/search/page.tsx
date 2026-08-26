@@ -331,8 +331,10 @@ export default async function SearchPage({
 }: {
   searchParams: RawSearchParams;
 }) {
-  const { t, locale } = await getDictionary();
-  const raw = await searchParams;
+  const [{ t, locale }, raw] = await Promise.all([
+    getDictionary(),
+    searchParams,
+  ]);
   const rawParams = Object.fromEntries(
     Object.entries(raw).map(([key, value]) => [key, pickFirst(value)])
   ) as Record<string, string | undefined>;
@@ -344,12 +346,17 @@ export default async function SearchPage({
       }
     : rawParams;
 
-  const categories = await getCategories();
   const intent = detectSearchIntent(params.q);
 
   const explicitCategoryNodeId = toNumber(params.categoryNodeId);
-  const aiIntentNode = aiParsed?.categoryPath ? await getCategoryNodeByPath(aiParsed.categoryPath) : null;
-  const intentNode = intent ? await getCategoryNodeByPath(intent.categoryPath) : null;
+  const categoriesPromise = getCategories();
+  const aiIntentNodePromise = aiParsed?.categoryPath ? getCategoryNodeByPath(aiParsed.categoryPath) : Promise.resolve(null);
+  const intentNodePromise = intent ? getCategoryNodeByPath(intent.categoryPath) : Promise.resolve(null);
+  const [categories, aiIntentNode, intentNode] = await Promise.all([
+    categoriesPromise,
+    aiIntentNodePromise,
+    intentNodePromise,
+  ]);
   const effectiveCategoryNodeId = explicitCategoryNodeId ?? aiIntentNode?.id ?? intentNode?.id ?? undefined;
 
   const [filterDefinitions, effectiveNode, children, parentPath] = await Promise.all([
@@ -359,16 +366,16 @@ export default async function SearchPage({
     effectiveCategoryNodeId ? getCategoryPath(effectiveCategoryNodeId) : Promise.resolve([]),
   ]);
 
-  const siblings = effectiveNode?.parent_id
-    ? await getCategoryChildren(effectiveNode.parent_id)
-    : [];
+  const siblingsPromise = effectiveNode?.parent_id
+    ? getCategoryChildren(effectiveNode.parent_id)
+    : Promise.resolve([]);
 
   const autoVehicleBrand = params.vehicleBrand ?? params.vehicle_brand ?? intent?.brand;
   const autoVehicleModel = params.vehicleModel ?? params.vehicle_model ?? intent?.model;
   const autoRentalType = params.rentalType ?? params.rental_type ?? intent?.rentalType;
   const listingType = params.listingType ?? params.listing_type;
 
-  const listings = await getApprovedListings({
+  const listingsPromise = getApprovedListings({
     locale,
     search: params.q,
     province: params.province,
@@ -468,8 +475,8 @@ export default async function SearchPage({
     params.categoryNodeId
   );
 
-  const rewriteContext = hasSearchSignal
-    ? await (async () => {
+  const rewriteContextPromise = hasSearchSignal
+    ? (async () => {
         try {
           const supabase = await createSupabaseServerClient();
           return resolveSearchRewriteContext({
@@ -485,7 +492,13 @@ export default async function SearchPage({
           };
         }
       })()
-    : { normalizedQuery: "", variants: [], rewrittenTerms: [] };
+    : Promise.resolve({ normalizedQuery: "", variants: [], rewrittenTerms: [] });
+
+  const [siblings, listings, rewriteContext] = await Promise.all([
+    siblingsPromise,
+    listingsPromise,
+    rewriteContextPromise,
+  ]);
 
   const telemetryId = hasSearchSignal
     ? await logSearchTelemetry({
@@ -501,7 +514,7 @@ export default async function SearchPage({
     : "";
 
   if (aiParsed) {
-    await logAiSearchParseTelemetry({
+    void logAiSearchParseTelemetry({
       rawQuery: aiParsed.rawQuery,
       normalizedQuery: aiParsed.normalizedQuery,
       selectedLanguage: locale,

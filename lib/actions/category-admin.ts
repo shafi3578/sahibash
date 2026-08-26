@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission, getCurrentUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { recordAuditEvent } from "@/lib/audit";
+import { revalidatePublicTaxonomyCache } from "@/lib/cache/public-cache";
 
 function text(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -43,6 +44,7 @@ export async function adminCreateCategoryAction(formData: FormData) {
     });
   }
 
+  revalidatePublicTaxonomyCache();
   revalidatePath("/admin/categories");
 }
 
@@ -79,6 +81,7 @@ export async function adminUpdateCategoryAction(formData: FormData) {
     });
   }
 
+  revalidatePublicTaxonomyCache();
   revalidatePath("/admin/categories");
 }
 
@@ -103,6 +106,7 @@ export async function adminDeleteCategoryAction(formData: FormData) {
     });
   }
 
+  revalidatePublicTaxonomyCache();
   revalidatePath("/admin/categories");
 }
 
@@ -127,5 +131,6 @@ export async function adminUpsertCategoryAliasAction(formData: FormData) {
     return;
   }
 
+  revalidatePublicTaxonomyCache();
   revalidatePath("/admin/categories");
 }

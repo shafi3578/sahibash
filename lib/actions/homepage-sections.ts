@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicServerClient } from "@/lib/supabase/public";
+import { PUBLIC_CACHE_TAGS, revalidatePublicChromeCache } from "@/lib/cache/public-cache";
 import { normalizeHomepageSectionDraft } from "@/lib/data/homepage-sections";
 
 export async function saveHomepageSectionAction(formData: FormData) {
@@ -35,8 +38,8 @@ export async function saveHomepageSectionAction(formData: FormData) {
     throw new Error(error.message);
   }
 
+  revalidatePublicChromeCache();
   revalidatePath("/administrator/settings");
-  revalidatePath("/");
   redirect("/administrator/settings");
 }
 
@@ -54,22 +57,33 @@ export async function deleteHomepageSectionAction(formData: FormData) {
     throw new Error(error.message);
   }
 
+  revalidatePublicChromeCache();
   revalidatePath("/administrator/settings");
-  revalidatePath("/");
   redirect("/administrator/settings");
 }
 
-export async function getHomepageSections() {
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("homepage_sections")
-    .select("id, slug, section_type, title, body, cta_label, cta_path, sort_order, is_enabled, created_at, updated_at")
-    .order("sort_order", { ascending: true })
-    .order("updated_at", { ascending: false });
+const getCachedHomepageSections = unstable_cache(
+  async () => {
+    const supabase = createSupabasePublicServerClient();
+    const { data, error } = await supabase
+      .from("homepage_sections")
+      .select("id, slug, section_type, title, body, cta_label, cta_path, sort_order, is_enabled, created_at, updated_at")
+      .order("sort_order", { ascending: true })
+      .order("updated_at", { ascending: false });
 
-  if (error) {
-    return [];
+    if (error) {
+      return [];
+    }
+
+    return data ?? [];
+  },
+  ["sahibash-homepage-sections"],
+  {
+    revalidate: 1800,
+    tags: [PUBLIC_CACHE_TAGS.homepageSections],
   }
+);
 
-  return data ?? [];
+export async function getHomepageSections() {
+  return getCachedHomepageSections();
 }

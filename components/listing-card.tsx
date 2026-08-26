@@ -3,13 +3,71 @@ import Link from "next/link";
 import type { ListingWithImages } from "@/types/database";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
-import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
-import { labelForLocale } from "@/lib/listing-schema-config";
 import { toggleFavoriteAction } from "@/lib/actions/favorites";
 import { formatDate } from "@/lib/i18n/format";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
 import { formatListingPrice } from "@/lib/listings/price-display";
 import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
+
+const CARD_FACT_LABELS = {
+  en: {
+    condition: "Condition",
+    mileage: "Mileage",
+    year: "Year",
+    storage: "Storage",
+    ram: "RAM",
+    rooms: "Rooms",
+    area_sqm: "Area",
+  },
+  fa: {
+    condition: "وضعیت",
+    mileage: "کارکرد",
+    year: "سال",
+    storage: "حافظه",
+    ram: "رم",
+    rooms: "اتاق",
+    area_sqm: "مساحت",
+  },
+  ps: {
+    condition: "حالت",
+    mileage: "کارېدنه",
+    year: "کال",
+    storage: "حافظه",
+    ram: "رم",
+    rooms: "خونې",
+    area_sqm: "مساحت",
+  },
+} as const;
+
+const CARD_FACT_ORDER = ["condition", "mileage", "year", "storage", "ram", "rooms", "area_sqm"] as const;
+
+function readAttributeValue(attribute: Record<string, unknown> | undefined) {
+  if (!attribute) return null;
+  return (
+    attribute.attribute_value_text
+    ?? attribute.attribute_value_number
+    ?? attribute.attribute_value_boolean
+    ?? attribute.attribute_value_json
+    ?? null
+  );
+}
+
+function buildCardFacts(
+  attributes: Map<string, Record<string, unknown>>,
+  locale: keyof typeof CARD_FACT_LABELS
+) {
+  return CARD_FACT_ORDER.flatMap((key) => {
+    const raw = readAttributeValue(attributes.get(key));
+    if (raw === null || raw === undefined || raw === "") return [];
+    const value = typeof raw === "boolean"
+      ? raw
+        ? (locale === "fa" ? "بلی" : locale === "ps" ? "هو" : "Yes")
+        : (locale === "fa" ? "خیر" : locale === "ps" ? "نه" : "No")
+      : String(raw);
+
+    return [{ key, label: CARD_FACT_LABELS[locale][key], value }];
+  }).slice(0, 2);
+}
 
 export async function ListingCard({
   listing,
@@ -30,16 +88,11 @@ export async function ListingCard({
   const isStudentSuitable = Boolean(listing.suitable_for_students);
   const isFeatured = isFeaturedCurrentlyActive(listing);
   const fallbackProvince = listing.province ?? listing.district ?? "-";
-  const schemaVersion = listing.category_node?.id ? await getPublishedListingSchema(Number(listing.category_node.id)) : null;
-  const attributes = new Map(((listing as ListingWithImages & { listing_attributes?: Array<Record<string, unknown>> }).listing_attributes ?? []).map((attribute) => [String(attribute.attribute_key), attribute]));
-  const cardFields = (schemaVersion?.config.fields ?? []).filter((field) => field.active && field.card).sort((a, b) => a.order - b.order).slice(0, 4).flatMap((field) => {
-    const attribute = attributes.get(field.key);
-    const direct = (listing as unknown as Record<string, unknown>)[field.key];
-    const raw = direct ?? attribute?.attribute_value_text ?? attribute?.attribute_value_number ?? attribute?.attribute_value_boolean;
-    if (raw === null || raw === undefined || raw === "") return [];
-    const option = field.options.find((item) => item.value === String(raw));
-    return [{ key: field.key, label: labelForLocale(field.labels, locale), value: option ? labelForLocale(option.labels, locale) : typeof raw === "boolean" ? (raw ? t.search.yes : t.search.no) : String(raw) }];
-  });
+  const attributes = new Map(
+    ((listing as ListingWithImages & { listing_attributes?: Array<Record<string, unknown>> }).listing_attributes ?? [])
+      .map((attribute) => [String(attribute.attribute_key), attribute])
+  );
+  const cardFields = buildCardFacts(attributes, locale);
   const freshness = formatDate(listing.created_at, locale, { month: "short", day: "numeric" });
   const sourceTransparency = getSourceTransparency(listing, locale);
   return (

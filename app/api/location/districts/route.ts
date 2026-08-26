@@ -1,53 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import { getPublicDistricts } from "@/lib/location/reference-data";
+
+const LOCATION_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
+  "CDN-Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+};
+
+function toPositiveInt(value: string | null) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
 /**
  * GET /api/location/districts?province_id=<id>
- * Returns districts for a specific province
+ * Returns active districts for a province from the public location reference cache.
  */
 export async function GET(request: NextRequest) {
   try {
-    const provinceId = request.nextUrl.searchParams.get('province_id');
+    const provinceId = toPositiveInt(request.nextUrl.searchParams.get("province_id"));
 
     if (!provinceId) {
       return NextResponse.json(
-        { success: false, error: 'province_id parameter is required' },
+        { success: false, error: "province_id parameter is required" },
         { status: 400 }
       );
     }
 
-    // This would connect to Supabase in production
-    // For now, return structured response format
-    // In production, replace with actual Supabase query:
-    // const { data, error } = await supabase
-    //   .from('districts')
-    //   .select('*')
-    //   .eq('province_id', provinceId)
-    //   .eq('is_active', true)
-    //   .order('sort_order', { ascending: true });
+    const districts = await getPublicDistricts(provinceId);
 
-    const districts = [
-      {
-        id: '1',
-        province_id: provinceId,
-        slug: 'district-1',
-        name_en: 'District 1',
-        name_fa: 'ناحیه اول',
-        name_ps: 'ولسوالی یک',
-        aliases: [],
-        sort_order: 1,
-        is_active: true,
-      },
-      // ... more districts (populated from database)
-    ];
-
-    return NextResponse.json({
-      success: true,
-      data: districts,
-      province_id: provinceId,
-    });
+    return NextResponse.json(
+      { success: true, data: districts, province_id: provinceId },
+      { headers: LOCATION_CACHE_HEADERS }
+    );
   } catch {
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch districts' },
+      { success: false, error: "Failed to fetch districts" },
       { status: 500 }
     );
   }

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, requirePermission, requireUser } from "@/lib/auth";
 import { hasAdminPermission } from "@/lib/authorization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { revalidatePublicMarketplaceCache } from "@/lib/cache/public-cache";
 import { getSelectedCategoryNodeId, listingSchema, type ListingInput } from "@/lib/validators/listing";
 import { getVehicleBranchFromPath } from "@/data/catalog/vehicles";
 import {
@@ -1420,13 +1421,15 @@ async function buildListingPayload(
     return null;
   }
 
+  const submittedProvince = toFormValueText(formData.get("province")) || null;
+  const submittedDistrict = toFormValueText(formData.get("district")) || null;
   const [{ data: provinceRow }, { data: districtRow }] = await Promise.all([
-    supabase.from("provinces").select("name").eq("id", provinceId).maybeSingle(),
-    supabase.from("districts").select("name").eq("id", districtId).maybeSingle(),
+    submittedProvince ? Promise.resolve({ data: null }) : supabase.from("provinces").select("name").eq("id", provinceId).maybeSingle(),
+    submittedDistrict ? Promise.resolve({ data: null }) : supabase.from("districts").select("name").eq("id", districtId).maybeSingle(),
   ]);
 
-  const resolvedProvince = toFormValueText(formData.get("province")) || (provinceRow?.name ? String(provinceRow.name) : null);
-  const resolvedDistrict = toFormValueText(formData.get("district")) || (districtRow?.name ? String(districtRow.name) : null);
+  const resolvedProvince = submittedProvince || (provinceRow?.name ? String(provinceRow.name) : null);
+  const resolvedDistrict = submittedDistrict || (districtRow?.name ? String(districtRow.name) : null);
   const resolvedCity = null;
   const variantId = input.vehicle_variant_id ?? null;
   const manualSpecsRaw = toFormValueText(formData.get("vehicle_manual_specs_json"));
@@ -1697,6 +1700,7 @@ export async function createListingFormAction(formData: FormData): Promise<void>
   });
   await processPendingListingTranslationJobs(supabase, { listingId: data.id, limit: 3 });
 
+  revalidatePublicMarketplaceCache(data.id);
   revalidatePath("/");
   revalidatePath("/listings");
   revalidatePath("/dashboard/my-ads");
@@ -1816,6 +1820,7 @@ export async function createListingAction(formData: FormData): Promise<{
   await processPendingListingTranslationJobs(supabase, { listingId: data.id, limit: 3 });
   await markQuickDraftPublished(supabase, user.id, formData, data.id);
 
+  revalidatePublicMarketplaceCache(data.id);
   revalidatePath("/");
   revalidatePath("/listings");
   revalidatePath("/dashboard/my-ads");
@@ -1948,6 +1953,7 @@ export async function updateListingAction(
     await processPendingListingTranslationJobs(supabase, { listingId, limit: 3 });
   }
 
+  revalidatePublicMarketplaceCache(listingId);
   revalidatePath("/listings");
   revalidatePath("/dashboard/my-ads");
   revalidatePath(`/listings/${listingId}`);
@@ -1997,6 +2003,7 @@ export async function updateListingStatusAction(
     return { ok: false, message: error.message };
   }
 
+  revalidatePublicMarketplaceCache(listingId);
   revalidatePath("/");
   revalidatePath("/admin/listings");
   revalidatePath(`/listings/${listingId}`);
@@ -2058,6 +2065,7 @@ export async function deleteListingAction(listingId: string): Promise<{
     return { ok: false, message: error.message };
   }
 
+  revalidatePublicMarketplaceCache(listingId);
   revalidatePath("/");
   revalidatePath("/listings");
   revalidatePath("/dashboard/my-ads");
@@ -2122,6 +2130,7 @@ export async function uploadListingImageFormAction(
     return;
   }
 
+  revalidatePublicMarketplaceCache(listingId);
   revalidatePath(`/listings/${listingId}`);
   revalidatePath("/dashboard/my-ads");
 }
@@ -2198,6 +2207,7 @@ export async function uploadListingImageAction(
     return { ok: false, message: insertError.message };
   }
 
+  revalidatePublicMarketplaceCache(listingId);
   revalidatePath(`/listings/${listingId}`);
   revalidatePath("/dashboard/my-ads");
 
@@ -2239,6 +2249,7 @@ export async function deleteListingImageAction(imageId: string): Promise<{
     return { ok: false, message: error.message };
   }
 
+  revalidatePublicMarketplaceCache(image.listing_id);
   revalidatePath(`/listings/${image.listing_id}`);
   revalidatePath("/dashboard/my-ads");
 
@@ -2364,6 +2375,7 @@ export async function bumpListingAction(
     return { ok: false, message: error.message };
   }
 
+  revalidatePublicMarketplaceCache(listingId);
   revalidatePath("/");
   revalidatePath("/listings");
   revalidatePath(`/listings/${listingId}`);

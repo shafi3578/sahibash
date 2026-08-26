@@ -1,35 +1,26 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { getPublicProvinces } from "@/lib/location/reference-data";
+
+const LOCATION_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
+  "CDN-Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+};
 
 /**
  * GET /api/location/provinces
- * Returns all provinces
+ * Returns active Afghanistan provinces from the public location reference cache.
  */
 export async function GET() {
   try {
-    // This would connect to Supabase in production
-    // For now, return structured response format
-    // In production, replace with actual Supabase query
-    const provinces = [
-      {
-        id: '1',
-        slug: 'kabul',
-        name_en: 'Kabul',
-        name_fa: 'کابل',
-        name_ps: 'کابل',
-        aliases: ['Kabul City'],
-        sort_order: 1,
-        is_active: true,
-      },
-      // ... more provinces (populated from database)
-    ];
+    const provinces = await getPublicProvinces();
 
-    return NextResponse.json({
-      success: true,
-      data: provinces,
-    });
+    return NextResponse.json(
+      { success: true, data: provinces },
+      { headers: LOCATION_CACHE_HEADERS }
+    );
   } catch {
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch provinces' },
+      { success: false, error: "Failed to fetch provinces" },
       { status: 500 }
     );
   }

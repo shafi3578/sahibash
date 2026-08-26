@@ -1,8 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { getCurrentUser, requirePermission } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache/public-cache";
 
 function asText(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -27,6 +28,11 @@ function asBoolean(value: FormDataEntryValue | null) {
   return text === "true" || text === "1" || text === "on" || text === "yes";
 }
 
+function revalidateSearchReferenceCache() {
+  updateTag(PUBLIC_CACHE_TAGS.searchReference);
+  revalidatePath("/admin/search");
+}
+
 export async function adminCreateSearchAliasAction(formData: FormData) {
   await requirePermission("search.manage");
   const supabase = await createSupabaseServerClient();
@@ -44,7 +50,7 @@ export async function adminCreateSearchAliasAction(formData: FormData) {
     is_active: asBoolean(formData.get("is_active")),
   });
 
-  revalidatePath("/admin/search");
+  revalidateSearchReferenceCache();
 }
 
 export async function adminUpdateSearchAliasAction(formData: FormData) {
@@ -72,7 +78,7 @@ export async function adminUpdateSearchAliasAction(formData: FormData) {
     })
     .eq("id", id);
 
-  revalidatePath("/admin/search");
+  revalidateSearchReferenceCache();
 }
 
 export async function adminApproveSearchAliasAction(formData: FormData) {
@@ -93,7 +99,7 @@ export async function adminApproveSearchAliasAction(formData: FormData) {
     })
     .eq("id", id);
 
-  revalidatePath("/admin/search");
+  revalidateSearchReferenceCache();
 }
 
 export async function adminToggleSearchAliasAction(formData: FormData) {
@@ -111,7 +117,7 @@ export async function adminToggleSearchAliasAction(formData: FormData) {
     .update({ is_active: nextValue })
     .eq("id", id);
 
-  revalidatePath("/admin/search");
+  revalidateSearchReferenceCache();
 }
 
 export async function adminDeleteSearchAliasAction(formData: FormData) {
@@ -124,5 +130,5 @@ export async function adminDeleteSearchAliasAction(formData: FormData) {
   }
 
   await supabase.from("search_alias_dictionary").delete().eq("id", id);
-  revalidatePath("/admin/search");
+  revalidateSearchReferenceCache();
 }

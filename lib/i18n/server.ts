@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { headers } from "next/headers";
+import { cache } from "react";
 import {
   SUPPORTED_LOCALES,
   getSafeTranslations,
@@ -14,7 +15,7 @@ function isSupportedLocale(value: string): value is AppLocale {
   return (SUPPORTED_LOCALES as readonly string[]).includes(value);
 }
 
-export async function getCurrentLocale(): Promise<AppLocale> {
+async function resolveCurrentLocale(): Promise<AppLocale> {
   const headerStore = await headers();
   const headerLocale = normalizeLocaleInput(headerStore.get("x-sahibash-locale"));
   if (headerLocale) {
@@ -51,10 +52,12 @@ export async function getCurrentLocale(): Promise<AppLocale> {
   return "fa";
 }
 
-export async function getDictionary() {
+export const getCurrentLocale = cache(resolveCurrentLocale);
+
+export const getDictionary = cache(async () => {
   const locale = await getCurrentLocale();
   return {
     locale,
     t: getSafeTranslations(locale),
   };
-}
+});

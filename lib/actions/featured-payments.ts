@@ -7,6 +7,7 @@ import { requirePermission, requireSuperAdministrator, requireUser } from "@/lib
 import { recordAuditEvent } from "@/lib/audit";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { revalidatePublicMarketplaceCache } from "@/lib/cache/public-cache";
 import {
   FEATURED_CAMPAIGN_KEY,
   PAYMENT_RECEIPTS_BUCKET,
@@ -463,6 +464,7 @@ export async function adminApproveFeaturedPaymentRequestAction(formData: FormDat
     });
   }
 
+  revalidatePublicMarketplaceCache(listingId || undefined);
   revalidatePath("/");
   revalidatePath("/admin");
   revalidatePath("/admin/featured-payments");

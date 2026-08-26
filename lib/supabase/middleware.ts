@@ -2,12 +2,24 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv, hasSupabaseEnv } from "@/lib/supabase/env";
 
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies.getAll().some((cookie) =>
+    cookie.value &&
+    cookie.name.startsWith("sb-") &&
+    cookie.name.includes("auth-token")
+  );
+}
+
 export async function updateSession(
   request: NextRequest,
   response: NextResponse = NextResponse.next({ request })
 ) {
 
   if (!hasSupabaseEnv()) {
+    return response;
+  }
+
+  if (!hasSupabaseAuthCookie(request)) {
     return response;
   }
 
