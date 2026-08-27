@@ -129,6 +129,7 @@ type QuickField = {
 };
 
 type AiResponse = {
+  source?: "gateway" | "deterministic";
   suggestion?: {
     rootSlug?: string;
     pathSlugs?: string[];
@@ -2152,7 +2153,11 @@ export default function QuickPostForm({
       ) : null}
 
       {step === 2 ? (
-      <section data-testid="quick-post-ai-chips" className="order-10 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+      <section
+        data-testid="quick-post-ai-chips"
+        data-ai-source={aiResponse?.source ?? aiStatus}
+        className="order-10 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="font-display text-lg font-bold">{c.detected}</h3>
