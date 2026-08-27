@@ -99,7 +99,8 @@ export async function POST(request: Request) {
     const allowedLeafPaths = (leafRows ?? [])
       .map((row) => String((row as { path?: string }).path ?? ""))
       .filter((path) => path && LAUNCH_ROOTS.has(path.split("/")[0]));
-    const gatewaySuggestions = await requestGatewayCategorySuggestion({ title, description, allowedPaths: allowedLeafPaths });
+    const gatewayResult = await requestGatewayCategorySuggestion({ title, description, allowedPaths: allowedLeafPaths });
+    const gatewaySuggestions = gatewayResult.suggestions;
     if (image instanceof File && key) {
       const client = new InferenceClient(key);
       const output = await client.imageClassification({
@@ -182,6 +183,7 @@ export async function POST(request: Request) {
       suggestion,
       suggestions,
       source: gatewaySuggestions.length > 0 ? "gateway" : "deterministic",
+      gatewayStatus: gatewayResult.status,
       labels: labels.slice(0, 8),
       suggestedProduct: specsMatch
         ? {
