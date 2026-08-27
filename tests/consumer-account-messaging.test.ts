@@ -205,3 +205,17 @@ test("consumer header and messages keep settings and moderation in the right pla
   assert.match(reportSource, /reporter_user_id/);
   assert.doesNotMatch(reportSource, /(^|\n)\s*user_id:\s*user\.id/);
 });
+
+test("mobile account surfaces expose a localized current-session logout", () => {
+  const dashboard = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
+  const accountSettings = readFileSync(join(process.cwd(), "app", "dashboard", "settings", "account", "page.tsx"), "utf8");
+  const logoutForm = readFileSync(join(process.cwd(), "components", "account", "logout-form.tsx"), "utf8");
+  const authActions = readFileSync(join(process.cwd(), "lib", "actions", "auth.ts"), "utf8");
+
+  assert.match(dashboard, /LogoutForm/);
+  assert.match(accountSettings, /LogoutForm/);
+  assert.match(logoutForm, /action=\{signOutAction\}/);
+  assert.match(logoutForm, /name="locale"/);
+  assert.match(authActions, /signOut\(\{ scope: "local" \}\)/);
+  assert.match(authActions, /redirect\(localizePath\("\/", locale\)\)/);
+});

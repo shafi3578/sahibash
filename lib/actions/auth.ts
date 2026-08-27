@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { normalizeAfghanistanPhone } from "@/lib/inventory/normalization";
-import { normalizeLocaleInput } from "@/lib/i18n/routing";
+import { localizePath, normalizeLocaleInput } from "@/lib/i18n/routing";
 
 export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -54,10 +54,16 @@ export async function signUpAction(formData: FormData) {
   return { ok: true, message: "Account created. Check your email for verification link." };
 }
 
-export async function signOutAction() {
+export async function signOutAction(formData: FormData) {
+  const locale = normalizeLocaleInput(String(formData.get("locale") ?? "en")) ?? "en";
   const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
-  redirect("/");
+  const { error } = await supabase.auth.signOut({ scope: "local" });
+
+  if (error) {
+    throw new Error("Unable to log out. Please try again.");
+  }
+
+  redirect(localizePath("/", locale));
 }
 
 export async function resetPasswordAction(formData: FormData) {

@@ -31,6 +31,7 @@ export const ACCOUNT_EXPERIENCE_COPY: Record<AppLocale, {
   deletionTitle: string;
   deletionDescription: string;
   deletionUnavailable: string;
+  logout: string;
   logoutNotice: string;
   safety: string;
   safetyDescription: string;
@@ -68,7 +69,8 @@ export const ACCOUNT_EXPERIENCE_COPY: Record<AppLocale, {
     deletionTitle: "Delete account",
     deletionDescription: "Account deletion requires a verified retention and ownership workflow before it can be enabled safely.",
     deletionUnavailable: "Deletion is not exposed yet; contact Sahibash support for a manual review request.",
-    logoutNotice: "Use the Log Out button in the desktop header, or your device/browser session controls on mobile.",
+    logout: "Log out",
+    logoutNotice: "Log out securely from this device when you are finished.",
     safety: "Safety Center",
     safetyDescription: "Avoid scams, protect verification codes, and report suspicious activity.",
     emptyActionBrowse: "Explore listings",
@@ -105,7 +107,8 @@ export const ACCOUNT_EXPERIENCE_COPY: Record<AppLocale, {
     deletionTitle: "حذف حساب",
     deletionDescription: "برای فعال‌شدن حذف حساب، جریان تأیید مالکیت و نگهداری داده باید به‌صورت امن کامل شود.",
     deletionUnavailable: "حذف مستقیم هنوز فعال نیست؛ برای بررسی دستی با پشتیبانی صاحبش تماس بگیرید.",
-    logoutNotice: "در دسکتاپ از دکمه خروج در سربرگ استفاده کنید؛ در موبایل از مدیریت نشست مرورگر/دستگاه استفاده کنید.",
+    logout: "خروج",
+    logoutNotice: "پس از پایان کار، از این دستگاه به‌صورت امن خارج شوید.",
     safety: "مرکز ایمنی",
     safetyDescription: "از کلاه‌برداری دوری کنید، کدهای تأیید را محافظت کنید و فعالیت مشکوک را گزارش دهید.",
     emptyActionBrowse: "دیدن اعلان‌ها",
@@ -142,7 +145,8 @@ export const ACCOUNT_EXPERIENCE_COPY: Record<AppLocale, {
     deletionTitle: "حساب ړنګول",
     deletionDescription: "د حساب ړنګول باید د مالکیت او د معلوماتو ساتنې خوندي بهیر ولري مخکې له دې چې فعال شي.",
     deletionUnavailable: "مستقیم ړنګول لا فعال نه دي؛ د لاسني بیاکتنې لپاره د صاحبش ملاتړ سره اړیکه ونیسئ.",
-    logoutNotice: "په ډیسکتاپ کې د سرلیک د وتلو تڼۍ وکاروئ، په موبایل کې د براوزر/وسیله د ناستې کنټرولونه وکاروئ.",
+    logout: "وتل",
+    logoutNotice: "کله چې مو کار پای ته ورسېد، له دې وسیلې څخه په خوندي ډول ووځئ.",
     safety: "د خوندیتوب مرکز",
     safetyDescription: "له درغلیو ځان وساتئ، د تأیید کوډونه خوندي کړئ او شکمن فعالیت راپور کړئ.",
     emptyActionBrowse: "اعلانونه وګورئ",

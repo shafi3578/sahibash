@@ -5,6 +5,7 @@ import { ACCOUNT_EXPERIENCE_COPY } from "@/lib/account/copy";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { updateAccountProfileAction } from "@/lib/actions/profile";
 import { PhoneVerificationPanel } from "@/components/account/phone-verification-panel";
+import { LogoutForm } from "@/components/account/logout-form";
 
 async function handleUpdateAccountProfile(formData: FormData) {
   "use server";
@@ -121,6 +122,13 @@ export default async function AccountManagementSettingsPage() {
         <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
           <h2 className="font-semibold text-[var(--ink-1)]">{copy.accountManagement}</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--ink-2)]">{copy.logoutNotice}</p>
+          <div className="mt-4">
+            <LogoutForm
+              locale={locale}
+              label={copy.logout}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--ink-1)] px-5 text-sm font-bold text-white transition hover:opacity-90"
+            />
+          </div>
         </section>
 
         <section className="rounded-2xl border border-red-200 bg-red-50 p-4">

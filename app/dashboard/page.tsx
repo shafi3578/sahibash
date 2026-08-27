@@ -7,6 +7,7 @@ import { localizePath } from "@/lib/i18n/routing";
 import { formatDate, formatNumber } from "@/lib/i18n/format";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ACCOUNT_EXPERIENCE_COPY } from "@/lib/account/copy";
+import { LogoutForm } from "@/components/account/logout-form";
 
 type ProfileSummary = {
   full_name: string | null;
@@ -86,9 +87,12 @@ export default async function DashboardPage() {
                 <span className="rounded-full bg-white px-3 py-1 text-[var(--ink-2)]">{profile?.phone ? copy.verified : copy.notVerified}</span>
               </div>
             </div>
-            <Link href={localizePath("/dashboard/account-information", locale)} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--ink-1)] px-4 text-sm font-bold text-white">
-              {copy.profile}
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href={localizePath("/dashboard/account-information", locale)} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[var(--ink-1)] px-4 text-sm font-bold text-white">
+                {copy.profile}
+              </Link>
+              <LogoutForm locale={locale} label={copy.logout} />
+            </div>
           </div>
         </section>
 
