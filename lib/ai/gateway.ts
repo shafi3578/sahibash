@@ -27,7 +27,8 @@ export async function requestGatewayCategorySuggestion(input: {
       body: JSON.stringify({
         model: "openai/gpt-5-mini",
         temperature: 0,
-        max_tokens: 260,
+        reasoning_effort: "minimal",
+        max_completion_tokens: 512,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: "Choose 2 or 3 plausible existing marketplace leaf paths, best first. Return JSON only: {suggestions:[{pathSlugs:string[],confidence:number,reason:string}]}. Every path must be copied exactly from allowedLeafPaths. Never invent, shorten, or return a parent path. Return fewer only when no second plausible leaf exists." },

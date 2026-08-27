@@ -118,6 +118,8 @@ test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matchi
   assert.match(aiGateway, /AI_GATEWAY_API_KEY \?\? process\.env\.VERCEL_OIDC_TOKEN/);
   assert.match(aiGateway, /openai\/gpt-5-mini/);
   assert.match(aiGateway, /15_000/);
+  assert.match(aiGateway, /reasoning_effort: "minimal"/);
+  assert.match(aiGateway, /max_completion_tokens: 512/);
   assert.match(aiGateway, /status: `http_\$\{response\.status\}`/);
   assert.match(aiGateway, /input\.allowedPaths\.includes\(path\)/);
   assert.match(aiRoute, /preliminarySuggestion/);
