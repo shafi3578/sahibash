@@ -99,7 +99,18 @@ export async function POST(request: Request) {
     const allowedLeafPaths = (leafRows ?? [])
       .map((row) => String((row as { path?: string }).path ?? ""))
       .filter((path) => path && LAUNCH_ROOTS.has(path.split("/")[0]));
-    const gatewayResult = await requestGatewayCategorySuggestion({ title, description, allowedPaths: allowedLeafPaths });
+    const preliminarySuggestion = mapSignalsToCategory({ title, description, labels: [], specsMatch: null });
+    const preliminarySegments = preliminarySuggestion?.pathSlugs ?? [];
+    let gatewayLeafPaths = allowedLeafPaths;
+    for (let depth = preliminarySegments.length; depth > 0; depth -= 1) {
+      const prefix = preliminarySegments.slice(0, depth).join("/");
+      const branchPaths = allowedLeafPaths.filter((path) => path === prefix || path.startsWith(`${prefix}/`));
+      if (branchPaths.length >= 2) {
+        gatewayLeafPaths = branchPaths;
+        break;
+      }
+    }
+    const gatewayResult = await requestGatewayCategorySuggestion({ title, description, allowedPaths: gatewayLeafPaths });
     const gatewaySuggestions = gatewayResult.suggestions;
     if (image instanceof File && key) {
       const client = new InferenceClient(key);

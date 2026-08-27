@@ -117,8 +117,11 @@ test("Quick Post resolves AI suggestions against canonical taxonomy instead of a
 test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matching", () => {
   assert.match(aiGateway, /AI_GATEWAY_API_KEY \?\? process\.env\.VERCEL_OIDC_TOKEN/);
   assert.match(aiGateway, /openai\/gpt-5-mini/);
+  assert.match(aiGateway, /15_000/);
   assert.match(aiGateway, /status: `http_\$\{response\.status\}`/);
   assert.match(aiGateway, /input\.allowedPaths\.includes\(path\)/);
+  assert.match(aiRoute, /preliminarySuggestion/);
+  assert.match(aiRoute, /path\.startsWith\(`\$\{prefix\}\//);
   assert.match(aiRoute, /image instanceof File && key/);
   assert.match(aiRoute, /gatewaySuggestions\.length > 0 \? "gateway" : "deterministic"/);
   assert.match(aiRoute, /leafCategoryId/);

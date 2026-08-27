@@ -18,7 +18,7 @@ export async function requestGatewayCategorySuggestion(input: {
   if (input.allowedPaths.length === 0) return { suggestions: [], status: "missing_taxonomy" };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+  const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
     const response = await fetch(ENDPOINT, {
       method: "POST",
@@ -27,7 +27,7 @@ export async function requestGatewayCategorySuggestion(input: {
       body: JSON.stringify({
         model: "openai/gpt-5-mini",
         temperature: 0,
-        max_tokens: 420,
+        max_tokens: 260,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: "Choose 2 or 3 plausible existing marketplace leaf paths, best first. Return JSON only: {suggestions:[{pathSlugs:string[],confidence:number,reason:string}]}. Every path must be copied exactly from allowedLeafPaths. Never invent, shorten, or return a parent path. Return fewer only when no second plausible leaf exists." },
