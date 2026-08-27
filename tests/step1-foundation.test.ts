@@ -46,12 +46,26 @@ test("native posting and editing use profile contact instead of ad-level free te
   assert.match(listingActions, /contact_name: sellerContact\.fullName/);
 });
 
-test("phone reveal resolves native profile phone and keeps external listing fallback", () => {
-  assert.match(inventoryActions, /function resolveRevealPhone/);
-  assert.match(inventoryActions, /\.from\("profiles"\)[\s\S]*\.select\("phone"\)/);
+test("contact actions use the native profile phone and keep external source fallback", () => {
+  assert.match(inventoryActions, /function resolveContactPhone/);
+  assert.match(inventoryActions, /\.from\("profiles"\)[\s\S]*\.select\("phone,phone_verification_status,phone_verified_at"\)/);
   assert.match(inventoryActions, /contactSource: "profile_phone"/);
   assert.match(inventoryActions, /source_listing_phone/);
+  assert.match(inventoryActions, /profile_phone_unavailable/);
+  assert.match(inventoryActions, /phone_verification_status === "verified"/);
+  assert.match(inventoryActions, /phone_verified_at/);
   assert.match(inventoryActions, /contact_source: contactSource/);
+});
+
+test("account settings provide a rate-limited Supabase phone OTP verification flow", () => {
+  const verificationPanel = readFileSync(join(process.cwd(), "components", "account", "phone-verification-panel.tsx"), "utf8");
+  assert.match(profileActions, /requestProfilePhoneVerificationAction/);
+  assert.match(profileActions, /supabase\.auth\.updateUser\(\{ phone \}\)/);
+  assert.match(profileActions, /verifyProfilePhoneOtpAction/);
+  assert.match(profileActions, /type: "phone_change"/);
+  assert.match(profileActions, /phone_verification_status: "verified"/);
+  assert.match(profileActions, /consumeRateLimit/);
+  assert.match(verificationPanel, /autoComplete="one-time-code"/);
 });
 
 test("category navigation opens localized root browsers", () => {

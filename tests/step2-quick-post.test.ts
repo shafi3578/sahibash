@@ -31,6 +31,7 @@ test("Quick Post is exactly two required steps and preserves existing draft/publ
     'data-testid="quick-post-step-indicator"',
     'data-testid="quick-post-form"',
     'data-testid="quick-post-photos"',
+    'data-testid="quick-post-title-description"',
     'data-testid="quick-post-description"',
     'data-testid="quick-post-price"',
     'data-testid="quick-post-location"',
@@ -72,7 +73,7 @@ test("Step 1 collects universal seller information without category blocking", (
   assert.doesNotMatch(stepOneGuard, /missingCategory/);
 });
 
-test("Quick Post restores and autosaves complete local/server drafts with a 1-second debounce", () => {
+test("Quick Post protects local work without continuously server-saving while typing", () => {
   for (const marker of [
     "QUICK_DRAFT_KEY",
     "QUICK_IMAGE_DB_NAME",
@@ -85,21 +86,30 @@ test("Quick Post restores and autosaves complete local/server drafts with a 1-se
     "locationVisibility",
     "locationAccuracy",
     "isConfirmed",
-    "lastServerDraftSignatureRef",
-    "window.setTimeout",
-    "}, 1000)",
+    'window.addEventListener("pagehide"',
+    'navigator.sendBeacon(',
+    '"/api/posting/draft"',
     "saveCurrentDraftNow(2)",
+    "saveDraftAndExit",
+    "userEditedDuringHydrationRef",
   ]) {
     assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  const localPersistenceEffect = quickPostForm.slice(
+    quickPostForm.indexOf("localStorage.setItem(QUICK_DRAFT_KEY"),
+    quickPostForm.indexOf('window.addEventListener("pagehide"'),
+  );
+  assert.doesNotMatch(localPersistenceEffect, /saveListingDraftAction/);
+  assert.doesNotMatch(quickPostForm, /}, 1000\)/);
+  assert.match(quickPostForm, /hasLocalRecovery \|\| userEditedDuringHydrationRef\.current/);
 });
 
 test("Quick Post resolves AI suggestions against canonical taxonomy instead of arbitrary IDs", () => {
   assert.match(quickPostForm, /\.from\("category_nodes"\)/);
   assert.match(quickPostForm, /\.eq\("is_active", true\)/);
-  assert.match(quickPostForm, /suggestedProduct\?\.categoryNodeId/);
-  assert.match(quickPostForm, /scoreCategoryNode/);
-  assert.match(quickPostForm, /categoryCandidates\.slice\(0, 4\)/);
+  assert.match(quickPostForm, /json\.suggestions/);
+  assert.match(quickPostForm, /manualChildren/);
+  assert.match(quickPostForm, /candidate\.is_leaf/);
   assert.match(quickPostForm, /setSelectedCategory\(candidate\)/);
   assert.doesNotMatch(quickPostForm, /formData\.set\("category_node_id",\s*ai/i);
 });
@@ -109,7 +119,10 @@ test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matchi
   assert.match(aiGateway, /openai\/gpt-5\.6-luna/);
   assert.match(aiGateway, /input\.allowedPaths\.includes\(path\)/);
   assert.match(aiRoute, /image instanceof File && key/);
-  assert.match(aiRoute, /gatewaySuggestion \? "gateway" : "deterministic"/);
+  assert.match(aiRoute, /gatewaySuggestions\.length > 0 \? "gateway" : "deterministic"/);
+  assert.match(aiRoute, /leafCategoryId/);
+  assert.match(aiRoute, /pathIds/);
+  assert.match(aiRoute, /\.slice\(0, 3\)/);
   assert.doesNotMatch(aiRoute, /if \(!key\) \{\s*return NextResponse/);
 });
 
@@ -125,9 +138,23 @@ test("Quick Post supports professional item location without exposing device GPS
     "hidden",
     "formData.set(\"location_visibility\", locationVisibility)",
     "formData.set(\"is_location_confirmed\", locationConfirmed ? \"true\" : \"false\")",
+    "/api/location/reverse",
+    "streetText",
   ]) {
     assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.doesNotMatch(quickPostForm, /toFixed\(6\)/);
+});
+
+test("Step 1 presents photos, title and description, location, then price", () => {
+  const photos = quickPostForm.indexOf('data-testid="quick-post-photos"');
+  const titleDescription = quickPostForm.indexOf('data-testid="quick-post-title-description"');
+  const locationOrder = quickPostForm.indexOf('data-testid="quick-post-location"');
+  const priceOrder = quickPostForm.indexOf('data-testid="quick-post-price"');
+  assert.ok(photos < titleDescription);
+  assert.match(quickPostForm.slice(photos, titleDescription + 200), /order-10[\s\S]*order-20/);
+  assert.match(quickPostForm.slice(locationOrder, locationOrder + 200), /order-30/);
+  assert.match(quickPostForm.slice(priceOrder, priceOrder + 200), /order-40/);
 });
 
 test("Quick Post restores car-only 2D damage reporting and buyer detail visibility", () => {
@@ -144,6 +171,7 @@ test("Quick Post restores car-only 2D damage reporting and buyer detail visibili
   assert.match(listingActions, /persistVehicleDamage\(supabase, data\.id, formData\)/);
   assert.match(listingDetail, /VehicleDamageCard/);
   assert.match(listingDetail, /vehicleDamageCardParts/);
+  assert.doesNotMatch(listingDetail, /VehicleModelViewer|selectVehicleModel3D/);
 });
 
 test("Quick Post exposes only Step 2 launch roots and maps unsupported item detections into second-hand", () => {

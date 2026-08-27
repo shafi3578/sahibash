@@ -15,7 +15,10 @@ function sanitizeProfile(profile: ListingWithRelations["profile"]): ListingWithR
 }
 
 function hasCallableSellerContact(listing: ListingWithRelations) {
-  return listing.allow_contact_display !== false && Boolean(listing.contact_phone || listing.profile?.phone);
+  const sourceType = String(listing.source_type ?? "native");
+  const nativePhoneVerified = listing.profile?.phone_verification_status === "verified" && Boolean(listing.profile.phone_verified_at);
+  const hasSourcePhone = sourceType !== "native" && Boolean(listing.contact_phone);
+  return listing.allow_contact_display !== false && (nativePhoneVerified || hasSourcePhone);
 }
 
 export function sanitizePublicListingBoundary(listing: ListingWithRelations): ListingWithRelations {

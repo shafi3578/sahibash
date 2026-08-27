@@ -1528,6 +1528,7 @@ async function buildListingPayload(
       is_location_confirmed: true,
       contact_phone: sellerContact.phone,
       contact_name: sellerContact.fullName,
+      whatsapp_enabled: toFormValueBoolean(formData.get("whatsapp_enabled")),
       negotiable: input.negotiable ?? false,
       minimum_offer: input.minimum_offer ?? null,
       featured: false,

@@ -2,31 +2,23 @@
 
 import type { AppLocale } from "@/lib/i18n/translations";
 import { damageCondition, damagePartLabel } from "@/lib/vehicles/damage-report";
+import { VehicleBodyDiagram } from "@/components/vehicles/VehicleBodyDiagram";
 
 const COPY = {
   en: {
-    title: "Painted or Replaced Parts",
+    title: "Seller vehicle body report",
     allOriginal: "All body parts are in original factory condition.",
-    paintedParts: "Painted Parts",
-    changedParts: "Changed Parts",
-    noPainted: "No painted parts reported.",
-    noChanged: "No changed parts reported.",
+    summary: "Reported body-part conditions",
   },
   fa: {
-    title: "قطعات رنگ‌شده یا تعویض‌شده",
+    title: "گزارش وضعیت بدنه فروشنده",
     allOriginal: "فروشنده گزارش داده است که تمام قطعات بدنه در حالت اصلی فابریکه است.",
-    paintedParts: "قطعات رنگ‌شده",
-    changedParts: "قطعات تعویض‌شده",
-    noPainted: "قطعه رنگ‌شده گزارش نشده است.",
-    noChanged: "قطعه تعویض‌شده گزارش نشده است.",
+    summary: "وضعیت گزارش‌شده قطعات بدنه",
   },
   ps: {
-    title: "رنګ شوي یا بدل شوي پرزې",
+    title: "د پلورونکي د موټر د بدنې راپور",
     allOriginal: "پلورونکي راپور ورکړی چې د بدنې ټولې برخې فابریکوي اصلي حالت لري.",
-    paintedParts: "رنګ شوي پرزې",
-    changedParts: "بدل شوي پرزې",
-    noPainted: "رنګ شوې برخه نه ده راپور شوې.",
-    noChanged: "بدله شوې برخه نه ده راپور شوې.",
+    summary: "د بدنې د برخو راپور شوی حالت",
   },
 } as const satisfies Record<AppLocale, Record<string, string>>;
 
@@ -41,28 +33,17 @@ type Props = {
 export function VehicleDamageCard({ allOriginal, parts, locale = "en" }: Props) {
   const copy = COPY[locale] ?? COPY.en;
 
-  if (allOriginal) {
-    return (
-      <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-        <h2 className="text-base font-bold">{copy.title}</h2>
-        <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.allOriginal}</p>
-      </section>
-    );
-  }
-
   const nonOriginal = parts.filter((p) => p.condition !== "original");
-  const original = parts.filter((p) => p.condition === "original");
-  const paintedParts = parts.filter((p) => p.condition === "painted" || p.condition === "local_painted");
-  const changedParts = parts.filter((p) => p.condition === "changed" || p.condition === "replaced");
+  const diagramParts = parts.map((part) => ({ key: part.part_key, condition: part.condition }));
 
   return (
     <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
       <h2 className="text-base font-bold">{copy.title}</h2>
+      {allOriginal ? <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.allOriginal}</p> : null}
 
       {/* Legend */}
       <div className="mt-3 flex flex-wrap gap-2">
         {Array.from(new Set(parts.map((part) => part.condition)))
-          .filter((key) => key !== "original" || original.length < parts.length)
           .map((key) => {
             const info = damageCondition(key);
             return (
@@ -77,46 +58,14 @@ export function VehicleDamageCard({ allOriginal, parts, locale = "en" }: Props) 
           })}
       </div>
 
-      {/* Compact SVG diagram */}
-      <div className="mt-3 flex justify-center">
-        <svg viewBox="0 0 220 340" className="w-full max-w-[180px]" aria-label="Vehicle damage overview">
-          <rect x={50} y={10} width={120} height={320} rx={20} fill="#f1f5f9" stroke="#94a3b8" strokeWidth={1.5} />
-          {parts.map((p) => {
-            const info = damageCondition(p.condition);
-            const coords: Record<string, [number, number, number, number]> = {
-              hood:               [60,  15, 100,  55],
-              front_bumper:       [55,   8, 110,  18],
-              roof:               [62, 114,  96,  55],
-              trunk:              [60, 203, 100,  55],
-              rear_bumper:        [55, 260, 110,  18],
-              front_left_fender:  [20,  22,  38,  38],
-              front_right_fender: [162, 22,  38,  38],
-              rear_left_fender:   [20, 220,  38,  38],
-              rear_right_fender:  [162,220,  38,  38],
-              front_left_door:    [18,  72,  40,  68],
-              front_right_door:   [162, 72,  40,  68],
-              rear_left_door:     [18, 148,  40,  68],
-              rear_right_door:    [162,148,  40,  68],
-            };
-            const c = coords[p.part_key];
-            if (!c) return null;
-            return (
-              <rect
-                key={p.part_key}
-                x={c[0]} y={c[1]} width={c[2]} height={c[3]}
-                rx={3}
-                fill={info.color}
-                fillOpacity={p.condition === "original" ? 0.3 : 0.7}
-                stroke="#374151"
-                strokeWidth={0.8}
-              />
-            );
-          })}
-        </svg>
+      <div className="mt-4 flex justify-center rounded-2xl border border-slate-200 bg-gradient-to-b from-[#fffdf5] to-[#f4f7fa] p-3 shadow-inner sm:p-5">
+        <VehicleBodyDiagram parts={diagramParts} locale={locale} compact />
       </div>
 
       {nonOriginal.length > 0 && (
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="mt-4">
+          <h3 className="text-sm font-bold">{copy.summary}</h3>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {nonOriginal.map((p) => {
             const info = damageCondition(p.condition);
             return (
@@ -129,36 +78,9 @@ export function VehicleDamageCard({ allOriginal, parts, locale = "en" }: Props) 
               </div>
             );
           })}
+          </div>
         </div>
       )}
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-          <h3 className="text-sm font-bold">{copy.paintedParts}</h3>
-          {paintedParts.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-sm text-[var(--ink-1)]">
-              {paintedParts.map((part) => (
-                <li key={`painted-${part.part_key}`}>{damagePartLabel(part.part_key, locale) || part.part_label}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.noPainted}</p>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3">
-          <h3 className="text-sm font-bold">{copy.changedParts}</h3>
-          {changedParts.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-sm text-[var(--ink-1)]">
-              {changedParts.map((part) => (
-                <li key={`changed-${part.part_key}`}>{damagePartLabel(part.part_key, locale) || part.part_label}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.noChanged}</p>
-          )}
-        </div>
-      </div>
     </section>
   );
 }

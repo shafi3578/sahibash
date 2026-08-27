@@ -135,6 +135,14 @@ type AiResponse = {
     label?: string;
     confidence?: number;
   } | null;
+  suggestions?: Array<{
+    rootSlug?: string;
+    pathSlugs?: string[];
+    label?: string;
+    confidence?: number;
+    leafCategoryId?: number;
+    pathIds?: number[];
+  }>;
   suggestedProduct?: {
     categoryNodeId?: number;
     categoryPath?: string;
@@ -175,7 +183,7 @@ const COPY = {
     stepTwo: "Step 2 of 2",
     stepOneTitle: "Post your ad",
     stepTwoTitle: "Confirm category and details",
-    subtitle: "Photos, description, price and location. Sahibash fills the rest, and you can edit every suggestion.",
+    subtitle: "Photos, title, description, location and price. Sahibash fills the rest, and you can edit every suggestion.",
     continue: "Continue",
     back: "Back",
     editStepOne: "Edit Step 1",
@@ -227,6 +235,7 @@ const COPY = {
     province: "Province",
     district: "District / City",
     area: "Area or neighborhood (optional)",
+    street: "Village or street note (optional)",
     select: "Select",
     detected: "Sahibash detected",
     detectionHint: "Edit any chip. If detection is uncertain, choose one category.",
@@ -236,6 +245,11 @@ const COPY = {
     chooseSubcategory: "Choose the exact subcategory",
     selectedSubcategory: "Selected subcategory",
     noSubcategories: "Choose a root category to load active subcategories.",
+    categoryBack: "Back one level",
+    saveAndExit: "Save draft & exit",
+    whatsappOptIn: "Enable WhatsApp for this listing",
+    whatsappHint: "Uses your profile phone and appears only when enabled.",
+    locationLookupFailed: "We could not match this point confidently. Please choose province and district manually.",
     selected: "Selected",
     suggested: "Suggested",
     otherPossibilities: "Other possibilities",
@@ -274,7 +288,7 @@ const COPY = {
     stepTwo: "مرحله ۲ از ۲",
     stepOneTitle: "اعلان خود را ثبت کنید",
     stepTwoTitle: "دسته و جزئیات را تایید کنید",
-    subtitle: "عکس، توضیح، قیمت و موقعیت را وارد کنید. صاحباش بقیه را پیشنهاد می‌کند و شما هر مورد را ویرایش می‌کنید.",
+    subtitle: "عکس‌ها، عنوان، توضیحات، موقعیت و قیمت را وارد کنید. صاحبش جزئیات دیگر را پیشنهاد می‌کند و اختیار ویرایش همیشه با شماست.",
     continue: "ادامه",
     back: "برگشت",
     editStepOne: "ویرایش مرحله ۱",
@@ -326,6 +340,7 @@ const COPY = {
     province: "ولایت",
     district: "ولسوالی / شهر",
     area: "ناحیه یا محله (اختیاری)",
+    street: "قریه یا نشانی سرک (اختیاری)",
     select: "انتخاب",
     detected: "صاحباش تشخیص داد",
     detectionHint: "هر چیپ را ویرایش کنید. اگر تشخیص نامطمئن باشد، یک دسته را انتخاب کنید.",
@@ -335,6 +350,11 @@ const COPY = {
     chooseSubcategory: "زیر‌دسته دقیق را انتخاب کنید",
     selectedSubcategory: "زیر‌دسته انتخاب‌شده",
     noSubcategories: "برای بارگذاری زیر‌دسته‌ها، یک دسته اصلی انتخاب کنید.",
+    categoryBack: "یک مرحله به عقب",
+    saveAndExit: "ذخیره پیش‌نویس و خروج",
+    whatsappOptIn: "فعال‌کردن واتساپ برای این اعلان",
+    whatsappHint: "از شماره پروفایل شما استفاده می‌کند و فقط در صورت فعال‌بودن نمایش داده می‌شود.",
+    locationLookupFailed: "این نقطه با اطمینان کافی تطبیق نشد. ولایت و ولسوالی را دستی انتخاب کنید.",
     selected: "انتخاب‌شده",
     suggested: "پیشنهادی",
     otherPossibilities: "احتمال‌های دیگر",
@@ -373,7 +393,7 @@ const COPY = {
     stepTwo: "۲ له ۲ مرحلې",
     stepOneTitle: "خپل اعلان ثبت کړئ",
     stepTwoTitle: "کټګوري او تفصیلات تایید کړئ",
-    subtitle: "انځورونه، تشریح، بیه او ځای ولیکئ. صاحبش پاتې معلومات وړاندیز کوي او تاسو هر وړاندیز سمولای شئ.",
+    subtitle: "انځورونه، سرلیک، تشریح، ځای او بیه ولیکئ. صاحبش نور تفصیلات وړاندیز کوي او تاسو هر وړاندیز سمولای شئ.",
     continue: "دوام",
     back: "شاته",
     editStepOne: "۱مه مرحله سمول",
@@ -425,6 +445,7 @@ const COPY = {
     province: "ولایت",
     district: "ولسوالي / ښار",
     area: "سیمه یا ګاونډ (اختیاري)",
+    street: "کلی یا د سړک پته (اختیاري)",
     select: "وټاکئ",
     detected: "صاحبش وموندل",
     detectionHint: "هر چیپ سمولای شئ. که ډاډ کم وي، یوه کټګوري وټاکئ.",
@@ -434,6 +455,11 @@ const COPY = {
     chooseSubcategory: "دقیق فرعي کټګوري وټاکئ",
     selectedSubcategory: "ټاکل شوې فرعي کټګوري",
     noSubcategories: "د فرعي کټګوریو لپاره یوه اصلي کټګوري وټاکئ.",
+    categoryBack: "یو پړاو شاته",
+    saveAndExit: "مسوده خوندي او وځئ",
+    whatsappOptIn: "د دې اعلان لپاره واټس‌اپ فعال کړئ",
+    whatsappHint: "ستاسو د پروفایل شمېره کاروي او یوازې د فعالېدو پر مهال ښکاري.",
+    locationLookupFailed: "دا ځای په کافي باور سره ونه پېژندل شو. ولایت او ولسوالۍ لاسي وټاکئ.",
     selected: "ټاکل شوی",
     suggested: "وړاندیز",
     otherPossibilities: "نور احتمالونه",
@@ -898,11 +924,13 @@ export default function QuickPostForm({
   const [details, setDetails] = useState<Record<string, DetailValue>>({});
   const [images, setImages] = useState<StagedImage[]>([]);
   const imagesRef = useRef<StagedImage[]>([]);
+  const userEditedDuringHydrationRef = useRef(false);
   const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
   const [districtOptions, setDistrictOptions] = useState<DistrictOption[]>([]);
   const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
   const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
   const [areaText, setAreaText] = useState("");
+  const [streetText, setStreetText] = useState("");
   const [locationSource, setLocationSource] = useState<QuickLocationSource>("manual");
   const [locationVisibility, setLocationVisibility] = useState<QuickLocationVisibility>("approximate");
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -916,11 +944,14 @@ export default function QuickPostForm({
   const [rootTouched, setRootTouched] = useState(Boolean(normalizeQuickPostRootSlug(initialRootSlug)));
   const [selectedCategory, setSelectedCategory] = useState<CandidateNode | null>(null);
   const [categoryCandidates, setCategoryCandidates] = useState<CandidateNode[]>([]);
+  const [categoryNodes, setCategoryNodes] = useState<CandidateNode[]>([]);
+  const [manualCategoryPath, setManualCategoryPath] = useState("");
   const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [smartSuggestion, setSmartSuggestion] = useState<SmartPostingParseResult | null>(null);
   const [aiResponse, setAiResponse] = useState<AiResponse | null>(null);
   const [damageParts, setDamageParts] = useState<DamagePart[]>(() => defaultVehicleDamageParts());
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const [aiStatus, setAiStatus] = useState<"idle" | "working" | "ready" | "unavailable">("idle");
   const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [isPublishing, setIsPublishing] = useState(false);
@@ -950,6 +981,26 @@ export default function QuickPostForm({
   );
   const selectedCategoryId = selectedCategory?.id ?? null;
   const selectedCategoryPath = selectedCategory?.path ?? null;
+  const manualCurrentNode = useMemo(
+    () => categoryNodes.find((node) => node.path === (manualCategoryPath || selectedRootSlug)) ?? null,
+    [categoryNodes, manualCategoryPath, selectedRootSlug],
+  );
+  const manualChildren = useMemo(
+    () => manualCurrentNode
+      ? categoryNodes
+          .filter((node) => node.parent_id === manualCurrentNode.id && node.is_active)
+          .sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name))
+      : [],
+    [categoryNodes, manualCurrentNode],
+  );
+  const manualBreadcrumb = useMemo(() => {
+    const path = manualCurrentNode?.path ?? selectedRootSlug;
+    if (!path) return [];
+    const segments = path.split("/");
+    return segments
+      .map((_, index) => categoryNodes.find((node) => node.path === segments.slice(0, index + 1).join("/")))
+      .filter((node): node is CandidateNode => Boolean(node));
+  }, [categoryNodes, manualCurrentNode, selectedRootSlug]);
 
   const detectionText = `${title} ${description} ${Object.values(details).join(" ")}`;
   const quickKind = useMemo(
@@ -1005,6 +1056,20 @@ export default function QuickPostForm({
       ? localizeCategoryName({ locale, fallbackName: selectedRoot.name, slug: selectedRoot.slug })
       : "";
 
+  function categoryBreadcrumbLabel(node: CandidateNode) {
+    const segments = node.path.split("/");
+    return segments.map((_, index) => {
+      const path = segments.slice(0, index + 1).join("/");
+      const pathNode = categoryNodes.find((candidate) => candidate.path === path);
+      return localizeCategoryName({
+        locale,
+        fallbackName: pathNode?.name ?? segments[index].replace(/-/g, " "),
+        slug: pathNode?.slug ?? segments[index],
+        path,
+      });
+    }).join(" › ");
+  }
+
   const chips = useMemo(() => {
     const items = new Map<string, string>();
     if (categoryLabel) items.set("category", categoryLabel);
@@ -1040,10 +1105,12 @@ export default function QuickPostForm({
   useEffect(() => {
     let cancelled = false;
     async function loadDraft() {
+      let hasLocalRecovery = false;
       try {
         const localRaw = window.localStorage.getItem(QUICK_DRAFT_KEY);
         if (localRaw) {
           const local = JSON.parse(localRaw) as Record<string, unknown>;
+          hasLocalRecovery = true;
           const nextDetails = (local.details && typeof local.details === "object" ? local.details : {}) as Record<string, unknown>;
           setStep(local.step === 2 ? 2 : 1);
           if (readDraftString(local.publishRequestId)) setPublishRequestId(readDraftString(local.publishRequestId));
@@ -1065,6 +1132,7 @@ export default function QuickPostForm({
           setSelectedProvinceId(Number(location.provinceId) || null);
           setSelectedDistrictId(Number(location.districtId) || null);
           setAreaText(readDraftString(location.areaText));
+          setStreetText(readDraftString(location.streetText));
           const nextVisibility = readDraftString(location.locationVisibility);
           if (["exact", "approximate", "province_district", "hidden"].includes(nextVisibility)) {
             setLocationVisibility(nextVisibility as QuickLocationVisibility);
@@ -1098,6 +1166,7 @@ export default function QuickPostForm({
               .map((part) => ({ key: String(part.key), label: String(part.label ?? part.key), condition: String(part.condition) as DamagePart["condition"] }));
             if (restoredDamage.length > 0) setDamageParts(restoredDamage);
           }
+          setWhatsappEnabled(readDraftBoolean(local.whatsappEnabled));
         }
 
         const storedImages = await loadQuickPostImages().catch(() => []);
@@ -1133,6 +1202,7 @@ export default function QuickPostForm({
         const serverDraft = await getMyActiveDraftAction();
         if (cancelled || !serverDraft.ok || serverDraft.draft?.posting_type !== "quick") return;
         setDraftId(serverDraft.draft.id);
+        if (hasLocalRecovery || userEditedDuringHydrationRef.current) return;
         const serverDetails = serverDraft.draft.details ?? {};
         const serverCategory = serverDraft.draft.category ?? {};
         const serverLocation = serverDraft.draft.location ?? {};
@@ -1171,6 +1241,7 @@ export default function QuickPostForm({
         setSelectedProvinceId(Number(serverLocation.provinceId) || null);
         setSelectedDistrictId(Number(serverLocation.districtId) || null);
         setAreaText(readDraftString(serverLocation.areaText));
+        setStreetText(readDraftString(serverLocation.streetText));
         const serverVisibility = readDraftString(serverLocation.locationVisibility);
         if (["exact", "approximate", "province_district", "hidden"].includes(serverVisibility)) {
           setLocationVisibility(serverVisibility as QuickLocationVisibility);
@@ -1189,6 +1260,7 @@ export default function QuickPostForm({
             .map((part) => ({ key: String(part.key), label: String(part.label ?? part.key), condition: String(part.condition) as DamagePart["condition"] }));
           if (restoredDamage.length > 0) setDamageParts(restoredDamage);
         }
+        setWhatsappEnabled(readDraftBoolean(serverDetails.whatsappEnabled));
       } catch {
         // Local draft corruption should not block posting.
       } finally {
@@ -1239,6 +1311,8 @@ export default function QuickPostForm({
   useEffect(() => {
     if (!draftLoaded) return;
     const localDraft = {
+      updatedAt: new Date().toISOString(),
+      language: locale,
       step,
       publishRequestId,
       title,
@@ -1272,11 +1346,13 @@ export default function QuickPostForm({
       smartSuggestion,
       details,
       damageParts,
+      whatsappEnabled,
       photos: images.map((image) => ({ name: image.file.name, size: image.file.size, type: image.file.type })),
       location: {
         provinceId: selectedProvinceId,
         districtId: selectedDistrictId,
         areaText,
+        streetText,
         locationSource,
         locationVisibility,
         latitude,
@@ -1286,45 +1362,6 @@ export default function QuickPostForm({
       },
     };
     window.localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify(localDraft));
-
-    const hasUsefulDraft =
-      description.trim().length > 0
-      || title.trim().length > 0
-      || images.length > 0
-      || Boolean(selectedRootSlug);
-    if (!hasUsefulDraft) return;
-
-    const serverPayload = {
-      postingType: "quick" as const,
-      category: {
-        rootSlug: selectedRootSlug,
-        categoryNodeId: selectedCategory?.id ?? null,
-        categoryPath: selectedCategory?.path ?? null,
-        selectedCategory: localDraft.selectedCategory,
-      },
-      details: localDraft,
-      photos: localDraft.photos,
-      location: localDraft.location,
-      language: locale,
-    };
-    const serverSignature = JSON.stringify(serverPayload);
-    if (lastServerDraftSignatureRef.current === serverSignature) return;
-
-    const timeout = window.setTimeout(() => {
-      if (lastServerDraftSignatureRef.current === serverSignature) return;
-      setDraftStatus("saving");
-      void saveListingDraftAction(serverPayload).then((result) => {
-        if (result.ok) {
-          lastServerDraftSignatureRef.current = serverSignature;
-          setDraftId(result.draftId || draftId);
-          setDraftStatus("saved");
-        } else {
-          setDraftStatus(result.statusCode === 401 ? "idle" : "error");
-        }
-      });
-    }, 1000);
-
-    return () => window.clearTimeout(timeout);
   }, [
     areaText,
     contactForPrice,
@@ -1356,12 +1393,27 @@ export default function QuickPostForm({
     selectedProvinceId,
     selectedRootSlug,
     suitableForStudents,
+    streetText,
     step,
     smartSuggestion,
     title,
     transaction,
     aiResponse,
+    whatsappEnabled,
   ]);
+
+  useEffect(() => {
+    const persistOnPageExit = () => {
+      const recovery = window.localStorage.getItem(QUICK_DRAFT_KEY);
+      if (!recovery || recovery.length > 60_000) return;
+      navigator.sendBeacon(
+        "/api/posting/draft",
+        new Blob([recovery], { type: "application/json" }),
+      );
+    };
+    window.addEventListener("pagehide", persistOnPageExit);
+    return () => window.removeEventListener("pagehide", persistOnPageExit);
+  }, []);
 
   const applySmartSuggestion = useCallback((suggestion: SmartPostingParseResult) => {
     setSmartSuggestion(suggestion);
@@ -1384,6 +1436,7 @@ export default function QuickPostForm({
   }, [contactForPrice, priceAmount, rootChoices, rootTouched, updateDetail]);
 
   useEffect(() => {
+    if (step !== 2) return;
     const meaningful = description.trim().length >= 20 || images.length > 0;
     if (!meaningful) return;
     const signature = `${title.trim()}|${description.trim().slice(0, 500)}|${images[0]?.file.name ?? ""}|${images[0]?.file.size ?? 0}`;
@@ -1418,9 +1471,9 @@ export default function QuickPostForm({
         }
         aiCacheRef.current.set(signature, json);
         setAiResponse(json);
-        setAiStatus(json.suggestion || json.suggestedProduct ? "ready" : "unavailable");
+        setAiStatus(json.suggestions?.length || json.suggestion || json.suggestedProduct ? "ready" : "unavailable");
         const rootFromProduct = json.suggestedProduct?.categoryPath?.split("/")[0] ?? "";
-        const rootFromSuggestion = json.suggestion?.rootSlug ?? "";
+        const rootFromSuggestion = json.suggestions?.[0]?.rootSlug ?? json.suggestion?.rootSlug ?? "";
         const nextRoot = normalizeQuickPostRootSlug(rootFromProduct || rootFromSuggestion);
         if (nextRoot && !rootTouched && rootChoices.some((category) => category.slug === nextRoot)) {
           setSelectedCategory(null);
@@ -1438,7 +1491,7 @@ export default function QuickPostForm({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [applySmartSuggestion, description, images, rootChoices, rootTouched, title, updateDetail]);
+  }, [applySmartSuggestion, description, images, rootChoices, rootTouched, step, title, updateDetail]);
 
   useEffect(() => {
     if (!selectedRootSlug) {
@@ -1450,22 +1503,27 @@ export default function QuickPostForm({
       setCategoryLoading(true);
       const text = `${title} ${description} ${Object.values(details).join(" ")}`;
       const kind = inferKind(selectedRootSlug, selectedCategoryPath, text);
+      const aiPaths = (aiResponse?.suggestions ?? [])
+        .map((suggestion) => suggestion.pathSlugs?.join("/") ?? "")
+        .filter(Boolean);
       const aiPath = aiResponse?.suggestedProduct?.categoryPath
+        ?? aiPaths[0]
         ?? (aiResponse?.suggestion?.pathSlugs?.length ? aiResponse.suggestion.pathSlugs.join("/") : null);
-      let exactNode: CandidateNode | null = null;
+      const exactNodes: CandidateNode[] = [];
 
       try {
-        if (aiResponse?.suggestedProduct?.categoryNodeId) {
+        const exactIds = Array.from(new Set([
+          aiResponse?.suggestedProduct?.categoryNodeId,
+          ...(aiResponse?.suggestions ?? []).map((suggestion) => suggestion.leafCategoryId),
+        ].filter((id): id is number => typeof id === "number")));
+        if (exactIds.length > 0) {
           const { data: exact } = await supabase
             .from("category_nodes")
             .select("id, category_id, parent_id, name, slug, path, level, display_order, is_active, is_leaf")
-            .eq("id", aiResponse.suggestedProduct.categoryNodeId)
+            .in("id", exactIds)
             .eq("is_active", true)
-            .maybeSingle();
-          const resolvedExactNode = exact as CandidateNode | null;
-          if (resolvedExactNode?.path?.startsWith(selectedRootSlug)) {
-            exactNode = resolvedExactNode;
-          }
+            .eq("is_leaf", true);
+          exactNodes.push(...((exact ?? []) as CandidateNode[]).filter((node) => node.path?.startsWith(selectedRootSlug)));
         }
 
         const { data } = await supabase
@@ -1475,24 +1533,25 @@ export default function QuickPostForm({
           .ilike("path", `${selectedRootSlug}%`)
           .order("level", { ascending: false })
           .order("display_order", { ascending: true })
-          .limit(160);
+          .limit(500);
 
         const nodes = ((data ?? []) as CandidateNode[]).filter((node) => node.path?.startsWith(selectedRootSlug));
         const ranked = nodes
+          .filter((node) => node.is_leaf)
           .map((node) => ({ node, score: scoreCategoryNode(node, kind, text, aiPath) }))
           .sort((a, b) => b.score - a.score || b.node.level - a.node.level || a.node.display_order - b.node.display_order)
           .map((item) => item.node);
         const choices = [
-          ...(exactNode ? [exactNode] : []),
-          ...ranked.filter((node) => node.id !== exactNode?.id),
+          ...aiPaths.map((path) => exactNodes.find((node) => node.path === path)).filter((node): node is CandidateNode => Boolean(node)),
+          ...exactNodes,
+          ...ranked,
         ].filter((node, index, all) => all.findIndex((item) => item.id === node.id) === index);
-        const best = choices[0] ?? null;
 
         if (!cancelled) {
-          setCategoryCandidates(choices.slice(0, 16));
-          if (exactNode || !rootTouched) {
-            setSelectedCategory(best);
-          } else if (selectedCategoryPath && !selectedCategoryPath.startsWith(selectedRootSlug)) {
+          setCategoryNodes(nodes);
+          setCategoryCandidates(choices.slice(0, 3));
+          setManualCategoryPath((current) => current.startsWith(selectedRootSlug) ? current : selectedRootSlug);
+          if (selectedCategoryPath && !selectedCategoryPath.startsWith(selectedRootSlug)) {
             setSelectedCategory(null);
           }
         }
@@ -1562,14 +1621,36 @@ export default function QuickPostForm({
     setIsDetectingLocation(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLatitude(position.coords.latitude);
-        setLongitude(position.coords.longitude);
-        setLocationAccuracy(Math.round(position.coords.accuracy));
-        setLocationSource("device");
-        setLocationVisibility((current) => current === "exact" || current === "hidden" ? current : "approximate");
-        setLocationConfirmed(false);
-        setLocationHint(c.currentLocationHint);
-        setIsDetectingLocation(false);
+        void (async () => {
+          const nextLatitude = position.coords.latitude;
+          const nextLongitude = position.coords.longitude;
+          setLatitude(nextLatitude);
+          setLongitude(nextLongitude);
+          setLocationAccuracy(Math.round(position.coords.accuracy));
+          setLocationSource("device");
+          setLocationVisibility((current) => current === "exact" || current === "hidden" ? current : "approximate");
+          setLocationConfirmed(false);
+          try {
+            const response = await fetch(`/api/location/reverse?latitude=${encodeURIComponent(String(nextLatitude))}&longitude=${encodeURIComponent(String(nextLongitude))}&locale=${locale}`);
+            const result = await response.json() as {
+              ok?: boolean;
+              province?: ProvinceOption;
+              district?: DistrictOption & { provinceId?: number };
+            };
+            if (!response.ok || !result.ok || !result.province || !result.district) throw new Error("UNMATCHED_LOCATION");
+            setProvinceOptions((current) => current.some((item) => item.id === result.province!.id) ? current : [...current, result.province!]);
+            setDistrictOptions((current) => current.some((item) => item.id === result.district!.id) ? current : [result.district!, ...current]);
+            setSelectedProvinceId(result.province.id);
+            setSelectedDistrictId(result.district.id);
+            setLocationHint(`${c.detectedLocation}: ${result.province.name} › ${result.district.name}`);
+          } catch {
+            setSelectedProvinceId(null);
+            setSelectedDistrictId(null);
+            setLocationHint(c.locationLookupFailed);
+          } finally {
+            setIsDetectingLocation(false);
+          }
+        })();
       },
       (geoError) => {
         setLocationHint(geoError.code === 1 ? c.gpsDenied : c.gpsUnavailable);
@@ -1579,7 +1660,7 @@ export default function QuickPostForm({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [c.currentLocationHint, c.gpsDenied, c.gpsUnavailable]);
+  }, [c.detectedLocation, c.gpsDenied, c.gpsUnavailable, c.locationLookupFailed, locale]);
 
   const handleConfirmDetectedLocation = useCallback(() => {
     if (!selectedProvinceId || !selectedDistrictId) {
@@ -1593,6 +1674,8 @@ export default function QuickPostForm({
   async function saveCurrentDraftNow(stepOverride: QuickStep = step) {
     if (!draftLoaded) return draftId;
     const localDraft = {
+      updatedAt: new Date().toISOString(),
+      language: locale,
       step: stepOverride,
       publishRequestId,
       title,
@@ -1626,11 +1709,13 @@ export default function QuickPostForm({
       smartSuggestion,
       details,
       damageParts,
+      whatsappEnabled,
       photos: images.map((image) => ({ name: image.file.name, size: image.file.size, type: image.file.type })),
       location: {
         provinceId: selectedProvinceId,
         districtId: selectedDistrictId,
         areaText,
+        streetText,
         locationSource,
         locationVisibility,
         latitude,
@@ -1667,6 +1752,11 @@ export default function QuickPostForm({
       setDraftStatus(result.statusCode === 401 ? "idle" : "error");
     }
     return draftId;
+  }
+
+  async function saveDraftAndExit() {
+    await saveCurrentDraftNow(step);
+    router.push(localizePath("/dashboard", locale));
   }
 
   function validateStepOneBeforeContinue() {
@@ -1765,10 +1855,11 @@ export default function QuickPostForm({
     formData.set("district_id", String(selectedDistrictId));
     formData.set("province", selectedProvince?.name ?? "");
     formData.set("district", selectedDistrict?.name ?? "");
-    formData.set("area_text", areaText.trim());
+    formData.set("area_text", [areaText.trim(), streetText.trim()].filter(Boolean).join(" · "));
     formData.set("location_source", locationSource);
     formData.set("location_visibility", locationVisibility);
     formData.set("is_location_confirmed", locationConfirmed ? "true" : "false");
+    formData.set("whatsapp_enabled", whatsappEnabled ? "true" : "false");
     formData.set("publish_request_id", publishRequestId);
     appendIfPresent(formData, "draft_id", savedDraftId);
     appendIfPresent(formData, "latitude", latitude);
@@ -1941,8 +2032,15 @@ export default function QuickPostForm({
   };
 
   return (
-    <div data-testid="quick-post-form" dir={direction} className="mt-6 space-y-4 pb-28">
-      <section className="overflow-hidden rounded-[2rem] border border-[var(--line)] bg-gradient-to-br from-[#fff7ed] via-white to-[#eef7ff] p-4 shadow-sm sm:p-6">
+    <div
+      data-testid="quick-post-form"
+      dir={direction}
+      className="mt-6 flex flex-col gap-4 pb-28"
+      onInputCapture={() => { userEditedDuringHydrationRef.current = true; }}
+      onChangeCapture={() => { userEditedDuringHydrationRef.current = true; }}
+      onPointerDownCapture={() => { userEditedDuringHydrationRef.current = true; }}
+    >
+      <section className="order-0 overflow-hidden rounded-[2rem] border border-[var(--line)] bg-gradient-to-br from-[#fff7ed] via-white to-[#eef7ff] p-4 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-[var(--accent)]">{c.quickPost}</p>
           <p data-testid="quick-post-step-indicator" className="rounded-full bg-white/80 px-3 py-1 text-xs font-black text-[var(--ink-2)] shadow-sm">
@@ -1955,7 +2053,7 @@ export default function QuickPostForm({
 
       {step === 1 ? (
         <>
-      <section data-testid="quick-post-photos" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+      <section data-testid="quick-post-photos" className="order-10 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-display text-lg font-bold">{c.photosTitle}</h3>
@@ -1997,7 +2095,22 @@ export default function QuickPostForm({
         )}
       </section>
 
-      <section className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+      <section data-testid="quick-post-title-description" className="order-20 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+        <label className="block text-sm font-bold">
+          {c.title}
+          <input
+            value={title}
+            maxLength={120}
+            onChange={(event) => {
+              setTitleTouched(true);
+              setTitle(event.target.value);
+            }}
+            className="mt-2 w-full rounded-2xl border border-[var(--line)] px-3 py-3 text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+          />
+          <span className={`mt-1 block text-xs ${title.trim().length > 0 && title.trim().length < 5 ? "text-amber-700" : "text-[var(--ink-2)]"}`}>
+            {title.trim().length > 0 && title.trim().length < 5 ? c.titleTooShort : c.titleHint}
+          </span>
+        </label>
         <label data-testid="quick-post-description" className="block text-sm font-bold">
           {c.description}
           <textarea
@@ -2028,25 +2141,10 @@ export default function QuickPostForm({
               }
             }}
             placeholder={c.descriptionPlaceholder}
-            className="mt-2 min-h-40 w-full resize-y rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-base outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[var(--accent)]/15"
+            className="mt-4 min-h-40 w-full resize-y rounded-3xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-base outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[var(--accent)]/15"
           />
           <span className={`mt-1 block text-xs ${description.trim().length >= 20 ? "text-emerald-700" : "text-[var(--ink-2)]"}`}>
             {description.trim().length}/20 · {c.descriptionRequirement}
-          </span>
-        </label>
-        <label className="mt-4 block text-sm font-bold">
-          {c.title}
-          <input
-            value={title}
-            maxLength={120}
-            onChange={(event) => {
-              setTitleTouched(true);
-              setTitle(event.target.value);
-            }}
-            className="mt-2 w-full rounded-2xl border border-[var(--line)] px-3 py-3 text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
-          />
-          <span className={`mt-1 block text-xs ${title.trim().length > 0 && title.trim().length < 5 ? "text-amber-700" : "text-[var(--ink-2)]"}`}>
-            {title.trim().length > 0 && title.trim().length < 5 ? c.titleTooShort : c.titleHint}
           </span>
         </label>
       </section>
@@ -2054,7 +2152,7 @@ export default function QuickPostForm({
       ) : null}
 
       {step === 2 ? (
-      <section data-testid="quick-post-ai-chips" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+      <section data-testid="quick-post-ai-chips" className="order-10 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="font-display text-lg font-bold">{c.detected}</h3>
@@ -2088,8 +2186,10 @@ export default function QuickPostForm({
                   setRootTouched(true);
                   setSelectedCategory(null);
                   setCategoryCandidates([]);
+                  setCategoryNodes([]);
                   setShowOptionalDetails(false);
                   setSelectedRootSlug(category.slug);
+                  setManualCategoryPath(category.slug);
                 }}
                 className={`shrink-0 rounded-full border px-4 py-2 text-sm font-bold transition ${
                   selectedRootSlug === category.slug
@@ -2105,7 +2205,7 @@ export default function QuickPostForm({
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--ink-2)]">{c.suggestionsTitle}</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {categoryCandidates.slice(0, 4).map((candidate, index) => {
+                {categoryCandidates.map((candidate, index) => {
                   const isSelected = selectedCategory?.id === candidate.id;
                   return (
                     <button
@@ -2125,7 +2225,7 @@ export default function QuickPostForm({
                       <span className="block text-[11px] uppercase tracking-[0.16em] opacity-75">
                         {index === 0 ? c.suggested : c.otherPossibilities}
                       </span>
-                      {localizeCategoryName({ locale, fallbackName: candidate.name, slug: candidate.slug, path: candidate.path })}
+                      <span className="mt-1 block">{categoryBreadcrumbLabel(candidate)}</span>
                     </button>
                   );
                 })}
@@ -2134,17 +2234,40 @@ export default function QuickPostForm({
 
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--ink-2)]">{c.manualCategory}</p>
-              {categoryCandidates.length > 0 ? (
-                <div className="mt-2 grid max-h-72 gap-2 overflow-y-auto rounded-2xl border border-[var(--line)] bg-white p-2 sm:grid-cols-2">
-                  {categoryCandidates.map((candidate) => {
-                    const isSelected = selectedCategory?.id === candidate.id;
+              {manualCurrentNode ? (
+                <div className="mt-2 rounded-2xl border border-[var(--line)] bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-3">
+                    <p className="text-xs font-bold text-[var(--ink-2)]">
+                      {manualBreadcrumb.map((node) => localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })).join(" › ")}
+                    </p>
+                    {manualCurrentNode.parent_id ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const parent = categoryNodes.find((node) => node.id === manualCurrentNode.parent_id);
+                          if (parent) setManualCategoryPath(parent.path);
+                        }}
+                        className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-xs font-bold"
+                      >
+                        {c.categoryBack}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">
+                  {manualChildren.map((candidate) => {
+                    const isSelected = candidate.is_leaf && selectedCategory?.id === candidate.id;
                     return (
                       <button
                         key={`manual-${candidate.id}`}
                         type="button"
                         onClick={() => {
                           setRootTouched(true);
-                          setSelectedCategory(candidate);
+                          if (candidate.is_leaf) {
+                            setSelectedCategory(candidate);
+                          } else {
+                            setSelectedCategory(null);
+                            setManualCategoryPath(candidate.path);
+                          }
                           setShowOptionalDetails(false);
                         }}
                         className={`rounded-xl px-3 py-2 text-start text-sm font-semibold transition ${
@@ -2153,10 +2276,13 @@ export default function QuickPostForm({
                             : "bg-[var(--surface-2)] text-[var(--ink-1)] hover:bg-white"
                         }`}
                       >
-                        {localizeCategoryName({ locale, fallbackName: candidate.name, slug: candidate.slug, path: candidate.path })}
+                        <span>{localizeCategoryName({ locale, fallbackName: candidate.name, slug: candidate.slug, path: candidate.path })}</span>
+                        <span aria-hidden="true" className="float-end opacity-60">{candidate.is_leaf ? "✓" : direction === "rtl" ? "‹" : "›"}</span>
                       </button>
                     );
                   })}
+                  </div>
+                  {manualChildren.length === 0 ? <p className="mt-3 text-sm text-[var(--ink-2)]">{c.noSubcategories}</p> : null}
                 </div>
               ) : (
                 <p className="mt-2 rounded-2xl bg-[var(--surface-2)] px-3 py-3 text-sm text-[var(--ink-2)]">
@@ -2174,7 +2300,8 @@ export default function QuickPostForm({
       </section>
       ) : null}
 
-      <section data-testid="quick-post-price" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+      {step === 1 ? (
+      <section data-testid="quick-post-price" className="order-40 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <h3 className="font-display text-lg font-bold">{c.price}</h3>
 
         {showContextualPrice && (isHousing || isLand) && !contactForPrice ? (
@@ -2258,8 +2385,10 @@ export default function QuickPostForm({
           </label>
         ) : null}
       </section>
+      ) : null}
 
-      <section data-testid="quick-post-location" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+      {step === 1 ? (
+      <section data-testid="quick-post-location" className="order-30 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-display text-lg font-bold">{c.location}</h3>
@@ -2308,12 +2437,11 @@ export default function QuickPostForm({
           </p>
         ) : null}
 
-        {(latitude !== null && longitude !== null) ? (
+        {locationSource !== "manual" && selectedProvinceId && selectedDistrictId ? (
           <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
             <p className="font-bold">{c.detectedLocation}</p>
-            <p className="mt-1" dir="ltr">
-              {latitude.toFixed(6)}, {longitude.toFixed(6)}
-              {locationAccuracy !== null ? ` · ±${locationAccuracy}m` : ""}
+            <p className="mt-1">
+              {provinceOptions.find((item) => item.id === selectedProvinceId)?.name} › {districtOptions.find((item) => item.id === selectedDistrictId)?.name}
             </p>
             <button type="button" onClick={handleConfirmDetectedLocation} className="mt-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white">
               {c.confirmLocation}
@@ -2380,6 +2508,10 @@ export default function QuickPostForm({
             {c.area}
             <input value={areaText} onChange={(event) => setAreaText(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
           </label>
+          <label className="text-sm font-bold sm:col-span-2">
+            {c.street}
+            <input value={streetText} onChange={(event) => setStreetText(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
+          </label>
           <fieldset className="sm:col-span-2">
             <legend className="text-sm font-bold">{c.locationPrivacy}</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-4">
@@ -2406,10 +2538,11 @@ export default function QuickPostForm({
           </fieldset>
         </div>
       </section>
+      ) : null}
 
       {step === 2 ? (
         <>
-          <section data-testid="quick-post-advanced-details" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+          <section data-testid="quick-post-advanced-details" className="order-20 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="font-display text-lg font-bold">{c.additionalDetails}</h3>
@@ -2450,7 +2583,7 @@ export default function QuickPostForm({
           </section>
 
           {isCarDamageEligible ? (
-            <section data-testid="quick-post-car-damage" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+            <section data-testid="quick-post-car-damage" className="order-30 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
               <h3 className="font-display text-lg font-bold">{c.carDamageTitle}</h3>
               <p className="mt-1 text-sm leading-6 text-[var(--ink-2)]">{c.carDamageHint}</p>
               <div className="mt-4">
@@ -2477,7 +2610,7 @@ export default function QuickPostForm({
             </section>
           ) : null}
 
-          <section data-testid="quick-post-review" className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+          <section data-testid="quick-post-review" className="order-40 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="font-display text-lg font-bold">{c.previewTitle}</h3>
@@ -2511,7 +2644,7 @@ export default function QuickPostForm({
                 })}</p>
                 <p className="mt-1 text-[var(--accent)]">{contactForPrice ? c.contactForPrice : `${priceValueForSubmit() || priceAmount || "—"} ${currency}`}</p>
                 <p className="mt-1 text-[var(--ink-2)]">
-                  {[provinceOptions.find((item) => item.id === selectedProvinceId)?.name, districtOptions.find((item) => item.id === selectedDistrictId)?.name, areaText].filter(Boolean).join(" • ") || c.missingLocation}
+                  {[provinceOptions.find((item) => item.id === selectedProvinceId)?.name, districtOptions.find((item) => item.id === selectedDistrictId)?.name, areaText, streetText].filter(Boolean).join(" • ") || c.missingLocation}
                 </p>
                 <p className="mt-2 line-clamp-3 text-[var(--ink-2)]">{description}</p>
                 {chips.length > 0 ? (
@@ -2525,18 +2658,22 @@ export default function QuickPostForm({
             </div>
           </section>
 
-          <section className="rounded-3xl border border-[var(--line)] bg-white p-4 text-sm text-[var(--ink-2)] shadow-sm sm:p-5">
+          <section className="order-50 rounded-3xl border border-[var(--line)] bg-white p-4 text-sm text-[var(--ink-2)] shadow-sm sm:p-5">
             <p className="font-semibold text-[var(--ink-1)]">{sellerContactName || "Profile contact"}</p>
             <p className="mt-1">{maskedSellerContactPhone || c.missingContact}</p>
             <p className="mt-2">{c.noOverride}</p>
+            <label className="mt-4 flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 font-bold text-[var(--ink-1)]">
+              <input type="checkbox" checked={whatsappEnabled} onChange={(event) => setWhatsappEnabled(event.target.checked)} className="h-5 w-5" />
+              <span>{c.whatsappOptIn}<span className="mt-1 block text-xs font-normal text-[var(--ink-2)]">{c.whatsappHint}</span></span>
+            </label>
           </section>
         </>
       ) : null}
 
-      {error ? <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</p> : null}
-      {status ? <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{status}</p> : null}
+      {error ? <p role="alert" className="order-60 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</p> : null}
+      {status ? <p className="order-60 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{status}</p> : null}
 
-      <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,.08)] backdrop-blur lg:bottom-0">
+      <div className="order-70 fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,.08)] backdrop-blur lg:bottom-0">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-3">
           <p className="hidden text-xs font-semibold text-[var(--ink-2)] sm:block">
             {draftStatus === "saving" ? c.saving : draftStatus === "saved" ? c.saved : ""}
@@ -2546,6 +2683,9 @@ export default function QuickPostForm({
               {c.back}
             </button>
           ) : null}
+          <button type="button" onClick={saveDraftAndExit} disabled={draftStatus === "saving"} className="min-h-12 shrink-0 rounded-2xl border border-[var(--line)] bg-white px-3 py-3 text-xs font-black sm:px-4 sm:text-sm disabled:opacity-60">
+            {c.saveAndExit}
+          </button>
           {step === 1 ? (
             <button
               type="button"

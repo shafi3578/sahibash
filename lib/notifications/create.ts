@@ -3,7 +3,7 @@ import "server-only";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import type { AppLocale } from "@/lib/i18n/translations";
 
-type NotificationType = "listing_message" | "system";
+type NotificationType = "listing_message" | "listing_offer" | "system";
 
 type Copy = Record<AppLocale, { title: string; body: string }>;
 

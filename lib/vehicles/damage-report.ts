@@ -22,6 +22,7 @@ export const VEHICLE_DAMAGE_CONDITIONS = [
   { value: "original", labels: { en: "Original", fa: "اصلی", ps: "اصلي" }, color: "#64748b", className: "bg-slate-500" },
   { value: "local_painted", labels: { en: "Locally painted", fa: "رنگ موضعی", ps: "ځایي رنګ" }, color: "#f59e0b", className: "bg-amber-500" },
   { value: "painted", labels: { en: "Painted", fa: "رنگ‌شده", ps: "رنګ شوی" }, color: "#2563eb", className: "bg-blue-600" },
+  { value: "repaired", labels: { en: "Repaired", fa: "ترمیم‌شده", ps: "ترمیم شوی" }, color: "#0f766e", className: "bg-teal-700" },
   { value: "changed", labels: { en: "Replaced", fa: "تعویض‌شده", ps: "بدل شوی" }, color: "#dc2626", className: "bg-red-600" },
   { value: "damaged", labels: { en: "Damaged", fa: "آسیب‌دیده", ps: "زیانمن" }, color: "#7c3aed", className: "bg-violet-600" },
 ] as const satisfies ReadonlyArray<{ value: string; labels: LocalizedLabel; color: string; className: string }>;

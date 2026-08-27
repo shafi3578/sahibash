@@ -23,7 +23,7 @@ type TrustedSupabaseClient =
   | ReturnType<typeof createSupabaseAdmin>
   | Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
-type RevealListingPhoneResult =
+type ListingContactPhoneResult =
   | { ok: true; phone: string }
   | { ok: false; message: string; statusCode?: number };
 
@@ -43,7 +43,7 @@ async function createTrustedServerClient(): Promise<TrustedSupabaseClient> {
   return createSupabaseServerClient();
 }
 
-function normalizeRevealPhone(phone: unknown) {
+function normalizeContactPhone(phone: unknown) {
   const raw = String(phone ?? "").trim();
   const normalized = normalizeAfghanistanPhone(raw).normalized ?? raw;
   const digits = normalized.replace(/[^\d+]/g, "");
@@ -53,7 +53,7 @@ function normalizeRevealPhone(phone: unknown) {
   return digits;
 }
 
-async function resolveRevealPhone(
+async function resolveContactPhone(
   supabase: TrustedSupabaseClient,
   listing: {
     user_id?: string | null;
@@ -66,20 +66,24 @@ async function resolveRevealPhone(
   if ((sourceType === "native" || sourceType === "") && listing.user_id) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("phone")
+      .select("phone,phone_verification_status,phone_verified_at")
       .eq("id", listing.user_id)
       .maybeSingle();
-    const profilePhone = normalizeRevealPhone((profile as { phone?: string | null } | null)?.phone);
+    const safeProfile = profile as { phone?: string | null; phone_verification_status?: string | null; phone_verified_at?: string | null } | null;
+    const profilePhone = safeProfile?.phone_verification_status === "verified" && safeProfile.phone_verified_at
+      ? normalizeContactPhone(safeProfile.phone)
+      : null;
 
     if (profilePhone) {
       return { phone: profilePhone, contactSource: "profile_phone" };
     }
   }
 
-  return {
-    phone: normalizeRevealPhone(listing.contact_phone),
-    contactSource: sourceType === "native" || sourceType === "" ? "legacy_listing_phone_fallback" : "source_listing_phone",
-  };
+  if (sourceType === "native" || sourceType === "") {
+    return { phone: null, contactSource: "profile_phone_unavailable" };
+  }
+
+  return { phone: normalizeContactPhone(listing.contact_phone), contactSource: "source_listing_phone" };
 }
 
 async function currentUserIsAdmin(supabase: TrustedSupabaseClient, userId?: string) {
@@ -139,10 +143,11 @@ export async function recordInventoryContactEventAction(
   return { ok: true };
 }
 
-export async function revealListingPhoneAction(
+export async function getListingContactPhoneAction(
   listingId: string,
-  locale: AppLocale
-): Promise<RevealListingPhoneResult> {
+  locale: AppLocale,
+  channel: "call" | "whatsapp",
+): Promise<ListingContactPhoneResult> {
   const safeListingId = String(listingId ?? "").trim();
   const safeLocale = normalizeActionLocale(locale);
 
@@ -151,8 +156,12 @@ export async function revealListingPhoneAction(
   }
 
   const user = await getCurrentUser();
+  if (channel !== "call" && channel !== "whatsapp") {
+    return { ok: false, message: "Invalid contact channel.", statusCode: 400 };
+  }
+  const eventType = channel === "call" ? "call_click" : "whatsapp_click";
   const rateLimit = await consumeRateLimit({
-    scope: "inventory.contact.phone_reveal",
+    scope: `inventory.contact.${channel}`,
     userId: user?.id ?? null,
     maxRequests: 20,
     windowSeconds: 10 * 60,
@@ -187,20 +196,20 @@ export async function revealListingPhoneAction(
     return { ok: false, message: "Contact not available.", statusCode: 403 };
   }
 
-  const { phone, contactSource } = await resolveRevealPhone(supabase, listing);
+  const { phone, contactSource } = await resolveContactPhone(supabase, listing);
   if (!phone) {
     return { ok: false, message: "Contact not available.", statusCode: 404 };
   }
 
   const { error: contactAuditError } = await supabase.from("listing_contact_events").insert({
     listing_id: safeListingId,
-    event_type: "phone_reveal",
+    event_type: eventType,
     actor_user_id: user?.id ?? null,
     source_type: listing.source_type ?? "native",
     locale: safeLocale,
     metadata: {
       source: "listing_detail",
-      privacy_boundary: "server_reveal",
+      privacy_boundary: "server_contact_action",
       actor_kind: user ? "authenticated" : "anonymous",
       is_owner: isOwner,
       is_admin: isAdmin,
@@ -215,12 +224,12 @@ export async function revealListingPhoneAction(
     await recordDemandSignalAction({
       signalType: "contact_action",
       locale: safeLocale,
-      attributes: { eventType: "phone_reveal", listingId: safeListingId },
-      weight: 3,
+      attributes: { eventType, listingId: safeListingId },
+      weight: 4,
       source: "listing_contact",
     });
   } catch {
-    // Phone reveal should remain available even if demand telemetry is temporarily unavailable.
+    // Contact should remain available even if demand telemetry is temporarily unavailable.
   }
 
   return { ok: true, phone };

@@ -11,7 +11,6 @@ import { reportListingTranslationIssueAction } from "@/lib/actions/translations"
 import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
-import { VehicleModelViewer } from "@/components/vehicles/VehicleModelViewer";
 import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
 import LocationCard from "@/components/location/LocationCard";
 import type { LocationVisibility } from "@/components/location/LocationCard";
@@ -24,8 +23,6 @@ import DynamicDetailSection from "@/data/componentsDynamicDetailSection";
 import { ELECTRONICS_DYNAMIC_LEAF_KEY } from "@/lib/posting/electronics-dynamic";
 import { getPublishedListingSchema } from "@/lib/data/listing-schema-config";
 import { labelForLocale } from "@/lib/listing-schema-config";
-import { selectVehicleModel3D } from "@/lib/vehicles/model-catalog";
-import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { ListingContactActions } from "@/components/listings/listing-contact-actions";
 import { ListingCard } from "@/components/listing-card";
@@ -37,7 +34,6 @@ import { initiateListingClaimAction, recordInventoryContactEventAction } from "@
 import { localizePath } from "@/lib/i18n/routing";
 
 type NamedLocationRelation = { name?: string | null } | null;
-const ENABLE_BUYER_VEHICLE_3D = false;
 type ListingDetail = NonNullable<Awaited<ReturnType<typeof getListingById>>>;
 type ListingDetailLocale = Awaited<ReturnType<typeof getDictionary>>["locale"];
 
@@ -312,18 +308,6 @@ export default async function ListingDetailPage({
     || "-";
   const vehicleMileageValue = attributeMap.get("mileage") || "-";
   const vehicleYearValue = attributeMap.get("year") || "-";
-  const vehicleModel3D = ENABLE_BUYER_VEHICLE_3D && isVehicleListing ? selectVehicleModel3D({
-    make: vehicleMakeValue,
-    model: vehicleModelValue,
-    year: vehicleYearValue,
-    title: displayTitle,
-  }) : null;
-  const vehicleDamageParts = normalizeVehicleDamageParts(
-    (listing.vehicle_damage?.vehicle_damage_parts ?? []).map((part) => ({
-      key: part.part_key,
-      condition: part.condition,
-    }))
-  );
   const vehicleDamageCardParts = (listing.vehicle_damage?.vehicle_damage_parts ?? []).map((part) => ({
     part_key: String(part.part_key ?? ""),
     part_label: String(part.part_label ?? ""),
@@ -674,7 +658,6 @@ export default async function ListingDetailPage({
       <div className="space-y-4 pb-20 sm:pb-0">
         <ListingGallery images={listing.listing_images ?? []} title={displayTitle} labels={galleryLabels} />
 
-        {vehicleModel3D ? <VehicleModelViewer model={vehicleModel3D} locale={locale} damageParts={vehicleDamageParts} hasDamageReport={Boolean(listing.vehicle_damage)} /> : null}
         {isVehicleListing && listing.vehicle_damage ? (
           <VehicleDamageCard allOriginal={Boolean(listing.vehicle_damage.all_original)} parts={vehicleDamageCardParts} locale={locale} />
         ) : null}

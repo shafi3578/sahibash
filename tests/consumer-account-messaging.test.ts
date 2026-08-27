@@ -17,6 +17,7 @@ import {
   normalizeMessageBody,
 } from "@/lib/messages/threading";
 import type { Message } from "@/types/database";
+import { notificationDestination } from "@/lib/notifications/destination";
 
 function message(overrides: Partial<Message>): Message {
   const base: Message = {
@@ -85,9 +86,33 @@ test("public seller profiles and notification center are localized account surfa
   assert.match(messageActions, /createAccountNotification/);
   assert.match(notificationWriter, /createSupabaseAdmin/);
   assert.match(notificationWriter, /new_messages/);
+  assert.match(notifications, /openNotificationAction/);
+  assert.match(notifications, /bg-red-600/);
   assert.match(messagesPage, /sentBySeller \? "mr-auto/);
   assert.match(messagesPage, /"ml-auto bg-\[var\(--ink-1\)\]/);
   assert.match(blockedUsers, /unblockUserFormAction/);
+});
+
+test("notification destinations preserve message, offer, follower and listing context", () => {
+  assert.equal(
+    notificationDestination({ listing_id: "listing", sender_user_id: "sender", offer_id: "offer" }),
+    "/dashboard/messages?listing=listing&participant=sender",
+  );
+  assert.equal(notificationDestination({ listing_id: "listing", offer_id: "offer" }), "/dashboard/offers");
+  assert.equal(notificationDestination({ follower_user_id: "seller" }), "/sellers/seller");
+  assert.equal(notificationDestination({ listing_id: "listing" }), "/listings/listing");
+});
+
+test("favorites, offers and follows create account notifications after successful writes", () => {
+  const favorites = readFileSync(join(process.cwd(), "lib", "actions", "favorites.ts"), "utf8");
+  const offers = readFileSync(join(process.cwd(), "lib", "actions", "offers.ts"), "utf8");
+  const social = readFileSync(join(process.cwd(), "lib", "actions", "social.ts"), "utf8");
+  const notificationActions = readFileSync(join(process.cwd(), "lib", "actions", "notifications.ts"), "utf8");
+  assert.match(favorites, /createAccountNotification/);
+  assert.match(offers, /type: "listing_offer"/);
+  assert.match(social, /createAccountNotification/);
+  assert.match(notificationActions, /\.eq\("user_id", user\.id\)/);
+  assert.match(notificationActions, /notificationDestination/);
 });
 
 test("admin routes stay web-only and are stripped from localized consumer paths", () => {

@@ -14,6 +14,8 @@ export default async function OffersPage() {
   const ui = getUiTranslations(locale);
   const copy = DASHBOARD_COPY[locale];
   const supabase = await createSupabaseServerClient();
+  const { incoming, outgoing } = await getMyOffers(user.id);
+  const unreadLabel = locale === "fa" ? "تازه" : locale === "ps" ? "نوی" : "New";
 
   await Promise.all([
     supabase
@@ -30,8 +32,6 @@ export default async function OffersPage() {
       .is("buyer_seen_at", null),
   ]);
 
-  const { incoming, outgoing } = await getMyOffers(user.id);
-
   return (
     <DashboardSection
       currentPath="/dashboard/offers"
@@ -46,7 +46,8 @@ export default async function OffersPage() {
           ) : (
             <div className="space-y-3">
               {incoming.map((offer) => (
-                <div key={offer.id} className="rounded-xl border border-[var(--line)] bg-white p-4">
+                <div key={offer.id} className={`rounded-xl border bg-white p-4 ${offer.seller_seen_at ? "border-[var(--line)]" : "border-red-200 ring-1 ring-red-100"}`}>
+                  {!offer.seller_seen_at ? <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700"><span className="h-2 w-2 rounded-full bg-red-600" aria-hidden="true" />{unreadLabel}</span> : null}
                   <p className="text-sm font-semibold">{copy.offer}: {formatCurrencyAmount(offer.offered_price, offer.currency, locale)}</p>
                   <p className="mt-1 text-xs text-[var(--ink-2)]">{copy.status}: {offer.status} • {copy.listing} {offer.listing_id.slice(0, 8)}</p>
                   {offer.buyer_note ? <p className="mt-2 text-sm">{copy.buyerNote}: {offer.buyer_note}</p> : null}
@@ -73,7 +74,8 @@ export default async function OffersPage() {
           ) : (
             <div className="space-y-3">
               {outgoing.map((offer) => (
-                <div key={offer.id} className="rounded-xl border border-[var(--line)] bg-white p-4">
+                <div key={offer.id} className={`rounded-xl border bg-white p-4 ${offer.buyer_seen_at || offer.status === "pending" ? "border-[var(--line)]" : "border-red-200 ring-1 ring-red-100"}`}>
+                  {!offer.buyer_seen_at && offer.status !== "pending" ? <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700"><span className="h-2 w-2 rounded-full bg-red-600" aria-hidden="true" />{unreadLabel}</span> : null}
                   <p className="text-sm font-semibold">{copy.yourOffer}: {formatCurrencyAmount(offer.offered_price, offer.currency, locale)}</p>
                   <p className="mt-1 text-xs text-[var(--ink-2)]">{copy.status}: {offer.status} • {copy.listing} {offer.listing_id.slice(0, 8)}</p>
                   {offer.status === "accepted" ? (

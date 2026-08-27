@@ -7,16 +7,19 @@ import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { requestGatewayCategorySuggestion } from "@/lib/ai/gateway";
 
 type Suggestion = {
-  rootSlug: "real-estate" | "vehicles" | "mobile-phones-tablets" | "electronics-computers" | "home-furniture-appliances" | "clothing-personal-items" | "jobs" | "services" | "business-industry" | "farm-animals" | "education" | "sports-hobbies" | "other";
+  rootSlug: string;
   pathSlugs: string[];
   label: string;
   reason: string;
   confidence: number;
+  leafCategoryId?: number;
+  pathIds?: number[];
 };
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_URLS = 12;
 const MAX_IMAGE_URL_LENGTH = 2048;
+const LAUNCH_ROOTS = new Set(["vehicles", "real-estate", "mobile-phones-tablets", "second-hand-items"]);
 
 function parseImageUrls(raw: FormDataEntryValue | null): string[] {
   if (typeof raw !== "string" || !raw.trim()) return [];
@@ -89,12 +92,14 @@ export async function POST(request: Request) {
     let labels: Array<{ label: string; score: number }> = [];
     const { data: leafRows } = await supabase
       .from("category_nodes")
-      .select("path")
+      .select("id,path")
       .eq("is_active", true)
       .eq("is_leaf", true)
       .limit(500);
-    const allowedLeafPaths = (leafRows ?? []).map((row) => String((row as { path?: string }).path ?? "")).filter(Boolean);
-    const gatewaySuggestion = await requestGatewayCategorySuggestion({ title, description, allowedPaths: allowedLeafPaths });
+    const allowedLeafPaths = (leafRows ?? [])
+      .map((row) => String((row as { path?: string }).path ?? ""))
+      .filter((path) => path && LAUNCH_ROOTS.has(path.split("/")[0]));
+    const gatewaySuggestions = await requestGatewayCategorySuggestion({ title, description, allowedPaths: allowedLeafPaths });
     if (image instanceof File && key) {
       const client = new InferenceClient(key);
       const output = await client.imageClassification({
@@ -124,15 +129,43 @@ export async function POST(request: Request) {
       labels,
       specsMatch,
     }) as Suggestion | null;
-    const suggestion = gatewaySuggestion
-      ? ({
-          rootSlug: gatewaySuggestion.pathSlugs[0] as Suggestion["rootSlug"],
+    const mappedPath = mappedSuggestion?.pathSlugs?.join("/") ?? "";
+    const unhydratedSuggestions: Suggestion[] = gatewaySuggestions.length > 0
+      ? gatewaySuggestions.map((gatewaySuggestion) => ({
+          rootSlug: gatewaySuggestion.pathSlugs[0],
           pathSlugs: gatewaySuggestion.pathSlugs,
           label: gatewaySuggestion.pathSlugs.join(" > "),
           reason: gatewaySuggestion.reason,
           confidence: gatewaySuggestion.confidence,
-        } satisfies Suggestion)
-      : mappedSuggestion;
+        }))
+      : mappedSuggestion && allowedLeafPaths.includes(mappedPath)
+        ? [mappedSuggestion]
+        : [];
+
+    const neededPaths = Array.from(new Set(unhydratedSuggestions.flatMap((suggestion) =>
+      suggestion.pathSlugs.map((_, index) => suggestion.pathSlugs.slice(0, index + 1).join("/"))
+    )));
+    const { data: pathRows } = neededPaths.length > 0
+      ? await supabase
+          .from("category_nodes")
+          .select("id,path,is_active,is_leaf")
+          .in("path", neededPaths)
+          .eq("is_active", true)
+      : { data: [] };
+    const nodeByPath = new Map((pathRows ?? []).map((row) => [String(row.path), row]));
+    const suggestions = unhydratedSuggestions
+      .map((candidate) => {
+        const fullPath = candidate.pathSlugs.join("/");
+        const leaf = nodeByPath.get(fullPath);
+        const pathIds = candidate.pathSlugs
+          .map((_, index) => nodeByPath.get(candidate.pathSlugs.slice(0, index + 1).join("/"))?.id)
+          .filter((id): id is number => typeof id === "number");
+        if (!leaf?.is_leaf || pathIds.length !== candidate.pathSlugs.length) return null;
+        return { ...candidate, leafCategoryId: Number(leaf.id), pathIds } satisfies Suggestion;
+      })
+      .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
+      .slice(0, 3);
+    const suggestion = suggestions[0] ?? null;
 
     let suggestedCategoryNodeId: number | null = null;
     if (suggestion) {
@@ -147,7 +180,8 @@ export async function POST(request: Request) {
 
     const responsePayload = {
       suggestion,
-      source: gatewaySuggestion ? "gateway" : "deterministic",
+      suggestions,
+      source: gatewaySuggestions.length > 0 ? "gateway" : "deterministic",
       labels: labels.slice(0, 8),
       suggestedProduct: specsMatch
         ? {

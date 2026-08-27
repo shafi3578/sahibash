@@ -5,6 +5,31 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
+import { createAccountNotification } from "@/lib/notifications/create";
+
+const OFFER_CREATED_COPY = {
+  en: { title: "New offer", body: "A buyer sent an offer for one of your listings." },
+  fa: { title: "پیشنهاد تازه", body: "یک خریدار برای یکی از اعلان‌های شما پیشنهاد فرستاد." },
+  ps: { title: "نوی وړاندیز", body: "یوه پېرودونکي ستاسو د یوه اعلان لپاره وړاندیز ولېږه." },
+} as const;
+
+const OFFER_STATUS_COPY = {
+  accepted: {
+    en: { title: "Offer accepted", body: "The seller accepted your offer." },
+    fa: { title: "پیشنهاد پذیرفته شد", body: "فروشنده پیشنهاد شما را پذیرفت." },
+    ps: { title: "وړاندیز ومنل شو", body: "پلورونکي ستاسو وړاندیز ومانه." },
+  },
+  rejected: {
+    en: { title: "Offer declined", body: "The seller declined your offer." },
+    fa: { title: "پیشنهاد رد شد", body: "فروشنده پیشنهاد شما را رد کرد." },
+    ps: { title: "وړاندیز رد شو", body: "پلورونکي ستاسو وړاندیز رد کړ." },
+  },
+  cancelled: {
+    en: { title: "Offer cancelled", body: "The buyer cancelled an offer." },
+    fa: { title: "پیشنهاد لغو شد", body: "خریدار یک پیشنهاد را لغو کرد." },
+    ps: { title: "وړاندیز لغوه شو", body: "پېرودونکي یو وړاندیز لغوه کړ." },
+  },
+} as const;
 
 function toNumber(value: FormDataEntryValue | null): number {
   const n = Number(String(value ?? "0").replace(/,/g, ""));
@@ -47,7 +72,7 @@ export async function createOfferAction(formData: FormData): Promise<void> {
     redirect(`/listings/${listingId}?offer=too-low`);
   }
 
-  const { error } = await supabase.from("offers").insert({
+  const { data: createdOffer, error } = await supabase.from("offers").insert({
     listing_id: listing.id,
     buyer_user_id: user.id,
     seller_user_id: listing.user_id,
@@ -57,11 +82,18 @@ export async function createOfferAction(formData: FormData): Promise<void> {
     status: "pending",
     buyer_seen_at: new Date().toISOString(),
     seller_seen_at: null,
-  });
+  }).select("id").single();
 
   if (error) {
     redirect(`/listings/${listingId}?offer=error`);
   }
+
+  await createAccountNotification({
+    userId: listing.user_id,
+    type: "listing_offer",
+    copy: OFFER_CREATED_COPY,
+    payload: { listing_id: listing.id, offer_id: createdOffer.id },
+  });
 
   revalidatePath(`/listings/${listingId}`);
   revalidatePath("/dashboard/offers");
@@ -114,7 +146,16 @@ export async function updateOfferStatusAction(
     payload.seller_response_note = sellerResponseNote.trim() || null;
   }
 
-  await supabase.from("offers").update(payload).eq("id", offerId);
+  const { error } = await supabase.from("offers").update(payload).eq("id", offerId);
+  if (!error) {
+    const recipientId = status === "cancelled" ? offer.seller_user_id : offer.buyer_user_id;
+    await createAccountNotification({
+      userId: recipientId,
+      type: "listing_offer",
+      copy: OFFER_STATUS_COPY[status],
+      payload: { listing_id: offer.listing_id, offer_id: offer.id },
+    });
+  }
 
   revalidatePath("/dashboard/offers");
   revalidatePath(`/listings/${offer.listing_id}`);

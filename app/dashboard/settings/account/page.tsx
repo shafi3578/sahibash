@@ -4,6 +4,7 @@ import { getCurrentLocale } from "@/lib/i18n/server";
 import { ACCOUNT_EXPERIENCE_COPY } from "@/lib/account/copy";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { updateAccountProfileAction } from "@/lib/actions/profile";
+import { PhoneVerificationPanel } from "@/components/account/phone-verification-panel";
 
 async function handleUpdateAccountProfile(formData: FormData) {
   "use server";
@@ -106,16 +107,15 @@ export default async function AccountManagementSettingsPage() {
                 <option value="en">English</option>
               </select>
             </label>
-            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">
-              <p className="font-semibold text-[var(--ink-1)]">{profileCopy.verification}</p>
-              <p className="mt-1 text-[var(--ink-2)]">{String(profile?.phone_verification_status ?? profileCopy.unverified)}</p>
-            </div>
             <div className="sm:col-span-2">
               <button className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">
                 {profileCopy.save}
               </button>
             </div>
           </form>
+          <div className="mt-4">
+            <PhoneVerificationPanel locale={locale} verified={profile?.phone_verification_status === "verified"} />
+          </div>
         </section>
 
         <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">

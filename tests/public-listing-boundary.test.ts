@@ -25,6 +25,7 @@ const contactActions = readFileSync(join(process.cwd(), "components", "listings"
 const listingDetailPage = readFileSync(join(process.cwd(), "app", "listings", "[id]", "page.tsx"), "utf8");
 const inventoryActions = readFileSync(join(process.cwd(), "lib", "actions", "inventory.ts"), "utf8");
 const adminRbacData = readFileSync(join(process.cwd(), "lib", "data", "admin-rbac.ts"), "utf8");
+const publicBoundary = readFileSync(join(process.cwd(), "lib", "listings", "public-boundary.ts"), "utf8");
 
 function grantBlock(role: "anon" | "authenticated") {
   const match = migration.match(new RegExp(`grant select \\(([\\s\\S]*?)\\) on public\\.listings to ${role};`, "i"));
@@ -95,21 +96,23 @@ test("public listing child embeds use trusted visibility checks without exposing
   assert.doesNotMatch(finalHardeningMigration, /grant execute on function public\.can_read_listing_children/i);
 });
 
-test("phone reveal is server-side, rate-limited, and audited", () => {
-  assert.match(contactActions, /revealListingPhoneAction/);
+test("call and WhatsApp actions are server-side, rate-limited, and audited without a reveal control", () => {
+  assert.match(contactActions, /getListingContactPhoneAction/);
+  assert.doesNotMatch(contactActions, /Reveal Number|revealListingPhoneAction/);
   assert.doesNotMatch(contactActions, /phone:string/);
   assert.doesNotMatch(listingDetailPage, /phone=\{listing\.contact_phone\}/);
   assert.doesNotMatch(listingDetailPage, /tel:\$\{listing\.contact_phone/);
 
-  const revealAction = inventoryActions.slice(inventoryActions.indexOf("export async function revealListingPhoneAction"));
-  assert.match(revealAction, /consumeRateLimit/);
-  assert.match(revealAction, /status === "approved"/);
-  assert.match(revealAction, /allow_contact_display === false/);
-  assert.match(revealAction, /\.from\("listing_contact_events"\)\.insert/);
-  assert.match(revealAction, /contactAuditError/);
-  assert.match(revealAction, /privacy_boundary: "server_reveal"/);
-  assert.match(revealAction, /resolveRevealPhone/);
-  assert.match(revealAction, /contact_source: contactSource/);
+  const contactAction = inventoryActions.slice(inventoryActions.indexOf("export async function getListingContactPhoneAction"));
+  assert.match(contactAction, /consumeRateLimit/);
+  assert.match(contactAction, /status === "approved"/);
+  assert.match(contactAction, /allow_contact_display === false/);
+  assert.match(contactAction, /\.from\("listing_contact_events"\)\.insert/);
+  assert.match(contactAction, /contactAuditError/);
+  assert.match(contactAction, /privacy_boundary: "server_contact_action"/);
+  assert.match(contactAction, /resolveContactPhone/);
+  assert.match(contactAction, /contact_source: contactSource/);
+  assert.match(publicBoundary, /phone_verification_status === "verified"/);
 });
 
 test("contact audit rows cannot be forged directly by public clients", () => {
