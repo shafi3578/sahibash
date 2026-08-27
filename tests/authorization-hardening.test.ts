@@ -164,11 +164,8 @@ test("paid AI category inference requires a user and bounds uploaded input", () 
   assert.match(aiCategoryRoute, /url\.protocol !== "https:"/);
   assert.match(aiCategoryRoute, /title\.length > 120/);
   assert.match(aiCategoryRoute, /description\.length > 5000/);
-  assert.match(aiCategoryRoute, /AI suggestions are temporarily unavailable/);
-  assert.doesNotMatch(
-    aiCategoryRoute.slice(aiCategoryRoute.indexOf("if (!key)"), aiCategoryRoute.indexOf("const formData")),
-    /HUGGINGFACE_API_KEY/,
-  );
+  assert.match(aiCategoryRoute, /image instanceof File && key/);
+  assert.doesNotMatch(aiCategoryRoute, /if \(!key\) \{\s*return NextResponse/);
   assert.doesNotMatch(aiCategoryRoute, /error instanceof Error \? error\.message/);
 });
 

@@ -27,6 +27,7 @@ import DashboardFavoritesPage from "@/app/dashboard/favorites/page";
 import DashboardFavoriteSearchesPage from "@/app/dashboard/favorite-searches/page";
 import DashboardHelpPage from "@/app/dashboard/help/page";
 import DashboardMessagesPage from "@/app/dashboard/messages/page";
+import DashboardNotificationsPage from "@/app/dashboard/notifications/page";
 import DashboardMyAdsPage from "@/app/dashboard/my-ads/page";
 import DashboardMyListingsPage from "@/app/dashboard/my-listings/page";
 import DashboardOffersPage from "@/app/dashboard/offers/page";
@@ -37,8 +38,10 @@ import DashboardSafetyPage from "@/app/dashboard/safety/page";
 import DashboardSettingsAccountPage from "@/app/dashboard/settings/account/page";
 import DashboardSettingsLanguagePage from "@/app/dashboard/settings/language/page";
 import DashboardSettingsNotificationsPage from "@/app/dashboard/settings/notifications/page";
+import DashboardSettingsBlockedUsersPage from "@/app/dashboard/settings/blocked-users/page";
 import FavoritesPage from "@/app/favorites/page";
 import MyAdsPage from "@/app/my-ads/page";
+import PublicSellerPage from "@/app/sellers/[id]/page";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getPublishedStaticPageBySlug } from "@/lib/data/static-pages";
 import type { AppLocale } from "@/lib/i18n/translations";
@@ -169,6 +172,8 @@ export default async function LocaleCatchAllPage({
           return renderPage(DashboardHelpPage, { searchParams: resolvedSearchParams });
         case "messages":
           return renderPage(DashboardMessagesPage, { searchParams: resolvedSearchParams });
+        case "notifications":
+          return renderPage(DashboardNotificationsPage, { searchParams: resolvedSearchParams });
         case "my-ads":
           return renderPage(DashboardMyAdsPage, { searchParams: resolvedSearchParams });
         case "my-listings":
@@ -193,8 +198,14 @@ export default async function LocaleCatchAllPage({
           return renderPage(DashboardSettingsLanguagePage, { searchParams: resolvedSearchParams });
         case "notifications":
           return renderPage(DashboardSettingsNotificationsPage, { searchParams: resolvedSearchParams });
+        case "blocked-users":
+          return renderPage(DashboardSettingsBlockedUsersPage, { searchParams: resolvedSearchParams });
       }
     }
+  }
+
+  if (first === "sellers" && slug.length === 2) {
+    return renderPage(PublicSellerPage, { params: Promise.resolve({ id: second }) });
   }
 
   if (first === "favorites" && slug.length === 1) {

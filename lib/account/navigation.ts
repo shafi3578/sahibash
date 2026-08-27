@@ -6,6 +6,7 @@ export type AccountNavKey =
   | "favoriteListings"
   | "favoriteSearches"
   | "messages"
+  | "notifications"
   | "questionsAnswers"
   | "offers"
   | "accountInformation"
@@ -18,7 +19,7 @@ export type AccountNavKey =
 export type AccountNavItem = {
   key: AccountNavKey;
   href: string;
-  badge?: "messages" | "offers";
+  badge?: "messages" | "offers" | "notifications";
 };
 
 export const ACCOUNT_NAV_ITEMS = [
@@ -26,6 +27,7 @@ export const ACCOUNT_NAV_ITEMS = [
   { key: "favoriteListings", href: "/dashboard/favorites" },
   { key: "favoriteSearches", href: "/dashboard/favorite-searches" },
   { key: "messages", href: "/dashboard/messages", badge: "messages" },
+  { key: "notifications", href: "/dashboard/notifications", badge: "notifications" },
   { key: "questionsAnswers", href: "/dashboard/questions" },
   { key: "offers", href: "/dashboard/offers", badge: "offers" },
   { key: "accountInformation", href: "/dashboard/account-information" },

@@ -53,10 +53,41 @@ test("consumer account navigation has no admin entry points", () => {
 test("social safety actions and messaging enforce block boundaries", () => {
   const social = readFileSync(join(process.cwd(), "lib", "actions", "social.ts"), "utf8");
   const messages = readFileSync(join(process.cwd(), "lib", "actions", "messages.ts"), "utf8");
+  const boundaryMigration = readFileSync(join(process.cwd(), "supabase", "migrations", "20260826212316_enforce_social_block_boundaries.sql"), "utf8");
   assert.match(social, /followUserAction/);
   assert.match(social, /blockUserAction/);
   assert.match(social, /user_blocks/);
   assert.match(messages, /user_blocks/);
+  assert.match(boundaryMigration, /before insert on public\.messages/);
+  assert.match(boundaryMigration, /before insert on public\.user_follows/);
+  assert.match(boundaryMigration, /security definer/);
+  assert.match(boundaryMigration, /revoke all on function public\.enforce_message_block_boundary/);
+});
+
+test("public seller profiles and notification center are localized account surfaces", () => {
+  const seller = readFileSync(join(process.cwd(), "app", "sellers", "[id]", "page.tsx"), "utf8");
+  const notifications = readFileSync(join(process.cwd(), "app", "dashboard", "notifications", "page.tsx"), "utf8");
+  const header = readFileSync(join(process.cwd(), "components", "auth-aware-header-actions.tsx"), "utf8");
+  const messageActions = readFileSync(join(process.cwd(), "lib", "actions", "messages.ts"), "utf8");
+  const notificationWriter = readFileSync(join(process.cwd(), "lib", "notifications", "create.ts"), "utf8");
+  const messagesPage = readFileSync(join(process.cwd(), "app", "dashboard", "messages", "page.tsx"), "utf8");
+  const blockedUsers = readFileSync(join(process.cwd(), "app", "dashboard", "settings", "blocked-users", "page.tsx"), "utf8");
+  const blockButton = readFileSync(join(process.cwd(), "components", "social", "block-user-button.tsx"), "utf8");
+  assert.match(seller, /status", "approved"/);
+  assert.match(seller, /createSupabaseAdmin/);
+  assert.doesNotMatch(seller, /contact_phone|latitude|longitude|address_text/);
+  assert.match(seller, /followUserAction/);
+  assert.match(seller, /BlockUserButton/);
+  assert.match(blockButton, /blockUserAction/);
+  assert.match(notifications, /markAllNotificationsReadAction/);
+  assert.match(header, /dashboard\/notifications/);
+  assert.match(header, /postgres_changes/);
+  assert.match(messageActions, /createAccountNotification/);
+  assert.match(notificationWriter, /createSupabaseAdmin/);
+  assert.match(notificationWriter, /new_messages/);
+  assert.match(messagesPage, /sentBySeller \? "mr-auto/);
+  assert.match(messagesPage, /"ml-auto bg-\[var\(--ink-1\)\]/);
+  assert.match(blockedUsers, /unblockUserFormAction/);
 });
 
 test("admin routes stay web-only and are stripped from localized consumer paths", () => {

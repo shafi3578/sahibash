@@ -888,7 +888,7 @@ export default async function ListingDetailPage({
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.sellerInformation}</h2>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-            <p><span className="text-[var(--ink-2)]">{t.listing.name}:</span> <span className="font-semibold">{safeSellerName}</span></p>
+            <p><span className="text-[var(--ink-2)]">{t.listing.name}:</span> {listing.user_id ? <Link href={localizePath(`/sellers/${listing.user_id}`, locale)} className="font-semibold text-[var(--accent)] hover:underline">{safeSellerName}</Link> : <span className="font-semibold">{safeSellerName}</span>}</p>
             <p><span className="text-[var(--ink-2)]">{t.listing.phone}:</span> <span className="font-semibold">{phonePrivacyLabel}</span></p>
             {sellerJoinedDate ? (
               <p><span className="text-[var(--ink-2)]">{t.listing.joined}:</span> <span className="font-semibold">{sellerJoinedDate}</span></p>

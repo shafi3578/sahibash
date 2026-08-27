@@ -60,9 +60,6 @@ export async function POST(request: Request) {
     }
 
     const key = process.env.HUGGINGFACE_API_KEY;
-    if (!key) {
-      return NextResponse.json({ suggestion: null, message: "AI suggestions are temporarily unavailable." }, { status: 200 });
-    }
 
     const formData = await request.formData();
     const image = formData.get("image");
@@ -98,7 +95,7 @@ export async function POST(request: Request) {
       .limit(500);
     const allowedLeafPaths = (leafRows ?? []).map((row) => String((row as { path?: string }).path ?? "")).filter(Boolean);
     const gatewaySuggestion = await requestGatewayCategorySuggestion({ title, description, allowedPaths: allowedLeafPaths });
-    if (image instanceof File) {
+    if (image instanceof File && key) {
       const client = new InferenceClient(key);
       const output = await client.imageClassification({
         model: "google/vit-base-patch16-224",
@@ -150,6 +147,7 @@ export async function POST(request: Request) {
 
     const responsePayload = {
       suggestion,
+      source: gatewaySuggestion ? "gateway" : "deterministic",
       labels: labels.slice(0, 8),
       suggestedProduct: specsMatch
         ? {

@@ -14,6 +14,8 @@ const listingDetail = readFileSync(join(process.cwd(), "app", "listings", "[id]"
 const homePage = readFileSync(join(process.cwd(), "app", "page.tsx"), "utf8");
 const featuredPage = readFileSync(join(process.cwd(), "app", "featured", "page.tsx"), "utf8");
 const detailSpecs = readFileSync(join(process.cwd(), "lib", "listings", "detailSpecs.ts"), "utf8");
+const aiRoute = readFileSync(join(process.cwd(), "app", "api", "ai", "category-suggestion", "route.ts"), "utf8");
+const aiGateway = readFileSync(join(process.cwd(), "lib", "ai", "gateway.ts"), "utf8");
 
 test("consumer create page defaults to the two-step Quick Post but preserves the standard form", () => {
   assert.match(createPage, /import QuickPostForm/);
@@ -100,6 +102,15 @@ test("Quick Post resolves AI suggestions against canonical taxonomy instead of a
   assert.match(quickPostForm, /categoryCandidates\.slice\(0, 4\)/);
   assert.match(quickPostForm, /setSelectedCategory\(candidate\)/);
   assert.doesNotMatch(quickPostForm, /formData\.set\("category_node_id",\s*ai/i);
+});
+
+test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matching", () => {
+  assert.match(aiGateway, /AI_GATEWAY_API_KEY \?\? process\.env\.VERCEL_OIDC_TOKEN/);
+  assert.match(aiGateway, /openai\/gpt-5\.6-luna/);
+  assert.match(aiGateway, /input\.allowedPaths\.includes\(path\)/);
+  assert.match(aiRoute, /image instanceof File && key/);
+  assert.match(aiRoute, /gatewaySuggestion \? "gateway" : "deterministic"/);
+  assert.doesNotMatch(aiRoute, /if \(!key\) \{\s*return NextResponse/);
 });
 
 test("Quick Post supports professional item location without exposing device GPS by default", () => {

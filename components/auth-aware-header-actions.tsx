@@ -58,13 +58,33 @@ export function AuthAwareNotificationLink({
   label: string;
 }) {
   const authenticated = useAuthStatus(false);
+  const [hasUnread, setHasUnread] = useState(false);
   const href = authenticated
-    ? localizePath("/dashboard/messages", locale)
-    : buildLoginRedirectHref({ targetPath: "/dashboard/messages", locale });
+    ? localizePath("/dashboard/notifications", locale)
+    : buildLoginRedirectHref({ targetPath: "/dashboard/notifications", locale });
+
+  useEffect(() => {
+    if (!authenticated) return;
+    const supabase = createSupabaseBrowserClient();
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (!active || !data.user) return;
+      const refresh = async () => {
+        const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", data.user!.id).eq("is_read", false);
+        if (active) setHasUnread((count ?? 0) > 0);
+      };
+      await refresh();
+      if (!active) return;
+      channel = supabase.channel(`notifications:${data.user.id}`).on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${data.user.id}` }, refresh).subscribe();
+    });
+    return () => { active = false; if (channel) void supabase.removeChannel(channel); };
+  }, [authenticated]);
 
   return (
-    <Link href={href} aria-label={label} className="grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--ink-1)] lg:hidden">
+    <Link href={href} aria-label={label} className="relative grid h-10 w-10 place-items-center rounded-full bg-white/80 text-[var(--ink-1)] lg:hidden">
       <HeaderIcon name="bell" />
+      {authenticated && hasUnread ? <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-white" aria-hidden="true" /> : null}
     </Link>
   );
 }

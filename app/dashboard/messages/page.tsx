@@ -312,17 +312,20 @@ export default async function MessagesPage({
                   <div className="max-h-[560px] space-y-2 overflow-y-auto rounded-2xl bg-white p-3">
                     {selectedThread.messages.map((msg) => {
                       const mine = msg.sender_user_id === user.id;
+                      const sellerUserId = listingMap.get(selectedThread.listingId)?.user_id;
+                      const sentBySeller = msg.sender_user_id === sellerUserId;
                       const isLatestUnreadIncoming = msg.id === selectedThread.latestUnreadIncomingId;
                       return (
                         <div
                           key={msg.id}
-                          className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm shadow-sm ${mine ? "ms-auto bg-[var(--ink-1)] text-white" : "bg-[var(--surface-2)] text-[var(--ink-1)]"} ${isLatestUnreadIncoming ? "ring-2 ring-red-300" : ""}`}
+                          dir="auto"
+                          className={`max-w-[86%] rounded-2xl px-3 py-2 text-sm shadow-sm ${sentBySeller ? "mr-auto bg-[var(--surface-2)] text-[var(--ink-1)]" : "ml-auto bg-[var(--ink-1)] text-white"} ${isLatestUnreadIncoming ? "ring-2 ring-red-300" : ""}`}
                         >
                           {!mine && isLatestUnreadIncoming ? (
                             <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-red-700">{ui.dashboard.newSellerReply}</p>
                           ) : null}
                           <p className="whitespace-pre-wrap leading-6">{msg.body}</p>
-                          <p className={`mt-1 text-[10px] ${mine ? "text-white/80" : "text-[var(--ink-2)]"}`}>
+                          <p className={`mt-1 text-[10px] ${sentBySeller ? "text-[var(--ink-2)]" : "text-white/80"}`}>
                             {formatDate(msg.created_at, locale, { dateStyle: "medium", timeStyle: "short" })}
                           </p>
                         </div>

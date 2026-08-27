@@ -9,15 +9,15 @@ export async function requestGatewayCategorySuggestion(input: {
   description: string;
   allowedPaths: string[];
 }): Promise<GatewaySuggestion | null> {
-  const key = process.env.AI_GATEWAY_API_KEY;
-  if (!key || input.allowedPaths.length === 0) return null;
+  const token = process.env.AI_GATEWAY_API_KEY ?? process.env.VERCEL_OIDC_TOKEN;
+  if (!token || input.allowedPaths.length === 0) return null;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
   try {
     const response = await fetch(ENDPOINT, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
         model: "openai/gpt-5.6-luna",

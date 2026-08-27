@@ -78,6 +78,11 @@ test("browser locale detection prefers supported Afghan locales and safely falls
   assert.equal(resolveBrowserLocale(null), "fa");
 });
 
+test("Vercel telemetry assets bypass locale routing", () => {
+  assert.equal(isProxyExcludedPath("/_vercel/insights/script.js"), true);
+  assert.equal(isProxyExcludedPath("/_vercel/speed-insights/script.js"), true);
+});
+
 test("final category selection exposes a direct details action above mobile navigation", () => {
   assert.match(canonicalPostingForm, /data-testid="category-continue-to-details"/);
   assert.match(canonicalPostingForm, /data-testid="posting-step-actions"/);

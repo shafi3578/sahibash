@@ -7,7 +7,7 @@ import { getSupabaseEnv, hasSupabaseEnv } from "@/lib/supabase/env";
 import { isPostAdPath, isProtectedPostingPath } from "@/lib/auth/protected-routes";
 import { isAdminWebPath } from "@/lib/admin/routing";
 
-const EXCLUDED_PATH_PREFIXES = ["/api", "/_next", "/favicon.ico", "/robots.txt", "/sitemap.xml"];
+const EXCLUDED_PATH_PREFIXES = ["/api", "/_next", "/_vercel", "/favicon.ico", "/robots.txt", "/sitemap.xml"];
 
 export function isProxyExcludedPath(pathname: string) {
   if (pathname === "/locale") {
@@ -150,5 +150,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|_vercel|favicon.ico).*)"],
 };

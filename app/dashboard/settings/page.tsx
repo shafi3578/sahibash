@@ -15,6 +15,7 @@ export default async function SettingsPage() {
   const settingCards = [
     { title: copy.language, description: copy.languageDescription, href: "/dashboard/settings/language" },
     { title: copy.notifications, description: copy.notificationsDescription, href: "/dashboard/settings/notifications" },
+    { title: locale === "fa" ? "کاربران مسدودشده" : locale === "ps" ? "بند شوي کاروونکي" : "Blocked users", description: locale === "fa" ? "فهرست مسدودی و دسترسی پیام را مدیریت کنید." : locale === "ps" ? "د بندیز لېست او د پیغام اجازه اداره کړئ." : "Manage your block list and messaging access.", href: "/dashboard/settings/blocked-users" },
     { title: copy.privacySecurity, description: copy.privacySecurityDescription, href: "/dashboard/account-security" },
     { title: copy.accountManagement, description: copy.accountManagementDescription, href: "/dashboard/settings/account" },
   ];

@@ -8,6 +8,13 @@ import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { isUuid, isValidMessageBody, normalizeMessageBody } from "@/lib/messages/threading";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
+import { createAccountNotification } from "@/lib/notifications/create";
+
+const MESSAGE_NOTIFICATION_COPY = {
+  en: { title: "New listing message", body: "You received a new message about one of your listings." },
+  fa: { title: "پیام تازه برای اعلان", body: "دربارهٔ یکی از اعلان‌های شما پیام تازه‌ای رسیده است." },
+  ps: { title: "د اعلان نوی پیغام", body: "ستاسو د یوه اعلان په اړه نوی پیغام راغلی دی." },
+} as const;
 
 function listingRedirect(listingId: string, locale: Awaited<ReturnType<typeof getCurrentLocale>>, status: string) {
   const targetPath = listingId && isUuid(listingId)
@@ -65,6 +72,14 @@ export async function sendListingMessageAction(formData: FormData): Promise<void
   if (error) {
     redirect(listingRedirect(listingId, locale, "error"));
   }
+
+  await createAccountNotification({
+    userId: listing.user_id,
+    type: "listing_message",
+    copy: MESSAGE_NOTIFICATION_COPY,
+    payload: { listing_id: listing.id, sender_user_id: user.id },
+    preference: "new_messages",
+  });
 
   revalidatePath(`/listings/${listingId}`);
   revalidatePath(localizePath(`/listings/${listingId}`, locale));
@@ -131,6 +146,14 @@ export async function replyMessageAction(formData: FormData): Promise<void> {
   });
 
   if (error) return;
+
+  await createAccountNotification({
+    userId: recipientUserId,
+    type: "listing_message",
+    copy: MESSAGE_NOTIFICATION_COPY,
+    payload: { listing_id: listingId, sender_user_id: user.id },
+    preference: "new_messages",
+  });
 
   revalidatePath("/dashboard/messages");
   revalidatePath(localizePath("/dashboard/messages", locale));

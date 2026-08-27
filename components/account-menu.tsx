@@ -17,6 +17,7 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
     favoriteListings: ui.dashboard.favoriteListings,
     favoriteSearches: ui.dashboard.favoriteSearches,
     messages: ui.dashboard.messages,
+    notifications: locale === "fa" ? "اعلان‌ها" : locale === "ps" ? "خبرتیاوې" : "Notifications",
     questionsAnswers: ui.dashboard.questionsAnswers,
     offers: ui.dashboard.offers,
     accountInformation: ui.dashboard.accountInformation,
@@ -29,6 +30,7 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
 
   let newMessages = 0;
   let newOffers = 0;
+  let newNotifications = 0;
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -41,6 +43,7 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
         { count: msgCount },
         { count: incomingOfferCount },
         { count: buyerDecisionCount },
+        { count: notificationCount },
       ] = await Promise.all([
         supabase
           .from("messages")
@@ -59,14 +62,17 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
           .eq("buyer_user_id", user.id)
           .in("status", ["accepted", "rejected"])
           .is("buyer_seen_at", null),
+        supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("is_read", false),
       ]);
 
       newMessages = msgCount ?? 0;
       newOffers = (incomingOfferCount ?? 0) + (buyerDecisionCount ?? 0);
+      newNotifications = notificationCount ?? 0;
     }
   } catch {
     newMessages = 0;
     newOffers = 0;
+    newNotifications = 0;
   }
 
   return (
@@ -91,6 +97,9 @@ export async function AccountMenu({ currentPath }: { currentPath: string }) {
               ) : null}
               {badge === "offers" && !active && newOffers > 0 ? (
                 <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label={ui.dashboard.newOffersBadge} />
+              ) : null}
+              {badge === "notifications" && !active && newNotifications > 0 ? (
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-label={locale === "fa" ? "اعلان تازه" : locale === "ps" ? "نوې خبرتیا" : "New notification"} />
               ) : null}
             </Link>
           );
