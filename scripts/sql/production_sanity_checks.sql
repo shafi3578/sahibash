@@ -210,7 +210,7 @@ select
   allow_contact_display,
   noindex_external
 from public.listings
-where source_type in ('external_indexed', 'partner_feed', 'scout')
+where source_type in ('external_indexed', 'partner_feed', 'scout_assisted')
   and (
     source_url is null
     or source_platform is null

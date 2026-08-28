@@ -102,6 +102,20 @@ test("Quick Post protects local work without continuously server-saving while ty
   assert.doesNotMatch(localPersistenceEffect, /saveListingDraftAction/);
   assert.doesNotMatch(quickPostForm, /}, 1000\)/);
   assert.match(quickPostForm, /hasLocalRecovery \|\| userEditedDuringHydrationRef\.current/);
+  assert.match(quickPostForm, /const checkpoint = await saveCurrentDraftNow\(step\)/);
+  assert.match(quickPostForm, /if \(!checkpoint\.persisted\)/);
+  assert.match(quickPostForm, /window\.localStorage\.removeItem\(QUICK_DRAFT_KEY\);[\s\S]*router\.push/);
+  assert.match(quickPostForm, /const savedDraftId = checkpoint\.draftId/);
+});
+
+test("Quick Post localizes category-specific labels without changing canonical stored option values", () => {
+  assert.match(quickPostForm, /const QUICK_FIELD_LABELS/);
+  assert.match(quickPostForm, /const QUICK_OPTION_LABELS/);
+  assert.match(quickPostForm, /quickFieldLabel\(locale, field\)/);
+  assert.match(quickPostForm, /value=\{option\}>\{quickOptionLabel\(locale, option\)\}/);
+  assert.match(quickPostForm, /detected: "صاحبش تشخیص داد"/);
+  assert.match(quickPostForm, /make: \{ fa: "برند \/ سازنده", ps: "برانډ \/ جوړوونکی" \}/);
+  assert.match(quickPostForm, /Automatic: \{ fa: "اتومات", ps: "اتومات" \}/);
 });
 
 test("Quick Post resolves AI suggestions against canonical taxonomy instead of arbitrary IDs", () => {

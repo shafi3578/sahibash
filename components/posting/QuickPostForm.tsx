@@ -268,6 +268,7 @@ const COPY = {
     publishing: "Publishing...",
     saved: "Draft saved",
     saving: "Saving draft...",
+    draftSaveFailed: "We could not save this draft yet. Your work is still on this device; please try again.",
     aiWorking: "Reading your ad...",
     aiUnavailable: "AI is optional; smart local suggestions are active.",
     missingPhotos: "Please add at least one clear photo.",
@@ -344,7 +345,7 @@ const COPY = {
     area: "ناحیه یا محله (اختیاری)",
     street: "قریه یا نشانی سرک (اختیاری)",
     select: "انتخاب",
-    detected: "صاحباش تشخیص داد",
+    detected: "صاحبش تشخیص داد",
     detectionHint: "هر چیپ را ویرایش کنید. اگر تشخیص نامطمئن باشد، یک دسته را انتخاب کنید.",
     suggestionsTitle: "دسته‌های پیشنهادی",
     manualCategory: "انتخاب دستی دسته",
@@ -373,6 +374,7 @@ const COPY = {
     publishing: "در حال نشر...",
     saved: "پیش‌نویس ذخیره شد",
     saving: "ذخیره پیش‌نویس...",
+    draftSaveFailed: "هنوز نتوانستیم این پیش‌نویس را ذخیره کنیم. کار شما در همین دستگاه محفوظ است؛ لطفاً دوباره کوشش کنید.",
     aiWorking: "در حال خواندن اعلان...",
     aiUnavailable: "هوش مصنوعی اختیاری است؛ پیشنهادهای هوشمند محلی فعال است.",
     missingPhotos: "لطفاً حداقل یک عکس واضح اضافه کنید.",
@@ -478,6 +480,7 @@ const COPY = {
     publishing: "خپرېږي...",
     saved: "مسوده خوندي شوه",
     saving: "مسوده خوندي کېږي...",
+    draftSaveFailed: "تر اوسه مو دا مسوده خوندي نه شوه کړای. ستاسو کار په همدې وسیله کې خوندي دی؛ بیا هڅه وکړئ.",
     aiWorking: "ستاسو اعلان لوستل کېږي...",
     aiUnavailable: "AI اختیاري دی؛ ځایي هوښیار وړاندیزونه فعال دي.",
     missingPhotos: "مهرباني وکړئ لږ تر لږه یو روښانه انځور زیات کړئ.",
@@ -574,6 +577,82 @@ const GENERAL_FIELDS: QuickField[] = [
   { key: "model", label: "Model", type: "text" },
   { key: "color", label: "Color", type: "text" },
 ];
+
+const QUICK_FIELD_LABELS: Record<string, { fa: string; ps: string }> = {
+  make: { fa: "برند / سازنده", ps: "برانډ / جوړوونکی" },
+  brand: { fa: "برند", ps: "برانډ" },
+  model: { fa: "مدل", ps: "موډل" },
+  year: { fa: "سال ساخت", ps: "د جوړېدو کال" },
+  mileageKm: { fa: "کارکرد (کیلومتر)", ps: "مزل (کیلومتر)" },
+  transmission: { fa: "گیربکس", ps: "ګیربکس" },
+  fuelType: { fa: "نوع سوخت", ps: "د سون توکو ډول" },
+  condition: { fa: "وضعیت", ps: "حالت" },
+  color: { fa: "رنگ", ps: "رنګ" },
+  documentType: { fa: "نوع اسناد", ps: "د اسنادو ډول" },
+  storageGb: { fa: "حافظه", ps: "ذخیره" },
+  ramGb: { fa: "حافظه رم", ps: "رېم" },
+  batteryHealth: { fa: "سلامت باتری ٪", ps: "د بټرۍ روغتیا ٪" },
+  warranty: { fa: "ضمانت", ps: "تضمین" },
+  accessories: { fa: "جعبه / شارژر / لوازم", ps: "بکس / چارجر / لوازم" },
+  repair_history: { fa: "سابقه ترمیم", ps: "د ترمیم مخینه" },
+  payment_period: { fa: "دوره پرداخت", ps: "د تادیې موده" },
+  gender_allowed: { fa: "افراد مجاز", ps: "منل شوی جنسیت" },
+  room_type: { fa: "نوع اتاق", ps: "د خونې ډول" },
+  students_per_room: { fa: "محصل در هر اتاق", ps: "په هره خونه کې محصلین" },
+  available_beds: { fa: "تخت / جای خالی", ps: "خالي کټونه / ځایونه" },
+  internet: { fa: "انترنت / وای‌فای", ps: "انټرنېټ / وای‌فای" },
+  hot_water: { fa: "آب گرم", ps: "ګرمې اوبه" },
+  electricity: { fa: "برق", ps: "برېښنا" },
+  heating: { fa: "سیستم گرمایش", ps: "تودوخه" },
+  meals_included: { fa: "غذا شامل است", ps: "خواړه پکې شامل دي" },
+  furnished: { fa: "وسایل / فرنیچر", ps: "فرنیچر / وسایل" },
+  security: { fa: "امنیت / محافظ", ps: "امنیت / ساتونکی" },
+  laundry: { fa: "رخت‌شویی", ps: "کالی مینځل" },
+  bathroom_type: { fa: "حمام", ps: "تشناب / حمام" },
+  nearby_institution: { fa: "مکتب / دانشگاه نزدیک", ps: "نږدې ښوونځی / پوهنتون" },
+  distance_to_university: { fa: "فاصله تا محل تحصیل (کیلومتر)", ps: "د زده‌کړې ځای واټن (کیلومتر)" },
+  rules: { fa: "قوانین / وقت ورود", ps: "قوانین / د تګ راتګ وخت" },
+  landType: { fa: "نوع زمین", ps: "د ځمکې ډول" },
+  areaSize: { fa: "مساحت", ps: "مساحت" },
+  areaUnit: { fa: "واحد مساحت", ps: "د مساحت واحد" },
+  owner_type: { fa: "مالک / نماینده", ps: "مالک / استازی" },
+  roadAccess: { fa: "دسترسی سرک", ps: "سړک ته لاسرسی" },
+  water: { fa: "آب", ps: "اوبه" },
+  rooms: { fa: "اتاق‌ها", ps: "خونې" },
+  bedrooms: { fa: "اتاق خواب", ps: "د خوب خونې" },
+  bathrooms: { fa: "حمام‌ها", ps: "تشنابونه / حمامونه" },
+  floor: { fa: "منزل", ps: "پوړ" },
+  parking: { fa: "پارکینگ", ps: "پارکېنګ" },
+  type: { fa: "نوع", ps: "ډول" },
+};
+
+const QUICK_OPTION_LABELS: Record<string, { fa: string; ps: string }> = {
+  Automatic: { fa: "اتومات", ps: "اتومات" }, Manual: { fa: "دستی", ps: "لاسي" }, Other: { fa: "سایر", ps: "نور" },
+  Petrol: { fa: "پترول", ps: "پټرول" }, Diesel: { fa: "دیزل", ps: "ډیزل" }, Hybrid: { fa: "هیبرید", ps: "هایبرډ" }, Electric: { fa: "برقی", ps: "برېښنايي" },
+  New: { fa: "نو", ps: "نوی" }, "Like New": { fa: "مانند نو", ps: "د نوي په شان" }, Used: { fa: "استفاده‌شده", ps: "کارول شوی" }, Damaged: { fa: "آسیب‌دیده", ps: "زیانمن" }, "For Parts": { fa: "برای پرزه", ps: "د پرزو لپاره" },
+  Complete: { fa: "کامل", ps: "بشپړ" }, Customs: { fa: "گمرکی", ps: "ګمرکي" }, "No Document": { fa: "بدون سند", ps: "بې اسناده" },
+  monthly: { fa: "ماهانه", ps: "میاشتنی" }, semester: { fa: "سمستر", ps: "سمسټر" }, yearly: { fa: "سالانه", ps: "کلنی" }, daily: { fa: "روزانه", ps: "ورځنی" }, other: { fa: "سایر", ps: "نور" },
+  male: { fa: "مردان", ps: "نارینه" }, female: { fa: "زنان", ps: "ښځینه" }, family: { fa: "فامیل", ps: "کورنۍ" }, everyone: { fa: "همه", ps: "ټول" },
+  shared: { fa: "مشترک", ps: "ګډ" }, private: { fa: "خصوصی", ps: "خصوصي" }, single: { fa: "یک‌نفره", ps: "یو کسیزه" }, bed_space: { fa: "جای تخت", ps: "د کټ ځای" }, unknown: { fa: "نامعلوم", ps: "نامعلوم" },
+  Available: { fa: "موجود", ps: "شته" }, "Not Available": { fa: "موجود نیست", ps: "نشته" }, Unknown: { fa: "نامعلوم", ps: "نامعلوم" }, Limited: { fa: "محدود", ps: "محدود" }, Nearby: { fa: "نزدیک", ps: "نږدې" }, "24-hour": { fa: "۲۴ ساعته", ps: "۲۴ ساعته" },
+  Yes: { fa: "بله", ps: "هو" }, No: { fa: "خیر", ps: "نه" }, Optional: { fa: "اختیاری", ps: "اختیاري" }, Partial: { fa: "قسمتی", ps: "یوه برخه" },
+  Residential: { fa: "رهایشی", ps: "استوګنیزه" }, Commercial: { fa: "تجارتی", ps: "سوداګریزه" }, Agricultural: { fa: "زراعتی", ps: "کرنیزه" }, Industrial: { fa: "صنعتی", ps: "صنعتي" },
+  sqm: { fa: "متر مربع", ps: "متر مربع" }, biswa: { fa: "بسوه", ps: "بسوه" }, jerib: { fa: "جریب", ps: "جریب" },
+  "Title Deed": { fa: "قباله رسمی", ps: "رسمي قباله" }, Qabala: { fa: "قباله", ps: "قباله" }, "Customary Document": { fa: "سند عرفی", ps: "عرفي سند" },
+  Owner: { fa: "مالک", ps: "مالک" }, Agent: { fa: "نماینده", ps: "استازی" }, Heirs: { fa: "ورثه", ps: "وارثان" }, Tenant: { fa: "کرایه‌نشین", ps: "کرایه‌دار" },
+  "Main Road": { fa: "سرک عمومی", ps: "عمومي سړک" }, "Side Road": { fa: "سرک فرعی", ps: "فرعي سړک" }, "No Road Access": { fa: "بدون دسترسی سرک", ps: "سړک ته لاسرسی نشته" },
+  Well: { fa: "چاه", ps: "څاه" }, Irrigation: { fa: "آبیاری", ps: "اوبه لګونه" }, Tanker: { fa: "تانکر", ps: "ټانکر" }, "Semi Furnished": { fa: "نیمه‌مبله", ps: "نیمه فرنیچر" },
+};
+
+function quickFieldLabel(locale: AppLocale, field: QuickField) {
+  if (locale === "en") return field.label;
+  return QUICK_FIELD_LABELS[field.key]?.[locale] ?? field.label;
+}
+
+function quickOptionLabel(locale: AppLocale, option: string) {
+  if (locale === "en") return option;
+  return QUICK_OPTION_LABELS[option]?.[locale] ?? option;
+}
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -1674,7 +1753,7 @@ export default function QuickPostForm({
   }, [c.detectedLocation, c.locationMustConfirm, selectedDistrictId, selectedProvinceId]);
 
   async function saveCurrentDraftNow(stepOverride: QuickStep = step) {
-    if (!draftLoaded) return draftId;
+    if (!draftLoaded) return { draftId, persisted: false };
     const localDraft = {
       updatedAt: new Date().toISOString(),
       language: locale,
@@ -1741,7 +1820,9 @@ export default function QuickPostForm({
       language: locale,
     };
     const serverSignature = JSON.stringify(serverPayload);
-    if (lastServerDraftSignatureRef.current === serverSignature) return draftId;
+    if (lastServerDraftSignatureRef.current === serverSignature) {
+      return { draftId, persisted: Boolean(draftId) };
+    }
     setDraftStatus("saving");
     const result = await saveListingDraftAction(serverPayload);
     if (result.ok) {
@@ -1749,15 +1830,20 @@ export default function QuickPostForm({
       lastServerDraftSignatureRef.current = serverSignature;
       setDraftId(nextDraftId);
       setDraftStatus("saved");
-      return nextDraftId;
+      return { draftId: nextDraftId, persisted: Boolean(nextDraftId) };
     } else {
       setDraftStatus(result.statusCode === 401 ? "idle" : "error");
     }
-    return draftId;
+    return { draftId, persisted: false };
   }
 
   async function saveDraftAndExit() {
-    await saveCurrentDraftNow(step);
+    const checkpoint = await saveCurrentDraftNow(step);
+    if (!checkpoint.persisted) {
+      setError(c.draftSaveFailed);
+      return;
+    }
+    window.localStorage.removeItem(QUICK_DRAFT_KEY);
     router.push(localizePath("/dashboard", locale));
   }
 
@@ -1945,7 +2031,8 @@ export default function QuickPostForm({
     setIsPublishing(true);
     startTransition(() => {
       void (async () => {
-        const savedDraftId = await saveCurrentDraftNow(2);
+        const checkpoint = await saveCurrentDraftNow(2);
+        const savedDraftId = checkpoint.draftId;
         const formData = buildPublishFormData(savedDraftId);
         const result = await createListingAction(formData);
         if (!result.ok || !result.listingId) {
@@ -1980,12 +2067,13 @@ export default function QuickPostForm({
 
   const renderField = (field: QuickField) => {
     const value = details[field.key] ?? "";
+    const label = quickFieldLabel(locale, field);
     const commonClass = "mt-1 w-full rounded-2xl border border-[var(--line)] bg-white px-3 py-3 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15";
 
     if (field.type === "textarea") {
       return (
         <label key={field.key} className="text-sm font-semibold">
-          {field.label} {field.required ? <span className="text-red-600">*</span> : null}
+          {label} {field.required ? <span className="text-red-600">*</span> : null}
           <textarea
             value={String(value)}
             placeholder={field.placeholder}
@@ -1999,11 +2087,11 @@ export default function QuickPostForm({
     if (field.type === "select") {
       return (
         <label key={field.key} className="text-sm font-semibold">
-          {field.label} {field.required ? <span className="text-red-600">*</span> : null}
+          {label} {field.required ? <span className="text-red-600">*</span> : null}
           <select value={String(value)} onChange={(event) => updateDetail(field.key, event.target.value)} className={commonClass}>
             <option value="">{c.select}</option>
             {(field.options ?? []).map((option) => (
-              <option key={`${field.key}-${option}`} value={option}>{option}</option>
+              <option key={`${field.key}-${option}`} value={option}>{quickOptionLabel(locale, option)}</option>
             ))}
           </select>
         </label>
@@ -2014,14 +2102,14 @@ export default function QuickPostForm({
       return (
         <label key={field.key} className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white px-3 py-3 text-sm font-semibold">
           <input type="checkbox" checked={Boolean(value)} onChange={(event) => updateDetail(field.key, event.target.checked)} className="h-4 w-4" />
-          {field.label}
+          {label}
         </label>
       );
     }
 
     return (
       <label key={field.key} className="text-sm font-semibold">
-        {field.label} {field.required ? <span className="text-red-600">*</span> : null}
+        {label} {field.required ? <span className="text-red-600">*</span> : null}
         <input
           type={field.type}
           value={String(value)}
