@@ -1500,7 +1500,7 @@ export default function QuickPostForm({
     setSmartSuggestion(suggestion);
     const nextRoot = normalizeQuickPostRootSlug(suggestion.categorySlug);
     if (nextRoot && !rootTouched && rootChoices.some((category) => category.slug === nextRoot)) {
-      setSelectedCategory(null);
+      if (!selectedCategoryPath?.startsWith(nextRoot)) setSelectedCategory(null);
       setSelectedRootSlug(nextRoot);
     }
     if (suggestion.price && !priceAmount && !contactForPrice) setPriceAmount(String(suggestion.price));
@@ -1514,7 +1514,7 @@ export default function QuickPostForm({
     if (suggestion.storage) updateDetail("storageGb", suggestion.storage.replace(/GB/i, " GB").replace(/TB/i, " TB"));
     if (suggestion.ram) updateDetail("ramGb", suggestion.ram.replace(/GB/i, " GB"));
     if (suggestion.battery) updateDetail("batteryHealth", suggestion.battery.replace("%", ""));
-  }, [contactForPrice, priceAmount, rootChoices, rootTouched, updateDetail]);
+  }, [contactForPrice, priceAmount, rootChoices, rootTouched, selectedCategoryPath, updateDetail]);
 
   useEffect(() => {
     if (step !== 2) return;
@@ -1557,7 +1557,7 @@ export default function QuickPostForm({
         const rootFromSuggestion = json.suggestions?.[0]?.rootSlug ?? json.suggestion?.rootSlug ?? "";
         const nextRoot = normalizeQuickPostRootSlug(rootFromProduct || rootFromSuggestion);
         if (nextRoot && !rootTouched && rootChoices.some((category) => category.slug === nextRoot)) {
-          setSelectedCategory(null);
+          if (!selectedCategoryPath?.startsWith(nextRoot)) setSelectedCategory(null);
           setSelectedRootSlug(nextRoot);
         }
         if (json.suggestedProduct?.brand) updateDetail("brand", json.suggestedProduct.brand);
@@ -1572,7 +1572,7 @@ export default function QuickPostForm({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [applySmartSuggestion, description, images, rootChoices, rootTouched, step, title, updateDetail]);
+  }, [applySmartSuggestion, description, images, rootChoices, rootTouched, selectedCategoryPath, step, title, updateDetail]);
 
   useEffect(() => {
     if (!selectedRootSlug) {

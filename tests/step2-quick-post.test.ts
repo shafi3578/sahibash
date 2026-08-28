@@ -125,6 +125,7 @@ test("Quick Post resolves AI suggestions against canonical taxonomy instead of a
   assert.match(quickPostForm, /manualChildren/);
   assert.match(quickPostForm, /candidate\.is_leaf/);
   assert.match(quickPostForm, /setSelectedCategory\(candidate\)/);
+  assert.match(quickPostForm, /if \(!selectedCategoryPath\?\.startsWith\(nextRoot\)\) setSelectedCategory\(null\)/);
   assert.doesNotMatch(quickPostForm, /formData\.set\("category_node_id",\s*ai/i);
 });
 
