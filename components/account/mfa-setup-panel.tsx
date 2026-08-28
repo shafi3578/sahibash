@@ -232,7 +232,7 @@ export function MfaSetupPanel({
 
   return (
     <div className="space-y-4">
-      {securityRedirect || (isPrivilegedUser && !isAal2) ? (
+      {isPrivilegedUser && (securityRedirect || !isAal2) ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-bold">{copy.requiredTitle}</p>
           <p className="mt-1 leading-6">{copy.requiredBody}</p>

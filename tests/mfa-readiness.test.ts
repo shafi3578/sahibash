@@ -36,6 +36,11 @@ test("account security page exposes a complete Supabase MFA TOTP flow", () => {
   assert.doesNotMatch(mfaPanel, /user_metadata/i);
 });
 
+test("administrator MFA warning is never shown to normal users", () => {
+  assert.match(mfaPanel, /isPrivilegedUser && \(securityRedirect \|\| !isAal2\)/);
+  assert.doesNotMatch(mfaPanel, /securityRedirect \|\| \(isPrivilegedUser && !isAal2\)/);
+});
+
 test("MFA audit action records only verified AAL2 admin events", () => {
   assert.match(accountSecurityAction, /MFA_VERIFIED/);
   assert.match(accountSecurityAction, /MFA_SESSION_CONFIRMED/);
