@@ -52,6 +52,7 @@ export default async function PostAdCreatePage({
           locale={locale}
           initialRootSlug={initialRootSlug}
           sellerProfile={sellerProfile}
+          draftOwnerId={user?.id ?? null}
         />
       ) : (
         <PostAdForm
@@ -62,6 +63,7 @@ export default async function PostAdCreatePage({
           initialMode={initialMode}
           initialRootSlug={initialRootSlug}
           sellerProfile={sellerProfile}
+          draftOwnerId={user?.id ?? null}
         />
       )}
     </main>

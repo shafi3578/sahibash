@@ -27,6 +27,7 @@ type QuickPostProps = {
   locale: AppLocale;
   initialRootSlug?: string;
   sellerProfile?: SellerProfileContact | null;
+  draftOwnerId?: string | null;
 };
 
 type LocationMapPickerProps = {
@@ -171,12 +172,17 @@ type QuickRootSlug = (typeof CATEGORY_ROOTS)[number];
 
 type StoredQuickPostImage = {
   id: string;
+  ownerScope: string;
   name: string;
   type: string;
   lastModified: number;
   isPrimary: boolean;
   blob: Blob;
 };
+
+function quickDraftStorageKey(ownerScope: string) {
+  return `${QUICK_DRAFT_KEY}:${ownerScope}`;
+}
 
 const COPY = {
   en: {
@@ -879,24 +885,33 @@ function openQuickPostImageDb() {
   });
 }
 
-async function persistQuickPostImages(images: StagedImage[]) {
+async function persistQuickPostImages(images: StagedImage[], ownerScope: string) {
   if (typeof indexedDB === "undefined") return;
   const db = await openQuickPostImageDb();
   try {
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(QUICK_IMAGE_STORE, "readwrite");
       const store = transaction.objectStore(QUICK_IMAGE_STORE);
-      store.clear();
-      for (const image of images.slice(0, 15)) {
-        store.put({
-          id: image.id,
-          name: image.file.name,
-          type: image.file.type,
-          lastModified: image.file.lastModified,
-          isPrimary: image.isPrimary,
-          blob: image.file,
-        } satisfies StoredQuickPostImage);
-      }
+      const cursorRequest = store.openCursor();
+      cursorRequest.onsuccess = () => {
+        const cursor = cursorRequest.result;
+        if (cursor) {
+          if ((cursor.value as Partial<StoredQuickPostImage>).ownerScope === ownerScope) cursor.delete();
+          cursor.continue();
+          return;
+        }
+        for (const image of images.slice(0, 15)) {
+          store.put({
+            id: image.id,
+            ownerScope,
+            name: image.file.name,
+            type: image.file.type,
+            lastModified: image.file.lastModified,
+            isPrimary: image.isPrimary,
+            blob: image.file,
+          } satisfies StoredQuickPostImage);
+        }
+      };
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error("Could not save quick-post image draft."));
       transaction.onabort = () => reject(transaction.error ?? new Error("Could not save quick-post image draft."));
@@ -906,14 +921,16 @@ async function persistQuickPostImages(images: StagedImage[]) {
   }
 }
 
-async function loadQuickPostImages() {
+async function loadQuickPostImages(ownerScope: string) {
   if (typeof indexedDB === "undefined") return [] as StoredQuickPostImage[];
   const db = await openQuickPostImageDb();
   try {
     return await new Promise<StoredQuickPostImage[]>((resolve, reject) => {
       const transaction = db.transaction(QUICK_IMAGE_STORE, "readonly");
       const request = transaction.objectStore(QUICK_IMAGE_STORE).getAll();
-      request.onsuccess = () => resolve((request.result ?? []) as StoredQuickPostImage[]);
+      request.onsuccess = () => resolve(
+        ((request.result ?? []) as StoredQuickPostImage[]).filter((image) => image.ownerScope === ownerScope),
+      );
       request.onerror = () => reject(request.error ?? new Error("Could not load quick-post image draft."));
     });
   } finally {
@@ -921,13 +938,19 @@ async function loadQuickPostImages() {
   }
 }
 
-async function clearQuickPostImages() {
+async function clearQuickPostImages(ownerScope: string) {
   if (typeof indexedDB === "undefined") return;
   const db = await openQuickPostImageDb();
   try {
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(QUICK_IMAGE_STORE, "readwrite");
-      transaction.objectStore(QUICK_IMAGE_STORE).clear();
+      const cursorRequest = transaction.objectStore(QUICK_IMAGE_STORE).openCursor();
+      cursorRequest.onsuccess = () => {
+        const cursor = cursorRequest.result;
+        if (!cursor) return;
+        if ((cursor.value as Partial<StoredQuickPostImage>).ownerScope === ownerScope) cursor.delete();
+        cursor.continue();
+      };
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error("Could not clear quick-post image draft."));
       transaction.onabort = () => reject(transaction.error ?? new Error("Could not clear quick-post image draft."));
@@ -976,6 +999,7 @@ export default function QuickPostForm({
   locale,
   initialRootSlug = "",
   sellerProfile = null,
+  draftOwnerId = null,
 }: QuickPostProps) {
   void t;
   const router = useRouter();
@@ -986,6 +1010,8 @@ export default function QuickPostForm({
   const [isPending, startTransition] = useTransition();
   const c = COPY[locale] ?? COPY.en;
   const direction = locale === "en" ? "ltr" : "rtl";
+  const draftOwnerScope = draftOwnerId || "guest";
+  const quickDraftKey = quickDraftStorageKey(draftOwnerScope);
 
   const [step, setStep] = useState<QuickStep>(1);
   const [publishRequestId, setPublishRequestId] = useState(() => createId());
@@ -1188,7 +1214,7 @@ export default function QuickPostForm({
     async function loadDraft() {
       let hasLocalRecovery = false;
       try {
-        const localRaw = window.localStorage.getItem(QUICK_DRAFT_KEY);
+        const localRaw = window.localStorage.getItem(quickDraftKey);
         if (localRaw) {
           const local = JSON.parse(localRaw) as Record<string, unknown>;
           hasLocalRecovery = true;
@@ -1250,7 +1276,7 @@ export default function QuickPostForm({
           setWhatsappEnabled(readDraftBoolean(local.whatsappEnabled));
         }
 
-        const storedImages = await loadQuickPostImages().catch(() => []);
+        const storedImages = await loadQuickPostImages(draftOwnerScope).catch(() => []);
         if (!cancelled && storedImages.length > 0) {
           setImages((current) => {
             for (const image of current) {
@@ -1352,12 +1378,12 @@ export default function QuickPostForm({
     return () => {
       cancelled = true;
     };
-  }, [initialRootSlug]);
+  }, [draftOwnerScope, initialRootSlug, quickDraftKey]);
 
   useEffect(() => {
     if (!draftLoaded) return;
-    void persistQuickPostImages(images).catch(() => undefined);
-  }, [draftLoaded, images]);
+    void persistQuickPostImages(images, draftOwnerScope).catch(() => undefined);
+  }, [draftLoaded, draftOwnerScope, images]);
 
   useEffect(() => {
     async function loadProvinces() {
@@ -1392,6 +1418,7 @@ export default function QuickPostForm({
   useEffect(() => {
     if (!draftLoaded) return;
     const localDraft = {
+      ownerScope: draftOwnerScope,
       updatedAt: new Date().toISOString(),
       language: locale,
       step,
@@ -1442,7 +1469,7 @@ export default function QuickPostForm({
         isConfirmed: locationConfirmed,
       },
     };
-    window.localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify(localDraft));
+    window.localStorage.setItem(quickDraftKey, JSON.stringify(localDraft));
   }, [
     areaText,
     contactForPrice,
@@ -1481,11 +1508,13 @@ export default function QuickPostForm({
     transaction,
     aiResponse,
     whatsappEnabled,
+    draftOwnerScope,
+    quickDraftKey,
   ]);
 
   useEffect(() => {
     const persistOnPageExit = () => {
-      const recovery = window.localStorage.getItem(QUICK_DRAFT_KEY);
+      const recovery = window.localStorage.getItem(quickDraftKey);
       if (!recovery || recovery.length > 60_000) return;
       navigator.sendBeacon(
         "/api/posting/draft",
@@ -1494,7 +1523,7 @@ export default function QuickPostForm({
     };
     window.addEventListener("pagehide", persistOnPageExit);
     return () => window.removeEventListener("pagehide", persistOnPageExit);
-  }, []);
+  }, [quickDraftKey]);
 
   const applySmartSuggestion = useCallback((suggestion: SmartPostingParseResult) => {
     setSmartSuggestion(suggestion);
@@ -1755,6 +1784,7 @@ export default function QuickPostForm({
   async function saveCurrentDraftNow(stepOverride: QuickStep = step) {
     if (!draftLoaded) return { draftId, persisted: false };
     const localDraft = {
+      ownerScope: draftOwnerScope,
       updatedAt: new Date().toISOString(),
       language: locale,
       step: stepOverride,
@@ -1805,7 +1835,7 @@ export default function QuickPostForm({
         isConfirmed: locationConfirmed,
       },
     };
-    window.localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify(localDraft));
+    window.localStorage.setItem(quickDraftKey, JSON.stringify(localDraft));
     const serverPayload = {
       postingType: "quick" as const,
       category: {
@@ -1843,7 +1873,7 @@ export default function QuickPostForm({
       setError(c.draftSaveFailed);
       return;
     }
-    window.localStorage.removeItem(QUICK_DRAFT_KEY);
+    window.localStorage.removeItem(quickDraftKey);
     router.push(localizePath("/dashboard", locale));
   }
 
@@ -2052,8 +2082,8 @@ export default function QuickPostForm({
           }
         }
 
-        window.localStorage.removeItem(QUICK_DRAFT_KEY);
-        await clearQuickPostImages().catch(() => undefined);
+        window.localStorage.removeItem(quickDraftKey);
+        await clearQuickPostImages(draftOwnerScope).catch(() => undefined);
         if (savedDraftId || draftId) await deleteMyDraftAction(savedDraftId || draftId);
         setStatus(c.success);
         router.push(localizePath(`/listings/${result.listingId}/manage`, locale));

@@ -96,7 +96,7 @@ test("Quick Post protects local work without continuously server-saving while ty
     assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   const localPersistenceEffect = quickPostForm.slice(
-    quickPostForm.indexOf("localStorage.setItem(QUICK_DRAFT_KEY"),
+    quickPostForm.indexOf("localStorage.setItem(quickDraftKey"),
     quickPostForm.indexOf('window.addEventListener("pagehide"'),
   );
   assert.doesNotMatch(localPersistenceEffect, /saveListingDraftAction/);
@@ -104,8 +104,20 @@ test("Quick Post protects local work without continuously server-saving while ty
   assert.match(quickPostForm, /hasLocalRecovery \|\| userEditedDuringHydrationRef\.current/);
   assert.match(quickPostForm, /const checkpoint = await saveCurrentDraftNow\(step\)/);
   assert.match(quickPostForm, /if \(!checkpoint\.persisted\)/);
-  assert.match(quickPostForm, /window\.localStorage\.removeItem\(QUICK_DRAFT_KEY\);[\s\S]*router\.push/);
+  assert.match(quickPostForm, /window\.localStorage\.removeItem\(quickDraftKey\);[\s\S]*router\.push/);
   assert.match(quickPostForm, /const savedDraftId = checkpoint\.draftId/);
+});
+
+test("local posting recovery is isolated per authenticated account", () => {
+  assert.match(createPage, /draftOwnerId=\{user\?\.id \?\? null\}/);
+  assert.match(quickPostForm, /const draftOwnerScope = draftOwnerId \|\| "guest"/);
+  assert.match(quickPostForm, /quickDraftStorageKey\(draftOwnerScope\)/);
+  assert.match(quickPostForm, /loadQuickPostImages\(draftOwnerScope\)/);
+  assert.match(quickPostForm, /persistQuickPostImages\(images, draftOwnerScope\)/);
+  assert.match(quickPostForm, /image\.ownerScope === ownerScope/);
+  assert.doesNotMatch(quickPostForm, /localStorage\.getItem\(QUICK_DRAFT_KEY\)/);
+  assert.doesNotMatch(quickPostForm, /localStorage\.setItem\(QUICK_DRAFT_KEY/);
+  assert.doesNotMatch(quickPostForm, /objectStore\(QUICK_IMAGE_STORE\)\.clear\(\)/);
 });
 
 test("Quick Post localizes category-specific labels without changing canonical stored option values", () => {
@@ -249,9 +261,9 @@ test("Quick Post publish is idempotent through the existing listing draft", () =
 test("Quick Post preserves photo drafts and normalizes short publish titles", () => {
   for (const marker of [
     "QUICK_IMAGE_DB_NAME",
-    "persistQuickPostImages(images)",
-    "loadQuickPostImages()",
-    "clearQuickPostImages()",
+    "persistQuickPostImages(images, draftOwnerScope)",
+    "loadQuickPostImages(draftOwnerScope)",
+    "clearQuickPostImages(draftOwnerScope)",
     "buildSuggestedQuickPostTitle",
     "normalizeTitleCandidate",
     "maxLength={120}",

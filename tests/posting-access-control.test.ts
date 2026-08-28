@@ -89,3 +89,12 @@ test("final category selection exposes a direct details action above mobile navi
   assert.match(canonicalPostingForm, /bottom-\[calc\(4\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
   assert.match(canonicalPostingForm, /lg:bottom-0/);
 });
+
+test("standard posting drafts and remembered locations are account scoped from first render", () => {
+  assert.match(canonicalPostingForm, /draftOwnerId\?: string \| null/);
+  assert.match(canonicalPostingForm, /const draftOwnerScope = draftOwnerId \|\| "guest"/);
+  assert.match(canonicalPostingForm, /`\$\{DRAFT_KEY\}:\$\{draftOwnerScope\}`/);
+  assert.match(canonicalPostingForm, /`\$\{PREVIOUS_LOCATION_KEY\}:\$\{draftOwnerScope\}`/);
+  assert.doesNotMatch(canonicalPostingForm, /useState\(DRAFT_KEY\)/);
+  assert.doesNotMatch(canonicalPostingForm, /setDraftStorageKey/);
+});

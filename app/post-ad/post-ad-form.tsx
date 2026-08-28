@@ -287,16 +287,20 @@ export default function PostAdForm({
     initialMode = "standard",
     initialRootSlug = "",
     sellerProfile = null,
+    draftOwnerId = null,
   }: Props & {    t: Dictionary;
     locale: AppLocale;
     initialListingType?: "for_sale" | "for_rent" | "wanted";
     initialMode?: PostMode;
     initialRootSlug?: string;
     sellerProfile?: SellerProfileContact | null;
+    draftOwnerId?: string | null;
   }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
-  const [draftStorageKey, setDraftStorageKey] = useState(DRAFT_KEY);
+  const draftOwnerScope = draftOwnerId || "guest";
+  const draftStorageKey = `${DRAFT_KEY}:${draftOwnerScope}`;
+  const previousLocationKey = `${PREVIOUS_LOCATION_KEY}:${draftOwnerScope}`;
   const [pendingDraft, setPendingDraft] = useState<{
     core?: CoreForm;
     dynamicValues?: Record<string, string | boolean | string[]>;
@@ -369,7 +373,7 @@ export default function PostAdForm({
     }
 
     try {
-      const raw = globalThis.localStorage?.getItem(PREVIOUS_LOCATION_KEY);
+      const raw = globalThis.localStorage?.getItem(previousLocationKey);
       if (!raw) {
         return null;
       }
@@ -382,7 +386,7 @@ export default function PostAdForm({
     }
 
     return null;
-  }, []);
+  }, [previousLocationKey]);
 
   const activeCategories = useMemo(
     () => categories.filter((category) => category.is_active !== false && !category.is_coming_soon),
@@ -1195,28 +1199,6 @@ export default function PostAdForm({
   useEffect(() => {
     let active = true;
 
-    const resolveDraftScope = async () => {
-      try {
-        const supabase = createSupabaseBrowserClient();
-        const { data } = await supabase.auth.getUser();
-        const userId = data.user?.id ?? "guest";
-        if (!active) return;
-        setDraftStorageKey(`${DRAFT_KEY}:${userId}`);
-      } catch {
-        if (!active) return;
-        setDraftStorageKey(`${DRAFT_KEY}:guest`);
-      }
-    };
-
-    void resolveDraftScope();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
     const loadServerDraft = async () => {
       const response = await getMyActiveDraftAction();
       if (!active || !response.ok || !response.draft) {
@@ -1719,7 +1701,7 @@ export default function PostAdForm({
           areaText,
           locationVisibility,
         };
-        globalThis.localStorage?.setItem(PREVIOUS_LOCATION_KEY, JSON.stringify(snapshot));
+        globalThis.localStorage?.setItem(previousLocationKey, JSON.stringify(snapshot));
       }
       await deleteMyDraftAction();
       setStatus(t.postAd.publishing);
