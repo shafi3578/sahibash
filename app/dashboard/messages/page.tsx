@@ -30,7 +30,6 @@ type MessageListingContext = {
   district: string | null;
   listing_images?: Array<{
     public_url?: string | null;
-    image_url?: string | null;
     is_primary?: boolean | null;
     sort_order?: number | null;
   }>;
@@ -105,7 +104,7 @@ function getListingImage(listing?: MessageListingContext) {
       Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary)) ||
       Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0),
   );
-  return images[0]?.image_url ?? images[0]?.public_url ?? null;
+  return images[0]?.public_url ?? null;
 }
 
 function getParticipantRole({
@@ -206,7 +205,7 @@ export default async function MessagesPage({
   const { data: listingRows } = listingIds.length > 0
     ? await admin
         .from("listings")
-        .select("id,user_id,title,price,currency,status,province,district,listing_images(public_url,image_url,is_primary,sort_order)")
+        .select("id,user_id,title,price,currency,status,province,district,listing_images(public_url,is_primary,sort_order)")
         .in("id", listingIds)
         .eq("status", "approved")
     : { data: [] };

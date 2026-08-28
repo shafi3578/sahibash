@@ -93,6 +93,8 @@ test("public seller profiles and notification center are localized account surfa
   assert.match(messagesPage, /createSupabaseAdmin/);
   assert.match(messagesPage, /\.in\("id", listingIds\)/);
   assert.match(messagesPage, /\.eq\("status", "approved"\)/);
+  assert.match(messagesPage, /listing_images\(public_url,is_primary,sort_order\)/);
+  assert.doesNotMatch(messagesPage, /listing_images\([^)]*image_url/);
   assert.doesNotMatch(messagesPage, /contact_phone|latitude|longitude|address_text/);
   assert.match(blockedUsers, /unblockUserFormAction/);
 });
