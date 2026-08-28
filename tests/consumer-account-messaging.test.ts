@@ -90,6 +90,10 @@ test("public seller profiles and notification center are localized account surfa
   assert.match(notifications, /bg-red-600/);
   assert.match(messagesPage, /sentBySeller \? "mr-auto/);
   assert.match(messagesPage, /"ml-auto bg-\[var\(--ink-1\)\]/);
+  assert.match(messagesPage, /createSupabaseAdmin/);
+  assert.match(messagesPage, /\.in\("id", listingIds\)/);
+  assert.match(messagesPage, /\.eq\("status", "approved"\)/);
+  assert.doesNotMatch(messagesPage, /contact_phone|latitude|longitude|address_text/);
   assert.match(blockedUsers, /unblockUserFormAction/);
 });
 

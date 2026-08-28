@@ -6,6 +6,7 @@ import { getMyMessageThreads } from "@/lib/data/queries";
 import { replyMessageAction } from "@/lib/actions/messages";
 import { reportConversationAction } from "@/lib/actions/reports";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import { formatCurrencyAmount, formatDate } from "@/lib/i18n/format";
@@ -190,6 +191,7 @@ export default async function MessagesPage({
   const ui = getUiTranslations(locale);
   const messageCopy = MESSAGE_COPY[locale];
   const supabase = await createSupabaseServerClient();
+  const admin = createSupabaseAdmin();
   const resolvedSearchParams = await searchParams;
 
   const threads = buildMessageThreads(await getMyMessageThreads(user.id), user.id);
@@ -202,10 +204,11 @@ export default async function MessagesPage({
     null;
 
   const { data: listingRows } = listingIds.length > 0
-    ? await supabase
+    ? await admin
         .from("listings")
         .select("id,user_id,title,price,currency,status,province,district,listing_images(public_url,image_url,is_primary,sort_order)")
         .in("id", listingIds)
+        .eq("status", "approved")
     : { data: [] };
   const listingMap = new Map(
     ((listingRows as MessageListingContext[] | null) ?? []).map((listing) => [listing.id, listing]),
