@@ -97,7 +97,11 @@ export async function interpretAiSearch(input: {
   if (intent.currency) params.currency = intent.currency;
   if (intent.vehicleBrand) params.vehicleBrand = intent.vehicleBrand;
   if (intent.vehicleModel) params.vehicleModel = intent.vehicleModel;
-  if (intent.phoneModel) params.phoneModel = intent.phoneModel;
+  if (intent.phoneModel) {
+    params.phoneModel = intent.phoneModel;
+    delete params.vehicleBrand;
+    delete params.vehicleModel;
+  }
   if (intent.rentalType) params.rentalType = intent.rentalType;
   if (intent.condition) params.condition = intent.condition;
   if (intent.listingType) params.listingType = intent.listingType;

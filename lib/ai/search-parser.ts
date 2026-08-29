@@ -37,6 +37,15 @@ function normalizeModelName(model?: string) {
   return clean;
 }
 
+function extractPhoneModel(value: string) {
+  const match = value.match(/(?:iphone|آیفون|ایفون)\s*(\d{1,2})(?:\s*(pro\s*max|pro|max|plus|mini))?/iu);
+  if (!match?.[1]) return "";
+  const variant = match[2]
+    ? match[2].toLowerCase().replace(/\s+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+    : "";
+  return `iPhone ${match[1]}${variant ? ` ${variant}` : ""}`;
+}
+
 function multiplierForUnit(unit: string | undefined) {
   if (!unit) return 1;
   if (/^(?:k|thousand|هزار|زر|زره)$/u.test(unit)) return 1_000;
@@ -154,8 +163,14 @@ export function parseSahibashAiSearch(query: string, locale: AppLocale): Sahibas
 
   const productName = firstProduct?.canonical ?? intent?.model ?? intent?.brand ?? "";
   const model = normalizeModelName(intent?.model ?? productName);
+  const phoneModel = extractPhoneModel(rawQuery);
   const isToyotaCorolla = /toyota corolla|corolla|corola|کرولا|کورولا/i.test(productName || rawQuery);
-  if (isToyotaCorolla) {
+  if (phoneModel) {
+    params.q = phoneModel;
+    params.phoneModel = phoneModel;
+    chips.push({ key: "phoneModel", label: labels.model, value: phoneModel, removeKeys: ["q", "phoneModel", "phone_model"] });
+    confidence += 0.25;
+  } else if (isToyotaCorolla) {
     params.q = "Corolla";
     params.vehicleBrand = "Toyota";
     params.vehicleModel = "Corolla";

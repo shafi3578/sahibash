@@ -81,6 +81,13 @@ test("deterministic AI fallback supports Afghanistan price, year, room, and land
   const biswa = parseSahibashAiSearch("زمین 5 بسوه برای فروش", "fa");
   assert.ok(biswa);
   assert.equal(biswa.params.minLandSize, "500");
+
+  const iphone = parseSahibashAiSearch("iPhone 15 Pro in Kabul", "en");
+  assert.ok(iphone);
+  assert.equal(iphone.params.q, "iPhone 15 Pro");
+  assert.equal(iphone.params.phoneModel, "iPhone 15 Pro");
+  assert.equal(iphone.params.vehicleBrand, undefined);
+  assert.equal(iphone.params.vehicleModel, undefined);
 });
 
 test("listing AI assistant is factual-only and does not call an LLM", () => {
