@@ -1,6 +1,25 @@
 export type SuggestedDetailValue = string | boolean;
 export type SuggestedDetails = Record<string, SuggestedDetailValue>;
 
+export function shouldApplyCategorySuggestedDetails({
+  userChoseCategory,
+  selectedRootSlug,
+  selectedCategoryPath,
+  suggestedRootSlug,
+  suggestedCategoryPath,
+}: {
+  userChoseCategory: boolean;
+  selectedRootSlug: string;
+  selectedCategoryPath?: string | null;
+  suggestedRootSlug?: string | null;
+  suggestedCategoryPath?: string | null;
+}) {
+  if (!userChoseCategory) return true;
+  if (!suggestedRootSlug || suggestedRootSlug !== selectedRootSlug) return false;
+  if (!selectedCategoryPath || !suggestedCategoryPath) return false;
+  return selectedCategoryPath === suggestedCategoryPath;
+}
+
 function isEmptySuggestedValue(value: SuggestedDetailValue | undefined) {
   return value === undefined || (typeof value === "string" && value.trim() === "");
 }

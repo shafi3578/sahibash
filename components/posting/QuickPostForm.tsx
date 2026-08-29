@@ -11,7 +11,12 @@ import { localizePath } from "@/lib/i18n/routing";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
-import { reconcileSuggestedDetails, sanitizeSuggestedDetails, type SuggestedDetails } from "@/lib/posting/suggested-details";
+import {
+  reconcileSuggestedDetails,
+  sanitizeSuggestedDetails,
+  shouldApplyCategorySuggestedDetails,
+  type SuggestedDetails,
+} from "@/lib/posting/suggested-details";
 import { damageCondition, damagePartLabel, defaultVehicleDamageParts, getNonOriginalVehicleDamageParts, type DamagePart } from "@/lib/vehicles/damage-report";
 import type { Category, CategoryNode } from "@/types/database";
 
@@ -1192,8 +1197,37 @@ export default function QuickPostForm({
   const chips = useMemo(() => {
     const items = new Map<string, string>();
     if (categoryLabel) items.set("category", categoryLabel);
-    const brand = readDraftString(details.brand) || readDraftString(details.make) || smartSuggestion?.brand || aiResponse?.suggestedProduct?.brand || "";
-    const model = readDraftString(details.model) || smartSuggestion?.model || aiResponse?.suggestedProduct?.model || "";
+    const smartRoot = normalizeQuickPostRootSlug(smartSuggestion?.categorySlug ?? "");
+    const mayShowSmartProduct = shouldApplyCategorySuggestedDetails({
+      userChoseCategory: rootTouched,
+      selectedRootSlug,
+      selectedCategoryPath,
+      suggestedRootSlug: smartRoot,
+      suggestedCategoryPath: null,
+    });
+    const aiPath = aiResponse?.suggestedProduct?.categoryPath ?? null;
+    const aiRoot = normalizeQuickPostRootSlug(
+      aiPath?.split("/")[0]
+        ?? aiResponse?.suggestions?.[0]?.rootSlug
+        ?? aiResponse?.suggestion?.rootSlug
+        ?? "",
+    );
+    const mayShowAiProduct = shouldApplyCategorySuggestedDetails({
+      userChoseCategory: rootTouched,
+      selectedRootSlug,
+      selectedCategoryPath,
+      suggestedRootSlug: aiRoot,
+      suggestedCategoryPath: aiPath,
+    });
+    const brand = readDraftString(details.brand)
+      || readDraftString(details.make)
+      || (mayShowSmartProduct ? smartSuggestion?.brand : "")
+      || (mayShowAiProduct ? aiResponse?.suggestedProduct?.brand : "")
+      || "";
+    const model = readDraftString(details.model)
+      || (mayShowSmartProduct ? smartSuggestion?.model : "")
+      || (mayShowAiProduct ? aiResponse?.suggestedProduct?.model : "")
+      || "";
     const year = readDraftString(details.year);
     const condition = readDraftString(details.condition);
     if (brand) items.set("brand", brand);
@@ -1203,7 +1237,7 @@ export default function QuickPostForm({
     if (smartSuggestion?.price && !contactForPrice) items.set("price", `${smartSuggestion.price} ${currency}`);
     if (smartSuggestion?.province) items.set("province", smartSuggestion.province);
     return Array.from(items.entries()).map(([key, value]) => ({ key, value }));
-  }, [aiResponse?.suggestedProduct?.brand, aiResponse?.suggestedProduct?.model, categoryLabel, contactForPrice, currency, details, smartSuggestion]);
+  }, [aiResponse, categoryLabel, contactForPrice, currency, details, rootTouched, selectedCategoryPath, selectedRootSlug, smartSuggestion]);
 
   const updateDetail = useCallback((key: string, value: DetailValue) => {
     userEditedDetailKeysRef.current.add(key);
@@ -1609,16 +1643,25 @@ export default function QuickPostForm({
     if (suggestion.priceType === "contact") setContactForPrice(true);
     const suggestedDetails: SuggestedDetails = {};
     if (suggestion.negotiable) suggestedDetails.negotiable = true;
-    if (suggestion.brand) {
-      suggestedDetails.brand = suggestion.brand;
-      suggestedDetails.make = suggestion.brand;
+    const mayApplyCategoryDetails = shouldApplyCategorySuggestedDetails({
+      userChoseCategory: rootTouched,
+      selectedRootSlug,
+      selectedCategoryPath,
+      suggestedRootSlug: nextRoot,
+      suggestedCategoryPath: null,
+    });
+    if (mayApplyCategoryDetails) {
+      if (suggestion.brand) {
+        suggestedDetails.brand = suggestion.brand;
+        suggestedDetails.make = suggestion.brand;
+      }
+      if (suggestion.model) suggestedDetails.model = suggestion.model;
+      if (suggestion.storage) suggestedDetails.storageGb = suggestion.storage.replace(/GB/i, " GB").replace(/TB/i, " TB");
+      if (suggestion.ram) suggestedDetails.ramGb = suggestion.ram.replace(/GB/i, " GB");
+      if (suggestion.battery) suggestedDetails.batteryHealth = suggestion.battery.replace("%", "");
     }
-    if (suggestion.model) suggestedDetails.model = suggestion.model;
-    if (suggestion.storage) suggestedDetails.storageGb = suggestion.storage.replace(/GB/i, " GB").replace(/TB/i, " TB");
-    if (suggestion.ram) suggestedDetails.ramGb = suggestion.ram.replace(/GB/i, " GB");
-    if (suggestion.battery) suggestedDetails.batteryHealth = suggestion.battery.replace("%", "");
     applySuggestedDetails("local", suggestedDetails);
-  }, [applySuggestedDetails, contactForPrice, priceAmount, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath]);
+  }, [applySuggestedDetails, contactForPrice, priceAmount, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, selectedRootSlug]);
 
   useEffect(() => {
     if (step !== 2) return;
@@ -1637,12 +1680,26 @@ export default function QuickPostForm({
         aiResponseSignatureRef.current = signature;
         setAiResponse(cached);
         setAiStatus("ready");
-        applySuggestedDetails("gateway", {
+        const cachedPath = cached.suggestedProduct?.categoryPath ?? null;
+        const cachedRoot = normalizeQuickPostRootSlug(
+          cachedPath?.split("/")[0]
+            ?? cached.suggestions?.[0]?.rootSlug
+            ?? cached.suggestion?.rootSlug
+            ?? "",
+        );
+        const mayApplyCachedDetails = shouldApplyCategorySuggestedDetails({
+          userChoseCategory: rootTouched,
+          selectedRootSlug,
+          selectedCategoryPath,
+          suggestedRootSlug: cachedRoot,
+          suggestedCategoryPath: cachedPath,
+        });
+        applySuggestedDetails("gateway", mayApplyCachedDetails ? {
           ...(cached.suggestedProduct?.brand
             ? { brand: cached.suggestedProduct.brand, make: cached.suggestedProduct.brand }
             : {}),
           ...(cached.suggestedProduct?.model ? { model: cached.suggestedProduct.model } : {}),
-        });
+        } : {});
         return;
       }
 
@@ -1705,12 +1762,19 @@ export default function QuickPostForm({
           if (!selectedCategoryPath?.startsWith(nextRoot)) setSelectedCategory(null);
           setSelectedRootSlug(nextRoot);
         }
-        applySuggestedDetails("gateway", {
+        const mayApplyGatewayDetails = shouldApplyCategorySuggestedDetails({
+          userChoseCategory: rootTouched,
+          selectedRootSlug,
+          selectedCategoryPath,
+          suggestedRootSlug: nextRoot,
+          suggestedCategoryPath: json.suggestedProduct?.categoryPath ?? null,
+        });
+        applySuggestedDetails("gateway", mayApplyGatewayDetails ? {
           ...(json.suggestedProduct?.brand
             ? { brand: json.suggestedProduct.brand, make: json.suggestedProduct.brand }
             : {}),
           ...(json.suggestedProduct?.model ? { model: json.suggestedProduct.model } : {}),
-        });
+        } : {});
       });
     }, 700);
 
@@ -1718,7 +1782,7 @@ export default function QuickPostForm({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [applySmartSuggestion, applySuggestedDetails, description, images, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, step, title]);
+  }, [applySmartSuggestion, applySuggestedDetails, description, images, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, selectedRootSlug, step, title]);
 
   useEffect(() => {
     if (!selectedRootSlug) {

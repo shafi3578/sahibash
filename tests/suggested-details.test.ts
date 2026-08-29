@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { reconcileSuggestedDetails, sanitizeSuggestedDetails } from "@/lib/posting/suggested-details";
+import {
+  reconcileSuggestedDetails,
+  sanitizeSuggestedDetails,
+  shouldApplyCategorySuggestedDetails,
+} from "@/lib/posting/suggested-details";
 
 test("suggested details replace and remove only values previously managed by suggestions", () => {
   const result = reconcileSuggestedDetails({
@@ -52,4 +56,44 @@ test("suggestion metadata accepts only non-empty strings and booleans", () => {
     sanitizeSuggestedDetails({ make: " Toyota ", model: "", negotiable: true, count: 2, nested: {} }),
     { make: "Toyota", negotiable: true },
   );
+});
+
+test("category suggestions cannot repopulate fields after the seller chooses a different root", () => {
+  assert.equal(shouldApplyCategorySuggestedDetails({
+    userChoseCategory: true,
+    selectedRootSlug: "vehicles",
+    selectedCategoryPath: "vehicles/cars/toyota/corolla",
+    suggestedRootSlug: "phones-electronics",
+    suggestedCategoryPath: "phones-electronics/mobile-phones/samsung",
+  }), false);
+});
+
+test("category suggestions apply after a matching suggested leaf is selected", () => {
+  assert.equal(shouldApplyCategorySuggestedDetails({
+    userChoseCategory: true,
+    selectedRootSlug: "phones-electronics",
+    selectedCategoryPath: "phones-electronics/mobile-phones/samsung",
+    suggestedRootSlug: "phones-electronics",
+    suggestedCategoryPath: "phones-electronics/mobile-phones/samsung",
+  }), true);
+});
+
+test("manual root and intermediate selections remain free of category-specific suggestions", () => {
+  assert.equal(shouldApplyCategorySuggestedDetails({
+    userChoseCategory: true,
+    selectedRootSlug: "vehicles",
+    selectedCategoryPath: null,
+    suggestedRootSlug: "vehicles",
+    suggestedCategoryPath: "vehicles/cars/honda/civic",
+  }), false);
+});
+
+test("automatic suggestions remain available before the seller overrides category selection", () => {
+  assert.equal(shouldApplyCategorySuggestedDetails({
+    userChoseCategory: false,
+    selectedRootSlug: "vehicles",
+    selectedCategoryPath: null,
+    suggestedRootSlug: "phones-electronics",
+    suggestedCategoryPath: "phones-electronics/mobile-phones/samsung",
+  }), true);
 });
