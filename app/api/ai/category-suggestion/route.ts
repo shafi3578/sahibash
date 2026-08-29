@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       const rootPaths = allowedLeafPaths.filter((path) => path.startsWith(`${preliminaryRoot}/`));
       if (rootPaths.length >= 2) gatewayLeafPaths = rootPaths;
     }
-    const gatewayResult = await requestGatewayCategorySuggestion({ title, description, allowedPaths: gatewayLeafPaths });
+    const gatewayResult = await requestGatewayCategorySuggestion({ title, description, allowedPaths: gatewayLeafPaths, userId: user.id });
     const gatewaySuggestions = gatewayResult.suggestions;
     if (image instanceof File && key) {
       const client = new InferenceClient(key);
@@ -191,6 +191,7 @@ export async function POST(request: Request) {
       suggestions,
       source: gatewaySuggestions.length > 0 ? "gateway" : "deterministic",
       gatewayStatus: gatewayResult.status,
+      gatewayModel: gatewayResult.model,
       labels: labels.slice(0, 8),
       suggestedProduct: specsMatch
         ? {
