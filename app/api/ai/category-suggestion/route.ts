@@ -59,7 +59,14 @@ export async function POST(request: Request) {
       windowSeconds: 60 * 60,
     });
     if (!rateLimit.allowed) {
-      return NextResponse.json({ suggestion: null, message: "Too many requests. Please try again later." }, { status: 429 });
+      const resetAt = rateLimit.resetAt ? Date.parse(rateLimit.resetAt) : Number.NaN;
+      const retryAfterSeconds = Number.isFinite(resetAt)
+        ? Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
+        : 60;
+      return NextResponse.json(
+        { suggestion: null, message: "Too many requests. Please try again later.", retryAfterSeconds },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+      );
     }
 
     const key = process.env.HUGGINGFACE_API_KEY;

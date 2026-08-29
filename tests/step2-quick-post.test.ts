@@ -103,6 +103,11 @@ test("Quick Post protects local work without continuously server-saving while ty
   assert.doesNotMatch(localPersistenceEffect, /saveListingDraftAction/);
   assert.doesNotMatch(quickPostForm, /}, 1000\)/);
   assert.match(quickPostForm, /hasLocalRecovery \|\| userEditedDuringHydrationRef\.current/);
+  const stepTransition = quickPostForm.slice(
+    quickPostForm.indexOf("function goToStepTwo"),
+    quickPostForm.indexOf("function goBackToStepOne"),
+  );
+  assert.doesNotMatch(stepTransition, /saveCurrentDraftNow|saveListingDraftAction|router\.refresh/);
   assert.match(quickPostForm, /const checkpoint = await saveCurrentDraftNow\(step\)/);
   assert.match(quickPostForm, /if \(!checkpoint\.persisted\)/);
   assert.match(quickPostForm, /window\.localStorage\.removeItem\(quickDraftKey\);[\s\S]*router\.push/);
@@ -177,6 +182,7 @@ test("deterministic AI fallback resolves common multilingual signals to active l
     ["کرنیزه ځمکه د خرڅلاو لپاره", "Agricultural land for sale", "real-estate/land/for-sale/agricultural-land"],
     ["Used Dell laptop", "Second hand computer notebook", "second-hand-items/electronics-computers/laptops"],
     ["Solar panels 550W", "Used photovoltaic panels", "second-hand-items/electronics-computers/solar-power-equipment/solar-panels"],
+    ["Samsung Galaxy S23", "Mobile phone in good condition", "mobile-phones-tablets/mobile-phones/samsung"],
   ] as const;
 
   for (const [title, description, expected] of cases) {
@@ -196,7 +202,23 @@ test("Quick Post deduplicates in-flight AI requests for the same Step 1 signatur
   assert.match(quickPostForm, /let request = aiInFlightRef\.current\.get\(signature\)/);
   assert.match(quickPostForm, /aiInFlightRef\.current\.set\(signature, request\)/);
   assert.match(quickPostForm, /aiInFlightRef\.current\.delete\(signature\)/);
-  assert.match(quickPostForm, /if \(!response\.ok\) return null/);
+  assert.match(quickPostForm, /if \(!response\.ok\)/);
+});
+
+test("Quick Post tracks suggested detail provenance and preserves seller edits", () => {
+  for (const marker of [
+    "managedSuggestedDetailsRef",
+    "userEditedDetailKeysRef",
+    "applySuggestedDetails",
+    "reconcileSuggestedDetails",
+    "managedSuggestedDetails",
+    "userEditedDetailKeys",
+    "reconcileDetailsForCategoryChange",
+  ]) {
+    assert.match(quickPostForm, new RegExp(marker));
+  }
+  assert.match(aiRoute, /retryAfterSeconds/);
+  assert.match(aiRoute, /"Retry-After"/);
 });
 
 test("Quick Post supports professional item location without exposing device GPS by default", () => {

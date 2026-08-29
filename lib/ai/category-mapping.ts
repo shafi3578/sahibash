@@ -201,7 +201,7 @@ export function mapSignalsToCategory(input: MappingInput): CategorySuggestion | 
     return suggestion("mobile-phones-tablets/mobile-phones/google-pixel", "Mobile Phones & Tablets > Mobile Phones > Google Pixel", "Detected Google Pixel signals.", 0.86);
   }
 
-  if (containsAny(text, ["iphone", "apple phone", "apple iphone", "smartphone", "mobile phone"])) {
+  if (containsAny(text, ["iphone", "apple phone", "apple iphone"])) {
     return {
       rootSlug: "mobile-phones-tablets",
       pathSlugs: ["mobile-phones-tablets", "mobile-phones", "apple-iphone"],

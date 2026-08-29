@@ -11,6 +11,7 @@ import { localizePath } from "@/lib/i18n/routing";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
+import { reconcileSuggestedDetails, sanitizeSuggestedDetails, type SuggestedDetails } from "@/lib/posting/suggested-details";
 import { damageCondition, damagePartLabel, defaultVehicleDamageParts, getNonOriginalVehicleDamageParts, type DamagePart } from "@/lib/vehicles/damage-report";
 import type { Category, CategoryNode } from "@/types/database";
 
@@ -985,6 +986,15 @@ function isQuickPostCarDamageCategory(rootSlug: string | null | undefined, path:
   return normalizedPath === "vehicles/cars" || normalizedPath.includes("/cars");
 }
 
+function fieldsForQuickKind(kind: QuickKind) {
+  if (kind === "vehicle") return VEHICLE_FIELDS;
+  if (kind === "phone" || kind === "tablet") return PHONE_FIELDS;
+  if (kind === "dormitory") return DORMITORY_FIELDS;
+  if (kind === "land") return LAND_FIELDS;
+  if (kind === "housing") return HOUSING_FIELDS;
+  return GENERAL_FIELDS;
+}
+
 function moveImageInOrder(images: StagedImage[], id: string, direction: -1 | 1) {
   const index = images.findIndex((image) => image.id === id);
   const target = index + direction;
@@ -1009,6 +1019,10 @@ export default function QuickPostForm({
   const aiCacheRef = useRef<Map<string, AiResponse>>(new Map());
   const aiInFlightRef = useRef<Map<string, Promise<AiResponse | null>>>(new Map());
   const aiResponseSignatureRef = useRef("");
+  const aiRetryAtRef = useRef<Map<string, number>>(new Map());
+  const suggestedDetailSourcesRef = useRef<{ local: SuggestedDetails; gateway: SuggestedDetails }>({ local: {}, gateway: {} });
+  const managedSuggestedDetailsRef = useRef<SuggestedDetails>({});
+  const userEditedDetailKeysRef = useRef<Set<string>>(new Set());
   const lastServerDraftSignatureRef = useRef("");
   const [isPending, startTransition] = useTransition();
   const c = COPY[locale] ?? COPY.en;
@@ -1135,12 +1149,7 @@ export default function QuickPostForm({
   }, [contactForPrice, isDormitory, isLand, isRentHousing, rahnGerawyEnabled, transaction]);
 
   const visibleFields = useMemo<QuickField[]>(() => {
-    if (quickKind === "vehicle") return VEHICLE_FIELDS;
-    if (quickKind === "phone" || quickKind === "tablet") return PHONE_FIELDS;
-    if (quickKind === "dormitory") return DORMITORY_FIELDS;
-    if (quickKind === "land") return LAND_FIELDS;
-    if (quickKind === "housing") return HOUSING_FIELDS;
-    return GENERAL_FIELDS;
+    return fieldsForQuickKind(quickKind);
   }, [quickKind]);
 
   const priorityFieldKeys = useMemo(() => {
@@ -1197,8 +1206,54 @@ export default function QuickPostForm({
   }, [aiResponse?.suggestedProduct?.brand, aiResponse?.suggestedProduct?.model, categoryLabel, contactForPrice, currency, details, smartSuggestion]);
 
   const updateDetail = useCallback((key: string, value: DetailValue) => {
+    userEditedDetailKeysRef.current.add(key);
+    delete managedSuggestedDetailsRef.current[key];
     setDetails((current) => ({ ...current, [key]: value }));
   }, []);
+
+  const applySuggestedDetails = useCallback((source: "local" | "gateway", values: SuggestedDetails) => {
+    suggestedDetailSourcesRef.current[source] = sanitizeSuggestedDetails(values);
+    const merged = {
+      ...suggestedDetailSourcesRef.current.local,
+      ...suggestedDetailSourcesRef.current.gateway,
+    };
+    setDetails((current) => {
+      const reconciled = reconcileSuggestedDetails({
+        current,
+        previousManaged: managedSuggestedDetailsRef.current,
+        nextSuggested: merged,
+        userEditedKeys: userEditedDetailKeysRef.current,
+      });
+      managedSuggestedDetailsRef.current = reconciled.managed;
+      return reconciled.details;
+    });
+  }, []);
+
+  const reconcileDetailsForCategoryChange = useCallback((nextRootSlug: string, nextCategoryPath?: string | null) => {
+    const nextKind = inferKind(nextRootSlug, nextCategoryPath, `${title} ${description}`);
+    if (nextRootSlug === selectedRootSlug && nextKind === quickKind) return;
+
+    const nextFieldKeys = new Set(fieldsForQuickKind(nextKind).map((field) => field.key));
+    const allowedKeys = nextRootSlug === selectedRootSlug
+      ? new Set(visibleFields.filter((field) => nextFieldKeys.has(field.key)).map((field) => field.key))
+      : new Set(["condition", "negotiable"]);
+
+    const retainAllowed = (values: SuggestedDetails) => Object.fromEntries(
+      Object.entries(values).filter(([key]) => allowedKeys.has(key)),
+    ) as SuggestedDetails;
+
+    suggestedDetailSourcesRef.current = {
+      local: retainAllowed(suggestedDetailSourcesRef.current.local),
+      gateway: retainAllowed(suggestedDetailSourcesRef.current.gateway),
+    };
+    managedSuggestedDetailsRef.current = retainAllowed(managedSuggestedDetailsRef.current);
+    userEditedDetailKeysRef.current = new Set(
+      Array.from(userEditedDetailKeysRef.current).filter((key) => allowedKeys.has(key)),
+    );
+    setDetails((current) => Object.fromEntries(
+      Object.entries(current).filter(([key]) => allowedKeys.has(key)),
+    ));
+  }, [description, quickKind, selectedRootSlug, title, visibleFields]);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -1222,6 +1277,12 @@ export default function QuickPostForm({
           const local = JSON.parse(localRaw) as Record<string, unknown>;
           hasLocalRecovery = true;
           const nextDetails = (local.details && typeof local.details === "object" ? local.details : {}) as Record<string, unknown>;
+          const managedDetails = sanitizeSuggestedDetails(local.managedSuggestedDetails);
+          managedSuggestedDetailsRef.current = managedDetails;
+          suggestedDetailSourcesRef.current = { local: managedDetails, gateway: {} };
+          userEditedDetailKeysRef.current = new Set(
+            Array.isArray(local.userEditedDetailKeys) ? local.userEditedDetailKeys.map(String) : [],
+          );
           setStep(local.step === 2 ? 2 : 1);
           if (readDraftString(local.publishRequestId)) setPublishRequestId(readDraftString(local.publishRequestId));
           setTitle(readDraftString(local.title));
@@ -1345,6 +1406,12 @@ export default function QuickPostForm({
           });
         }
         const nestedDetails = (serverDetails.details && typeof serverDetails.details === "object" ? serverDetails.details : {}) as Record<string, unknown>;
+        const managedDetails = sanitizeSuggestedDetails(serverDetails.managedSuggestedDetails);
+        managedSuggestedDetailsRef.current = managedDetails;
+        suggestedDetailSourcesRef.current = { local: managedDetails, gateway: {} };
+        userEditedDetailKeysRef.current = new Set(
+          Array.isArray(serverDetails.userEditedDetailKeys) ? serverDetails.userEditedDetailKeys.map(String) : [],
+        );
         setDetails(Object.fromEntries(Object.entries(nestedDetails).map(([key, value]) => [key, typeof value === "boolean" ? value : readDraftString(value)])));
         setStep(serverDetails.step === 2 ? 2 : 1);
         if (readDraftString(serverDetails.publishRequestId)) setPublishRequestId(readDraftString(serverDetails.publishRequestId));
@@ -1456,6 +1523,8 @@ export default function QuickPostForm({
       aiResponse,
       smartSuggestion,
       details,
+      managedSuggestedDetails: managedSuggestedDetailsRef.current,
+      userEditedDetailKeys: Array.from(userEditedDetailKeysRef.current),
       damageParts,
       whatsappEnabled,
       photos: images.map((image) => ({ name: image.file.name, size: image.file.size, type: image.file.type })),
@@ -1532,21 +1601,24 @@ export default function QuickPostForm({
     setSmartSuggestion(suggestion);
     const nextRoot = normalizeQuickPostRootSlug(suggestion.categorySlug);
     if (nextRoot && !rootTouched && rootChoices.some((category) => category.slug === nextRoot)) {
+      reconcileDetailsForCategoryChange(nextRoot, null);
       if (!selectedCategoryPath?.startsWith(nextRoot)) setSelectedCategory(null);
       setSelectedRootSlug(nextRoot);
     }
     if (suggestion.price && !priceAmount && !contactForPrice) setPriceAmount(String(suggestion.price));
     if (suggestion.priceType === "contact") setContactForPrice(true);
-    if (suggestion.negotiable) updateDetail("negotiable", true);
+    const suggestedDetails: SuggestedDetails = {};
+    if (suggestion.negotiable) suggestedDetails.negotiable = true;
     if (suggestion.brand) {
-      updateDetail("brand", suggestion.brand);
-      updateDetail("make", suggestion.brand);
+      suggestedDetails.brand = suggestion.brand;
+      suggestedDetails.make = suggestion.brand;
     }
-    if (suggestion.model) updateDetail("model", suggestion.model);
-    if (suggestion.storage) updateDetail("storageGb", suggestion.storage.replace(/GB/i, " GB").replace(/TB/i, " TB"));
-    if (suggestion.ram) updateDetail("ramGb", suggestion.ram.replace(/GB/i, " GB"));
-    if (suggestion.battery) updateDetail("batteryHealth", suggestion.battery.replace("%", ""));
-  }, [contactForPrice, priceAmount, rootChoices, rootTouched, selectedCategoryPath, updateDetail]);
+    if (suggestion.model) suggestedDetails.model = suggestion.model;
+    if (suggestion.storage) suggestedDetails.storageGb = suggestion.storage.replace(/GB/i, " GB").replace(/TB/i, " TB");
+    if (suggestion.ram) suggestedDetails.ramGb = suggestion.ram.replace(/GB/i, " GB");
+    if (suggestion.battery) suggestedDetails.batteryHealth = suggestion.battery.replace("%", "");
+    applySuggestedDetails("local", suggestedDetails);
+  }, [applySuggestedDetails, contactForPrice, priceAmount, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath]);
 
   useEffect(() => {
     if (step !== 2) return;
@@ -1556,6 +1628,7 @@ export default function QuickPostForm({
 
     let cancelled = false;
     const timeout = window.setTimeout(() => {
+      suggestedDetailSourcesRef.current.gateway = {};
       const localSuggestion = parseSmartPostingText({ title, description });
       if (!cancelled) applySmartSuggestion(localSuggestion);
 
@@ -1564,6 +1637,18 @@ export default function QuickPostForm({
         aiResponseSignatureRef.current = signature;
         setAiResponse(cached);
         setAiStatus("ready");
+        applySuggestedDetails("gateway", {
+          ...(cached.suggestedProduct?.brand
+            ? { brand: cached.suggestedProduct.brand, make: cached.suggestedProduct.brand }
+            : {}),
+          ...(cached.suggestedProduct?.model ? { model: cached.suggestedProduct.model } : {}),
+        });
+        return;
+      }
+
+      const retryAt = aiRetryAtRef.current.get(signature) ?? 0;
+      if (retryAt > Date.now()) {
+        setAiStatus("unavailable");
         return;
       }
 
@@ -1580,7 +1665,15 @@ export default function QuickPostForm({
             method: "POST",
             body: payload,
           });
-          if (!response.ok) return null;
+          if (!response.ok) {
+            if (response.status === 429) {
+              const errorPayload = await response.json().catch(() => null) as { retryAfterSeconds?: number } | null;
+              const parsedRetryAfter = Number(errorPayload?.retryAfterSeconds ?? 60);
+              const retryAfterSeconds = Number.isFinite(parsedRetryAfter) ? Math.max(1, parsedRetryAfter) : 60;
+              aiRetryAtRef.current.set(signature, Date.now() + retryAfterSeconds * 1000);
+            }
+            return null;
+          }
           const json = (await response.json().catch(() => null)) as AiResponse | null;
           if (json) aiCacheRef.current.set(signature, json);
           return json;
@@ -1597,6 +1690,7 @@ export default function QuickPostForm({
       void request.then((json) => {
         if (cancelled) return;
         if (!json) {
+          applySuggestedDetails("gateway", {});
           setAiStatus("unavailable");
           return;
         }
@@ -1607,12 +1701,16 @@ export default function QuickPostForm({
         const rootFromSuggestion = json.suggestions?.[0]?.rootSlug ?? json.suggestion?.rootSlug ?? "";
         const nextRoot = normalizeQuickPostRootSlug(rootFromProduct || rootFromSuggestion);
         if (nextRoot && !rootTouched && rootChoices.some((category) => category.slug === nextRoot)) {
+          reconcileDetailsForCategoryChange(nextRoot, json.suggestedProduct?.categoryPath ?? null);
           if (!selectedCategoryPath?.startsWith(nextRoot)) setSelectedCategory(null);
           setSelectedRootSlug(nextRoot);
         }
-        if (json.suggestedProduct?.brand) updateDetail("brand", json.suggestedProduct.brand);
-        if (json.suggestedProduct?.brand) updateDetail("make", json.suggestedProduct.brand);
-        if (json.suggestedProduct?.model) updateDetail("model", json.suggestedProduct.model);
+        applySuggestedDetails("gateway", {
+          ...(json.suggestedProduct?.brand
+            ? { brand: json.suggestedProduct.brand, make: json.suggestedProduct.brand }
+            : {}),
+          ...(json.suggestedProduct?.model ? { model: json.suggestedProduct.model } : {}),
+        });
       });
     }, 700);
 
@@ -1620,7 +1718,7 @@ export default function QuickPostForm({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [applySmartSuggestion, description, images, rootChoices, rootTouched, selectedCategoryPath, step, title, updateDetail]);
+  }, [applySmartSuggestion, applySuggestedDetails, description, images, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, step, title]);
 
   useEffect(() => {
     if (!selectedRootSlug) {
@@ -1838,6 +1936,8 @@ export default function QuickPostForm({
       aiResponse,
       smartSuggestion,
       details,
+      managedSuggestedDetails: managedSuggestedDetailsRef.current,
+      userEditedDetailKeys: Array.from(userEditedDetailKeysRef.current),
       damageParts,
       whatsappEnabled,
       photos: images.map((image) => ({ name: image.file.name, size: image.file.size, type: image.file.type })),
@@ -1920,7 +2020,6 @@ export default function QuickPostForm({
       setAiStatus("working");
     }
     setStep(2);
-    void saveCurrentDraftNow(2);
   }
 
   function goBackToStepOne() {
@@ -2334,6 +2433,7 @@ export default function QuickPostForm({
                 key={category.id}
                 type="button"
                 onClick={() => {
+                  reconcileDetailsForCategoryChange(category.slug, null);
                   setRootTouched(true);
                   setSelectedCategory(null);
                   setCategoryCandidates([]);
@@ -2363,6 +2463,7 @@ export default function QuickPostForm({
                       key={`suggested-${candidate.id}`}
                       type="button"
                       onClick={() => {
+                        reconcileDetailsForCategoryChange(candidate.path.split("/")[0] ?? selectedRootSlug, candidate.path);
                         setRootTouched(true);
                         setSelectedCategory(candidate);
                         setShowOptionalDetails(false);
@@ -2414,6 +2515,7 @@ export default function QuickPostForm({
                         onClick={() => {
                           setRootTouched(true);
                           if (candidate.is_leaf) {
+                            reconcileDetailsForCategoryChange(candidate.path.split("/")[0] ?? selectedRootSlug, candidate.path);
                             setSelectedCategory(candidate);
                           } else {
                             setSelectedCategory(null);
