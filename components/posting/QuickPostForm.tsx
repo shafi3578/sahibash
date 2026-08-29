@@ -34,6 +34,8 @@ type QuickPostProps = {
   initialRootSlug?: string;
   sellerProfile?: SellerProfileContact | null;
   draftOwnerId?: string | null;
+  postingCategorySuggestionsEnabled?: boolean;
+  postingImageDetectionEnabled?: boolean;
 };
 
 type LocationMapPickerProps = {
@@ -199,6 +201,7 @@ const COPY = {
     stepOneTitle: "Post your ad",
     stepTwoTitle: "Confirm category and details",
     subtitle: "Photos, title, description, location and price. Sahibash fills the rest, and you can edit every suggestion.",
+    manualSubtitle: "Add the essential information, then choose the exact active category and optional details yourself.",
     continue: "Continue",
     back: "Back",
     editStepOne: "Edit Step 1",
@@ -215,6 +218,7 @@ const COPY = {
     descriptionRequirement: "At least 20 characters are required before publishing.",
     title: "Title",
     titleHint: "Keep it short and clear. Sahibash may suggest a better one later, but you stay in control.",
+    manualTitleHint: "Keep it short, specific and easy for buyers to understand.",
     titleTooShort: "Add a little more detail to the title.",
     price: "Price",
     amount: "Amount",
@@ -309,6 +313,7 @@ const COPY = {
     stepOneTitle: "اعلان خود را ثبت کنید",
     stepTwoTitle: "دسته و جزئیات را تایید کنید",
     subtitle: "عکس‌ها، عنوان، توضیحات، موقعیت و قیمت را وارد کنید. صاحبش جزئیات دیگر را پیشنهاد می‌کند و اختیار ویرایش همیشه با شماست.",
+    manualSubtitle: "معلومات اساسی را وارد کنید، سپس دسته فعال دقیق و جزئیات اختیاری را خودتان انتخاب کنید.",
     continue: "ادامه",
     back: "برگشت",
     editStepOne: "ویرایش مرحله ۱",
@@ -325,6 +330,7 @@ const COPY = {
     descriptionRequirement: "برای نشر اعلان حداقل ۲۰ حرف لازم است.",
     title: "عنوان",
     titleHint: "کوتاه و واضح بنویسید. صاحباش می‌تواند بعداً پیشنهاد بهتر بدهد، اما اختیار با شماست.",
+    manualTitleHint: "عنوان را کوتاه، مشخص و برای خریداران قابل فهم بنویسید.",
     titleTooShort: "کمی جزئیات بیشتر به عنوان اضافه کنید.",
     price: "قیمت",
     amount: "مبلغ",
@@ -419,6 +425,7 @@ const COPY = {
     stepOneTitle: "خپل اعلان ثبت کړئ",
     stepTwoTitle: "کټګوري او تفصیلات تایید کړئ",
     subtitle: "انځورونه، سرلیک، تشریح، ځای او بیه ولیکئ. صاحبش نور تفصیلات وړاندیز کوي او تاسو هر وړاندیز سمولای شئ.",
+    manualSubtitle: "اړین معلومات ولیکئ، بیا خپله کره فعاله کټګوري او اختیاري تفصیلات وټاکئ.",
     continue: "دوام",
     back: "شاته",
     editStepOne: "۱مه مرحله سمول",
@@ -435,6 +442,7 @@ const COPY = {
     descriptionRequirement: "د خپرولو لپاره لږ تر لږه ۲۰ توري اړین دي.",
     title: "سرلیک",
     titleHint: "لنډ او روښانه یې ولیکئ. صاحبش وروسته ښه وړاندیز کولای شي، خو اختیار ستاسو دی.",
+    manualTitleHint: "سرلیک لنډ، روښانه او د پېرېدونکو لپاره د پوهېدو وړ ولیکئ.",
     titleTooShort: "سرلیک ته لږ نور تفصیل زیات کړئ.",
     price: "بیه",
     amount: "اندازه",
@@ -1028,6 +1036,8 @@ export default function QuickPostForm({
   initialRootSlug = "",
   sellerProfile = null,
   draftOwnerId = null,
+  postingCategorySuggestionsEnabled = false,
+  postingImageDetectionEnabled = false,
 }: QuickPostProps) {
   void t;
   const router = useRouter();
@@ -1681,6 +1691,7 @@ export default function QuickPostForm({
   }, [applySuggestedDetails, contactForPrice, priceAmount, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, selectedRootSlug]);
 
   useEffect(() => {
+    if (!postingCategorySuggestionsEnabled) return;
     if (step !== 2) return;
     const meaningful = description.trim().length >= 20 || images.length > 0;
     if (!meaningful) return;
@@ -1733,7 +1744,9 @@ export default function QuickPostForm({
           const payload = new FormData();
           payload.set("title", title);
           payload.set("description", description);
-          const optimizedImage = images[0] ? await optimizeImageForAI(images[0].file) : null;
+          const optimizedImage = postingImageDetectionEnabled && images[0]
+            ? await optimizeImageForAI(images[0].file)
+            : null;
           if (optimizedImage) payload.set("image", optimizedImage);
           const response = await fetch("/api/ai/category-suggestion", {
             method: "POST",
@@ -1799,7 +1812,7 @@ export default function QuickPostForm({
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [applySmartSuggestion, applySuggestedDetails, description, images, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, selectedRootSlug, step, title]);
+  }, [applySmartSuggestion, applySuggestedDetails, description, images, postingCategorySuggestionsEnabled, postingImageDetectionEnabled, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, selectedRootSlug, step, title]);
 
   useEffect(() => {
     if (!selectedRootSlug) {
@@ -1857,7 +1870,7 @@ export default function QuickPostForm({
 
         if (!cancelled) {
           setCategoryNodes(nodes);
-          setCategoryCandidates(choices.slice(0, 3));
+          setCategoryCandidates(postingCategorySuggestionsEnabled ? choices.slice(0, 3) : []);
           setManualCategoryPath((current) => current.startsWith(selectedRootSlug) ? current : selectedRootSlug);
           if (selectedCategoryPath && !selectedCategoryPath.startsWith(selectedRootSlug)) {
             setSelectedCategory(null);
@@ -1871,7 +1884,7 @@ export default function QuickPostForm({
     return () => {
       cancelled = true;
     };
-  }, [aiResponse, description, details, rootTouched, selectedCategoryId, selectedCategoryPath, selectedRootSlug, supabase, title]);
+  }, [aiResponse, description, details, postingCategorySuggestionsEnabled, rootTouched, selectedCategoryId, selectedCategoryPath, selectedRootSlug, supabase, title]);
 
   const onPickFiles = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -2095,11 +2108,13 @@ export default function QuickPostForm({
     }
     setError(null);
     setStatus(null);
-    const aiSignature = `${title.trim()}|${description.trim().slice(0, 500)}|${images[0]?.file.name ?? ""}|${images[0]?.file.size ?? 0}`;
-    if (!aiCacheRef.current.has(aiSignature) && aiResponseSignatureRef.current !== aiSignature) {
-      setAiResponse(null);
-      setCategoryCandidates([]);
-      setAiStatus("working");
+    if (postingCategorySuggestionsEnabled) {
+      const aiSignature = `${title.trim()}|${description.trim().slice(0, 500)}|${images[0]?.file.name ?? ""}|${images[0]?.file.size ?? 0}`;
+      if (!aiCacheRef.current.has(aiSignature) && aiResponseSignatureRef.current !== aiSignature) {
+        setAiResponse(null);
+        setCategoryCandidates([]);
+        setAiStatus("working");
+      }
     }
     setStep(2);
   }
@@ -2374,7 +2389,9 @@ export default function QuickPostForm({
           </p>
         </div>
         <h2 className="mt-1 font-display text-2xl font-bold text-[var(--ink-1)]">{step === 1 ? c.stepOneTitle : c.stepTwoTitle}</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-2)]">{c.subtitle}</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ink-2)]">
+          {postingCategorySuggestionsEnabled ? c.subtitle : c.manualSubtitle}
+        </p>
       </section>
 
       {step === 1 ? (
@@ -2434,7 +2451,9 @@ export default function QuickPostForm({
             className="mt-2 w-full rounded-2xl border border-[var(--line)] px-3 py-3 text-sm outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
           />
           <span className={`mt-1 block text-xs ${title.trim().length > 0 && title.trim().length < 5 ? "text-amber-700" : "text-[var(--ink-2)]"}`}>
-            {title.trim().length > 0 && title.trim().length < 5 ? c.titleTooShort : c.titleHint}
+            {title.trim().length > 0 && title.trim().length < 5
+              ? c.titleTooShort
+              : postingCategorySuggestionsEnabled ? c.titleHint : c.manualTitleHint}
           </span>
         </label>
         <label data-testid="quick-post-description" className="block text-sm font-bold">
@@ -2479,7 +2498,7 @@ export default function QuickPostForm({
 
       {step === 2 ? (
       <section
-        data-testid="quick-post-ai-chips"
+        data-testid={postingCategorySuggestionsEnabled ? "quick-post-ai-chips" : "quick-post-category"}
         data-ai-source={aiResponse?.source ?? aiStatus}
         data-ai-status={aiResponse?.gatewayStatus ?? aiStatus}
         data-ai-model={aiResponse?.gatewayModel ?? ""}
@@ -2487,15 +2506,15 @@ export default function QuickPostForm({
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-display text-lg font-bold">{c.detected}</h3>
-            <p className="mt-1 text-xs text-[var(--ink-2)]">{c.detectionHint}</p>
+            <h3 className="font-display text-lg font-bold">{postingCategorySuggestionsEnabled ? c.detected : c.chooseCategory}</h3>
+            <p className="mt-1 text-xs text-[var(--ink-2)]">{postingCategorySuggestionsEnabled ? c.detectionHint : c.manualCategory}</p>
           </div>
-          <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-bold text-[var(--ink-2)]">
+          {postingCategorySuggestionsEnabled ? <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-bold text-[var(--ink-2)]">
             {aiStatus === "working" ? c.aiWorking : aiStatus === "unavailable" ? c.aiUnavailable : categoryLoading ? c.aiWorking : "AI"}
-          </span>
+          </span> : null}
         </div>
 
-        {chips.length > 0 ? (
+        {postingCategorySuggestionsEnabled && chips.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {chips.map((chip) => (
               <span key={chip.key} className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-3 py-1 text-sm font-semibold">
@@ -2503,9 +2522,9 @@ export default function QuickPostForm({
               </span>
             ))}
           </div>
-        ) : (
+        ) : postingCategorySuggestionsEnabled ? (
           <p className="mt-3 rounded-2xl bg-[var(--surface-2)] px-3 py-3 text-sm text-[var(--ink-2)]">{c.lowConfidence}</p>
-        )}
+        ) : null}
 
         <div className="mt-4">
           <p className="text-sm font-bold">{c.chooseCategory}</p>
@@ -2535,7 +2554,7 @@ export default function QuickPostForm({
             ))}
           </div>
           <div className="mt-4 grid gap-3">
-            <div>
+            {postingCategorySuggestionsEnabled ? <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--ink-2)]">{c.suggestionsTitle}</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {categoryCandidates.map((candidate, index) => {
@@ -2564,10 +2583,10 @@ export default function QuickPostForm({
                   );
                 })}
               </div>
-            </div>
+            </div> : null}
 
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--ink-2)]">{c.manualCategory}</p>
+              {postingCategorySuggestionsEnabled ? <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--ink-2)]">{c.manualCategory}</p> : null}
               {manualCurrentNode ? (
                 <div className="mt-2 rounded-2xl border border-[var(--line)] bg-white p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-3">

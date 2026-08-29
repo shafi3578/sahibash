@@ -37,26 +37,64 @@ function normalizeModelName(model?: string) {
   return clean;
 }
 
+function multiplierForUnit(unit: string | undefined) {
+  if (!unit) return 1;
+  if (/^(?:k|thousand|هزار|زر|زره)$/u.test(unit)) return 1_000;
+  if (/^(?:lakh|lac|لک|لاکه|لکه)$/u.test(unit)) return 100_000;
+  return 1;
+}
+
+function parseAmount(value: string, unit?: string) {
+  const parsed = Number(value.replaceAll(",", ""));
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed * multiplierForUnit(unit));
+}
+
 function extractMaxPrice(normalized: string) {
   const patterns = [
-    /(?:under|below|less than|max|maximum|up to|budget|تا|زیر|کمتر از|حداکثر|لاندې|تر)\s+(\d{4,9})/u,
-    /(\d{4,9})\s*(?:afn|afs|افغانی|افغانۍ|افغانیو)\s*(?:or less|and below|یا کمتر|یا کم|نه کم)?/u,
+    /(?:under|below|less than|max|maximum|up to|budget|تا|زیر|کمتر از|حداکثر|لاندې|تر)\s+(\d+(?:\.\d+)?)\s*(k|thousand|هزار|زر|زره|lakh|lac|لک|لاکه|لکه)?/u,
+    /(\d+(?:\.\d+)?)\s*(k|thousand|هزار|زر|زره|lakh|lac|لک|لاکه|لکه)?\s*(?:afn|afs|افغانی|افغانۍ|افغانیو)\s*(?:or less|and below|یا کمتر|یا کم|نه کم)?/u,
   ];
 
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
     if (match?.[1]) {
-      const parsed = Number(match[1]);
-      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      const parsed = parseAmount(match[1], match[2]);
+      if (parsed) return parsed;
     }
   }
+
+  if (/(?:پنځه|پنج)\s*(?:lakh|lac|لک|لاکه|لکه)/u.test(normalized)) return 500_000;
 
   return null;
 }
 
-function extractExactYear(numbers: number[], maxPrice: number | null) {
+function extractYearBounds(normalized: string, numbers: number[], maxPrice: number | null) {
   const currentYear = new Date().getFullYear();
-  return numbers.find((value) => value !== maxPrice && value >= 1950 && value <= currentYear + 1) ?? null;
+  const year = numbers.find((value) => value !== maxPrice && value >= 1950 && value <= currentYear + 1) ?? null;
+  if (!year) return { min: null, max: null };
+  const yearText = String(year);
+  const newer = new RegExp(`${yearText}\\s*(?:or newer|or later|and newer|به بعد|یا جدیدتر|به بالا|او وروسته|یا نویتر)`, "u").test(normalized);
+  const older = new RegExp(`${yearText}\\s*(?:or older|or earlier|and older|یا قدیمی تر|به پایین|او پخوانی|یا زوړ)`, "u").test(normalized);
+  if (newer) return { min: year, max: null };
+  if (older) return { min: null, max: year };
+  return { min: year, max: year };
+}
+
+function extractRooms(normalized: string) {
+  const match = normalized.match(/(\d{1,2})\s*(?:bed(?:room)?s?|rooms?|اتاق|اطاق|خونه|خونې)/u);
+  return match?.[1] ? Number(match[1]) : null;
+}
+
+function extractLandSize(normalized: string) {
+  const match = normalized.match(/(\d+(?:\.\d+)?)\s*(jerib|جریب|جریبه|biswa|بسوه|بیسوه|m2|sqm|متر مربع)/u);
+  if (!match?.[1] || !match[2]) return null;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const multiplier = /^(?:jerib|جریب|جریبه)$/u.test(match[2])
+    ? 2_000
+    : /^(?:biswa|بسوه|بیسوه)$/u.test(match[2]) ? 100 : 1;
+  return { squareMetres: Math.round(amount * multiplier), original: `${match[1]} ${match[2]}` };
 }
 
 function chipLabels(locale: AppLocale) {
@@ -68,6 +106,9 @@ function chipLabels(locale: AppLocale) {
       year: "کال",
       brand: "برانډ",
       model: "موډل",
+      rooms: "خونې",
+      land: "مساحت",
+      sort: "ترتیب",
     };
   }
   if (locale === "fa") {
@@ -78,6 +119,9 @@ function chipLabels(locale: AppLocale) {
       year: "سال",
       brand: "برند",
       model: "مدل",
+      rooms: "اتاق",
+      land: "مساحت",
+      sort: "ترتیب",
     };
   }
   return {
@@ -87,6 +131,9 @@ function chipLabels(locale: AppLocale) {
     year: "Year",
     brand: "Brand",
     model: "Model",
+    rooms: "Rooms",
+    land: "Land",
+    sort: "Sort",
   };
 }
 
@@ -158,17 +205,45 @@ export function parseSahibashAiSearch(query: string, locale: AppLocale): Sahibas
     confidence += 0.12;
   }
 
-  const exactYear = extractExactYear(understood.numericTokens, maxPrice);
-  if (exactYear) {
-    params.yearMin = String(exactYear);
-    params.yearMax = String(exactYear);
+  const yearBounds = extractYearBounds(normalizedQuery, understood.numericTokens, maxPrice);
+  if (yearBounds.min || yearBounds.max) {
+    if (yearBounds.min) params.yearMin = String(yearBounds.min);
+    if (yearBounds.max) params.yearMax = String(yearBounds.max);
     chips.push({
       key: "year",
       label: labels.year,
-      value: String(exactYear),
+      value: yearBounds.min && !yearBounds.max
+        ? `${yearBounds.min}+`
+        : yearBounds.max && !yearBounds.min ? `≤ ${yearBounds.max}` : String(yearBounds.min),
       removeKeys: ["yearMin", "yearMax", "year_min", "year_max"],
     });
     confidence += 0.08;
+  }
+
+  const rooms = extractRooms(normalizedQuery);
+  if (rooms) {
+    params.minRooms = String(rooms);
+    chips.push({ key: "rooms", label: labels.rooms, value: `${rooms}+`, removeKeys: ["minRooms", "rooms_min"] });
+    confidence += 0.06;
+  }
+
+  const landSize = extractLandSize(normalizedQuery);
+  if (landSize) {
+    params.minLandSize = String(landSize.squareMetres);
+    params.maxLandSize = String(landSize.squareMetres);
+    chips.push({ key: "land", label: labels.land, value: landSize.original, removeKeys: ["minLandSize", "maxLandSize", "min_land_size", "max_land_size"] });
+    confidence += 0.08;
+  }
+
+  if (/(?:cheapest|lowest price|cheap first|ارزان ترین|ارزانترین|کمترین قیمت|تر ټولو ارزانه)/u.test(normalizedQuery)) {
+    params.sort = "price_low";
+    chips.push({ key: "sort", label: labels.sort, value: "price low", removeKeys: ["sort"] });
+  }
+
+  if (/(?:wanted|looking for|خریدارم|ضرورت دارم|نیاز دارم|غواړم|اړتیا لرم)/u.test(normalizedQuery)) {
+    params.listingType = "wanted";
+  } else if (/(?:for sale|فروشی|برای فروش|د خرڅلاو)/u.test(normalizedQuery)) {
+    params.listingType = "for_sale";
   }
 
   const categoryPath = intent?.categoryPath

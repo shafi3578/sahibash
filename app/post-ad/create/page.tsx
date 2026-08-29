@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import QuickPostForm from "@/components/posting/QuickPostForm";
 import PostAdForm from "../post-ad-form";
+import { getAiFeatureFlags } from "@/lib/ai/feature-flags";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -21,9 +22,10 @@ export default async function PostAdCreatePage({
   const posting = getParam(params.posting);
   const initialRootSlug = getParam(params.category);
 
-  const [categories, { t, locale }] = await Promise.all([
+  const [categories, { t, locale }, aiFlags] = await Promise.all([
     getPostingRootCategories(),
     getDictionary(),
+    getAiFeatureFlags(),
   ]);
   const user = await getCurrentUser();
   const sellerProfile = user
@@ -53,6 +55,8 @@ export default async function PostAdCreatePage({
           initialRootSlug={initialRootSlug}
           sellerProfile={sellerProfile}
           draftOwnerId={user?.id ?? null}
+          postingCategorySuggestionsEnabled={aiFlags.postingCategorySuggestionsEnabled}
+          postingImageDetectionEnabled={aiFlags.postingImageDetectionEnabled}
         />
       ) : (
         <PostAdForm

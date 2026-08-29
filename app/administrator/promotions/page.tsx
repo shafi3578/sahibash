@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireSuperAdministrator } from "@/lib/auth";
 import { updateFeaturedCampaignConfigAction } from "@/lib/actions/featured-payments";
+import { updateAiFeatureFlagAction } from "@/lib/actions/ai-feature-flags";
+import { getAiFeatureFlagAdminRows, getAiSearchDailyMetrics, type AiFeatureFlagKey } from "@/lib/ai/feature-flags";
 import { getActiveFeaturedCampaignConfig } from "@/lib/data/featured-payments";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
@@ -30,6 +32,24 @@ const COPY = {
     missing: "Missing",
     provider: "Provider",
     updated: "Updated",
+    aiFeatures: "AI feature controls",
+    aiFeaturesHelp: "Independent, server-side controls. Enabling AI Search first verifies a real AI Gateway response. Posting AI remains optional and manual posting always works.",
+    enabled: "Active",
+    disabled: "Off",
+    enable: "Enable",
+    disable: "Disable",
+    changedBy: "Changed by",
+    never: "Not changed yet",
+    gatewayReady: "AI Gateway credential",
+    aiSaved: "AI feature setting saved and audited.",
+    aiFailed: "The setting was not changed. Gateway verification, authorization, or audit logging failed.",
+    today: "Today",
+    requests: "AI requests",
+    successRate: "Gateway success",
+    fallbackRate: "Fallback",
+    zeroRate: "Zero results",
+    latency: "Average latency",
+    cost: "Estimated cost",
   },
   fa: {
     title: "مرکز کنترل اعلان ویژه و هوش مصنوعی",
@@ -53,6 +73,24 @@ const COPY = {
     missing: "ناقص",
     provider: "ارائه‌دهنده",
     updated: "به‌روزرسانی",
+    aiFeatures: "کنترل قابلیت‌های هوش مصنوعی",
+    aiFeaturesHelp: "کنترل‌های مستقل و سمت سرور. پیش از فعال‌شدن جستجوی AI یک درخواست واقعی Gateway تأیید می‌شود. AI نشر اعلان اختیاری است و نشر دستی همیشه کار می‌کند.",
+    enabled: "فعال",
+    disabled: "خاموش",
+    enable: "فعال‌سازی",
+    disable: "غیرفعال‌سازی",
+    changedBy: "تغییر توسط",
+    never: "هنوز تغییر نکرده",
+    gatewayReady: "کلید AI Gateway",
+    aiSaved: "تنظیم قابلیت AI ذخیره و ثبت شد.",
+    aiFailed: "تنظیم تغییر نکرد. تأیید Gateway، مجوز یا ثبت رویداد موفق نبود.",
+    today: "امروز",
+    requests: "درخواست‌های AI",
+    successRate: "موفقیت Gateway",
+    fallbackRate: "بازگشت به جستجوی عادی",
+    zeroRate: "بدون نتیجه",
+    latency: "میانگین زمان پاسخ",
+    cost: "هزینه تخمینی",
   },
   ps: {
     title: "د ځانګړي اعلان او AI کنټرول مرکز",
@@ -76,6 +114,42 @@ const COPY = {
     missing: "ناقص",
     provider: "چمتوکوونکی",
     updated: "تازه شوی",
+    aiFeatures: "د AI ځانګړنو کنټرول",
+    aiFeaturesHelp: "خپلواک، سروري کنټرولونه. د AI لټون له فعالېدو مخکې د Gateway رښتینې غوښتنه تاییدېږي. د اعلان AI اختیاري دی او لاسي اعلان تل کار کوي.",
+    enabled: "فعال",
+    disabled: "بند",
+    enable: "فعالول",
+    disable: "بندول",
+    changedBy: "بدلون کوونکی",
+    never: "تر اوسه نه دی بدل شوی",
+    gatewayReady: "د AI Gateway کیلي",
+    aiSaved: "د AI ځانګړنې تنظیم خوندي او ثبت شو.",
+    aiFailed: "تنظیم بدل نه شو. د Gateway تایید، اجازه یا د پلټنې ثبت ناکام شو.",
+    today: "نن",
+    requests: "د AI غوښتنې",
+    successRate: "د Gateway بریا",
+    fallbackRate: "عادي لټون ته ستنېدل",
+    zeroRate: "بې پایلې",
+    latency: "منځنی ځنډ",
+    cost: "اټکلي لګښت",
+  },
+};
+
+const AI_FLAG_COPY: Record<AiFeatureFlagKey, Record<"en" | "fa" | "ps", { title: string; description: string }>> = {
+  ai_search_enabled: {
+    en: { title: "AI Search", description: "Adds an optional AI Search button beside normal search. Normal search never calls a model." },
+    fa: { title: "جستجوی AI", description: "یک دکمه اختیاری AI کنار جستجوی عادی می‌افزاید. جستجوی عادی هرگز مدل را فراخوانی نمی‌کند." },
+    ps: { title: "AI لټون", description: "د عادي لټون تر څنګ اختیاري AI تڼۍ زیاتوي. عادي لټون هېڅکله ماډل نه رابولي." },
+  },
+  ai_posting_category_suggestions_enabled: {
+    en: { title: "Posting category suggestions", description: "Allows optional text-based category suggestions. The seller still confirms a live leaf category." },
+    fa: { title: "پیشنهاد دسته‌بندی اعلان", description: "پیشنهاد اختیاری دسته‌بندی بر اساس متن را فعال می‌کند. فروشنده همچنان دسته نهایی فعال را تأیید می‌کند." },
+    ps: { title: "د اعلان کټګورۍ وړاندیز", description: "د متن اختیاري کټګورۍ وړاندیز فعالوي. پلورونکی بیا هم ژوندۍ وروستۍ کټګوري تاییدوي." },
+  },
+  ai_posting_image_detection_enabled: {
+    en: { title: "Posting image detection", description: "Allows image classification only while category suggestions are also active." },
+    fa: { title: "تشخیص تصویر اعلان", description: "طبقه‌بندی تصویر را فقط هنگامی اجازه می‌دهد که پیشنهاد دسته‌بندی نیز فعال باشد." },
+    ps: { title: "د اعلان انځور پېژندنه", description: "یوازې هغه وخت د انځور طبقه‌بندي اجازه ورکوي چې د کټګورۍ وړاندیز هم فعال وي." },
   },
 };
 
@@ -104,19 +178,27 @@ async function getLaunchFlags() {
   }
 }
 
-export default async function AdministratorPromotionsPage() {
+export default async function AdministratorPromotionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requireSuperAdministrator();
-  const locale = await getCurrentLocale();
+  const [locale, rawParams] = await Promise.all([getCurrentLocale(), searchParams]);
   const copy = COPY[locale];
-  const [config, flags] = await Promise.all([
+  const [config, flags, aiFlags, aiMetrics] = await Promise.all([
     getActiveFeaturedCampaignConfig(),
     getLaunchFlags(),
+    getAiFeatureFlagAdminRows(),
+    getAiSearchDailyMetrics(),
   ]);
+  const aiResult = Array.isArray(rawParams.ai) ? rawParams.ai[0] : rawParams.ai;
 
   const environment = [
     ["NEXT_PUBLIC_SUPABASE_URL", Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)],
     ["NEXT_PUBLIC_SUPABASE_ANON_KEY", Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)],
     ["SUPABASE_SERVICE_ROLE_KEY", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)],
+    [copy.gatewayReady, Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN)],
     ["HUGGINGFACE_API_KEY", Boolean(process.env.HUGGINGFACE_API_KEY)],
   ] as const;
 
@@ -127,6 +209,60 @@ export default async function AdministratorPromotionsPage() {
       </Link>
       <h1 className="mt-3 font-display text-3xl font-black">{copy.title}</h1>
       <p className="mt-1 text-sm text-[var(--ink-2)]">{copy.description}</p>
+      {aiResult ? (
+        <p className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${aiResult === "saved" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-900"}`}>
+          {aiResult === "saved" ? copy.aiSaved : copy.aiFailed}
+        </p>
+      ) : null}
+
+      <section className="mt-6 rounded-3xl border border-indigo-200 bg-indigo-50/60 p-5">
+        <h2 className="text-xl font-black text-indigo-950">{copy.aiFeatures}</h2>
+        <p className="mt-1 text-sm text-indigo-900">{copy.aiFeaturesHelp}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            [copy.requests, formatNumber(aiMetrics.requests, locale)],
+            [copy.successRate, `${formatNumber(aiMetrics.successRate * 100, locale, { maximumFractionDigits: 1 })}%`],
+            [copy.fallbackRate, `${formatNumber(aiMetrics.fallbackRate * 100, locale, { maximumFractionDigits: 1 })}%`],
+            [copy.zeroRate, `${formatNumber(aiMetrics.zeroResultRate * 100, locale, { maximumFractionDigits: 1 })}%`],
+            [copy.latency, `${formatNumber(aiMetrics.averageLatencyMs, locale)} ms`],
+            [copy.cost, `$${aiMetrics.estimatedCostUsd.toFixed(6)}`],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-indigo-100 bg-white px-3 py-2">
+              <p className="text-xs text-slate-500">{copy.today} · {label}</p>
+              <p className="mt-1 font-bold text-slate-950">{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3">
+          {aiFlags.map((flag) => {
+            const localized = AI_FLAG_COPY[flag.key][locale];
+            return (
+              <div key={flag.key} className="grid gap-3 rounded-2xl border border-indigo-100 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-bold text-slate-950">{localized.title}</h3>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${flag.enabled ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+                      {flag.enabled ? copy.enabled : copy.disabled}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-600">{localized.description}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {copy.updated}: {flag.updatedAt ? formatDate(flag.updatedAt, locale, { dateStyle: "medium", timeStyle: "short" }) : copy.never}
+                    {flag.updatedBy ? ` · ${copy.changedBy}: ${flag.updatedBy}` : ""}
+                  </p>
+                </div>
+                <form action={updateAiFeatureFlagAction}>
+                  <input type="hidden" name="key" value={flag.key} />
+                  <input type="hidden" name="enabled" value={flag.enabled ? "false" : "true"} />
+                  <button className={`min-h-11 rounded-xl px-4 text-sm font-bold ${flag.enabled ? "border border-slate-300 bg-white text-slate-700" : "bg-indigo-700 text-white"}`}>
+                    {flag.enabled ? copy.disable : copy.enable}
+                  </button>
+                </form>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
         <h2 className="text-xl font-black text-amber-950">{copy.featured}</h2>

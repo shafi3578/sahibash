@@ -36,7 +36,7 @@ test("Quick Post is exactly two required steps and preserves existing draft/publ
     'data-testid="quick-post-description"',
     'data-testid="quick-post-price"',
     'data-testid="quick-post-location"',
-    'data-testid="quick-post-ai-chips"',
+    '"quick-post-category"',
     'data-testid="quick-post-advanced-details"',
     'data-testid="quick-post-review"',
     'name="contact_for_price"',
@@ -153,7 +153,7 @@ test("Quick Post resolves AI suggestions against canonical taxonomy instead of a
 test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matching", () => {
   assert.match(aiGateway, /AI_GATEWAY_API_KEY \?\? process\.env\.VERCEL_OIDC_TOKEN/);
   assert.match(aiGateway, /mistral\/mistral-small/);
-  assert.match(aiGateway, /models: \["spacexai\/grok-4\.1-fast-non-reasoning", "openai\/gpt-5\.6-luna"\]/);
+  assert.match(aiGateway, /models: \["openai\/gpt-5-nano"\]/);
   assert.match(aiGateway, /feature:category-suggest/);
   assert.match(aiGateway, /createHash\("sha256"\)\.update\(input\.userId\)/);
   assert.match(aiGateway, /15_000/);

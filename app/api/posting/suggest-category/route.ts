@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import type { AISuggestion } from "@/lib/posting/types";
+import { getAiFeatureFlags } from "@/lib/ai/feature-flags";
 
 type SuggestionRequest = {
   title: string;
@@ -336,6 +337,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Authentication required", suggestion: null },
         { status: 401 }
+      );
+    }
+
+    const aiFlags = await getAiFeatureFlags();
+    if (!aiFlags.postingCategorySuggestionsEnabled) {
+      return NextResponse.json(
+        { error: "Optional posting AI is disabled", suggestion: null },
+        { status: 404 }
       );
     }
 

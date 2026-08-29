@@ -9,7 +9,8 @@ import {
   getFilterDefinitionsForNode,
   type FilterDefinition,
 } from "@/lib/data/queries";
-import { parseSahibashAiSearch } from "@/lib/ai/search-parser";
+import { interpretAiSearch } from "@/lib/ai/search-interpreter";
+import { getAiFeatureFlags } from "@/lib/ai/feature-flags";
 import { detectSearchIntent } from "@/lib/search/intent";
 import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
 import type { SearchRewriteClient } from "@/lib/search/rewrite";
@@ -22,6 +23,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { saveSearchAction } from "@/lib/actions/saved-searches";
 import { createWantedRequestAction } from "@/lib/actions/liquidity";
 import { wantedCopy } from "@/lib/liquidity/wanted";
+import { getCurrentUser } from "@/lib/auth";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -331,20 +333,32 @@ export default async function SearchPage({
 }: {
   searchParams: RawSearchParams;
 }) {
-  const [{ t, locale }, raw] = await Promise.all([
+  const [{ t, locale }, raw, aiFlags] = await Promise.all([
     getDictionary(),
     searchParams,
+    getAiFeatureFlags(),
   ]);
   const rawParams = Object.fromEntries(
     Object.entries(raw).map(([key, value]) => [key, pickFirst(value)])
   ) as Record<string, string | undefined>;
-  const aiParsed = parseSahibashAiSearch(rawParams.aiQuery ?? "", locale);
+  const searchInput = (rawParams.query ?? rawParams.aiQuery ?? rawParams.q ?? "").trim().slice(0, 240);
+  const aiRequested = aiFlags.aiSearchEnabled
+    && Boolean(searchInput)
+    && (rawParams.mode === "ai" || Boolean(rawParams.aiQuery));
+  const aiUser = aiRequested ? await getCurrentUser() : null;
+  const aiParsed = aiRequested
+    ? await interpretAiSearch({ query: searchInput, locale, userId: aiUser?.id ?? null })
+    : null;
+  const cleanParams = Object.fromEntries(
+    Object.entries(rawParams).filter(([key]) => !["query", "mode", "aiQuery"].includes(key))
+  ) as Record<string, string | undefined>;
+  if (searchInput) cleanParams.q = searchInput;
   const params = aiParsed
     ? {
-        ...rawParams,
+        ...cleanParams,
         ...aiParsed.params,
       }
-    : rawParams;
+    : cleanParams;
 
   const intent = detectSearchIntent(params.q);
 
@@ -374,6 +388,13 @@ export default async function SearchPage({
   const autoVehicleModel = params.vehicleModel ?? params.vehicle_model ?? intent?.model;
   const autoRentalType = params.rentalType ?? params.rental_type ?? intent?.rentalType;
   const listingType = params.listingType ?? params.listing_type;
+  const normalizedSort =
+    params.sort === "price_low" ||
+    params.sort === "price_high" ||
+    params.sort === "nearest" ||
+    params.sort === "relevant"
+      ? params.sort
+      : "newest";
 
   const listingsPromise = getApprovedListings({
     locale,
@@ -383,13 +404,7 @@ export default async function SearchPage({
     categoryId: toNumber(params.categoryId),
     categoryNodeId: effectiveCategoryNodeId,
     categoryScope: params.scope === "exact" ? "exact" : "subtree",
-    sort:
-      params.sort === "price_low" ||
-      params.sort === "price_high" ||
-      params.sort === "nearest" ||
-      params.sort === "relevant"
-        ? params.sort
-        : "newest",
+    sort: normalizedSort,
 
     minPrice: toNumber(params.minPrice ?? params.min_price),
     maxPrice: toNumber(params.maxPrice ?? params.max_price),
@@ -494,11 +509,29 @@ export default async function SearchPage({
       })()
     : Promise.resolve({ normalizedQuery: "", variants: [], rewrittenTerms: [] });
 
-  const [siblings, listings, rewriteContext] = await Promise.all([
+  const [siblings, initialListings, rewriteContext] = await Promise.all([
     siblingsPromise,
     listingsPromise,
     rewriteContextPromise,
   ]);
+  const broadenedAiFallback = Boolean(
+    aiParsed &&
+    initialListings.length === 0 &&
+    aiIntentNode &&
+    !explicitCategoryNodeId
+  );
+  const listings = broadenedAiFallback
+    ? await getApprovedListings({
+        locale,
+        search: params.q,
+        province: params.province,
+        district: params.district,
+        minPrice: toNumber(params.minPrice ?? params.min_price),
+        maxPrice: toNumber(params.maxPrice ?? params.max_price),
+        listingType: listingType === "wanted" ? "wanted" : listingType === "for_sale" ? "for_sale" : undefined,
+        sort: normalizedSort,
+      })
+    : initialListings;
 
   const telemetryId = hasSearchSignal
     ? await logSearchTelemetry({
@@ -506,7 +539,7 @@ export default async function SearchPage({
         normalizedQuery: rewriteContext.normalizedQuery,
         selectedLanguage: locale,
         resultCount: listings.length,
-        categoryFilter: effectiveNode?.path ?? params.categoryId ?? null,
+        categoryFilter: broadenedAiFallback ? null : effectiveNode?.path ?? params.categoryId ?? null,
         provinceFilter: params.province ?? null,
         districtFilter: params.district ?? null,
         rewrittenTerms: rewriteContext.rewrittenTerms,
@@ -528,13 +561,20 @@ export default async function SearchPage({
       resultCount: listings.length,
       parserSource: aiParsed.parserSource,
       confidence: aiParsed.confidence,
+      gatewayStatus: aiParsed.gatewayStatus,
+      gatewayModel: aiParsed.gatewayModel,
+      latencyMs: aiParsed.latencyMs,
+      inputTokens: aiParsed.inputTokens,
+      outputTokens: aiParsed.outputTokens,
+      estimatedCostUsd: aiParsed.estimatedCostUsd,
+      fallbackReason: aiParsed.fallbackReason ?? (broadenedAiFallback ? "zero_result_category_broadened" : null),
     });
   }
 
   const activeEntries = Object.entries(params).filter(
     ([key, value]) =>
       Boolean(value) &&
-      !["scope", "mobileFilters", "aiQuery"].includes(key)
+      !["scope", "mobileFilters", "aiQuery", "query", "mode"].includes(key)
   );
 
   const activeFilterCount = activeEntries.length;
@@ -545,27 +585,27 @@ export default async function SearchPage({
   closeMobileFilterParams.delete("mobileFilters");
   const aiCopy = locale === "fa"
     ? {
-        title: "با هوش صاحبش پیدا کن",
-        subtitle: "مثلاً: «کرولا در کابل زیر ۴۰۰۰۰۰» — صاحبش آن را به فیلترهای دقیق تبدیل می‌کند.",
+        title: "جستجوی صاحبش",
         placeholder: "مثلاً کرولا در کابل زیر 400000",
         button: "جستجوی هوشمند",
+        normalButton: "جستجو",
         interpreted: "برداشت صاحبش",
         confidence: "اعتماد",
       }
     : locale === "ps"
       ? {
-          title: "له صاحبش AI سره یې پیدا کړئ",
-          subtitle: "لکه: «Corolla په کابل کې تر 400000 کم» — صاحبش یې دقیقو فلټرونو ته اړوي.",
+          title: "د صاحبش لټون",
           placeholder: "لکه Corolla in Kabul under 400000",
           button: "هوښیار لټون",
+          normalButton: "لټون",
           interpreted: "د صاحبش برداشت",
           confidence: "باور",
         }
       : {
-          title: "Find It With Sahibash AI",
-          subtitle: "Example: “a Corolla in Kabul under 400000” — Sahibash turns it into exact filters.",
+          title: "Search Sahibash",
           placeholder: "a Corolla in Kabul under 400000",
           button: "AI search",
+          normalButton: "Search",
           interpreted: "Sahibash understood",
           confidence: "Confidence",
         };
@@ -577,29 +617,29 @@ export default async function SearchPage({
         {t.search.subtitle}
       </p>
 
-      <section className="mt-4 rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-black text-indigo-950">{aiCopy.title}</p>
-            <p className="mt-1 text-sm text-indigo-900">{aiCopy.subtitle}</p>
-          </div>
-          <form action={localizePath("/search", locale)} className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] lg:max-w-2xl">
-            <label className="sr-only" htmlFor="ai-search-query">{aiCopy.title}</label>
-            <input
-              id="ai-search-query"
-              name="aiQuery"
-              defaultValue={rawParams.aiQuery ?? ""}
-              placeholder={aiCopy.placeholder}
-              maxLength={240}
-              className="min-h-12 rounded-2xl border border-indigo-100 bg-white px-4 text-base shadow-sm"
-            />
-            <button className="min-h-12 rounded-2xl bg-indigo-700 px-5 text-sm font-black text-white shadow-sm hover:bg-indigo-800">
-              {aiCopy.button}
+      <section className="mt-4 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-sm">
+        <form action={localizePath("/search", locale)} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <label className="sr-only" htmlFor="marketplace-search-query">{aiCopy.title}</label>
+          <input
+            id="marketplace-search-query"
+            name="query"
+            defaultValue={searchInput}
+            placeholder={aiCopy.placeholder}
+            maxLength={240}
+            className="min-h-12 min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 text-base"
+          />
+          <button name="mode" value="normal" className="min-h-12 rounded-xl bg-[var(--ink-1)] px-5 text-sm font-bold text-white">
+            {aiCopy.normalButton}
+          </button>
+          {aiFlags.aiSearchEnabled ? (
+            <button name="mode" value="ai" className="min-h-12 rounded-xl border border-indigo-200 bg-indigo-50 px-5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
+              ✨ {aiCopy.button}
             </button>
-          </form>
-        </div>
+          ) : null}
+          <SearchHiddenFields params={params} exclude={["q", "query", "mode", "aiQuery", "mobileFilters"]} />
+        </form>
         {aiParsed ? (
-          <div className="mt-3 rounded-2xl border border-indigo-100 bg-white p-3">
+          <div className="mt-2 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span className="font-bold text-slate-950">{aiCopy.interpreted}</span>
               <span>{aiCopy.confidence}: {Math.round(aiParsed.confidence * 100)}%</span>
@@ -607,7 +647,6 @@ export default async function SearchPage({
             <div className="mt-2 flex flex-wrap gap-2">
               {aiParsed.chips.map((chip) => {
                 const next = buildParamsFromRecord(params);
-                next.delete("aiQuery");
                 for (const key of chip.removeKeys) next.delete(key);
                 return (
                   <a
@@ -623,23 +662,6 @@ export default async function SearchPage({
           </div>
         ) : null}
       </section>
-
-      <form action={localizePath("/search", locale)} className="mt-4 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-sm lg:hidden">
-        <label className="sr-only" htmlFor="mobile-search-query">{t.search.searchListings}</label>
-        <div className="flex gap-2">
-          <input
-            id="mobile-search-query"
-            name="q"
-            defaultValue={params.q ?? ""}
-            placeholder={t.search.searchListings}
-            className="min-h-12 min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 text-base"
-          />
-          <button className="min-h-12 rounded-xl bg-[var(--ink-1)] px-4 text-sm font-bold text-white">
-            {t.home.searchButton}
-          </button>
-        </div>
-        <SearchHiddenFields params={params} exclude={["q", "mobileFilters"]} />
-      </form>
 
       {hasSearchSignal ? (
         <form action={saveSearchAction} className="mt-4 flex max-w-xl gap-2 rounded-xl border border-[var(--line)] bg-white p-2">

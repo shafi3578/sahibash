@@ -5,6 +5,7 @@ import { mapSignalsToCategory } from "@/lib/ai/category-mapping";
 import { matchProductSpecsFromSignals } from "@/lib/ai/product-specs-matching";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { requestGatewayCategorySuggestion } from "@/lib/ai/gateway";
+import { getAiFeatureFlags } from "@/lib/ai/feature-flags";
 
 type Suggestion = {
   rootSlug: string;
@@ -52,6 +53,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ suggestion: null, message: "Authentication required" }, { status: 401 });
     }
 
+    const aiFlags = await getAiFeatureFlags();
+    if (!aiFlags.postingCategorySuggestionsEnabled) {
+      return NextResponse.json({ suggestion: null, message: "Optional posting AI is disabled" }, { status: 404 });
+    }
+
     const rateLimit = await consumeRateLimit({
       scope: "ai.category_suggestion",
       userId: user.id,
@@ -69,7 +75,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const key = process.env.HUGGINGFACE_API_KEY;
+    const key = aiFlags.postingImageDetectionEnabled ? process.env.HUGGINGFACE_API_KEY : undefined;
 
     const formData = await request.formData();
     const image = formData.get("image");
@@ -81,18 +87,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ suggestion: null, message: "Input is too long" }, { status: 413 });
     }
 
-    if (image instanceof File && (!image.type.startsWith("image/") || image.size > MAX_IMAGE_BYTES)) {
+    if (aiFlags.postingImageDetectionEnabled && image instanceof File && (!image.type.startsWith("image/") || image.size > MAX_IMAGE_BYTES)) {
       return NextResponse.json({ suggestion: null, message: "Image must be a supported file up to 10 MB" }, { status: 413 });
     }
 
     let imageUrls: string[];
     try {
-      imageUrls = parseImageUrls(imageUrlsRaw);
+      imageUrls = aiFlags.postingImageDetectionEnabled ? parseImageUrls(imageUrlsRaw) : [];
     } catch {
       return NextResponse.json({ suggestion: null, message: "Image URLs are invalid" }, { status: 400 });
     }
 
-    if (!(image instanceof File) && !title && !description) {
+    if (!(aiFlags.postingImageDetectionEnabled && image instanceof File) && !title && !description) {
       return NextResponse.json({ suggestion: null, message: "Please provide image or title/description" }, { status: 400 });
     }
 
@@ -115,7 +121,7 @@ export async function POST(request: Request) {
     }
     const gatewayResult = await requestGatewayCategorySuggestion({ title, description, allowedPaths: gatewayLeafPaths, userId: user.id });
     const gatewaySuggestions = gatewayResult.suggestions;
-    if (image instanceof File && key) {
+    if (aiFlags.postingImageDetectionEnabled && image instanceof File && key) {
       const client = new InferenceClient(key);
       const output = await client.imageClassification({
         model: "google/vit-base-patch16-224",

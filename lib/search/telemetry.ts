@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createHash } from "node:crypto";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 function sanitizeText(value: string | null | undefined) {
   return String(value ?? "").trim();
@@ -68,13 +69,21 @@ export async function logAiSearchParseTelemetry(args: {
   resultCount: number;
   parserSource: "deterministic" | "llm" | "hybrid";
   confidence: number;
+  gatewayStatus?: string | null;
+  gatewayModel?: string | null;
+  latencyMs?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  estimatedCostUsd?: number | null;
+  fallbackReason?: string | null;
 }) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: userData } = await supabase.auth.getUser();
+    const sessionClient = await createSupabaseServerClient();
+    const { data: userData } = await sessionClient.auth.getUser();
     const normalized = sanitizeText(args.normalizedQuery || args.rawQuery).slice(0, 240);
     if (!normalized) return;
 
+    const supabase = createSupabaseAdmin();
     await supabase.from("ai_search_parse_events").insert({
       actor_user_id: userData.user?.id ?? null,
       locale: sanitizeText(args.selectedLanguage) || "fa",
@@ -85,6 +94,13 @@ export async function logAiSearchParseTelemetry(args: {
       chips: args.chips,
       result_count: Math.max(0, Number(args.resultCount) || 0),
       zero_result: Number(args.resultCount) === 0,
+      gateway_status: normalizeNullableFilter(args.gatewayStatus),
+      gateway_model: normalizeNullableFilter(args.gatewayModel)?.slice(0, 120) ?? null,
+      latency_ms: args.latencyMs === null || args.latencyMs === undefined ? null : Math.max(0, Math.round(args.latencyMs)),
+      input_tokens: args.inputTokens === null || args.inputTokens === undefined ? null : Math.max(0, Math.round(args.inputTokens)),
+      output_tokens: args.outputTokens === null || args.outputTokens === undefined ? null : Math.max(0, Math.round(args.outputTokens)),
+      estimated_cost_usd: args.estimatedCostUsd === null || args.estimatedCostUsd === undefined ? null : Math.max(0, args.estimatedCostUsd),
+      fallback_reason: normalizeNullableFilter(args.fallbackReason)?.slice(0, 240) ?? null,
     });
   } catch {
     // Non-blocking telemetry. Never break search rendering.

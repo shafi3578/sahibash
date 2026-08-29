@@ -56,8 +56,31 @@ test("AI parse telemetry stores a hash and interpreted filters, not raw query te
   assert.match(telemetry, /createHash\("sha256"\)/);
   assert.match(telemetry, /interpreted_filters/);
   assert.doesNotMatch(telemetry, /raw_query:\s*args\.rawQuery/);
-  assert.match(searchPage, /Find It With Sahibash AI|با هوش صاحبش پیدا کن|له صاحبش AI سره/);
+  assert.match(searchPage, /aiFlags\.aiSearchEnabled/);
+  assert.match(searchPage, /name="mode" value="normal"/);
+  assert.match(searchPage, /name="mode" value="ai"/);
   assert.match(searchPage, /logAiSearchParseTelemetry/);
+});
+
+test("deterministic AI fallback supports Afghanistan price, year, room, and land units", () => {
+  const lakh = parseSahibashAiSearch("house with 3 rooms under 5 lakh in Kabul", "en");
+  assert.ok(lakh);
+  assert.equal(lakh.params.maxPrice, "500000");
+  assert.equal(lakh.params.minRooms, "3");
+
+  const newer = parseSahibashAiSearch("Toyota Corolla 2015 or newer", "en");
+  assert.ok(newer);
+  assert.equal(newer.params.yearMin, "2015");
+  assert.equal(newer.params.yearMax, undefined);
+
+  const jerib = parseSahibashAiSearch("2 jerib agricultural land for sale", "en");
+  assert.ok(jerib);
+  assert.equal(jerib.params.minLandSize, "4000");
+  assert.equal(jerib.params.maxLandSize, "4000");
+
+  const biswa = parseSahibashAiSearch("زمین 5 بسوه برای فروش", "fa");
+  assert.ok(biswa);
+  assert.equal(biswa.params.minLandSize, "500");
 });
 
 test("listing AI assistant is factual-only and does not call an LLM", () => {

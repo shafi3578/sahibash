@@ -29,7 +29,7 @@ export async function requestGatewayCategorySuggestion(input: {
       signal: controller.signal,
       body: JSON.stringify({
         model: "mistral/mistral-small",
-        models: ["spacexai/grok-4.1-fast-non-reasoning", "openai/gpt-5.6-luna"],
+        models: ["openai/gpt-5-nano"],
         temperature: 0,
         max_completion_tokens: 512,
         response_format: { type: "json_object" },
