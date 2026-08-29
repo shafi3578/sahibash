@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { parseAiSearchStructuredIntent } from "@/lib/ai/search-intent-schema";
+import { localizeFilterLabel, localizeFilterOptionLabel } from "@/lib/i18n/filter-labels";
 
 const root = process.cwd();
 const read = (...parts: string[]) => readFileSync(join(root, ...parts), "utf8");
@@ -27,6 +28,14 @@ test("AI search schema rejects invented fields and invalid numeric ranges", () =
   assert.throws(() => parseAiSearchStructuredIntent({ sql: "select *", confidence: 1 }), /Unsupported/);
   assert.throws(() => parseAiSearchStructuredIntent({ minPrice: 10, maxPrice: 1, confidence: 1 }), /inverted/);
   assert.throws(() => parseAiSearchStructuredIntent({ confidence: 2 }), /invalid/);
+});
+
+test("legacy search filters and option captions are localized without changing stored values", () => {
+  assert.equal(localizeFilterLabel("vehicle_model", "Model", "fa"), "مدل موتر");
+  assert.equal(localizeFilterLabel("vehicle_model", "Model", "ps"), "د موټر ماډل");
+  assert.equal(localizeFilterOptionLabel("Automatic", "Automatic", "fa"), "اتومات");
+  assert.equal(localizeFilterOptionLabel("Automatic", "Automatic", "ps"), "اتومات");
+  assert.equal(localizeFilterOptionLabel("Toyota", "Toyota", "fa"), "Toyota");
 });
 
 test("one server-only flag source fails closed and keeps public clients away from the table", () => {

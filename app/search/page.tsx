@@ -24,6 +24,7 @@ import { saveSearchAction } from "@/lib/actions/saved-searches";
 import { createWantedRequestAction } from "@/lib/actions/liquidity";
 import { wantedCopy } from "@/lib/liquidity/wanted";
 import { getCurrentUser } from "@/lib/auth";
+import { localizeFilterOptionLabel } from "@/lib/i18n/filter-labels";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -52,15 +53,32 @@ function toBoolean(value?: string): boolean | undefined {
   return undefined;
 }
 
-function toOptionList(def: FilterDefinition): string[] {
+type FilterOption = { value: string; label: string };
+
+function toOptionList(
+  def: FilterDefinition,
+  locale: Awaited<ReturnType<typeof getDictionary>>["locale"]
+): FilterOption[] {
   if (Array.isArray(def.options)) {
-    return def.options.map((v) => String(v));
+    return def.options.flatMap((item) => {
+      if (typeof item === "object" && item !== null && "value" in item) {
+        const value = String((item as { value?: unknown }).value ?? "").trim();
+        if (!value) return [];
+        const label = String((item as { label?: unknown }).label ?? value);
+        return [{ value, label: localizeFilterOptionLabel(value, label, locale) }];
+      }
+      const value = String(item).trim();
+      return value ? [{ value, label: localizeFilterOptionLabel(value, value, locale) }] : [];
+    });
   }
   if (typeof def.options === "string") {
     try {
       const parsed = JSON.parse(def.options) as unknown;
       if (Array.isArray(parsed)) {
-        return parsed.map((v) => String(v));
+        return parsed.flatMap((item) => {
+          const value = String(item).trim();
+          return value ? [{ value, label: localizeFilterOptionLabel(value, value, locale) }] : [];
+        });
       }
     } catch {
       return [];
@@ -106,7 +124,7 @@ function SearchHiddenFields({
 function renderDynamicFilterInput(
   def: FilterDefinition,
   selected: string,
-  options: string[],
+  options: FilterOption[],
   t: Awaited<ReturnType<typeof getDictionary>>["t"]
 ) {
   if (def.filter_type === "boolean") {
@@ -136,8 +154,8 @@ function renderDynamicFilterInput(
       >
         <option value="">{def.filter_label}: {t.search.any}</option>
         {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </select>
@@ -254,7 +272,7 @@ function FilterFields({
 
       {filterDefinitions.map((def) => {
         const selected = params[def.filter_key] ?? "";
-        const options = toOptionList(def);
+        const options = toOptionList(def, locale);
         return renderDynamicFilterInput(def, selected, options, t);
       })}
     </>

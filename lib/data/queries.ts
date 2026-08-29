@@ -31,6 +31,7 @@ import {
   type ListingLanguageCode,
 } from "@/lib/listings/translation-service";
 import type { AppLocale } from "@/lib/i18n/translations";
+import { localizeFilterLabel } from "@/lib/i18n/filter-labels";
 import { buildSearchKeywordIndex, normalizeSearchText } from "@/lib/search/multilingual";
 import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
 import type { SearchRewriteClient } from "@/lib/search/rewrite";
@@ -1571,7 +1572,10 @@ export async function getFilterDefinitionsForNode(
               filter_key: field.key,
               filter_label: field.label[locale] ?? field.label.en,
               filter_type: filterType,
-              options: (field.options ?? []).map((option) => option.value),
+              options: (field.options ?? []).map((option) => ({
+                value: option.value,
+                label: option.label[locale] ?? option.label.en,
+              })),
               source_table: null,
               source_column: null,
               sort_order: index + 1,
@@ -1582,7 +1586,10 @@ export async function getFilterDefinitionsForNode(
 
     const byKey = new Map<string, FilterDefinition>();
     for (const def of merged) {
-      byKey.set(def.filter_key, def);
+      byKey.set(def.filter_key, {
+        ...def,
+        filter_label: localizeFilterLabel(def.filter_key, def.filter_label, locale),
+      });
     }
 
     for (const def of generatedSimpleDefs) {
@@ -1599,7 +1606,9 @@ export async function getFilterDefinitionsForNode(
       for (const key of configuredKeys) byKey.delete(key);
       configuredFields.filter((field) => field.active !== false && field.filter === true).forEach((field, index) => {
         const fieldLabels = field.labels as Record<string, unknown> | undefined;
-        const options = Array.isArray(field.options) ? field.options as Array<{ value?: unknown }> : [];
+        const options = Array.isArray(field.options)
+          ? field.options as Array<{ value?: unknown; labels?: Record<string, unknown> }>
+          : [];
         const fieldType = String(field.type ?? "text");
         const key = String(field.key ?? "");
         if (!key) return;
@@ -1607,7 +1616,14 @@ export async function getFilterDefinitionsForNode(
           id: -(10000 + index), category_node_id: categoryNodeId, filter_key: key,
           filter_label: String(fieldLabels?.[locale] ?? fieldLabels?.en ?? key),
           filter_type: fieldType === "number" ? "range" : fieldType === "boolean" ? "boolean" : fieldType === "select" ? "select" : "text",
-          options: options.map((option) => String(option.value ?? "")).filter(Boolean), source_table: null, source_column: null,
+          options: options.flatMap((option) => {
+            const value = String(option.value ?? "").trim();
+            if (!value) return [];
+            return [{
+              value,
+              label: String(option.labels?.[locale] ?? option.labels?.en ?? value),
+            }];
+          }), source_table: null, source_column: null,
           sort_order: Number(field.order ?? index), is_active: true,
         });
       });
