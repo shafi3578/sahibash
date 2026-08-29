@@ -11,6 +11,14 @@ const migration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260820123009_inventory_provenance_foundation.sql"),
   "utf8",
 );
+const inventoryPage = readFileSync(
+  join(process.cwd(), "app", "admin", "inventory", "page.tsx"),
+  "utf8",
+);
+const inventoryCandidatePage = readFileSync(
+  join(process.cwd(), "app", "admin", "inventory", "candidates", "[id]", "page.tsx"),
+  "utf8",
+);
 
 test("Step 1 migration creates explicit provenance and ingestion objects with RLS", () => {
   for (const table of [
@@ -102,4 +110,16 @@ test("provenance ranking favors claimed/native inventory over unclaimed external
   const native = scoreMarketplaceListing({ ...base, sourceType: "native", ownershipStatus: "claimed", provenanceConfidence: 1 });
   const external = scoreMarketplaceListing({ ...base, sourceType: "external_indexed", ownershipStatus: "unclaimed", provenanceConfidence: 0.6 });
   assert.ok(native.finalScore > external.finalScore);
+});
+
+test("inventory control exposes transferred records and real listing drill-down links", () => {
+  assert.match(inventoryPage, /href={`#\$\{id\}`}/);
+  assert.match(inventoryPage, /candidate_listing_id/);
+  assert.match(inventoryPage, /localizePath\(`\/listings\/\$\{candidate\.candidate_listing_id\}`/);
+  assert.match(inventoryPage, /admin\/inventory\/candidates\/\$\{candidate\.id\}/);
+  assert.match(inventoryPage, /Listing not created yet/);
+  assert.match(inventoryPage, /\.neq\("source_type", "native"\)\.in\("freshness_status"/);
+  assert.match(inventoryCandidatePage, /requirePermission\("listings\.view"\)/);
+  assert.match(inventoryCandidatePage, /normalized_payload/);
+  assert.doesNotMatch(inventoryCandidatePage, /raw_payload/);
 });
