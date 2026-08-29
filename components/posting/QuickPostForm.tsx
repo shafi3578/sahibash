@@ -1006,6 +1006,7 @@ export default function QuickPostForm({
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const aiCacheRef = useRef<Map<string, AiResponse>>(new Map());
+  const aiResponseSignatureRef = useRef("");
   const lastServerDraftSignatureRef = useRef("");
   const [isPending, startTransition] = useTransition();
   const c = COPY[locale] ?? COPY.en;
@@ -1558,6 +1559,7 @@ export default function QuickPostForm({
 
       const cached = aiCacheRef.current.get(signature);
       if (cached) {
+        aiResponseSignatureRef.current = signature;
         setAiResponse(cached);
         setAiStatus("ready");
         return;
@@ -1580,6 +1582,7 @@ export default function QuickPostForm({
           return;
         }
         aiCacheRef.current.set(signature, json);
+        aiResponseSignatureRef.current = signature;
         setAiResponse(json);
         setAiStatus(json.suggestions?.length || json.suggestion || json.suggestedProduct ? "ready" : "unavailable");
         const rootFromProduct = json.suggestedProduct?.categoryPath?.split("/")[0] ?? "";
@@ -1894,6 +1897,12 @@ export default function QuickPostForm({
     }
     setError(null);
     setStatus(null);
+    const aiSignature = `${title.trim()}|${description.trim().slice(0, 500)}|${images[0]?.file.name ?? ""}|${images[0]?.file.size ?? 0}`;
+    if (!aiCacheRef.current.has(aiSignature) && aiResponseSignatureRef.current !== aiSignature) {
+      setAiResponse(null);
+      setCategoryCandidates([]);
+      setAiStatus("working");
+    }
     setStep(2);
     void saveCurrentDraftNow(2);
   }

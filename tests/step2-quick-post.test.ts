@@ -159,6 +159,12 @@ test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matchi
   assert.doesNotMatch(aiRoute, /if \(!key\) \{\s*return NextResponse/);
 });
 
+test("Quick Post invalidates stale AI suggestions after materially editing Step 1", () => {
+  assert.match(quickPostForm, /const aiResponseSignatureRef = useRef\(""\)/);
+  assert.match(quickPostForm, /if \(!aiCacheRef\.current\.has\(aiSignature\) && aiResponseSignatureRef\.current !== aiSignature\) \{\s*setAiResponse\(null\);\s*setCategoryCandidates\(\[\]\);\s*setAiStatus\("working"\);\s*\}/);
+  assert.match(quickPostForm, /aiResponseSignatureRef\.current = signature;\s*setAiResponse\(json\)/);
+});
+
 test("Quick Post supports professional item location without exposing device GPS by default", () => {
   for (const marker of [
     "handleUseCurrentLocation",
