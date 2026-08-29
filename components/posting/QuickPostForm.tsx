@@ -1351,6 +1351,7 @@ export default function QuickPostForm({
           setLocationAccuracy(readDraftNumber(location.locationAccuracy));
           setLocationConfirmed(readDraftBoolean(location.isConfirmed));
           const localCategory = (local.selectedCategory && typeof local.selectedCategory === "object" ? local.selectedCategory : null) as Record<string, unknown> | null;
+          setRootTouched(readDraftBoolean(local.rootTouched) || Boolean(localCategory?.id && localCategory?.path));
           if (localCategory?.id && localCategory?.path) {
             setSelectedCategory({
               id: Number(localCategory.id),
@@ -1425,6 +1426,7 @@ export default function QuickPostForm({
         setSuitableForStudents(readDraftBoolean(serverDetails.suitableForStudents));
         setSelectedRootSlug(normalizeQuickPostRootSlug(readDraftString(serverCategory.rootSlug) || initialRootSlug));
         const serverSelectedCategory = (serverCategory.selectedCategory && typeof serverCategory.selectedCategory === "object" ? serverCategory.selectedCategory : null) as Record<string, unknown> | null;
+        setRootTouched(readDraftBoolean(serverDetails.rootTouched) || Boolean(serverSelectedCategory?.id && serverSelectedCategory?.path));
         if (serverSelectedCategory?.id && serverSelectedCategory?.path) {
           setSelectedCategory({
             id: Number(serverSelectedCategory.id),
@@ -1540,6 +1542,7 @@ export default function QuickPostForm({
       landLeasePrice,
       suitableForStudents,
       selectedRootSlug,
+      rootTouched,
       selectedCategory: selectedCategory
         ? {
             id: selectedCategory.id,
@@ -1600,6 +1603,7 @@ export default function QuickPostForm({
     priceAmount,
     publishRequestId,
     rahnGerawyEnabled,
+    rootTouched,
     selectedCategory,
     selectedCategory?.id,
     selectedCategory?.path,
@@ -1983,6 +1987,7 @@ export default function QuickPostForm({
       landLeasePrice,
       suitableForStudents,
       selectedRootSlug,
+      rootTouched,
       selectedCategory: selectedCategory
         ? {
             id: selectedCategory.id,

@@ -80,6 +80,7 @@ test("Quick Post protects local work without continuously server-saving while ty
     "QUICK_IMAGE_DB_NAME",
     "publishRequestId",
     "selectedCategory",
+    "rootTouched",
     "aiResponse",
     "smartSuggestion",
     "damageParts",
@@ -103,6 +104,8 @@ test("Quick Post protects local work without continuously server-saving while ty
   assert.doesNotMatch(localPersistenceEffect, /saveListingDraftAction/);
   assert.doesNotMatch(quickPostForm, /}, 1000\)/);
   assert.match(quickPostForm, /hasLocalRecovery \|\| userEditedDuringHydrationRef\.current/);
+  assert.match(quickPostForm, /setRootTouched\(readDraftBoolean\(local\.rootTouched\) \|\| Boolean\(localCategory\?\.id && localCategory\?\.path\)\)/);
+  assert.match(quickPostForm, /setRootTouched\(readDraftBoolean\(serverDetails\.rootTouched\) \|\| Boolean\(serverSelectedCategory\?\.id && serverSelectedCategory\?\.path\)\)/);
   const stepTransition = quickPostForm.slice(
     quickPostForm.indexOf("function goToStepTwo"),
     quickPostForm.indexOf("function goBackToStepOne"),
