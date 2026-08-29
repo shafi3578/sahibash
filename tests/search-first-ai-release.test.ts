@@ -49,7 +49,7 @@ test("AI feature mutations require RBAC, AAL2-backed RLS, Gateway verification, 
   assert.match(flagAction, /verifyGatewayAiSearch\(\)/);
   assert.match(flagAction, /verification\.status !== "success"/);
   assert.match(flagAction, /recordAuditEvent/);
-  assert.match(flagAction, /ai_feature_flag\.updated/);
+  assert.match(flagAction, /AI_FEATURE_FLAG_UPDATED/);
   assert.match(flagAction, /audit-failed/);
 });
 

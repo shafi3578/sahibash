@@ -37,7 +37,7 @@ export async function updateAiFeatureFlagAction(formData: FormData) {
 
   const audit = await recordAuditEvent({
     adminUserId: actor.id,
-    action: "ai_feature_flag.updated",
+    action: "AI_FEATURE_FLAG_UPDATED",
     entityType: "feature_flag",
     entityId: key,
     safeChanges: { before: previous.enabled === true, after: enabled },
