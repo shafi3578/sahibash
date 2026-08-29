@@ -37,6 +37,18 @@ const inventoryActions = readFileSync(
   join(process.cwd(), "lib", "actions", "inventory-media.ts"),
   "utf8",
 );
+const candidatePublicationMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260830013000_publish_reviewed_ingest_candidate.sql"),
+  "utf8",
+);
+const candidatePublicationAction = readFileSync(
+  join(process.cwd(), "lib", "actions", "inventory-publish.ts"),
+  "utf8",
+);
+const candidatePublicationControl = readFileSync(
+  join(process.cwd(), "components", "admin", "ingest-candidate-publish.tsx"),
+  "utf8",
+);
 
 test("Step 1 migration creates explicit provenance and ingestion objects with RLS", () => {
   for (const table of [
@@ -175,4 +187,34 @@ test("Telegram candidate photos use a private bucket and permission-protected me
   assert.match(inventoryActions, /requirePermission\("listings\.moderate"\)/);
   assert.match(inventoryActions, /TELEGRAM_IMPORT_BOT_TOKEN/);
   assert.doesNotMatch(inventoryActions, /console\.(log|error)/);
+});
+
+test("reviewed candidate publication is atomic, auditable, and service-only", () => {
+  assert.match(candidatePublicationMigration, /create or replace function public\.publish_reviewed_ingest_candidate/i);
+  assert.match(candidatePublicationMigration, /security definer[\s\S]*set search_path = ''/i);
+  assert.match(candidatePublicationMigration, /for update/i);
+  assert.match(candidatePublicationMigration, /status <> 'publishable'/i);
+  assert.match(candidatePublicationMigration, /external_import_opt_outs/i);
+  assert.match(candidatePublicationMigration, /listing_source_observations[\s\S]*already linked to a listing/i);
+  assert.match(candidatePublicationMigration, /storage\.objects[\s\S]*bucket_id = 'listing-images'/i);
+  assert.match(candidatePublicationMigration, /Every retained candidate image must be published together/i);
+  assert.match(candidatePublicationMigration, /Public listing text must not contain a phone number/i);
+  assert.match(candidatePublicationMigration, /'external_indexed', 'unclaimed', 'fresh', 'permission_pending'/i);
+  assert.match(candidatePublicationMigration, /true, true, encode\(extensions\.digest/i);
+  assert.match(candidatePublicationMigration, /\('en', 'en'\), \('fa-AF', 'fa'\), \('ps-AF', 'ps'\)/i);
+  assert.match(candidatePublicationMigration, /listing_provenance_events/i);
+  assert.match(candidatePublicationMigration, /revoke all on function[\s\S]*from public, anon, authenticated/i);
+  assert.match(candidatePublicationMigration, /grant execute on function[\s\S]*to service_role/i);
+});
+
+test("candidate publication action requires stepped-up moderation and cleans uploaded media on failure", () => {
+  assert.match(candidatePublicationAction, /requirePermission\("listings\.moderate"\)/);
+  assert.match(candidatePublicationAction, /PRIVATE_INGEST_BUCKET = "listing-ingest-media"/);
+  assert.match(candidatePublicationAction, /PUBLIC_LISTING_BUCKET = "listing-images"/);
+  assert.match(candidatePublicationAction, /publish_reviewed_ingest_candidate/);
+  assert.match(candidatePublicationAction, /removeUploadedImages\(supabase, uploadedPaths\)/);
+  assert.doesNotMatch(candidatePublicationAction, /console\.(log|error)/);
+  assert.match(inventoryCandidatePage, /candidate\.status === "publishable"/);
+  assert.match(inventoryCandidatePage, /IngestCandidatePublish/);
+  assert.match(candidatePublicationControl, /useActionState/);
 });
