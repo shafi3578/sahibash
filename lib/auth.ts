@@ -137,8 +137,6 @@ async function requireVerifiedAuthenticatorAssurance(supabase: SupabaseServerCli
 
 export async function requirePermission(permission: PermissionKey) {
   const user = await requireUser();
-  await requireFreshPrimaryAuthentication(user);
-
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase.rpc("has_admin_permission", {
@@ -151,6 +149,7 @@ export async function requirePermission(permission: PermissionKey) {
   }
 
   if (requiresPrivilegedMfa(permission)) {
+    await requireFreshPrimaryAuthentication(user);
     await requireVerifiedAuthenticatorAssurance(supabase);
   }
 

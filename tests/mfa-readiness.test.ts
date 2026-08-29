@@ -93,6 +93,21 @@ test("AAL1 super admin can view read-only admin pages but cannot mutate until AA
     false,
     "AAL2 never bypasses RBAC permission denial",
   );
+
+  const permissionGate = auth.slice(
+    auth.indexOf("export async function requirePermission"),
+    auth.indexOf("export async function requireAdmin"),
+  );
+  assert.match(
+    permissionGate,
+    /if \(requiresPrivilegedMfa\(permission\)\) \{\s*await requireFreshPrimaryAuthentication\(user\);\s*await requireVerifiedAuthenticatorAssurance\(supabase\);/,
+    "fresh primary authentication and AAL2 apply only to privileged permissions",
+  );
+  assert.doesNotMatch(
+    permissionGate.slice(0, permissionGate.indexOf("if (requiresPrivilegedMfa(permission))")),
+    /requireFreshPrimaryAuthentication/,
+    "read-only permission checks do not require a fresh password sign-in",
+  );
 });
 
 test("audit writer is server-only, service-role capable, and redacts unsafe changes", () => {
