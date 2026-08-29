@@ -150,7 +150,8 @@ test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matchi
   assert.match(aiGateway, /status: `http_\$\{response\.status\}`/);
   assert.match(aiGateway, /input\.allowedPaths\.includes\(path\)/);
   assert.match(aiRoute, /preliminarySuggestion/);
-  assert.match(aiRoute, /path\.startsWith\(`\$\{prefix\}\//);
+  assert.match(aiRoute, /const preliminaryRoot = preliminarySuggestion\?\.pathSlugs\?\.\[0\]/);
+  assert.match(aiRoute, /path\.startsWith\(`\$\{preliminaryRoot\}\//);
   assert.match(aiRoute, /image instanceof File && key/);
   assert.match(aiRoute, /gatewaySuggestions\.length > 0 \? "gateway" : "deterministic"/);
   assert.match(aiRoute, /leafCategoryId/);
@@ -163,6 +164,14 @@ test("Quick Post invalidates stale AI suggestions after materially editing Step 
   assert.match(quickPostForm, /const aiResponseSignatureRef = useRef\(""\)/);
   assert.match(quickPostForm, /if \(!aiCacheRef\.current\.has\(aiSignature\) && aiResponseSignatureRef\.current !== aiSignature\) \{\s*setAiResponse\(null\);\s*setCategoryCandidates\(\[\]\);\s*setAiStatus\("working"\);\s*\}/);
   assert.match(quickPostForm, /aiResponseSignatureRef\.current = signature;\s*setAiResponse\(json\)/);
+});
+
+test("Quick Post deduplicates in-flight AI requests for the same Step 1 signature", () => {
+  assert.match(quickPostForm, /const aiInFlightRef = useRef<Map<string, Promise<AiResponse \| null>>>\(new Map\(\)\)/);
+  assert.match(quickPostForm, /let request = aiInFlightRef\.current\.get\(signature\)/);
+  assert.match(quickPostForm, /aiInFlightRef\.current\.set\(signature, request\)/);
+  assert.match(quickPostForm, /aiInFlightRef\.current\.delete\(signature\)/);
+  assert.match(quickPostForm, /if \(!response\.ok\) return null/);
 });
 
 test("Quick Post supports professional item location without exposing device GPS by default", () => {

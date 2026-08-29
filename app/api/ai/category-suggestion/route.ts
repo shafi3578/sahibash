@@ -100,15 +100,11 @@ export async function POST(request: Request) {
       .map((row) => String((row as { path?: string }).path ?? ""))
       .filter((path) => path && LAUNCH_ROOTS.has(path.split("/")[0]));
     const preliminarySuggestion = mapSignalsToCategory({ title, description, labels: [], specsMatch: null });
-    const preliminarySegments = preliminarySuggestion?.pathSlugs ?? [];
+    const preliminaryRoot = preliminarySuggestion?.pathSlugs?.[0] ?? "";
     let gatewayLeafPaths = allowedLeafPaths;
-    for (let depth = preliminarySegments.length; depth > 0; depth -= 1) {
-      const prefix = preliminarySegments.slice(0, depth).join("/");
-      const branchPaths = allowedLeafPaths.filter((path) => path === prefix || path.startsWith(`${prefix}/`));
-      if (branchPaths.length >= 2) {
-        gatewayLeafPaths = branchPaths;
-        break;
-      }
+    if (LAUNCH_ROOTS.has(preliminaryRoot)) {
+      const rootPaths = allowedLeafPaths.filter((path) => path.startsWith(`${preliminaryRoot}/`));
+      if (rootPaths.length >= 2) gatewayLeafPaths = rootPaths;
     }
     const gatewayResult = await requestGatewayCategorySuggestion({ title, description, allowedPaths: gatewayLeafPaths });
     const gatewaySuggestions = gatewayResult.suggestions;

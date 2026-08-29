@@ -1006,6 +1006,7 @@ export default function QuickPostForm({
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const aiCacheRef = useRef<Map<string, AiResponse>>(new Map());
+  const aiInFlightRef = useRef<Map<string, Promise<AiResponse | null>>>(new Map());
   const aiResponseSignatureRef = useRef("");
   const lastServerDraftSignatureRef = useRef("");
   const [isPending, startTransition] = useTransition();
@@ -1566,22 +1567,38 @@ export default function QuickPostForm({
       }
 
       setAiStatus("working");
-      void (async () => {
-        const payload = new FormData();
-        payload.set("title", title);
-        payload.set("description", description);
-        const optimizedImage = images[0] ? await optimizeImageForAI(images[0].file) : null;
-        if (optimizedImage) payload.set("image", optimizedImage);
-        const response = await fetch("/api/ai/category-suggestion", {
-          method: "POST",
-          body: payload,
+      let request = aiInFlightRef.current.get(signature);
+      if (!request) {
+        request = (async () => {
+          const payload = new FormData();
+          payload.set("title", title);
+          payload.set("description", description);
+          const optimizedImage = images[0] ? await optimizeImageForAI(images[0].file) : null;
+          if (optimizedImage) payload.set("image", optimizedImage);
+          const response = await fetch("/api/ai/category-suggestion", {
+            method: "POST",
+            body: payload,
+          });
+          if (!response.ok) return null;
+          const json = (await response.json().catch(() => null)) as AiResponse | null;
+          if (json) aiCacheRef.current.set(signature, json);
+          return json;
+        })().catch(() => null);
+        aiInFlightRef.current.set(signature, request);
+        const createdRequest = request;
+        void createdRequest.finally(() => {
+          if (aiInFlightRef.current.get(signature) === createdRequest) {
+            aiInFlightRef.current.delete(signature);
+          }
         });
-        const json = (await response.json().catch(() => null)) as AiResponse | null;
-        if (!json || cancelled) {
+      }
+
+      void request.then((json) => {
+        if (cancelled) return;
+        if (!json) {
           setAiStatus("unavailable");
           return;
         }
-        aiCacheRef.current.set(signature, json);
         aiResponseSignatureRef.current = signature;
         setAiResponse(json);
         setAiStatus(json.suggestions?.length || json.suggestion || json.suggestedProduct ? "ready" : "unavailable");
@@ -1595,8 +1612,6 @@ export default function QuickPostForm({
         if (json.suggestedProduct?.brand) updateDetail("brand", json.suggestedProduct.brand);
         if (json.suggestedProduct?.brand) updateDetail("make", json.suggestedProduct.brand);
         if (json.suggestedProduct?.model) updateDetail("model", json.suggestedProduct.model);
-      })().catch(() => {
-        if (!cancelled) setAiStatus("unavailable");
       });
     }, 700);
 
