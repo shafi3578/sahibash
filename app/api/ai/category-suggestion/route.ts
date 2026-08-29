@@ -138,17 +138,30 @@ export async function POST(request: Request) {
       specsMatch,
     }) as Suggestion | null;
     const mappedPath = mappedSuggestion?.pathSlugs?.join("/") ?? "";
-    const unhydratedSuggestions: Suggestion[] = gatewaySuggestions.length > 0
-      ? gatewaySuggestions.map((gatewaySuggestion) => ({
-          rootSlug: gatewaySuggestion.pathSlugs[0],
-          pathSlugs: gatewaySuggestion.pathSlugs,
-          label: gatewaySuggestion.pathSlugs.join(" > "),
-          reason: gatewaySuggestion.reason,
-          confidence: gatewaySuggestion.confidence,
-        }))
-      : mappedSuggestion && allowedLeafPaths.includes(mappedPath)
-        ? [mappedSuggestion]
-        : [];
+    const mappedCandidate = mappedSuggestion && allowedLeafPaths.includes(mappedPath)
+      ? mappedSuggestion
+      : null;
+    const gatewayCandidates: Suggestion[] = gatewaySuggestions.map((gatewaySuggestion) => ({
+      rootSlug: gatewaySuggestion.pathSlugs[0],
+      pathSlugs: gatewaySuggestion.pathSlugs,
+      label: gatewaySuggestion.pathSlugs.join(" > "),
+      reason: gatewaySuggestion.reason,
+      confidence: gatewaySuggestion.confidence,
+    }));
+    const rankedCandidates = mappedCandidate && mappedCandidate.confidence >= 0.8
+      ? [mappedCandidate, ...gatewayCandidates]
+      : gatewayCandidates.length > 0
+        ? gatewayCandidates
+        : mappedCandidate
+          ? [mappedCandidate]
+          : [];
+    const seenCandidatePaths = new Set<string>();
+    const unhydratedSuggestions = rankedCandidates.filter((candidate) => {
+      const path = candidate.pathSlugs.join("/");
+      if (seenCandidatePaths.has(path)) return false;
+      seenCandidatePaths.add(path);
+      return true;
+    }).slice(0, 3);
 
     const neededPaths = Array.from(new Set(unhydratedSuggestions.flatMap((suggestion) =>
       suggestion.pathSlugs.map((_, index) => suggestion.pathSlugs.slice(0, index + 1).join("/"))

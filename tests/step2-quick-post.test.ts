@@ -158,6 +158,9 @@ test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matchi
   assert.match(aiRoute, /path\.startsWith\(`\$\{preliminaryRoot\}\//);
   assert.match(aiRoute, /image instanceof File && key/);
   assert.match(aiRoute, /gatewaySuggestions\.length > 0 \? "gateway" : "deterministic"/);
+  assert.match(aiRoute, /mappedCandidate && mappedCandidate\.confidence >= 0\.8/);
+  assert.match(aiRoute, /\[mappedCandidate, \.\.\.gatewayCandidates\]/);
+  assert.match(aiRoute, /seenCandidatePaths/);
   assert.match(aiRoute, /leafCategoryId/);
   assert.match(aiRoute, /pathIds/);
   assert.match(aiRoute, /gatewayModel: gatewayResult\.model/);
