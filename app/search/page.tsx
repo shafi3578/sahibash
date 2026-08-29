@@ -680,7 +680,14 @@ export default async function SearchPage({
       {hasSearchSignal ? (
         <form action={saveSearchAction} className="mt-4 flex max-w-xl gap-2 rounded-xl border border-[var(--line)] bg-white p-2">
           <input type="hidden" name="params" value={buildParamsFromRecord(params).toString()} />
-          <input name="name" required maxLength={80} defaultValue={params.q || (locale === "fa" ? "جستجوی من" : locale === "ps" ? "زما لټون" : "My search")} aria-label="Saved search name" className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--line)] px-3 text-sm" />
+          <input
+            name="name"
+            required
+            maxLength={80}
+            defaultValue={params.q || (locale === "fa" ? "جستجوی من" : locale === "ps" ? "زما لټون" : "My search")}
+            aria-label={locale === "fa" ? "نام جستجوی ذخیره‌شده" : locale === "ps" ? "د خوندي شوي لټون نوم" : "Saved search name"}
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--line)] px-3 text-sm"
+          />
           <button className="min-h-11 rounded-lg bg-[var(--ink-1)] px-4 text-sm font-semibold text-white">{locale === "fa" ? "ذخیره جستجو" : locale === "ps" ? "لټون خوندي کړئ" : "Save search"}</button>
         </form>
       ) : null}
