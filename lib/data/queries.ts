@@ -1569,7 +1569,7 @@ export async function getFilterDefinitionsForNode(
               id: -(index + 1),
               category_node_id: categoryNodeId,
               filter_key: field.key,
-              filter_label: field.label.en,
+              filter_label: field.label[locale] ?? field.label.en,
               filter_type: filterType,
               options: (field.options ?? []).map((option) => option.value),
               source_table: null,

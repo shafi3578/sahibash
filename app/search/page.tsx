@@ -374,7 +374,7 @@ export default async function SearchPage({
   const effectiveCategoryNodeId = explicitCategoryNodeId ?? aiIntentNode?.id ?? intentNode?.id ?? undefined;
 
   const [filterDefinitions, effectiveNode, children, parentPath] = await Promise.all([
-    getFilterDefinitionsForNode(effectiveCategoryNodeId),
+    getFilterDefinitionsForNode(effectiveCategoryNodeId, locale),
     effectiveCategoryNodeId ? getCategoryNodeById(effectiveCategoryNodeId) : Promise.resolve(null),
     effectiveCategoryNodeId ? getCategoryChildren(effectiveCategoryNodeId) : Promise.resolve([]),
     effectiveCategoryNodeId ? getCategoryPath(effectiveCategoryNodeId) : Promise.resolve([]),

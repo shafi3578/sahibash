@@ -59,6 +59,7 @@ test("normal search is default and never enters the AI interpreter without expli
   assert.match(searchPage, /name="mode" value="normal"/);
   assert.match(searchPage, /aiFlags\.aiSearchEnabled \? \(/);
   assert.match(searchPage, /name="mode" value="ai"/);
+  assert.match(searchPage, /getFilterDefinitionsForNode\(effectiveCategoryNodeId, locale\)/);
   assert.doesNotMatch(searchPage, /bg-gradient-to-br from-indigo-50/);
   assert.match(searchPage, /broadenedAiFallback/);
   assert.match(searchPage, /zero_result_category_broadened/);
