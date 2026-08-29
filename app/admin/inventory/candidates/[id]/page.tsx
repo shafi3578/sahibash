@@ -1,6 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { adminPath } from "@/lib/admin/routing";
+import { recoverTelegramCandidatePhoto } from "@/lib/actions/inventory-media";
 import { requirePermission } from "@/lib/auth";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
@@ -24,6 +26,13 @@ type CandidateRow = {
 
 type SourceRow = { name: string; platform: string | null; source_type: string; status: string };
 type JobRow = { status: string; dry_run: boolean; accepted_rows: number; rejected_rows: number; error_rows: number };
+type MediaRow = {
+  id: string;
+  storage_bucket: string;
+  storage_path: string;
+  width: number | null;
+  height: number | null;
+};
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -56,25 +65,37 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   if (!data) notFound();
 
   const candidate = data as CandidateRow;
-  const [sourceResult, jobResult] = await Promise.all([
+  const [sourceResult, jobResult, mediaResult] = await Promise.all([
     candidate.source_id
       ? supabase.from("listing_sources").select("name,platform,source_type,status").eq("id", candidate.source_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("listing_ingest_jobs").select("status,dry_run,accepted_rows,rejected_rows,error_rows").eq("id", candidate.job_id).maybeSingle(),
+    supabase
+      .from("listing_ingest_candidate_media")
+      .select("id,storage_bucket,storage_path,width,height")
+      .eq("candidate_id", candidate.id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
   const source = sourceResult.data as SourceRow | null;
   const job = jobResult.data as JobRow | null;
   const payload = candidate.normalized_payload ?? {};
   const copy = locale === "fa"
-    ? { back: "بازگشت به موجودی", title: "بررسی انتقال", subtitle: "جزئیات ردیف انتقال‌شده پیش از تبدیل به اعلان عمومی.", waiting: "این مورد هنوز اعلان عمومی نیست و نیاز به بررسی دارد.", content: "محتوای انتقال‌شده", readiness: "آمادگی اعلان", source: "منبع و وظیفه", adTitle: "عنوان", description: "توضیحات", category: "دسته‌بندی", location: "موقعیت", price: "قیمت", photos: "تصویرها", sourceItem: "شناسه در منبع", received: "دریافت‌شده", status: "وضعیت", job: "وظیفه انتقال", dryRun: "اجرای آزمایشی", liveRun: "اجرای واقعی", notSet: "تعیین نشده", noDescription: "توضیحی دریافت نشده است.", noPhotos: "تعیین نشده", openListing: "بازکردن اعلان", openSource: "بازکردن منبع اصلی", notCreated: "هنوز اعلان ساخته نشده", accepted: "پذیرفته", rejected: "ردشده", errors: "خطا" }
+    ? { back: "بازگشت به موجودی", title: "بررسی انتقال", subtitle: "جزئیات ردیف انتقال‌شده پیش از تبدیل به اعلان عمومی.", waiting: "این مورد هنوز اعلان عمومی نیست و نیاز به بررسی دارد.", content: "محتوای انتقال‌شده", readiness: "آمادگی اعلان", source: "منبع و وظیفه", adTitle: "عنوان", description: "توضیحات", category: "دسته‌بندی", location: "موقعیت", price: "قیمت", photos: "تصویرها", sourceItem: "شناسه در منبع", received: "دریافت‌شده", status: "وضعیت", job: "وظیفه انتقال", dryRun: "اجرای آزمایشی", liveRun: "اجرای واقعی", notSet: "تعیین نشده", noDescription: "توضیحی دریافت نشده است.", noPhotos: "هیچ تصویری ذخیره نشده است. برای دریافت همه تصویرهای آلبوم، اعلان را دوباره به ربات بفرستید.", recoverPhoto: "بازیابی تصویر باقی‌مانده", openListing: "بازکردن اعلان", openSource: "بازکردن منبع اصلی", notCreated: "هنوز اعلان ساخته نشده", accepted: "پذیرفته", rejected: "ردشده", errors: "خطا" }
     : locale === "ps"
-      ? { back: "موجودۍ ته بېرته", title: "د لېږد بیاکتنه", subtitle: "د عام اعلان تر جوړېدو مخکې د لېږدول شوي ریکارډ جزیات.", waiting: "دا مورد لا عام اعلان نه دی او بیاکتنې ته اړتیا لري.", content: "لېږدول شوې منځپانګه", readiness: "د اعلان چمتووالی", source: "سرچینه او دنده", adTitle: "سرلیک", description: "تشریح", category: "کټګوري", location: "ځای", price: "بیه", photos: "انځورونه", sourceItem: "په سرچینه کې پېژند", received: "ترلاسه شوی", status: "حالت", job: "د لېږد دنده", dryRun: "ازمایښتي اجرا", liveRun: "اصلي اجرا", notSet: "نه دی ټاکل شوی", noDescription: "تشریح نه ده ترلاسه شوې.", noPhotos: "نه دي ټاکل شوي", openListing: "اعلان پرانیستل", openSource: "اصلي سرچینه پرانیستل", notCreated: "اعلان لا نه دی جوړ شوی", accepted: "منل شوي", rejected: "رد شوي", errors: "تېروتنې" }
-      : { back: "Back to inventory", title: "Review transfer", subtitle: "The transferred row before it becomes a public listing.", waiting: "This item is not a public listing yet and needs administrative review.", content: "Transferred content", readiness: "Listing readiness", source: "Source and job", adTitle: "Title", description: "Description", category: "Category", location: "Location", price: "Price", photos: "Photos", sourceItem: "Source item", received: "Received", status: "Status", job: "Import job", dryRun: "Dry run", liveRun: "Live run", notSet: "Not assigned", noDescription: "No description was received.", noPhotos: "Not reported", openListing: "Open listing", openSource: "Open original source", notCreated: "Listing not created yet", accepted: "Accepted", rejected: "Rejected", errors: "Errors" };
+      ? { back: "موجودۍ ته بېرته", title: "د لېږد بیاکتنه", subtitle: "د عام اعلان تر جوړېدو مخکې د لېږدول شوي ریکارډ جزیات.", waiting: "دا مورد لا عام اعلان نه دی او بیاکتنې ته اړتیا لري.", content: "لېږدول شوې منځپانګه", readiness: "د اعلان چمتووالی", source: "سرچینه او دنده", adTitle: "سرلیک", description: "تشریح", category: "کټګوري", location: "ځای", price: "بیه", photos: "انځورونه", sourceItem: "په سرچینه کې پېژند", received: "ترلاسه شوی", status: "حالت", job: "د لېږد دنده", dryRun: "ازمایښتي اجرا", liveRun: "اصلي اجرا", notSet: "نه دی ټاکل شوی", noDescription: "تشریح نه ده ترلاسه شوې.", noPhotos: "هېڅ انځور نه دی خوندي شوی. د البوم ټولو انځورونو لپاره اعلان بیا رباټ ته ولېږئ.", recoverPhoto: "پاتې انځور بېرته ترلاسه کړئ", openListing: "اعلان پرانیستل", openSource: "اصلي سرچینه پرانیستل", notCreated: "اعلان لا نه دی جوړ شوی", accepted: "منل شوي", rejected: "رد شوي", errors: "تېروتنې" }
+      : { back: "Back to inventory", title: "Review transfer", subtitle: "The transferred row before it becomes a public listing.", waiting: "This item is not a public listing yet and needs administrative review.", content: "Transferred content", readiness: "Listing readiness", source: "Source and job", adTitle: "Title", description: "Description", category: "Category", location: "Location", price: "Price", photos: "Photos", sourceItem: "Source item", received: "Received", status: "Status", job: "Import job", dryRun: "Dry run", liveRun: "Live run", notSet: "Not assigned", noDescription: "No description was received.", noPhotos: "No photo was stored. Forward the ad to the bot again to capture every album image.", recoverPhoto: "Recover retained photo", openListing: "Open listing", openSource: "Open original source", notCreated: "Listing not created yet", accepted: "Accepted", rejected: "Rejected", errors: "Errors" };
   const dateLocale = locale === "fa" ? "fa-AF" : locale === "ps" ? "ps-AF" : "en-AF";
   const receivedAt = new Intl.DateTimeFormat(dateLocale, { dateStyle: "long", timeStyle: "short" }).format(new Date(candidate.created_at));
   const title = displayText(payload.title, candidate.normalized_title || copy.notSet);
   const description = displayText(payload.description, copy.noDescription);
-  const photoCount = typeof payload.photo_count === "number" ? payload.photo_count : copy.noPhotos;
+  const signedMedia = (await Promise.all(((mediaResult.data ?? []) as MediaRow[]).map(async (item) => {
+    const { data: signed } = await supabase.storage
+      .from(item.storage_bucket)
+      .createSignedUrl(item.storage_path, 10 * 60);
+    return signed?.signedUrl ? { ...item, url: signed.signedUrl } : null;
+  }))).filter((item): item is MediaRow & { url: string } => item !== null);
+  const photoCount = signedMedia.length;
   const sourceHref = safeExternalHref(payload.source_url ?? payload.sourceUrl);
 
   return (
@@ -91,6 +112,18 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
         <section className="rounded-2xl border border-[var(--line)] bg-white p-5">
           <h2 className="font-display text-xl font-bold">{copy.content}</h2>
           <dl className="mt-4 space-y-5"><div><dt className="text-xs font-bold uppercase tracking-wide text-[var(--ink-2)]">{copy.adTitle}</dt><dd className="mt-1 whitespace-pre-line text-lg font-bold leading-7">{title}</dd></div><div><dt className="text-xs font-bold uppercase tracking-wide text-[var(--ink-2)]">{copy.description}</dt><dd className="mt-1 whitespace-pre-line text-sm leading-7 text-[var(--ink-1)]">{description}</dd></div></dl>
+          <div className="mt-6 border-t border-[var(--line)] pt-5">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--ink-2)]">{copy.photos}</h3>
+            {signedMedia.length ? (
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {signedMedia.map((item, index) => (
+                  <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface-2)]">
+                    <Image src={item.url} alt={`${title} — ${copy.photos} ${index + 1}`} fill sizes="(max-width: 639px) 50vw, 240px" className="object-cover transition-transform group-hover:scale-[1.02]" />
+                  </a>
+                ))}
+              </div>
+            ) : <div className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-900"><p>{copy.noPhotos}</p>{source?.platform === "telegram" ? <form action={recoverTelegramCandidatePhoto.bind(null, candidate.id)} className="mt-3"><button type="submit" className="rounded-lg bg-amber-900 px-3 py-2 text-xs font-bold text-white">{copy.recoverPhoto}</button></form> : null}</div>}
+          </div>
         </section>
 
         <div className="space-y-5">

@@ -6,6 +6,12 @@ import { normalizeAfghanistanPhone, normalizePriceToAfn, assertSafeExternalUrl, 
 import { scoreDuplicateCandidate } from "../lib/inventory/deduplication";
 import { getSourceTransparency, shouldShowInNormalDiscovery } from "../lib/inventory/provenance";
 import { scoreMarketplaceListing } from "../lib/ranking/marketplace";
+import {
+  candidateMediaStoragePath,
+  getTelegramTransferKey,
+  selectLargestTelegramPhoto,
+  telegramPhotoFingerprint,
+} from "../lib/inventory/telegram-media";
 
 const migration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260820123009_inventory_provenance_foundation.sql"),
@@ -17,6 +23,18 @@ const inventoryPage = readFileSync(
 );
 const inventoryCandidatePage = readFileSync(
   join(process.cwd(), "app", "admin", "inventory", "candidates", "[id]", "page.tsx"),
+  "utf8",
+);
+const telegramMediaMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260829194000_secure_telegram_candidate_media.sql"),
+  "utf8",
+);
+const telegramWebhook = readFileSync(
+  join(process.cwd(), "app", "api", "telegram", "webhook", "route.ts"),
+  "utf8",
+);
+const inventoryActions = readFileSync(
+  join(process.cwd(), "lib", "actions", "inventory-media.ts"),
   "utf8",
 );
 
@@ -121,5 +139,40 @@ test("inventory control exposes transferred records and real listing drill-down 
   assert.match(inventoryPage, /\.neq\("source_type", "native"\)\.in\("freshness_status"/);
   assert.match(inventoryCandidatePage, /requirePermission\("listings\.view"\)/);
   assert.match(inventoryCandidatePage, /normalized_payload/);
+  assert.match(inventoryCandidatePage, /listing_ingest_candidate_media/);
+  assert.match(inventoryCandidatePage, /createSignedUrl/);
   assert.doesNotMatch(inventoryCandidatePage, /raw_payload/);
+});
+
+test("Telegram photo variants resolve to one largest actual image", () => {
+  const selected = selectLargestTelegramPhoto([
+    { file_id: "small", file_unique_id: "same", width: 90, height: 90, file_size: 1_000 },
+    { file_id: "large", file_unique_id: "same", width: 1280, height: 960, file_size: 120_000 },
+    { file_id: "medium", file_unique_id: "same", width: 640, height: 480, file_size: 50_000 },
+  ]);
+  assert.equal(selected?.fileId, "large");
+  assert.equal(selected?.width, 1280);
+  assert.equal(telegramPhotoFingerprint(selected!), telegramPhotoFingerprint({ ...selected!, fileId: "another-variant" }));
+  assert.match(candidateMediaStoragePath("candidate-id", "29", "abc123", "jpg"), /^candidate-id\/29-abc123\.jpg$/);
+});
+
+test("Telegram album messages share one transfer identity and are no longer dropped", () => {
+  const first = getTelegramTransferKey({ message_id: 29, media_group_id: "album-7" }, "100");
+  const second = getTelegramTransferKey({ message_id: 30, media_group_id: "album-7" }, "101");
+  assert.equal(first.idempotencyKey, second.idempotencyKey);
+  assert.notEqual(first.sourceItemId, second.sourceItemId);
+  assert.doesNotMatch(telegramWebhook, /if \(!text && photos\.length > 0\)/);
+  assert.match(telegramWebhook, /selectLargestTelegramPhoto/);
+  assert.match(telegramWebhook, /listing_ingest_candidate_media/);
+});
+
+test("Telegram candidate photos use a private bucket and permission-protected metadata", () => {
+  assert.match(telegramMediaMigration, /create table if not exists public\.listing_ingest_candidate_media/i);
+  assert.match(telegramMediaMigration, /'listing-ingest-media'[\s\S]*false,[\s\S]*10485760/i);
+  assert.match(telegramMediaMigration, /listing_ingest_candidate_media_admin_read[\s\S]*has_admin_permission[\s\S]*'listings\.view'/i);
+  assert.match(telegramMediaMigration, /listing_ingest_media_admin_read[\s\S]*bucket_id = 'listing-ingest-media'/i);
+  assert.match(telegramMediaMigration, /sync_listing_ingest_candidate_photo_count/i);
+  assert.match(inventoryActions, /requirePermission\("listings\.moderate"\)/);
+  assert.match(inventoryActions, /TELEGRAM_IMPORT_BOT_TOKEN/);
+  assert.doesNotMatch(inventoryActions, /console\.(log|error)/);
 });
