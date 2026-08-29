@@ -62,6 +62,11 @@ test("normal search is default and never enters the AI interpreter without expli
   assert.doesNotMatch(searchPage, /bg-gradient-to-br from-indigo-50/);
   assert.match(searchPage, /broadenedAiFallback/);
   assert.match(searchPage, /zero_result_category_broadened/);
+  assert.match(
+    searchPage,
+    /\.\.\.listingFilters,\s*categoryNodeId: undefined,\s*categoryScope: undefined/,
+    "category broadening must retain exact model, price, location, and other interpreted filters"
+  );
 });
 
 test("AI Gateway failures, invalid responses, low confidence, and rate limits fall back deterministically", () => {

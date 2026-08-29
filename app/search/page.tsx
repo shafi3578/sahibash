@@ -396,7 +396,7 @@ export default async function SearchPage({
       ? params.sort
       : "newest";
 
-  const listingsPromise = getApprovedListings({
+  const listingFilters: NonNullable<Parameters<typeof getApprovedListings>[0]> = {
     locale,
     search: params.q,
     province: params.province,
@@ -480,7 +480,8 @@ export default async function SearchPage({
       params.postedWithin === "24h" || params.postedWithin === "7d" || params.postedWithin === "30d"
         ? params.postedWithin
         : undefined,
-  });
+  };
+  const listingsPromise = getApprovedListings(listingFilters);
 
   const hasSearchSignal = Boolean(
     params.q ||
@@ -522,14 +523,9 @@ export default async function SearchPage({
   );
   const listings = broadenedAiFallback
     ? await getApprovedListings({
-        locale,
-        search: params.q,
-        province: params.province,
-        district: params.district,
-        minPrice: toNumber(params.minPrice ?? params.min_price),
-        maxPrice: toNumber(params.maxPrice ?? params.max_price),
-        listingType: listingType === "wanted" ? "wanted" : listingType === "for_sale" ? "for_sale" : undefined,
-        sort: normalizedSort,
+        ...listingFilters,
+        categoryNodeId: undefined,
+        categoryScope: undefined,
       })
     : initialListings;
 
