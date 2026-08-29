@@ -242,6 +242,16 @@ test("Quick Post supports professional item location without exposing device GPS
     assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.doesNotMatch(quickPostForm, /toFixed\(6\)/);
+
+  const locationSection = quickPostForm.slice(
+    quickPostForm.indexOf('data-testid="quick-post-location"'),
+    quickPostForm.indexOf('data-testid="quick-post-advanced-details"'),
+  );
+  assert.match(locationSection, /showLocationDetails/);
+  assert.match(locationSection, /aria-expanded=\{showLocationDetails\}/);
+  assert.match(locationSection, /id="quick-post-location-optional-details"/);
+  assert.match(locationSection, /name="location_visibility"[\s\S]*<option value="approximate"/);
+  assert.doesNotMatch(locationSection, /type="radio"/);
 });
 
 test("Step 1 presents photos, title and description, location, then price", () => {

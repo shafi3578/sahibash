@@ -231,12 +231,16 @@ const COPY = {
     dormFee: "Dormitory fee",
     landLeasePrice: "Lease price",
     location: "Location",
-    useCurrentLocation: "Use My Current Location",
-    currentLocationHint: "We use your device location only to help set this item's location. Confirm or edit it before publishing.",
+    useCurrentLocation: "Current location",
+    currentLocationHint: "Choose the item's province and district. Your exact address stays private.",
     detectingLocation: "Detecting location...",
     detectedLocation: "Detected item location",
     confirmLocation: "Use this location",
     chooseManualLocation: "Choose manually",
+    moreLocationOptions: "Address & privacy",
+    hideLocationOptions: "Hide optional location details",
+    locationRequired: "Required",
+    locationConfirmedLabel: "Confirmed",
     gpsDenied: "Location permission was denied. You can continue by choosing manually.",
     gpsUnavailable: "We could not detect your location right now. Choose manually or set a map pin.",
     setOnMap: "Set on map",
@@ -337,12 +341,16 @@ const COPY = {
     dormFee: "فیس خوابگاه",
     landLeasePrice: "قیمت اجاره",
     location: "موقعیت",
-    useCurrentLocation: "استفاده از موقعیت فعلی من",
-    currentLocationHint: "موقعیت دستگاه فقط برای تنظیم موقعیت همین جنس استفاده می‌شود. پیش از نشر آن را تایید یا ویرایش کنید.",
+    useCurrentLocation: "موقعیت فعلی",
+    currentLocationHint: "ولایت و ولسوالی جنس را انتخاب کنید؛ نشانی دقیق شما نمایش داده نمی‌شود.",
     detectingLocation: "در حال تشخیص موقعیت...",
     detectedLocation: "موقعیت جنس تشخیص شد",
     confirmLocation: "استفاده از این موقعیت",
     chooseManualLocation: "انتخاب دستی",
+    moreLocationOptions: "نشانی و حریم خصوصی",
+    hideLocationOptions: "بستن جزئیات اختیاری موقعیت",
+    locationRequired: "ضروری",
+    locationConfirmedLabel: "تایید شد",
     gpsDenied: "اجازه موقعیت داده نشد. می‌توانید دستی ادامه دهید.",
     gpsUnavailable: "فعلاً نتوانستیم موقعیت را تشخیص دهیم. دستی انتخاب کنید یا پین نقشه بگذارید.",
     setOnMap: "تعیین روی نقشه",
@@ -443,12 +451,16 @@ const COPY = {
     dormFee: "د لیلیې فیس",
     landLeasePrice: "د اجارې بیه",
     location: "ځای",
-    useCurrentLocation: "زما فعلي ځای وکاروئ",
-    currentLocationHint: "د وسیلې ځای یوازې د همدې توکي د ځای ټاکلو لپاره کارېږي. له خپرولو مخکې یې تایید یا سم کړئ.",
+    useCurrentLocation: "فعلي ځای",
+    currentLocationHint: "د توکي ولایت او ولسوالي وټاکئ؛ ستاسو دقیق ادرس نه ښودل کېږي.",
     detectingLocation: "ځای موندل کېږي...",
     detectedLocation: "د توکي ځای وموندل شو",
     confirmLocation: "دا ځای وکاروئ",
     chooseManualLocation: "لاسي انتخاب",
+    moreLocationOptions: "ادرس او محرمیت",
+    hideLocationOptions: "اختیاري ځای تفصیلات پټ کړئ",
+    locationRequired: "اړین",
+    locationConfirmedLabel: "تایید شو",
     gpsDenied: "د ځای اجازه رد شوه. تاسو لاسي انتخاب سره ادامه ورکولای شئ.",
     gpsUnavailable: "اوس ځای ونه موندل شو. لاسي انتخاب وکړئ یا د نقشې پین وټاکئ.",
     setOnMap: "په نقشه کې وټاکئ",
@@ -1069,6 +1081,7 @@ export default function QuickPostForm({
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationHint, setLocationHint] = useState<string | null>(null);
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [showLocationDetails, setShowLocationDetails] = useState(false);
   const [selectedRootSlug, setSelectedRootSlug] = useState(() => normalizeQuickPostRootSlug(initialRootSlug));
   const [rootTouched, setRootTouched] = useState(Boolean(normalizeQuickPostRootSlug(initialRootSlug)));
   const [selectedCategory, setSelectedCategory] = useState<CandidateNode | null>(null);
@@ -2711,84 +2724,17 @@ export default function QuickPostForm({
 
       {step === 1 ? (
       <section data-testid="quick-post-location" className="order-30 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h3 className="font-display text-lg font-bold">{c.location}</h3>
-            <p className="mt-1 text-xs text-[var(--ink-2)]">{c.currentLocationHint}</p>
+            <p className="mt-0.5 text-xs leading-5 text-[var(--ink-2)]">{c.currentLocationHint}</p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-bold ${locationConfirmed ? "bg-emerald-50 text-emerald-700" : "bg-[var(--surface-2)] text-[var(--ink-2)]"}`}>
-            {locationConfirmed ? c.confirmLocation : c.locationMustConfirm}
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${locationConfirmed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+            {locationConfirmed ? c.locationConfirmedLabel : c.locationRequired}
           </span>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
-          <button
-            type="button"
-            onClick={handleUseCurrentLocation}
-            disabled={isDetectingLocation}
-            className="min-h-12 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
-          >
-            {isDetectingLocation ? c.detectingLocation : c.useCurrentLocation}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setLocationSource("manual");
-              setLatitude(null);
-              setLongitude(null);
-              setLocationAccuracy(null);
-              setLocationConfirmed(Boolean(selectedProvinceId && selectedDistrictId));
-              setLocationHint(null);
-            }}
-            className="min-h-12 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-2)]"
-          >
-            {c.chooseManualLocation}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowMapPicker((current) => !current)}
-            className="min-h-12 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm font-bold transition hover:bg-[var(--surface-2)]"
-          >
-            {showMapPicker ? c.hideMap : c.setOnMap}
-          </button>
-        </div>
-
-        {locationHint ? (
-          <p className="mt-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-3 text-sm text-[var(--ink-2)]">
-            {locationHint}
-          </p>
-        ) : null}
-
-        {locationSource !== "manual" && selectedProvinceId && selectedDistrictId ? (
-          <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
-            <p className="font-bold">{c.detectedLocation}</p>
-            <p className="mt-1">
-              {provinceOptions.find((item) => item.id === selectedProvinceId)?.name} › {districtOptions.find((item) => item.id === selectedDistrictId)?.name}
-            </p>
-            <button type="button" onClick={handleConfirmDetectedLocation} className="mt-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white">
-              {c.confirmLocation}
-            </button>
-          </div>
-        ) : null}
-
-        {showMapPicker ? (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-[var(--line)]">
-            <LocationMapPicker
-              initialLocation={{ latitude: latitude ?? undefined, longitude: longitude ?? undefined, accuracy: locationAccuracy ?? undefined }}
-              onLocationSelected={(location) => {
-                setLatitude(location.latitude);
-                setLongitude(location.longitude);
-                setLocationAccuracy(location.accuracy ?? null);
-                setLocationSource("map_pin");
-                setLocationVisibility((current) => current === "hidden" ? current : "approximate");
-                setLocationConfirmed(Boolean(selectedProvinceId && selectedDistrictId));
-                setLocationHint(c.mapPinSaved);
-              }}
-            />
-          </div>
-        ) : null}
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <label className="text-sm font-bold">
             {c.province}
             <select
@@ -2800,7 +2746,7 @@ export default function QuickPostForm({
                 confirmManualLocationIfReady(nextProvinceId, null);
                 if (!nextProvinceId) setDistrictOptions([]);
               }}
-              className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3"
+              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5"
             >
               <option value="">{c.select}</option>
               {provinceOptions.map((province) => (
@@ -2818,7 +2764,7 @@ export default function QuickPostForm({
                 confirmManualLocationIfReady(selectedProvinceId, nextDistrictId);
               }}
               disabled={!selectedProvinceId}
-              className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3 disabled:bg-[var(--surface-2)]"
+              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 disabled:bg-[var(--surface-2)]"
             >
               <option value="">{c.select}</option>
               {districtOptions.map((district) => (
@@ -2826,39 +2772,99 @@ export default function QuickPostForm({
               ))}
             </select>
           </label>
-          <label className="text-sm font-bold sm:col-span-2">
-            {c.area}
-            <input value={areaText} onChange={(event) => setAreaText(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
-          </label>
-          <label className="text-sm font-bold sm:col-span-2">
-            {c.street}
-            <input value={streetText} onChange={(event) => setStreetText(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
-          </label>
-          <fieldset className="sm:col-span-2">
-            <legend className="text-sm font-bold">{c.locationPrivacy}</legend>
-            <div className="mt-2 grid gap-2 sm:grid-cols-4">
-              {([
-                ["approximate", c.privacyApproximate],
-                ["province_district", c.privacyDistrict],
-                ["hidden", c.privacyHidden],
-                ["exact", c.privacyExact],
-              ] as const).map(([value, label]) => (
-                <label key={value} className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-bold transition ${locationVisibility === value ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--line)] bg-white text-[var(--ink-1)]"}`}>
-                  <input
-                    type="radio"
-                    name="location_visibility"
-                    value={value}
-                    checked={locationVisibility === value}
-                    onChange={() => setLocationVisibility(value)}
-                    className="h-4 w-4"
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-[var(--ink-2)]">{c.exactHidden}</p>
-          </fieldset>
         </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={handleUseCurrentLocation}
+            disabled={isDetectingLocation}
+            className="min-h-10 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
+          >
+            {isDetectingLocation ? c.detectingLocation : c.useCurrentLocation}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowLocationDetails((current) => !current)}
+            aria-expanded={showLocationDetails}
+            aria-controls="quick-post-location-optional-details"
+            className="min-h-10 flex-1 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold transition hover:bg-[var(--surface-2)]"
+          >
+            {showLocationDetails ? c.hideLocationOptions : c.moreLocationOptions}
+          </button>
+        </div>
+
+        {locationHint ? (
+          <p className="mt-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
+            {locationHint}
+          </p>
+        ) : null}
+
+        {locationSource !== "manual" && selectedProvinceId && selectedDistrictId ? (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            <p><span className="font-bold">{c.detectedLocation}:</span> {provinceOptions.find((item) => item.id === selectedProvinceId)?.name} › {districtOptions.find((item) => item.id === selectedDistrictId)?.name}</p>
+            {!locationConfirmed ? (
+              <button type="button" onClick={handleConfirmDetectedLocation} className="shrink-0 rounded-lg bg-emerald-700 px-3 py-1.5 font-black text-white">
+                {c.confirmLocation}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {showLocationDetails ? (
+          <div id="quick-post-location-optional-details" className="mt-3 space-y-3 border-t border-[var(--line)] pt-3">
+            <button
+              type="button"
+              onClick={() => setShowMapPicker((current) => !current)}
+              className="min-h-10 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold transition hover:bg-[var(--surface-2)]"
+            >
+              {showMapPicker ? c.hideMap : c.setOnMap}
+            </button>
+
+            {showMapPicker ? (
+              <div className="overflow-hidden rounded-2xl border border-[var(--line)]">
+                <LocationMapPicker
+                  initialLocation={{ latitude: latitude ?? undefined, longitude: longitude ?? undefined, accuracy: locationAccuracy ?? undefined }}
+                  onLocationSelected={(location) => {
+                    setLatitude(location.latitude);
+                    setLongitude(location.longitude);
+                    setLocationAccuracy(location.accuracy ?? null);
+                    setLocationSource("map_pin");
+                    setLocationVisibility((current) => current === "hidden" ? current : "approximate");
+                    setLocationConfirmed(Boolean(selectedProvinceId && selectedDistrictId));
+                    setLocationHint(c.mapPinSaved);
+                  }}
+                />
+              </div>
+            ) : null}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-bold">
+                {c.area}
+                <input value={areaText} onChange={(event) => setAreaText(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5" />
+              </label>
+              <label className="text-sm font-bold">
+                {c.street}
+                <input value={streetText} onChange={(event) => setStreetText(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5" />
+              </label>
+              <label className="text-sm font-bold sm:col-span-2">
+                {c.locationPrivacy}
+                <select
+                  name="location_visibility"
+                  value={locationVisibility}
+                  onChange={(event) => setLocationVisibility(event.target.value as QuickLocationVisibility)}
+                  className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5"
+                >
+                  <option value="approximate">{c.privacyApproximate}</option>
+                  <option value="province_district">{c.privacyDistrict}</option>
+                  <option value="hidden">{c.privacyHidden}</option>
+                  <option value="exact">{c.privacyExact}</option>
+                </select>
+                <span className="mt-1 block text-xs font-normal text-[var(--ink-2)]">{c.exactHidden}</span>
+              </label>
+            </div>
+          </div>
+        ) : null}
       </section>
       ) : null}
 
