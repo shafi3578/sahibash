@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatListingPrice } from "@/lib/listings/price-display";
+import { mapSignalsToCategory } from "@/lib/ai/category-mapping";
 
 const quickPostForm = readFileSync(join(process.cwd(), "components", "posting", "QuickPostForm.tsx"), "utf8");
 const createPage = readFileSync(join(process.cwd(), "app", "post-ad", "create", "page.tsx"), "utf8");
@@ -143,12 +144,12 @@ test("Quick Post resolves AI suggestions against canonical taxonomy instead of a
 
 test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matching", () => {
   assert.match(aiGateway, /AI_GATEWAY_API_KEY \?\? process\.env\.VERCEL_OIDC_TOKEN/);
-  assert.match(aiGateway, /openai\/gpt-5\.6-luna/);
-  assert.match(aiGateway, /models: \["google\/gemini-3\.1-flash-lite"\]/);
+  assert.match(aiGateway, /mistral\/mistral-small/);
+  assert.match(aiGateway, /models: \["spacexai\/grok-4\.1-fast-non-reasoning", "openai\/gpt-5\.6-luna"\]/);
   assert.match(aiGateway, /feature:category-suggest/);
   assert.match(aiGateway, /createHash\("sha256"\)\.update\(input\.userId\)/);
   assert.match(aiGateway, /15_000/);
-  assert.match(aiGateway, /reasoning_effort: "minimal"/);
+  assert.doesNotMatch(aiGateway, /reasoning_effort/);
   assert.match(aiGateway, /max_completion_tokens: 512/);
   assert.match(aiGateway, /status: `http_\$\{response\.status\}`/);
   assert.match(aiGateway, /input\.allowedPaths\.includes\(path\)/);
@@ -162,6 +163,23 @@ test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matchi
   assert.match(aiRoute, /gatewayModel: gatewayResult\.model/);
   assert.match(aiRoute, /\.slice\(0, 3\)/);
   assert.doesNotMatch(aiRoute, /if \(!key\) \{\s*return NextResponse/);
+});
+
+test("deterministic AI fallback resolves common multilingual signals to active leaf paths", () => {
+  const cases = [
+    ["Hyundai Elantra 2019", "النترا کم کار", "vehicles/cars/hyundai/elantra"],
+    ["Nissan Patrol 2015", "نیسان پترول", "vehicles/cars/nissan/patrol"],
+    ["Apple iPad tablet", "Used tablet, not a phone", "mobile-phones-tablets/tablets"],
+    ["آپارتمان مبله برای کرایه", "خانه اپارتمانی با وسایل", "real-estate/apartments/furnished-apartment"],
+    ["کرنیزه ځمکه د خرڅلاو لپاره", "Agricultural land for sale", "real-estate/land/for-sale/agricultural-land"],
+    ["Used Dell laptop", "Second hand computer notebook", "second-hand-items/electronics-computers/laptops"],
+    ["Solar panels 550W", "Used photovoltaic panels", "second-hand-items/electronics-computers/solar-power-equipment/solar-panels"],
+  ] as const;
+
+  for (const [title, description, expected] of cases) {
+    const result = mapSignalsToCategory({ title, description, labels: [], specsMatch: null });
+    assert.equal(result?.pathSlugs.join("/"), expected);
+  }
 });
 
 test("Quick Post invalidates stale AI suggestions after materially editing Step 1", () => {

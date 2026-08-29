@@ -28,10 +28,9 @@ export async function requestGatewayCategorySuggestion(input: {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        model: "openai/gpt-5.6-luna",
-        models: ["google/gemini-3.1-flash-lite"],
+        model: "mistral/mistral-small",
+        models: ["spacexai/grok-4.1-fast-non-reasoning", "openai/gpt-5.6-luna"],
         temperature: 0,
-        reasoning_effort: "minimal",
         max_completion_tokens: 512,
         response_format: { type: "json_object" },
         providerOptions: {

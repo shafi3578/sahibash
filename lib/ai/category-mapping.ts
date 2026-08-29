@@ -13,7 +13,7 @@ type SpecsMatch = {
 };
 
 export type CategorySuggestion = {
-  rootSlug: "real-estate" | "vehicles" | "mobile-phones-tablets" | "electronics-computers" | "home-furniture-appliances" | "clothing-personal-items" | "jobs" | "services" | "business-industry" | "farm-animals" | "education" | "sports-hobbies" | "other";
+  rootSlug: "real-estate" | "vehicles" | "mobile-phones-tablets" | "second-hand-items" | "electronics-computers" | "home-furniture-appliances" | "clothing-personal-items" | "jobs" | "services" | "business-industry" | "farm-animals" | "education" | "sports-hobbies" | "other";
   pathSlugs: string[];
   label: string;
   reason: string;
@@ -70,6 +70,17 @@ function buildText(input: MappingInput) {
   return normalize(`${input.title} ${input.description} ${labelsText}`);
 }
 
+function suggestion(path: string, label: string, reason: string, confidence = 0.78): CategorySuggestion {
+  const pathSlugs = path.split("/");
+  return {
+    rootSlug: pathSlugs[0] as CategorySuggestion["rootSlug"],
+    pathSlugs,
+    label,
+    reason,
+    confidence,
+  };
+}
+
 export function mapSignalsToCategory(input: MappingInput): CategorySuggestion | null {
   const text = buildText(input);
 
@@ -80,7 +91,7 @@ export function mapSignalsToCategory(input: MappingInput): CategorySuggestion | 
     const fallbackModelSlug = input.specsMatch.categoryPath.split("/").pop() ?? "other";
 
     return {
-      rootSlug: rootSlug && ["real-estate", "vehicles", "mobile-phones-tablets", "electronics-computers", "home-furniture-appliances", "clothing-personal-items", "jobs", "services", "business-industry", "farm-animals", "education", "sports-hobbies", "other"].includes(rootSlug)
+      rootSlug: rootSlug && ["real-estate", "vehicles", "mobile-phones-tablets", "second-hand-items", "electronics-computers", "home-furniture-appliances", "clothing-personal-items", "jobs", "services", "business-industry", "farm-animals", "education", "sports-hobbies", "other"].includes(rootSlug)
         ? rootSlug
         : "mobile-phones-tablets",
       pathSlugs: pathSlugs.length > 0 ? pathSlugs : ["mobile-phones-tablets", "mobile-phones", fallbackBrandSlug, fallbackModelSlug],
@@ -88,6 +99,106 @@ export function mapSignalsToCategory(input: MappingInput): CategorySuggestion | 
       reason: `Detected known model from title/description: ${input.specsMatch.model}`,
       confidence: Math.max(0.65, input.specsMatch.confidence),
     };
+  }
+
+  if (containsAny(text, ["land cruiser prado", "prado", "پرادو"])) {
+    return suggestion("vehicles/cars/toyota/land-cruiser-prado", "Vehicles > Cars > Toyota > Land Cruiser Prado", "Detected Toyota Prado signals.", 0.9);
+  }
+
+  if (containsAny(text, ["land cruiser", "landcruiser", "لندکروزر", "لند کروزر"])) {
+    return suggestion("vehicles/cars/toyota/land-cruiser", "Vehicles > Cars > Toyota > Land Cruiser", "Detected Toyota Land Cruiser signals.", 0.9);
+  }
+
+  if (containsAny(text, ["corolla", "کرولا", "کروولا"])) {
+    return suggestion("vehicles/cars/toyota/corolla", "Vehicles > Cars > Toyota > Corolla", "Detected Toyota Corolla signals.", 0.9);
+  }
+
+  if (containsAny(text, ["honda civic", "civic", "هوندا سیویک"])) {
+    return suggestion("vehicles/cars/honda/civic", "Vehicles > Cars > Honda > Civic", "Detected Honda Civic signals.", 0.88);
+  }
+
+  if (containsAny(text, ["hyundai elantra", "elantra", "النترا"])) {
+    return suggestion("vehicles/cars/hyundai/elantra", "Vehicles > Cars > Hyundai > Elantra", "Detected Hyundai Elantra signals.", 0.88);
+  }
+
+  if (containsAny(text, ["nissan patrol", "patrol", "نیسان پترول", "پترول"])) {
+    return suggestion("vehicles/cars/nissan/patrol", "Vehicles > Cars > Nissan > Patrol", "Detected Nissan Patrol signals.", 0.88);
+  }
+
+  if (containsAny(text, ["suzuki swift", "swift hatchback"])) {
+    return suggestion("vehicles/cars/suzuki", "Vehicles > Cars > Suzuki", "Detected Suzuki Swift signals.", 0.84);
+  }
+
+  if (containsAny(text, ["honda cg 125", "honda cg125", "cg 125", "cg125", "هوندا ۱۲۵", "هوندا 125"])) {
+    return suggestion("vehicles/motorcycles/honda-cg125-honda-125", "Vehicles > Motorcycles > Honda CG125 / Honda 125", "Detected Honda CG125 motorcycle signals.", 0.9);
+  }
+
+  if (containsAny(text, ["electric rickshaw", "electric three wheeler", "برقی رکشا"])) {
+    return suggestion("vehicles/rickshaws-three-wheelers/electric-rickshaw", "Vehicles > Rickshaws & Three Wheelers > Electric Rickshaw", "Detected electric rickshaw signals.", 0.88);
+  }
+
+  if (containsAny(text, ["mountain bike", "mountain bicycle", "بایسکل کوهی"])) {
+    return suggestion("vehicles/bicycles/mountain-bike", "Vehicles > Bicycles > Mountain Bike", "Detected mountain bicycle signals.", 0.88);
+  }
+
+  if (containsAny(text, ["solar panel", "photovoltaic", "پنل سولر"])) {
+    return suggestion("second-hand-items/electronics-computers/solar-power-equipment/solar-panels", "Second-hand Items > Electronics & Computers > Solar Power Equipment > Solar Panels", "Detected second-hand solar panel signals.", 0.86);
+  }
+
+  if (containsAny(text, ["laptop", "computer notebook", "لپ تاپ", "لپ‌تاپ"])) {
+    return suggestion("second-hand-items/electronics-computers/laptops", "Second-hand Items > Electronics & Computers > Laptops", "Detected second-hand laptop signals.", 0.86);
+  }
+
+  if (containsAny(text, ["refrigerator", "fridge", "یخچال"])) {
+    return suggestion("second-hand-items/home-appliances/refrigerator", "Second-hand Items > Home Appliances > Refrigerator", "Detected second-hand refrigerator signals.", 0.86);
+  }
+
+  if (containsAny(text, ["carpet", "rug", "قالین", "فرش"])) {
+    return suggestion("second-hand-items/home-furniture-appliances/carpets-rugs", "Second-hand Items > Home, Furniture & Appliances > Carpets & Rugs", "Detected second-hand carpet or rug signals.", 0.84);
+  }
+
+  if (containsAny(text, ["men's winter jacket", "mens winter jacket", "male clothing", "لباس مردانه"])) {
+    return suggestion("second-hand-items/clothing-personal-items/mens-clothing", "Second-hand Items > Clothing & Personal Items > Men's Clothing", "Detected second-hand men's clothing signals.", 0.84);
+  }
+
+  if (containsAny(text, ["school books", "textbook", "text book", "کتاب‌های درسی", "کتاب های درسی"])) {
+    return suggestion("second-hand-items/books", "Second-hand Items > Books", "Detected second-hand school book signals.", 0.84);
+  }
+
+  if (containsAny(text, ["furnished apartment", "apartment furnished", "آپارتمان مبله", "اپارتمان مبله"])) {
+    return suggestion("real-estate/apartments/furnished-apartment", "Real Estate > Apartments > Furnished Apartment", "Detected furnished apartment signals.", 0.88);
+  }
+
+  if (containsAny(text, ["villa", "ویلا", "ویلای"])) {
+    return suggestion("real-estate/houses/villa", "Real Estate > Houses > Villa", "Detected villa signals.", 0.86);
+  }
+
+  if (containsAny(text, ["agricultural land", "farmland", "کرنیزه ځمکه", "زمین زراعتی"])) {
+    return suggestion("real-estate/land/for-sale/agricultural-land", "Real Estate > Land > For Sale > Agricultural Land", "Detected agricultural land signals.", 0.86);
+  }
+
+  if (containsAny(text, ["warehouse", "storage warehouse", "گدام"])) {
+    return suggestion("real-estate/warehouses", "Real Estate > Warehouses", "Detected warehouse signals.", 0.84);
+  }
+
+  if (containsAny(text, ["commercial shop", "دکان تجارتی", "دوکان تجارتي"])) {
+    return suggestion("real-estate/shops-commercial", "Real Estate > Shops & Commercial", "Detected commercial shop signals.", 0.84);
+  }
+
+  if (containsAny(text, ["apartment", "aprtmnt", "آپارتمان", "اپارتمان"])) {
+    return suggestion("real-estate/apartments/apartment", "Real Estate > Apartments > Apartment", "Detected apartment signals.", 0.82);
+  }
+
+  if (containsAny(text, ["ipad", "tablet", "تبلت"])) {
+    return suggestion("mobile-phones-tablets/tablets", "Mobile Phones & Tablets > Tablets", "Detected tablet signals.", 0.86);
+  }
+
+  if (containsAny(text, ["smart watch", "smartwatch", "ساعت هوشمند", "هوښیار ساعت"])) {
+    return suggestion("mobile-phones-tablets/smart-watches", "Mobile Phones & Tablets > Smart Watches", "Detected smart watch signals.", 0.86);
+  }
+
+  if (containsAny(text, ["google pixel", "گوگل پیکسل"])) {
+    return suggestion("mobile-phones-tablets/mobile-phones/google-pixel", "Mobile Phones & Tablets > Mobile Phones > Google Pixel", "Detected Google Pixel signals.", 0.86);
   }
 
   if (containsAny(text, ["iphone", "apple phone", "apple iphone", "smartphone", "mobile phone"])) {
