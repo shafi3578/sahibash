@@ -17,34 +17,44 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return Boolean(value) && typeof value === "object" ? value as Record<string, unknown> : null;
 }
 
-export async function recoverTelegramCandidatePhoto(candidateId: string) {
+export type TelegramPhotoRecoveryState = {
+  status: "idle" | "success" | "error";
+  code: "idle" | "recovered" | "unavailable" | "configuration" | "storage" | "failed";
+};
+
+export async function recoverTelegramCandidatePhoto(
+  candidateId: string,
+  _previousState: TelegramPhotoRecoveryState,
+): Promise<TelegramPhotoRecoveryState> {
+  void _previousState;
   await requirePermission("listings.moderate");
-  if (!UUID_PATTERN.test(candidateId)) throw new Error("Invalid candidate");
+  if (!UUID_PATTERN.test(candidateId)) return { status: "error", code: "failed" };
 
   const token = process.env.TELEGRAM_IMPORT_BOT_TOKEN?.trim();
-  if (!token) throw new Error("Telegram import is not configured");
+  if (!token) return { status: "error", code: "configuration" };
   const supabase = createSupabaseAdmin();
   const { data: candidate, error: candidateError } = await supabase
     .from("listing_ingest_candidates")
     .select("id,source_item_id,raw_payload,normalized_payload")
     .eq("id", candidateId)
     .single();
-  if (candidateError || !candidate) throw new Error("Candidate was not found");
+  if (candidateError || !candidate) return { status: "error", code: "failed" };
 
   const payload = asRecord(candidate.normalized_payload);
-  if (payload?.source_platform !== "telegram") throw new Error("Candidate is not a Telegram transfer");
+  if (payload?.source_platform !== "telegram") return { status: "error", code: "failed" };
   const raw = asRecord(candidate.raw_payload);
   const message = asRecord(raw?.message) ?? asRecord(raw?.edited_message);
   const photo = selectLargestTelegramPhoto(message?.photo);
-  if (!photo) throw new Error("No recoverable Telegram photo was retained");
+  if (!photo) return { status: "error", code: "unavailable" };
 
   const sourceItemId =
     typeof message?.message_id === "number" && Number.isSafeInteger(message.message_id)
       ? String(message.message_id)
       : candidate.source_item_id;
-  if (!sourceItemId) throw new Error("Candidate source item is missing");
+  if (!sourceItemId) return { status: "error", code: "failed" };
 
-  const downloaded = await downloadTelegramPhoto(token, photo.fileId);
+  const downloaded = await downloadTelegramPhoto(token, photo.fileId).catch(() => null);
+  if (!downloaded) return { status: "error", code: "unavailable" };
   const fingerprint = telegramPhotoFingerprint(photo);
   const storagePath = candidateMediaStoragePath(candidate.id, sourceItemId, fingerprint, downloaded.extension);
   const { error: uploadError } = await supabase.storage
@@ -54,7 +64,7 @@ export async function recoverTelegramCandidatePhoto(candidateId: string) {
       contentType: downloaded.contentType,
       upsert: true,
     });
-  if (uploadError) throw new Error("Photo upload failed");
+  if (uploadError) return { status: "error", code: "storage" };
 
   const sortOrder = Number.parseInt(sourceItemId, 10);
   const { error: mediaError } = await supabase
@@ -76,8 +86,9 @@ export async function recoverTelegramCandidatePhoto(candidateId: string) {
 
   if (mediaError) {
     await supabase.storage.from(TELEGRAM_MEDIA_BUCKET).remove([storagePath]);
-    throw new Error("Photo metadata write failed");
+    return { status: "error", code: "storage" };
   }
 
   revalidatePath(`/admin/inventory/candidates/${candidateId}`);
+  return { status: "success", code: "recovered" };
 }
