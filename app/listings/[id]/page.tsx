@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getListingById, getSimilarListings } from "@/lib/data/queries";
 import Link from "next/link";
-import { toggleFavoriteAction } from "@/lib/actions/favorites";
 import { createReportAction } from "@/lib/actions/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { sendListingMessageAction } from "@/lib/actions/messages";
@@ -32,6 +31,8 @@ import { formatListingPrice } from "@/lib/listings/price-display";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
 import { initiateListingClaimAction, recordInventoryContactEventAction } from "@/lib/actions/inventory";
 import { localizePath } from "@/lib/i18n/routing";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { FavoriteToggleButton } from "@/components/listings/favorite-toggle-button";
 
 type NamedLocationRelation = { name?: string | null } | null;
 type ListingDetail = NonNullable<Awaited<ReturnType<typeof getListingById>>>;
@@ -86,7 +87,7 @@ export default async function ListingDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ message?: string; offer?: string; compose?: string; offerbox?: string; view?: string; translation?: string; st?: string }>;
+  searchParams: Promise<{ message?: string; offer?: string; report?: string; compose?: string; offerbox?: string; view?: string; translation?: string; st?: string }>;
 }) {
   const { t, locale } = await getDictionary();
   const { id } = await params;
@@ -97,6 +98,17 @@ export default async function ListingDetailPage({
   const currentUserPromise = getCurrentUser();
   const fieldsPromise = getCategoryFieldsWithOptions(listing.category_node_id);
   const configuredSchemaPromise = getPublishedListingSchema(listing.category_node_id);
+  const favoriteStatePromise = currentUserPromise.then(async (user) => {
+    if (!user) return false;
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase
+      .from("favorites")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("listing_id", listing.id)
+      .maybeSingle();
+    return Boolean(data?.id);
+  });
   const viewerLanguageCode = appLocaleToListingLanguage(locale);
   const showOriginal = qp.view === "original";
   const translationUnavailable = !showOriginal && viewerLanguageCode !== listing.display_language;
@@ -107,10 +119,11 @@ export default async function ListingDetailPage({
     ? (listing.original_description || listing.description)
     : (listing.translated_description || listing.description);
 
-  const [currentUser, fields, configuredSchema] = await Promise.all([
+  const [currentUser, fields, configuredSchema, isFavorited] = await Promise.all([
     currentUserPromise,
     fieldsPromise,
     configuredSchemaPromise,
+    favoriteStatePromise,
     telemetryPromise.then(() => null),
   ]);
   const isOwner = currentUser?.id === listing.user_id;
@@ -649,6 +662,21 @@ export default async function ListingDetailPage({
           {t.listing.offerTooLow}
         </div>
       )}
+      {qp.report === "sent" && (
+        <div role="status" className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          {t.listing.reportSubmitted}
+        </div>
+      )}
+      {qp.report === "invalid" && (
+        <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {t.listing.reportInvalid}
+        </div>
+      )}
+      {(qp.report === "error" || qp.report === "rate-limited") && (
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {t.listing.reportError}
+        </div>
+      )}
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link href={localizePath("/listings", locale)} className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold">
           {t.listing.backToListings}
@@ -1000,9 +1028,12 @@ export default async function ListingDetailPage({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-3">
-        <form action={async () => { "use server"; await toggleFavoriteAction(listing.id); }}>
-          <button className="rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{t.listing.addToFavorites}</button>
-        </form>
+        <FavoriteToggleButton
+          listingId={listing.id}
+          initialFavorited={isFavorited}
+          addLabel={t.listing.addToFavorites}
+          removeLabel={t.listing.removeFromFavorites}
+        />
         <form action={createReportAction} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="listingId" value={listing.id} />
           <select name="reason" required defaultValue="" className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm">

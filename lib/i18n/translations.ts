@@ -117,8 +117,12 @@ type TranslationTree = {
     safety3: string;
     safety4: string;
     addToFavorites: string;
+    removeFromFavorites: string;
       reportListing: string;
       reportTranslationIssue: string;
+    reportSubmitted: string;
+    reportInvalid: string;
+    reportError: string;
     selectReportReason: string;
     fraudOrScam: string;
     wrongCategory: string;
@@ -459,8 +463,12 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       safety3: "Meet in a safe public place if possible.",
       safety4: "Verify ownership before payment.",
       addToFavorites: "Add to Favorites",
+      removeFromFavorites: "Remove from Favorites",
       reportListing: "Report Listing",
       reportTranslationIssue: "Report translation issue",
+      reportSubmitted: "Report submitted. Sahibash moderation will review it.",
+      reportInvalid: "Choose a valid report reason.",
+      reportError: "We could not submit this report right now. Please try again.",
       selectReportReason: "Select report reason",
       fraudOrScam: "Fraud or scam",
       wrongCategory: "Wrong category",
@@ -819,7 +827,8 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       autoFilledSpecifications: "مشخصات تکمیل‌شده خودکار", buyerSafetyWarning: "هشدار ایمنی خریدار",
       safety1: "پیش از دیدن وسیله نقلیه پیش‌پرداخت نفرستید.", safety2: "اسناد وسیله نقلیه را بررسی کنید.",
       safety3: "در صورت امکان در مکان عمومی امن ملاقات کنید.", safety4: "پیش از پرداخت مالکیت را تأیید کنید.",
-      addToFavorites: "افزودن به علاقه‌مندی‌ها", reportListing: "گزارش اعلان", reportTranslationIssue: "گزارش مشکل ترجمه",
+      addToFavorites: "افزودن به علاقه‌مندی‌ها", removeFromFavorites: "حذف از علاقه‌مندی‌ها", reportListing: "گزارش اعلان", reportTranslationIssue: "گزارش مشکل ترجمه",
+      reportSubmitted: "گزارش ثبت شد. تیم نظارت صاحبش آن را بررسی می‌کند.", reportInvalid: "یک دلیل معتبر برای گزارش انتخاب کنید.", reportError: "در حال حاضر ثبت گزارش ممکن نشد. دوباره تلاش کنید.",
       selectReportReason: "دلیل گزارش را انتخاب کنید", fraudOrScam: "تقلب یا کلاهبرداری", wrongCategory: "دسته‌بندی نادرست",
       duplicateListing: "اعلان تکراری", prohibitedOrUnsafeItem: "مورد ممنوع یا ناامن", spamOrMisleading: "هرزنامه یا گمراه‌کننده",
       other: "سایر", optionalDetails: "جزئیات اختیاری", sendMessage: "ارسال پیام", hiAvailability: "سلام، آیا هنوز موجود است؟",
@@ -935,7 +944,8 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       autoFilledSpecifications: "په اوتومات ډول بشپړ شوي مشخصات", buyerSafetyWarning: "د پېرودونکي د خوندیتوب خبرتیا",
       safety1: "د موټر له لیدلو مخکې پیسې مه لېږئ.", safety2: "د موټر اسناد وګورئ.",
       safety3: "که ممکن وي په خوندي عامه ځای کې ووینئ.", safety4: "له پیسو مخکې مالکیت تایید کړئ.",
-      addToFavorites: "خوښو ته زیاتول", reportListing: "اعلان راپورول", reportTranslationIssue: "د ژباړې ستونزه راپورول",
+      addToFavorites: "خوښو ته زیاتول", removeFromFavorites: "له خوښو لرې کول", reportListing: "اعلان راپورول", reportTranslationIssue: "د ژباړې ستونزه راپورول",
+      reportSubmitted: "راپور ثبت شو. د صاحبش د څارنې ډله به یې وڅېړي.", reportInvalid: "د راپور لپاره یو سم دلیل وټاکئ.", reportError: "اوس مهال راپور ونه لېږل شو. بیا هڅه وکړئ.",
       selectReportReason: "د راپور دلیل وټاکئ", fraudOrScam: "درغلي یا فریب", wrongCategory: "ناسمه کټګوري",
       duplicateListing: "تکراري اعلان", prohibitedOrUnsafeItem: "منع یا ناامنه توکی", spamOrMisleading: "سپیم یا ګمراه کوونکی",
       other: "نور", optionalDetails: "اختیاري جزییات", sendMessage: "پیغام لېږل", hiAvailability: "سلام، دا لا شته؟",

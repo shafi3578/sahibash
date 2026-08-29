@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
@@ -8,14 +9,22 @@ import { localizePath } from "@/lib/i18n/routing";
 import { isUuid, normalizeMessageBody } from "@/lib/messages/threading";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 
+function listingReportRedirect(listingId: string, locale: Awaited<ReturnType<typeof getCurrentLocale>>, status: string) {
+  const target = isUuid(listingId)
+    ? `/listings/${listingId}?report=${status}`
+    : `/listings?report=${status}`;
+  return localizePath(target, locale);
+}
+
 export async function createReportAction(formData: FormData) {
   const user = await requireUser();
+  const locale = await getCurrentLocale();
   const listingId = String(formData.get("listingId") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
   const details = String(formData.get("details") ?? "").trim();
 
   if (!isUuid(listingId) || reason.length < 3) {
-    return;
+    redirect(listingReportRedirect(listingId, locale, "invalid"));
   }
 
   const rateLimit = await consumeRateLimit({
@@ -24,7 +33,7 @@ export async function createReportAction(formData: FormData) {
     maxRequests: 10,
     windowSeconds: 60 * 60,
   });
-  if (!rateLimit.allowed) return;
+  if (!rateLimit.allowed) redirect(listingReportRedirect(listingId, locale, "rate-limited"));
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("reports").insert({
@@ -35,12 +44,12 @@ export async function createReportAction(formData: FormData) {
   });
 
   if (error) {
-    return;
+    redirect(listingReportRedirect(listingId, locale, "error"));
   }
 
-  const locale = await getCurrentLocale();
   revalidatePath(`/listings/${listingId}`);
   revalidatePath(localizePath(`/listings/${listingId}`, locale));
+  redirect(listingReportRedirect(listingId, locale, "sent"));
 }
 
 export async function reportConversationAction(formData: FormData) {

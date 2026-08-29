@@ -111,12 +111,21 @@ test("notification destinations preserve message, offer, follower and listing co
 
 test("favorites, offers and follows create account notifications after successful writes", () => {
   const favorites = readFileSync(join(process.cwd(), "lib", "actions", "favorites.ts"), "utf8");
+  const favoriteButton = readFileSync(join(process.cwd(), "components", "listings", "favorite-toggle-button.tsx"), "utf8");
+  const listingPage = readFileSync(join(process.cwd(), "app", "listings", "[id]", "page.tsx"), "utf8");
   const offers = readFileSync(join(process.cwd(), "lib", "actions", "offers.ts"), "utf8");
   const social = readFileSync(join(process.cwd(), "lib", "actions", "social.ts"), "utf8");
   const notificationActions = readFileSync(join(process.cwd(), "lib", "actions", "notifications.ts"), "utf8");
   assert.match(favorites, /createAccountNotification/);
+  assert.match(favorites, /return \{ ok: true as const, favorited \}/);
+  assert.match(favoriteButton, /aria-pressed=\{favorited\}/);
+  assert.match(favoriteButton, /result\.favorited/);
+  assert.match(listingPage, /favoriteStatePromise/);
+  assert.match(listingPage, /removeFromFavorites/);
   assert.match(offers, /type: "listing_offer"/);
   assert.match(social, /createAccountNotification/);
+  assert.match(social, /revalidateSellerRelationshipPaths/);
+  assert.match(social, /localizePath\(`\/sellers\/\$\{userId\}`/);
   assert.match(notificationActions, /\.eq\("user_id", user\.id\)/);
   assert.match(notificationActions, /notificationDestination/);
 });
@@ -209,6 +218,9 @@ test("consumer header and messages keep settings and moderation in the right pla
   assert.match(messagesSource, /ThreadListingCard/);
   assert.match(messagesSource, /reportConversationAction/);
   assert.match(reportSource, /reporter_user_id/);
+  assert.match(reportSource, /listingReportRedirect/);
+  assert.match(reportSource, /report=\$\{status\}/);
+  assert.match(messagesSource, /Report conversation/);
   assert.doesNotMatch(reportSource, /(^|\n)\s*user_id:\s*user\.id/);
 });
 
