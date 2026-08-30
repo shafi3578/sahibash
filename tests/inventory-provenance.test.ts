@@ -49,6 +49,25 @@ const candidatePublicationControl = readFileSync(
   join(process.cwd(), "components", "admin", "ingest-candidate-publish.tsx"),
   "utf8",
 );
+const externalReviewRetentionMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260830202347_external_inventory_review_retention.sql"),
+  "utf8",
+);
+const candidateReviewAction = readFileSync(
+  join(process.cwd(), "lib", "actions", "inventory-review.ts"),
+  "utf8",
+);
+const candidateReviewControl = readFileSync(
+  join(process.cwd(), "components", "admin", "ingest-candidate-review-form.tsx"),
+  "utf8",
+);
+const retentionRoute = readFileSync(
+  join(process.cwd(), "app", "api", "cron", "external-inventory-retention", "route.ts"),
+  "utf8",
+);
+const vercelConfig = JSON.parse(readFileSync(join(process.cwd(), "vercel.json"), "utf8")) as {
+  crons?: Array<{ path: string; schedule: string }>;
+};
 
 test("Step 1 migration creates explicit provenance and ingestion objects with RLS", () => {
   for (const table of [
@@ -178,6 +197,16 @@ test("Telegram album messages share one transfer identity and are no longer drop
   assert.match(telegramWebhook, /listing_ingest_candidate_media/);
 });
 
+test("Telegram intake rejects unsigned or unauthorized forwarding sources", () => {
+  assert.match(telegramWebhook, /x-telegram-bot-api-secret-token/i);
+  assert.match(telegramWebhook, /timingSafeEqual/);
+  assert.match(telegramWebhook, /TELEGRAM_IMPORT_ALLOWED_CHAT_IDS/);
+  assert.match(telegramWebhook, /allowedChats\.has\(String\(chatId\)\)/);
+  assert.match(telegramWebhook, /content-length/);
+  assert.match(telegramWebhook, /1_000_000/);
+  assert.doesNotMatch(telegramWebhook, /console\.(log|error)/);
+});
+
 test("Telegram candidate photos use a private bucket and permission-protected metadata", () => {
   assert.match(telegramMediaMigration, /create table if not exists public\.listing_ingest_candidate_media/i);
   assert.match(telegramMediaMigration, /'listing-ingest-media'[\s\S]*false,[\s\S]*10485760/i);
@@ -217,4 +246,50 @@ test("candidate publication action requires stepped-up moderation and cleans upl
   assert.match(inventoryCandidatePage, /candidate\.status === "publishable"/);
   assert.match(inventoryCandidatePage, /IngestCandidatePublish/);
   assert.match(candidatePublicationControl, /useActionState/);
+});
+
+test("candidate review supports all active published leaf schemas and is super-admin-only", () => {
+  assert.match(externalReviewRetentionMigration, /create or replace function public\.save_reviewed_ingest_candidate/i);
+  assert.match(externalReviewRetentionMigration, /Candidate category must be an active leaf/i);
+  assert.match(externalReviewRetentionMigration, /Candidate category is not open for marketplace publication/i);
+  assert.match(externalReviewRetentionMigration, /jsonb_each\(v_details\)/i);
+  assert.match(externalReviewRetentionMigration, /Required category details are incomplete/i);
+  assert.doesNotMatch(externalReviewRetentionMigration, /Candidate vehicle brand is missing/i);
+  assert.match(externalReviewRetentionMigration, /grant execute on function public\.save_reviewed_ingest_candidate[\s\S]*to service_role/i);
+  assert.match(candidateReviewAction, /requireSuperAdministrator\(\)/);
+  assert.match(candidateReviewAction, /normalizeListingSchemaConfig/);
+  assert.match(candidateReviewAction, /normalizeAfghanistanPhone/);
+  assert.match(candidateReviewControl, /\["en", "fa", "ps"\]/);
+  assert.match(candidateReviewControl, /category-specific details/i);
+  assert.match(candidateReviewControl, /VehicleDamageDiagram/);
+  assert.match(candidateReviewAction, /normalizeVehicleDamageParts/);
+  assert.match(externalReviewRetentionMigration, /insert into public\.vehicle_damage_reports/i);
+  assert.match(externalReviewRetentionMigration, /insert into public\.vehicle_damage_parts/i);
+  assert.match(inventoryCandidatePage, /IngestCandidateReviewForm/);
+  assert.match(inventoryCandidatePage, /is_super_administrator/);
+});
+
+test("30-day cleanup is cron-protected and cannot touch normal user listings", () => {
+  assert.match(externalReviewRetentionMigration, /now\(\) \+ interval '30 days'/i);
+  assert.match(externalReviewRetentionMigration, /source_type = 'external_indexed'/i);
+  assert.match(externalReviewRetentionMigration, /source_platform = 'telegram'/i);
+  assert.match(externalReviewRetentionMigration, /ownership_status = 'unclaimed'/i);
+  assert.match(externalReviewRetentionMigration, /provenance_status = 'permission_pending'/i);
+  assert.match(externalReviewRetentionMigration, /private\.external_inventory_retention_tombstones/i);
+  assert.match(externalReviewRetentionMigration, /revoke all on table private\.external_inventory_retention_tombstones from public, anon, authenticated/i);
+  assert.match(externalReviewRetentionMigration, /if not v_has_user_history then[\s\S]*delete from public\.listings/i);
+  assert.match(externalReviewRetentionMigration, /ownership_status = 'removed', provenance_status = 'blocked'/i);
+  assert.match(retentionRoute, /authorization/i);
+  assert.match(retentionRoute, /timingSafeEqual/);
+  assert.match(retentionRoute, /expire_due_forwarded_external_ads/);
+  assert.match(retentionRoute, /purge_expired_forwarded_external_ad/);
+  assert.match(retentionRoute, /listing_ingest_candidate_media/);
+  assert.match(retentionRoute, /storage\.from\(bucket\)\.remove/);
+  assert.match(retentionRoute, /api\.telegram\.org\/bot\$\{token\}\/setWebhook/);
+  assert.match(retentionRoute, /secret_token: secret/);
+  assert.match(retentionRoute, /drop_pending_updates: false/);
+  assert.deepEqual(vercelConfig.crons, [{
+    path: "/api/cron/external-inventory-retention",
+    schedule: "15 1 * * *",
+  }]);
 });

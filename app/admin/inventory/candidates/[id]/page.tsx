@@ -2,11 +2,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IngestCandidatePublish } from "@/components/admin/ingest-candidate-publish";
+import { IngestCandidateReviewForm } from "@/components/admin/ingest-candidate-review-form";
 import { TelegramPhotoRecovery } from "@/components/admin/telegram-photo-recovery";
 import { adminPath } from "@/lib/admin/routing";
 import { requirePermission } from "@/lib/auth";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
+import { normalizeListingSchemaConfig, type ListingSchemaConfig } from "@/lib/listing-schema-config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type CandidateRow = {
@@ -21,6 +24,7 @@ type CandidateRow = {
   normalized_title: string | null;
   normalized_location: string | null;
   normalized_price_afn: number | null;
+  normalized_phone: string | null;
   category_node_id: number | null;
   created_at: string;
 };
@@ -52,7 +56,7 @@ function safeExternalHref(value: unknown) {
 }
 
 export default async function InventoryCandidatePage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePermission("listings.view");
+  const viewer = await requirePermission("listings.view");
   const { id } = await params;
   if (!UUID_PATTERN.test(id)) notFound();
 
@@ -60,13 +64,13 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("listing_ingest_candidates")
-    .select("id,job_id,source_id,row_number,source_item_id,status,normalized_payload,candidate_listing_id,normalized_title,normalized_location,normalized_price_afn,category_node_id,created_at")
+    .select("id,job_id,source_id,row_number,source_item_id,status,normalized_payload,candidate_listing_id,normalized_title,normalized_location,normalized_price_afn,normalized_phone,category_node_id,created_at")
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
 
   const candidate = data as CandidateRow;
-  const [sourceResult, jobResult, mediaResult] = await Promise.all([
+  const [sourceResult, jobResult, mediaResult, superAdminResult, launchCategoriesResult, provincesResult, districtsResult] = await Promise.all([
     candidate.source_id
       ? supabase.from("listing_sources").select("name,platform,source_type,status").eq("id", candidate.source_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -77,10 +81,39 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
       .eq("candidate_id", candidate.id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
+    supabase.rpc("is_super_administrator", { uid: viewer.id }),
+    supabase.from("categories").select("id").eq("is_active", true).eq("is_coming_soon", false),
+    supabase.from("provinces").select("id,name,name_fa,name_ps").eq("is_active", true).order("sort_order"),
+    supabase.from("districts").select("id,province_id,name,name_fa,name_ps").eq("is_active", true).order("sort_order"),
   ]);
   const source = sourceResult.data as SourceRow | null;
   const job = jobResult.data as JobRow | null;
   const payload = candidate.normalized_payload ?? {};
+  const launchCategoryIds = (launchCategoriesResult.data ?? []).map((category) => Number(category.id));
+  const { data: leafData } = launchCategoryIds.length
+    ? await supabase
+        .from("category_nodes")
+        .select("id,name,slug,path")
+        .in("category_id", launchCategoryIds)
+        .eq("is_active", true)
+        .eq("is_leaf", true)
+        .order("path")
+        .limit(1000)
+    : { data: [] };
+  const { data: initialSchemaData } = candidate.category_node_id
+    ? await supabase
+        .from("listing_schema_versions")
+        .select("config")
+        .eq("category_node_id", candidate.category_node_id)
+        .eq("status", "published")
+        .maybeSingle()
+    : { data: null };
+  let initialSchema: ListingSchemaConfig | null = null;
+  try {
+    initialSchema = initialSchemaData ? normalizeListingSchemaConfig(initialSchemaData.config) : null;
+  } catch {
+    initialSchema = null;
+  }
   const copy = locale === "fa"
     ? { back: "بازگشت به موجودی", title: "بررسی انتقال", subtitle: "جزئیات ردیف انتقال‌شده پیش از تبدیل به اعلان عمومی.", waiting: "این مورد هنوز اعلان عمومی نیست و نیاز به بررسی دارد.", content: "محتوای انتقال‌شده", readiness: "آمادگی اعلان", source: "منبع و وظیفه", adTitle: "عنوان", description: "توضیحات", category: "دسته‌بندی", location: "موقعیت", price: "قیمت", photos: "تصویرها", sourceItem: "شناسه در منبع", received: "دریافت‌شده", status: "وضعیت", job: "وظیفه انتقال", dryRun: "اجرای آزمایشی", liveRun: "اجرای واقعی", notSet: "تعیین نشده", noDescription: "توضیحی دریافت نشده است.", noPhotos: "هیچ تصویری ذخیره نشده است. برای دریافت همه تصویرهای آلبوم، اعلان را دوباره به ربات بفرستید.", recoverPhoto: "بازیابی تصویر باقی‌مانده", recoveringPhoto: "در حال بازیابی…", recoveredPhoto: "تصویر ذخیره شد.", unavailablePhoto: "مرجع قدیمی تصویر دیگر در تلگرام قابل دریافت نیست. لطفاً اعلان را دوباره بفرستید.", configurationError: "بازیابی تلگرام در سرور تنظیم نشده است.", storageError: "تصویر دریافت شد اما ذخیره‌سازی ناموفق بود. دوباره تلاش کنید.", failedRecovery: "بازیابی تصویر ناموفق بود.", openListing: "بازکردن اعلان", openSource: "بازکردن منبع اصلی", notCreated: "هنوز اعلان ساخته نشده", accepted: "پذیرفته", rejected: "ردشده", errors: "خطا" }
     : locale === "ps"
@@ -110,6 +143,27 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   }))).filter((item): item is MediaRow & { url: string } => item !== null);
   const photoCount = signedMedia.length;
   const sourceHref = safeExternalHref(payload.source_url ?? payload.sourceUrl);
+  const initialProvinceId = Number(payload.province_id);
+  const initialDistrictId = Number(payload.district_id);
+  const categoryOptions = (leafData ?? []).map((node) => {
+    const localizedName = localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path });
+    return {
+      id: Number(node.id),
+      label: locale === "en" ? `${localizedName} · ${node.path.replaceAll("/", " › ")}` : `${localizedName} · #${node.id}`,
+      path: node.path,
+    };
+  });
+  const localizeLocation = (row: { name: string; name_fa: string; name_ps: string }) =>
+    locale === "fa" ? row.name_fa : locale === "ps" ? row.name_ps : row.name;
+  const provinceOptions = (provincesResult.data ?? []).map((province) => ({
+    id: Number(province.id),
+    label: localizeLocation(province),
+  }));
+  const districtOptions = (districtsResult.data ?? []).map((district) => ({
+    id: Number(district.id),
+    provinceId: Number(district.province_id),
+    label: localizeLocation(district),
+  }));
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -147,6 +201,27 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
           <section className="rounded-2xl border border-[var(--line)] bg-white p-5"><h2 className="font-display text-lg font-bold">{copy.source}</h2><dl className="mt-4 space-y-3 text-sm"><div className="flex justify-between gap-4"><dt className="text-[var(--ink-2)]">{copy.source}</dt><dd className="text-end font-semibold">{source?.name || source?.platform || source?.source_type || copy.notSet}</dd></div><div className="flex justify-between gap-4"><dt className="text-[var(--ink-2)]">{copy.sourceItem}</dt><dd className="font-semibold">{candidate.source_item_id || copy.notSet}</dd></div><div className="flex justify-between gap-4"><dt className="text-[var(--ink-2)]">{copy.status}</dt><dd className="font-semibold">{source?.status || copy.notSet}</dd></div><div className="flex justify-between gap-4"><dt className="text-[var(--ink-2)]">{copy.job}</dt><dd className="text-end font-semibold">{job ? `${job.status} · ${job.dry_run ? copy.dryRun : copy.liveRun}` : copy.notSet}</dd></div>{job ? <div className="rounded-xl bg-[var(--surface-2)] p-3 text-xs text-[var(--ink-2)]">{copy.accepted} {job.accepted_rows} · {copy.rejected} {job.rejected_rows} · {copy.errors} {job.error_rows}</div> : null}<div className="flex justify-between gap-4"><dt className="text-[var(--ink-2)]">{copy.received}</dt><dd className="text-end font-semibold">{receivedAt}</dd></div></dl></section>
         </div>
       </div>
+
+      {superAdminResult.data === true && !candidate.candidate_listing_id ? (
+        <div className="mt-6">
+          <IngestCandidateReviewForm
+            candidateId={candidate.id}
+            locale={locale}
+            initial={{
+              categoryNodeId: candidate.category_node_id,
+              provinceId: Number.isInteger(initialProvinceId) && initialProvinceId > 0 ? initialProvinceId : null,
+              districtId: Number.isInteger(initialDistrictId) && initialDistrictId > 0 ? initialDistrictId : null,
+              normalizedPhone: candidate.normalized_phone ?? "",
+              normalizedPriceAfn: candidate.normalized_price_afn,
+              payload,
+            }}
+            categories={categoryOptions}
+            provinces={provinceOptions}
+            districts={districtOptions}
+            initialSchema={initialSchema}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-6 flex flex-wrap gap-2">{candidate.candidate_listing_id ? <Link href={localizePath(`/listings/${candidate.candidate_listing_id}`, locale)} className="rounded-xl bg-[var(--ink-1)] px-4 py-2.5 text-sm font-bold text-white">{copy.openListing}</Link> : <span className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600">{copy.notCreated}</span>}{sourceHref ? <a href={sourceHref} target="_blank" rel="noreferrer" className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-sm font-bold">{copy.openSource}</a> : null}</div>
     </main>

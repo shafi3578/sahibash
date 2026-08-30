@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
   candidateMediaStoragePath,
@@ -12,6 +13,22 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 
 const botToken = () => process.env.TELEGRAM_IMPORT_BOT_TOKEN?.trim();
+const webhookSecret = () => process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+const MAX_WEBHOOK_BYTES = 1_000_000;
+
+function allowedChatIds() {
+  return new Set(
+    (process.env.TELEGRAM_IMPORT_ALLOWED_CHAT_IDS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+}
+
+function secureEqual(actual: string, expected: string) {
+  if (actual.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return Boolean(value) && typeof value === "object"
@@ -35,23 +52,45 @@ async function sendMessage(chatId: number | string, text: string) {
 
 export async function POST(request: Request) {
   const token = botToken();
-  if (!token || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  const secret = webhookSecret();
+  const allowedChats = allowedChatIds();
+  if (!token || !secret || secret.length < 16 || allowedChats.size === 0 || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ ok: false }, { status: 503 });
+  }
+
+  const providedSecret = request.headers.get("x-telegram-bot-api-secret-token") ?? "";
+  if (!secureEqual(providedSecret, secret)) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
+
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_WEBHOOK_BYTES) {
+    return NextResponse.json({ ok: false }, { status: 413 });
   }
 
   let update: Record<string, unknown>;
   try {
-    update = asRecord(await request.json()) ?? {};
+    const body = await request.text();
+    if (Buffer.byteLength(body, "utf8") > MAX_WEBHOOK_BYTES) {
+      return NextResponse.json({ ok: false }, { status: 413 });
+    }
+    update = asRecord(JSON.parse(body)) ?? {};
   } catch {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const message = asRecord(update.message) ?? asRecord(update.edited_message);
+  const message = asRecord(update.message)
+    ?? asRecord(update.edited_message)
+    ?? asRecord(update.channel_post)
+    ?? asRecord(update.edited_channel_post);
   const chat = asRecord(message?.chat);
   const chatId = chat?.id;
 
   if (!message || (typeof chatId !== "number" && typeof chatId !== "string")) {
     return NextResponse.json({ ok: true });
+  }
+  if (!allowedChats.has(String(chatId))) {
+    return NextResponse.json({ ok: false }, { status: 403 });
   }
 
   const text =
@@ -218,5 +257,15 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ ok: true, service: "telegram-import-webhook" });
+  const ready = Boolean(
+    botToken()
+    && webhookSecret()
+    && webhookSecret()!.length >= 16
+    && allowedChatIds().size > 0
+    && process.env.SUPABASE_SERVICE_ROLE_KEY,
+  );
+  return NextResponse.json(
+    { ok: ready, service: "telegram-import-webhook" },
+    { status: ready ? 200 : 503, headers: { "cache-control": "no-store" } },
+  );
 }
