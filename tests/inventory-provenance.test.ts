@@ -53,6 +53,10 @@ const externalReviewRetentionMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260830202347_external_inventory_review_retention.sql"),
   "utf8",
 );
+const externalRetentionRpcFixMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260830204406_fix_external_retention_rpc_ambiguity.sql"),
+  "utf8",
+);
 const candidateReviewAction = readFileSync(
   join(process.cwd(), "lib", "actions", "inventory-review.ts"),
   "utf8",
@@ -292,4 +296,12 @@ test("30-day cleanup is cron-protected and cannot touch normal user listings", (
     path: "/api/cron/external-inventory-retention",
     schedule: "15 1 * * *",
   }]);
+});
+
+test("retention expiry RPC avoids PL/pgSQL output-column ambiguity", () => {
+  assert.match(externalRetentionRpcFixMigration, /create or replace function public\.expire_due_forwarded_external_ads/i);
+  assert.match(externalRetentionRpcFixMigration, /insert into public\.listing_provenance_events/i);
+  assert.doesNotMatch(externalRetentionRpcFixMigration, /returning\s+listing_id/i);
+  assert.match(externalRetentionRpcFixMigration, /revoke all on function[\s\S]*from public, anon, authenticated/i);
+  assert.match(externalRetentionRpcFixMigration, /grant execute on function[\s\S]*to service_role/i);
 });
