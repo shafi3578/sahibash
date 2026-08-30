@@ -4,6 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { parseAiSearchStructuredIntent } from "@/lib/ai/search-intent-schema";
 import { localizeFilterLabel, localizeFilterOptionLabel } from "@/lib/i18n/filter-labels";
+import { getFilterSelectedValue, organizeFilterDefinitions } from "@/lib/search/filter-presentation";
 
 const root = process.cwd();
 const read = (...parts: string[]) => readFileSync(join(root, ...parts), "utf8");
@@ -36,6 +37,44 @@ test("legacy search filters and option captions are localized without changing s
   assert.equal(localizeFilterOptionLabel("Automatic", "Automatic", "fa"), "اتومات");
   assert.equal(localizeFilterOptionLabel("Automatic", "Automatic", "ps"), "اتومات");
   assert.equal(localizeFilterOptionLabel("Toyota", "Toyota", "fa"), "Toyota");
+});
+
+test("category filters stay compact, functional, and deduplicated", () => {
+  const definitions = [
+    "mileageKm",
+    "firstRegistrationDate",
+    "fuelType",
+    "province",
+    "district",
+    "licensePlate",
+    "min_price",
+    "max_price",
+    "vehicle_brand",
+    "brand",
+    "vehicle_model",
+    "year_min",
+    "year_max",
+    "km_min",
+    "km_max",
+    "condition",
+    "fuel_type",
+    "transmission",
+    "color",
+    "body_type",
+    "customs_status",
+  ].map((filter_key, index) => ({ filter_key, sort_order: index }));
+
+  const organized = organizeFilterDefinitions(definitions, { transmission: "automatic" });
+  const displayedKeys = [...organized.primary, ...organized.advanced].map((definition) => definition.filter_key);
+
+  assert.equal(organized.primary.length, 8);
+  assert.equal(displayedKeys.includes("mileageKm"), false);
+  assert.equal(displayedKeys.includes("firstRegistrationDate"), false);
+  assert.equal(displayedKeys.includes("province"), false);
+  assert.equal(displayedKeys.includes("licensePlate"), false);
+  assert.equal(displayedKeys.filter((key) => key === "fuelType" || key === "fuel_type").length, 1);
+  assert.equal(organized.advancedHasSelection, true);
+  assert.equal(getFilterSelectedValue("fuelType", { fuel_type: "hybrid" }), "hybrid");
 });
 
 test("one server-only flag source fails closed and keeps public clients away from the table", () => {

@@ -25,6 +25,7 @@ import { createWantedRequestAction } from "@/lib/actions/liquidity";
 import { wantedCopy } from "@/lib/liquidity/wanted";
 import { getCurrentUser } from "@/lib/auth";
 import { localizeFilterOptionLabel } from "@/lib/i18n/filter-labels";
+import { getFilterSelectedValue, organizeFilterDefinitions } from "@/lib/search/filter-presentation";
 
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -189,6 +190,13 @@ function FilterFields({
   t: Awaited<ReturnType<typeof getDictionary>>["t"];
   locale: Awaited<ReturnType<typeof getDictionary>>["locale"];
 }) {
+  const { primary, advanced, advancedHasSelection } = organizeFilterDefinitions(filterDefinitions, params);
+  const renderDefinition = (def: FilterDefinition) => {
+    const selected = getFilterSelectedValue(def.filter_key, params);
+    const options = toOptionList(def, locale);
+    return renderDynamicFilterInput(def, selected, options, t);
+  };
+
   return (
     <>
       <input
@@ -270,11 +278,21 @@ function FilterFields({
         <option value="wanted">{t.search.wanted}</option>
       </select>
 
-      {filterDefinitions.map((def) => {
-        const selected = params[def.filter_key] ?? "";
-        const options = toOptionList(def, locale);
-        return renderDynamicFilterInput(def, selected, options, t);
-      })}
+      {primary.map(renderDefinition)}
+
+      {advanced.length > 0 ? (
+        <details open={advancedHasSelection} className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)]">
+          <summary className="cursor-pointer list-none px-3 py-3 text-sm font-semibold marker:content-none">
+            <span className="flex items-center justify-between gap-3">
+              {t.search.moreFilters}
+              <span className="rounded-full bg-white px-2 py-0.5 text-xs text-[var(--ink-2)]">{advanced.length}</span>
+            </span>
+          </summary>
+          <div className="grid gap-3 border-t border-[var(--line)] p-3">
+            {advanced.map(renderDefinition)}
+          </div>
+        </details>
+      ) : null}
     </>
   );
 }
@@ -720,7 +738,7 @@ export default async function SearchPage({
       ) : null}
 
       {siblings.length > 1 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
           {siblings
             .filter((node) => node.id !== effectiveNode?.id)
             .map((node) => {
@@ -731,7 +749,7 @@ export default async function SearchPage({
                 <a
                   key={`sibling-${node.id}`}
                   href={buildUrlWithParams(next, locale)}
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs hover:border-[var(--ink-1)]"
+                  className="shrink-0 rounded-full border border-[var(--line)] px-3 py-1 text-xs hover:border-[var(--ink-1)]"
                 >
                     {t.search.related}: {localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path })}
                 </a>
@@ -760,7 +778,7 @@ export default async function SearchPage({
       ) : null}
 
       <div className="mt-5 grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="hidden rounded-2xl border border-[var(--line)] bg-white p-4 lg:block">
+        <aside className="hidden self-start rounded-2xl border border-[var(--line)] bg-white p-4 lg:block">
           <form className="grid gap-3">
             <FilterFields params={params} categories={categories} filterDefinitions={filterDefinitions} t={t} locale={locale} />
 

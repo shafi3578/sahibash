@@ -84,6 +84,7 @@ type TranslationTree = {
     showing: string;
     noResults: string;
     filters: string;
+    moreFilters: string;
     close: string;
     reset: string;
     apply: string;
@@ -430,6 +431,7 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       showing: "Showing",
       noResults: "No listings matched these filters. Try removing one or two chips.",
       filters: "Filters",
+      moreFilters: "More filters",
       close: "Close",
       reset: "Reset",
       apply: "Apply",
@@ -813,6 +815,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       applyFilters: "اعمال فیلترها",
       clearAll: "پاک کردن همه",
       filters: "فیلترها",
+      moreFilters: "فیلترهای بیشتر",
       close: "بستن",
       reset: "بازنشانی",
       apply: "اعمال",
@@ -930,6 +933,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       applyFilters: "فلټرونه پلي کړئ",
       clearAll: "ټول پاک کړئ",
       filters: "فلټرونه",
+      moreFilters: "نور فلټرونه",
       close: "بندول",
       reset: "بیا تنظیم",
       apply: "پلي کول",
