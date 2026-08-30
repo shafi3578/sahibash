@@ -30,6 +30,11 @@ const FIXTURES: FixtureListing[] = [
     title: "Toyota Fielder 2008",
     description: "فیلدر clean condition فیلډر",
   },
+  {
+    id: "listing-aqua-core",
+    title: "تویوتا آکوا ۲۰۱۲ برای فروش در هرات",
+    description: "Toyota Aqua in clean condition",
+  },
 ];
 
 function findRelevantListingIds(query: string): string[] {
@@ -131,6 +136,21 @@ test("Fielder variants return equivalent relevant listings", () => {
 test("Dari transliteration expands to useful Latin variants", () => {
   const variants = expandSearchVariants("فیلدر");
   assert.ok(variants.includes("fildr") || variants.includes("fielder"));
+});
+
+test("Aqua alef variants return equivalent relevant listings", () => {
+  expectEquivalentResults("aqua", [
+    "Aqua",
+    "aqua",
+    "آکوا",
+    "اکوا",
+  ]);
+});
+
+test("Dari and Pashto orthographic character variants normalize identically", () => {
+  assert.equal(normalizeSearchText("آکوا"), normalizeSearchText("اکوا"));
+  assert.equal(normalizeSearchText("كابل"), normalizeSearchText("کابل"));
+  assert.equal(normalizeSearchText("موبايل"), normalizeSearchText("موبایل"));
 });
 
 test("mixed vehicle searches detect exact year and Afghan location without fuzzy numeric rewrites", () => {

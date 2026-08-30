@@ -318,17 +318,11 @@ function buildSearchOrClause(searchTerms: string[], includeIds?: string[]) {
     if (!trimmed) {
       continue;
     }
-    termClauses.push(`title.ilike.%${trimmed}%`);
-    termClauses.push(`description.ilike.%${trimmed}%`);
-    termClauses.push(`vehicle_brand.ilike.%${trimmed}%`);
-    termClauses.push(`vehicle_model.ilike.%${trimmed}%`);
+    termClauses.push(`search_normalized.ilike.%${trimmed}%`);
 
     const loosePattern = toLooseLatinPattern(trimmed);
     if (loosePattern) {
-      termClauses.push(`title.ilike.%${loosePattern}%`);
-      termClauses.push(`description.ilike.%${loosePattern}%`);
-      termClauses.push(`vehicle_brand.ilike.%${loosePattern}%`);
-      termClauses.push(`vehicle_model.ilike.%${loosePattern}%`);
+      termClauses.push(`search_normalized.ilike.%${loosePattern}%`);
     }
   }
 
@@ -437,11 +431,7 @@ async function loadApprovedListings(
 
       if (searchVariants.length > 0) {
         const translationSearchClause = searchVariants
-          .flatMap((term) => [
-            `title.ilike.%${term}%`,
-            `description.ilike.%${term}%`,
-            `normalized_keywords.ilike.%${term}%`,
-          ])
+          .map((term) => `search_normalized.ilike.%${term}%`)
           .join(",");
 
         const { data: translationRows } = await supabase
