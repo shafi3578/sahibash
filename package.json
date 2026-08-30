@@ -15,7 +15,7 @@
     "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts tests/taxonomy-schema-migrations.test.ts",
     "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/auth-step-up.test.ts tests/production-fixture-guard.test.ts tests/location-privacy.test.ts tests/production-sanity-sql.test.ts tests/storage-hardening.test.ts tests/rate-limit-foundation.test.ts tests/marketplace-ranking.test.ts tests/public-listing-boundary.test.ts tests/mfa-readiness.test.ts tests/step1-foundation.test.ts",
     "test:mfa-live": "node --import tsx --test tests/live-mfa-e2e.test.ts",
-    "test:inventory-provenance": "node --import tsx --test tests/inventory-provenance.test.ts",
+    "test:inventory-provenance": "node --import tsx --test --test-concurrency=1 tests/inventory-provenance.test.ts tests/external-listing-interactions.test.ts",
     "test:liquidity": "node --import tsx --test tests/liquidity-foundation.test.ts",
     "test:network-readiness": "node --import tsx --test tests/network-readiness.test.ts",
     "test:consumer-account": "node --import tsx --test tests/consumer-account-messaging.test.ts",

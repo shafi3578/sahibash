@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { reviewExternalListingClaimAction, reviewExternalListingRemovalAction } from "@/lib/actions/inventory";
 
 type CountQuery = {
   eq: (column: string, value: unknown) => CountQuery;
@@ -71,8 +72,23 @@ type ExternalListingRow = {
 type ClaimRow = {
   id: string;
   listing_id: string;
+  claimant_user_id: string | null;
   status: string;
   challenge_channel: string | null;
+  evidence: Record<string, unknown> | null;
+  reviewed_at: string | null;
+  created_at: string;
+};
+
+type RemovalRequestRow = {
+  id: string;
+  listing_id: string;
+  requester_user_id: string;
+  reason_code: string;
+  details: string;
+  status: string;
+  reviewer_note: string | null;
+  reviewed_at: string | null;
   created_at: string;
 };
 
@@ -146,6 +162,44 @@ function Section({ id, title, description, children }: { id: string; title: stri
   );
 }
 
+function ReviewControls({
+  kind,
+  id,
+  noteLabel,
+  approveLabel,
+  rejectLabel,
+}: {
+  kind: "claim" | "removal";
+  id: string;
+  noteLabel: string;
+  approveLabel: string;
+  rejectLabel: string;
+}) {
+  return (
+    <form action={kind === "claim" ? reviewExternalListingClaimAction : reviewExternalListingRemovalAction} className="mt-3 space-y-2 border-t border-[var(--line)] pt-3">
+      <input type="hidden" name={kind === "claim" ? "claimId" : "requestId"} value={id} />
+      <textarea
+        name="reviewerNote"
+        required
+        minLength={5}
+        maxLength={2000}
+        placeholder={noteLabel}
+        className="min-h-20 w-full rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs"
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <button name="decision" value="approve" className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white">{approveLabel}</button>
+        <button name="decision" value="reject" className="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold text-white">{rejectLabel}</button>
+      </div>
+      <p className="text-[11px] text-[var(--ink-2)]">AAL2 + listings.moderate</p>
+    </form>
+  );
+}
+
+function evidenceText(evidence: Record<string, unknown> | null) {
+  const value = evidence?.claimant_note;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 export default async function InventoryControlCenterPage() {
   await requirePermission("listings.view");
   const locale = await getCurrentLocale();
@@ -153,29 +207,30 @@ export default async function InventoryControlCenterPage() {
   const copy = locale === "fa"
     ? {
         title: "کنترول موجودی و منابع", subtitle: "منابع، انتقال‌ها، ردیف‌های در انتظار بررسی و اعلان‌های بیرونی را مشاهده و پیگیری کنید.", back: "بازگشت به ادمین",
-        sources: "منابع انتقال", jobs: "وظایف انتقال", candidates: "ردیف‌های انتقال‌شده", claims: "ادعاهای مالکیت", duplicates: "گروه‌های تکراری", optOuts: "انصراف‌های دائمی", external: "اعلان‌های بیرونی", stale: "کهنه یا منقضی",
-        view: "دیدن ردیف‌ها", sourcesHelp: "منابع تأییدشده‌ای که اعلان‌ها را به صاحباش می‌فرستند.", jobsHelp: "وضعیت هر انتقال، اجرای آزمایشی و نتیجه پردازش.", candidatesHelp: "ردیف‌های دریافت‌شده پیش از تبدیل‌شدن به اعلان واقعی.", externalHelp: "اعلان‌هایی که با موفقیت ساخته شده‌اند؛ هر ردیف پیوند صفحه اعلان را دارد.", reviewHelp: "ادعاها، موارد تکراری و انصراف‌های ثبت‌شده.",
-        empty: "هنوز هیچ ردیفی وجود ندارد.", notCreated: "هنوز اعلان ساخته نشده", waiting: "انتقال دریافت شده، اما هنوز اعلان عمومی نیست. پس از بررسی و تبدیل موفق، پیوند اعلان در همین‌جا ظاهر می‌شود.", live: "صف اعلان‌های تازه هر ۳۰ ثانیه بررسی می‌شود", reviewTransfer: "بررسی انتقال", openListing: "بازکردن اعلان", openSource: "بازکردن منبع اصلی", source: "منبع", status: "وضعیت", created: "ایجادشده", method: "روش", platform: "پلتفرم", rows: "ردیف‌ها", result: "نتیجه", dryRun: "اجرای آزمایشی", liveRun: "اجرای واقعی", accepted: "پذیرفته", rejected: "ردشده", errors: "خطا", row: "ردیف", sourceItem: "شناسه در منبع", category: "دسته‌بندی", location: "موقعیت", price: "قیمت", missingCategory: "تعیین نشده", missingLocation: "تعیین نشده", missingPrice: "تنظیم نشده", activeSource: "منبع فعال", emergencyStop: "توقف اضطراری روشن", reason: "دلیل", score: "امتیاز", latest: `نمایش تازه‌ترین ${RECENT_LIMIT} ردیف`, claimsEmpty: "درخواست مالکیت وجود ندارد.", duplicatesEmpty: "مورد تکراری وجود ندارد.", optOutsEmpty: "انصرافی ثبت نشده است.",
+        sources: "منابع انتقال", jobs: "وظایف انتقال", candidates: "ردیف‌های انتقال‌شده", claims: "درخواست‌های مالکیت", removals: "درخواست‌های حذف", duplicates: "گروه‌های تکراری", optOuts: "انصراف‌های دائمی", external: "اعلان‌های بیرونی", stale: "کهنه یا منقضی",
+        view: "دیدن ردیف‌ها", sourcesHelp: "منابع تأییدشده‌ای که اعلان‌ها را به صاحباش می‌فرستند.", jobsHelp: "وضعیت هر انتقال، اجرای آزمایشی و نتیجه پردازش.", candidatesHelp: "ردیف‌های دریافت‌شده پیش از تبدیل‌شدن به اعلان واقعی.", externalHelp: "اعلان‌هایی که با موفقیت ساخته شده‌اند؛ هر ردیف پیوند صفحه اعلان را دارد.", reviewHelp: "درخواست‌های مالکیت و حذف، موارد تکراری و انصراف‌های ثبت‌شده. تصمیم‌های حساس فقط با MFA سطح AAL2 اجرا می‌شود.",
+        empty: "هنوز هیچ ردیفی وجود ندارد.", notCreated: "هنوز اعلان ساخته نشده", waiting: "انتقال دریافت شده، اما هنوز اعلان عمومی نیست. پس از بررسی و تبدیل موفق، پیوند اعلان در همین‌جا ظاهر می‌شود.", live: "صف اعلان‌های تازه هر ۳۰ ثانیه بررسی می‌شود", reviewTransfer: "بررسی انتقال", openListing: "بازکردن اعلان", openSource: "بازکردن منبع اصلی", source: "منبع", status: "وضعیت", created: "ایجادشده", method: "روش", platform: "پلتفرم", rows: "ردیف‌ها", result: "نتیجه", dryRun: "اجرای آزمایشی", liveRun: "اجرای واقعی", accepted: "پذیرفته", rejected: "ردشده", errors: "خطا", row: "ردیف", sourceItem: "شناسه در منبع", category: "دسته‌بندی", location: "موقعیت", price: "قیمت", missingCategory: "تعیین نشده", missingLocation: "تعیین نشده", missingPrice: "تنظیم نشده", activeSource: "منبع فعال", emergencyStop: "توقف اضطراری روشن", reason: "دلیل", score: "امتیاز", latest: `نمایش تازه‌ترین ${RECENT_LIMIT} ردیف`, claimsEmpty: "درخواست مالکیت وجود ندارد.", removalsEmpty: "درخواست حذف وجود ندارد.", duplicatesEmpty: "مورد تکراری وجود ندارد.", optOutsEmpty: "انصرافی ثبت نشده است.", reviewerNote: "یادداشت بررسی و دلیل تصمیم", approve: "تأیید", reject: "رد", requester: "درخواست‌کننده", details: "جزئیات درخواست",
       }
     : locale === "ps"
       ? {
           title: "د موجودۍ او سرچینو کنټرول", subtitle: "سرچینې، لېږدونه، د بیاکتنې ریکارډونه او بهرني اعلانونه وګورئ او تعقیب یې کړئ.", back: "ادمین ته بېرته",
-          sources: "د لېږد سرچینې", jobs: "د لېږد دندې", candidates: "لېږدول شوي ریکارډونه", claims: "د مالکیت دعوې", duplicates: "تکراري ډلې", optOuts: "دایمي منع", external: "بهرني اعلانونه", stale: "زاړه یا تېر شوي",
-          view: "ریکارډونه وګورئ", sourcesHelp: "تأیید شوې سرچینې چې صاحباش ته اعلانونه لېږي.", jobsHelp: "د هر لېږد حالت، ازمایښتي اجرا او د پروسس پایله.", candidatesHelp: "تر اصلي اعلان جوړېدو مخکې ترلاسه شوي ریکارډونه.", externalHelp: "په بریالیتوب جوړ شوي اعلانونه؛ هر ریکارډ د اعلان پاڼې تړونی لري.", reviewHelp: "د مالکیت دعوې، تکراري موارد او ثبت شوې منع.",
-          empty: "تر اوسه هېڅ ریکارډ نشته.", notCreated: "اعلان لا نه دی جوړ شوی", waiting: "لېږد ترلاسه شوی، خو لا عام اعلان نه دی. له بیاکتنې او بریالۍ جوړونې وروسته به یې تړونی همدلته ښکاره شي.", live: "د نویو اعلانونو کتار هر ۳۰ ثانیې کتل کېږي", reviewTransfer: "لېږد بیاکتل", openListing: "اعلان پرانیستل", openSource: "اصلي سرچینه پرانیستل", source: "سرچینه", status: "حالت", created: "جوړ شوی", method: "طریقه", platform: "پلېټفارم", rows: "ریکارډونه", result: "پایله", dryRun: "ازمایښتي اجرا", liveRun: "اصلي اجرا", accepted: "منل شوي", rejected: "رد شوي", errors: "تېروتنې", row: "ریکارډ", sourceItem: "په سرچینه کې پېژند", category: "کټګوري", location: "ځای", price: "بیه", missingCategory: "نه ده ټاکل شوې", missingLocation: "نه دی ټاکل شوی", missingPrice: "نه ده ټاکل شوې", activeSource: "سرچینه فعاله ده", emergencyStop: "بېړنی تم فعال دی", reason: "دلیل", score: "نمره", latest: `وروستي ${RECENT_LIMIT} ریکارډونه ښودل کېږي`, claimsEmpty: "د مالکیت غوښتنه نشته.", duplicatesEmpty: "تکراري مورد نشته.", optOutsEmpty: "منع نه ده ثبت شوې.",
+          sources: "د لېږد سرچینې", jobs: "د لېږد دندې", candidates: "لېږدول شوي ریکارډونه", claims: "د مالکیت غوښتنې", removals: "د لرې کولو غوښتنې", duplicates: "تکراري ډلې", optOuts: "دایمي منع", external: "بهرني اعلانونه", stale: "زاړه یا تېر شوي",
+          view: "ریکارډونه وګورئ", sourcesHelp: "تأیید شوې سرچینې چې صاحباش ته اعلانونه لېږي.", jobsHelp: "د هر لېږد حالت، ازمایښتي اجرا او د پروسس پایله.", candidatesHelp: "تر اصلي اعلان جوړېدو مخکې ترلاسه شوي ریکارډونه.", externalHelp: "په بریالیتوب جوړ شوي اعلانونه؛ هر ریکارډ د اعلان پاڼې تړونی لري.", reviewHelp: "د مالکیت او لرې کولو غوښتنې، تکراري موارد او ثبت شوې منع. حساس پرېکړې یوازې د AAL2 MFA سره اجرا کېږي.",
+          empty: "تر اوسه هېڅ ریکارډ نشته.", notCreated: "اعلان لا نه دی جوړ شوی", waiting: "لېږد ترلاسه شوی، خو لا عام اعلان نه دی. له بیاکتنې او بریالۍ جوړونې وروسته به یې تړونی همدلته ښکاره شي.", live: "د نویو اعلانونو کتار هر ۳۰ ثانیې کتل کېږي", reviewTransfer: "لېږد بیاکتل", openListing: "اعلان پرانیستل", openSource: "اصلي سرچینه پرانیستل", source: "سرچینه", status: "حالت", created: "جوړ شوی", method: "طریقه", platform: "پلېټفارم", rows: "ریکارډونه", result: "پایله", dryRun: "ازمایښتي اجرا", liveRun: "اصلي اجرا", accepted: "منل شوي", rejected: "رد شوي", errors: "تېروتنې", row: "ریکارډ", sourceItem: "په سرچینه کې پېژند", category: "کټګوري", location: "ځای", price: "بیه", missingCategory: "نه ده ټاکل شوې", missingLocation: "نه دی ټاکل شوی", missingPrice: "نه ده ټاکل شوې", activeSource: "سرچینه فعاله ده", emergencyStop: "بېړنی تم فعال دی", reason: "دلیل", score: "نمره", latest: `وروستي ${RECENT_LIMIT} ریکارډونه ښودل کېږي`, claimsEmpty: "د مالکیت غوښتنه نشته.", removalsEmpty: "د لرې کولو غوښتنه نشته.", duplicatesEmpty: "تکراري مورد نشته.", optOutsEmpty: "منع نه ده ثبت شوې.", reviewerNote: "د کتنې یادښت او د پرېکړې دلیل", approve: "منل", reject: "ردول", requester: "غوښتونکی", details: "د غوښتنې معلومات",
         }
       : {
           title: "Inventory Source Control", subtitle: "Inspect and trace sources, transfers, review candidates, and created external listings.", back: "Back to admin",
-          sources: "Import sources", jobs: "Import jobs", candidates: "Transferred rows", claims: "Ownership claims", duplicates: "Duplicate groups", optOuts: "Permanent opt-outs", external: "External listings", stale: "Stale or expired",
-          view: "View records", sourcesHelp: "Approved sources that send listing inventory into Sahibash.", jobsHelp: "Every transfer run, its dry-run state, and processing result.", candidatesHelp: "Received rows before they are converted into actual listings.", externalHelp: "Successfully created listings; every record includes its listing-page link.", reviewHelp: "Ownership claims, duplicate reviews, and recorded opt-outs.",
-          empty: "No records yet.", notCreated: "Listing not created yet", waiting: "The transfer was received, but it is not a public listing yet. After review and successful conversion, its listing link will appear here.", live: "Checking the new-listing queue every 30 seconds", reviewTransfer: "Review transfer", openListing: "Open listing", openSource: "Open original source", source: "Source", status: "Status", created: "Created", method: "Method", platform: "Platform", rows: "Rows", result: "Result", dryRun: "Dry run", liveRun: "Live run", accepted: "Accepted", rejected: "Rejected", errors: "Errors", row: "Row", sourceItem: "Source item", category: "Category", location: "Location", price: "Price", missingCategory: "Not assigned", missingLocation: "Not resolved", missingPrice: "Not normalized", activeSource: "Source enabled", emergencyStop: "Emergency stop enabled", reason: "Reason", score: "Score", latest: `Showing the latest ${RECENT_LIMIT} records`, claimsEmpty: "No ownership claims.", duplicatesEmpty: "No duplicate cases.", optOutsEmpty: "No opt-outs recorded.",
+          sources: "Import sources", jobs: "Import jobs", candidates: "Transferred rows", claims: "Ownership requests", removals: "Removal requests", duplicates: "Duplicate groups", optOuts: "Permanent opt-outs", external: "External listings", stale: "Stale or expired",
+          view: "View records", sourcesHelp: "Approved sources that send listing inventory into Sahibash.", jobsHelp: "Every transfer run, its dry-run state, and processing result.", candidatesHelp: "Received rows before they are converted into actual listings.", externalHelp: "Successfully created listings; every record includes its listing-page link.", reviewHelp: "Review ownership and removal requests, duplicates, and opt-outs. Sensitive decisions require AAL2 MFA.",
+          empty: "No records yet.", notCreated: "Listing not created yet", waiting: "The transfer was received, but it is not a public listing yet. After review and successful conversion, its listing link will appear here.", live: "Checking the new-listing queue every 30 seconds", reviewTransfer: "Review transfer", openListing: "Open listing", openSource: "Open original source", source: "Source", status: "Status", created: "Created", method: "Method", platform: "Platform", rows: "Rows", result: "Result", dryRun: "Dry run", liveRun: "Live run", accepted: "Accepted", rejected: "Rejected", errors: "Errors", row: "Row", sourceItem: "Source item", category: "Category", location: "Location", price: "Price", missingCategory: "Not assigned", missingLocation: "Not resolved", missingPrice: "Not normalized", activeSource: "Source enabled", emergencyStop: "Emergency stop enabled", reason: "Reason", score: "Score", latest: `Showing the latest ${RECENT_LIMIT} records`, claimsEmpty: "No ownership requests.", removalsEmpty: "No removal requests.", duplicatesEmpty: "No duplicate cases.", optOutsEmpty: "No opt-outs recorded.", reviewerNote: "Review note and decision reason", approve: "Approve", reject: "Reject", requester: "Requester", details: "Request details",
         };
 
-  const [sources, jobs, candidates, claims, duplicates, optOuts, external, stale, sourcesResult, jobsResult, candidatesResult, claimsResult, duplicatesResult, optOutsResult, externalResult] = await Promise.all([
+  const [sources, jobs, candidates, claims, removals, duplicates, optOuts, external, stale, sourcesResult, jobsResult, candidatesResult, claimsResult, removalsResult, duplicatesResult, optOutsResult, externalResult] = await Promise.all([
     countRows("listing_sources"),
     countRows("listing_ingest_jobs"),
     countRows("listing_ingest_candidates"),
-    countRows("listing_claims"),
+    countRows("listing_claims", (query) => query.in("status", ["initiated", "challenge_sent", "verified"])),
+    countRows("listing_removal_requests", (query) => query.eq("status", "pending")),
     countRows("listing_duplicate_groups"),
     countRows("external_import_opt_outs"),
     countRows("listings", (query) => query.neq("source_type", "native").eq("publication_status", "published")),
@@ -183,7 +238,8 @@ export default async function InventoryControlCenterPage() {
     supabase.from("listing_sources").select("id,name,source_type,platform,ingest_method,status,kill_switch_enabled,created_at").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
     supabase.from("listing_ingest_jobs").select("id,source_id,source_type,status,dry_run,total_rows,accepted_rows,rejected_rows,duplicate_rows,error_rows,error_summary,created_at").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
     supabase.from("listing_ingest_candidates").select("id,job_id,source_id,row_number,source_item_id,status,normalized_payload,validation_errors,candidate_listing_id,normalized_title,normalized_location,normalized_price_afn,category_node_id,created_at").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
-    supabase.from("listing_claims").select("id,listing_id,status,challenge_channel,created_at").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
+    supabase.from("listing_claims").select("id,listing_id,claimant_user_id,status,challenge_channel,evidence,reviewed_at,created_at").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
+    supabase.from("listing_removal_requests").select("id,listing_id,requester_user_id,reason_code,details,status,reviewer_note,reviewed_at,created_at").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
     supabase.from("listing_duplicate_groups").select("id,canonical_listing_id,confidence,score,status,created_at").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
     supabase.from("external_import_opt_outs").select("id,source_id,source_type,source_platform,reason,created_at").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
     supabase.from("listings").select("id,title,source_type,source_platform,source_url,publication_status,freshness_status,province,district,created_at").neq("source_type", "native").order("created_at", { ascending: false }).limit(RECENT_LIMIT),
@@ -193,6 +249,7 @@ export default async function InventoryControlCenterPage() {
   const jobRows = (jobsResult.data ?? []) as JobRow[];
   const candidateRows = (candidatesResult.data ?? []) as CandidateRow[];
   const claimRows = (claimsResult.data ?? []) as ClaimRow[];
+  const removalRows = (removalsResult.data ?? []) as RemovalRequestRow[];
   const duplicateRows = (duplicatesResult.data ?? []) as DuplicateRow[];
   const optOutRows = (optOutsResult.data ?? []) as OptOutRow[];
   const externalRows = (externalResult.data ?? []) as ExternalListingRow[];
@@ -202,7 +259,7 @@ export default async function InventoryControlCenterPage() {
   const formatPrice = (value: number | null) => value === null ? copy.missingPrice : `${new Intl.NumberFormat(dateLocale, { maximumFractionDigits: 0 }).format(value)} AFN`;
   const cards = [
     ["sources", copy.sources, sources], ["jobs", copy.jobs, jobs], ["candidates", copy.candidates, candidates], ["reviews", copy.claims, claims],
-    ["reviews", copy.duplicates, duplicates], ["reviews", copy.optOuts, optOuts], ["external-listings", copy.external, external], ["external-listings", copy.stale, stale],
+    ["reviews", copy.removals, removals], ["reviews", copy.duplicates, duplicates], ["reviews", copy.optOuts, optOuts], ["external-listings", copy.external, external], ["external-listings", copy.stale, stale],
   ] as const;
 
   return (
@@ -238,9 +295,44 @@ export default async function InventoryControlCenterPage() {
           {jobRows.length === 0 ? <p className="p-5 text-sm text-[var(--ink-2)]">{copy.empty}</p> : <div className="divide-y divide-[var(--line)]">{jobRows.map((job) => <article key={job.id} className="p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">{sourceNames.get(job.source_id ?? "") ?? job.source_type}</h3><p className="mt-1 text-xs text-[var(--ink-2)]">{job.dry_run ? copy.dryRun : copy.liveRun} · {formatDate(job.created_at)}</p></div><StatusBadge value={job.status} /></div><div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4"><p className="rounded-lg bg-[var(--surface-2)] p-2">{copy.rows}: <strong>{job.total_rows}</strong></p><p className="rounded-lg bg-[var(--surface-2)] p-2">{copy.accepted}: <strong>{job.accepted_rows}</strong></p><p className="rounded-lg bg-[var(--surface-2)] p-2">{copy.rejected}: <strong>{job.rejected_rows}</strong></p><p className="rounded-lg bg-[var(--surface-2)] p-2">{copy.errors}: <strong>{job.error_rows}</strong></p></div>{job.error_summary ? <p className="mt-3 text-sm text-red-700">{job.error_summary}</p> : null}</article>)}</div>}
         </Section>
 
-        <Section id="reviews" title={`${copy.claims} · ${copy.duplicates} · ${copy.optOuts}`} description={copy.reviewHelp}>
-          <div className="grid gap-4 p-4 lg:grid-cols-3">
-            <div><h3 className="font-bold">{copy.claims} ({claims})</h3>{claimRows.length === 0 ? <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.claimsEmpty}</p> : <div className="mt-2 space-y-2">{claimRows.map((claim) => <article key={claim.id} className="rounded-xl bg-[var(--surface-2)] p-3"><StatusBadge value={claim.status} /><p className="mt-2 truncate text-xs text-[var(--ink-2)]">{claim.challenge_channel || copy.status} · {formatDate(claim.created_at)}</p><Link href={localizePath(`/listings/${claim.listing_id}`, locale)} className="mt-2 inline-block text-xs font-bold text-[var(--accent)]">{copy.openListing} →</Link></article>)}</div>}</div>
+        <Section id="reviews" title={`${copy.claims} · ${copy.removals} · ${copy.duplicates} · ${copy.optOuts}`} description={copy.reviewHelp}>
+          <div className="grid gap-5 p-4 xl:grid-cols-2">
+            <div>
+              <h3 className="font-bold">{copy.claims} ({claims})</h3>
+              {claimRows.length === 0 ? <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.claimsEmpty}</p> : (
+                <div className="mt-2 space-y-3">
+                  {claimRows.map((claim) => {
+                    const isPending = ["initiated", "challenge_sent", "verified"].includes(claim.status);
+                    return (
+                      <article key={claim.id} className="rounded-xl bg-[var(--surface-2)] p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2"><StatusBadge value={claim.status} /><span className="text-xs text-[var(--ink-2)]">{formatDate(claim.created_at)}</span></div>
+                        <p className="mt-2 text-xs text-[var(--ink-2)]">{copy.requester}: <span className="font-mono">{claim.claimant_user_id || "—"}</span></p>
+                        {evidenceText(claim.evidence) ? <p className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-sm">{evidenceText(claim.evidence)}</p> : null}
+                        <Link href={localizePath(`/listings/${claim.listing_id}`, locale)} className="mt-2 inline-block text-xs font-bold text-[var(--accent)]">{copy.openListing} →</Link>
+                        {isPending ? <ReviewControls kind="claim" id={claim.id} noteLabel={copy.reviewerNote} approveLabel={copy.approve} rejectLabel={copy.reject} /> : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold">{copy.removals} ({removals})</h3>
+              {removalRows.length === 0 ? <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.removalsEmpty}</p> : (
+                <div className="mt-2 space-y-3">
+                  {removalRows.map((request) => (
+                    <article key={request.id} className="rounded-xl bg-[var(--surface-2)] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2"><StatusBadge value={request.status} /><span className="text-xs text-[var(--ink-2)]">{formatDate(request.created_at)}</span></div>
+                      <p className="mt-2 text-xs font-semibold">{copy.reason}: {request.reason_code.replaceAll("_", " ")}</p>
+                      <p className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-sm"><span className="font-semibold">{copy.details}:</span> {request.details}</p>
+                      <p className="mt-2 text-xs text-[var(--ink-2)]">{copy.requester}: <span className="font-mono">{request.requester_user_id}</span></p>
+                      <Link href={localizePath(`/listings/${request.listing_id}`, locale)} className="mt-2 inline-block text-xs font-bold text-[var(--accent)]">{copy.openListing} →</Link>
+                      {request.status === "pending" ? <ReviewControls kind="removal" id={request.id} noteLabel={copy.reviewerNote} approveLabel={copy.approve} rejectLabel={copy.reject} /> : null}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
             <div><h3 className="font-bold">{copy.duplicates} ({duplicates})</h3>{duplicateRows.length === 0 ? <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.duplicatesEmpty}</p> : <div className="mt-2 space-y-2">{duplicateRows.map((group) => <article key={group.id} className="rounded-xl bg-[var(--surface-2)] p-3"><div className="flex flex-wrap gap-2"><StatusBadge value={group.status} /><StatusBadge value={group.confidence} /></div><p className="mt-2 text-xs text-[var(--ink-2)]">{copy.score}: {group.score ?? "—"} · {formatDate(group.created_at)}</p>{group.canonical_listing_id ? <Link href={localizePath(`/listings/${group.canonical_listing_id}`, locale)} className="mt-2 inline-block text-xs font-bold text-[var(--accent)]">{copy.openListing} →</Link> : null}</article>)}</div>}</div>
             <div><h3 className="font-bold">{copy.optOuts} ({optOuts})</h3>{optOutRows.length === 0 ? <p className="mt-2 text-sm text-[var(--ink-2)]">{copy.optOutsEmpty}</p> : <div className="mt-2 space-y-2">{optOutRows.map((optOut) => <article key={optOut.id} className="rounded-xl bg-[var(--surface-2)] p-3"><p className="font-semibold">{optOut.source_platform || sourceNames.get(optOut.source_id ?? "") || optOut.source_type || copy.source}</p><p className="mt-1 text-xs text-[var(--ink-2)]">{copy.reason}: {optOut.reason || "—"}</p><p className="mt-1 text-xs text-[var(--ink-2)]">{formatDate(optOut.created_at)}</p></article>)}</div>}</div>
           </div>

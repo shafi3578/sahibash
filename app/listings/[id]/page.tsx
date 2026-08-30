@@ -29,7 +29,7 @@ import { ListingAiAssistant, type ListingAiFact } from "@/components/listings/li
 import { formatCurrencyAmount } from "@/lib/i18n/format";
 import { formatListingPrice } from "@/lib/listings/price-display";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
-import { initiateListingClaimAction, recordInventoryContactEventAction } from "@/lib/actions/inventory";
+import { submitExternalListingClaimAction, submitExternalListingRemovalAction } from "@/lib/actions/inventory";
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { FavoriteToggleButton } from "@/components/listings/favorite-toggle-button";
@@ -87,7 +87,20 @@ export default async function ListingDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ message?: string; offer?: string; report?: string; compose?: string; offerbox?: string; view?: string; translation?: string; st?: string }>;
+  searchParams: Promise<{
+    message?: string;
+    offer?: string;
+    report?: string;
+    compose?: string;
+    offerbox?: string;
+    claim?: string;
+    remove?: string;
+    ownership?: string;
+    removal?: string;
+    view?: string;
+    translation?: string;
+    st?: string;
+  }>;
 }) {
   const { t, locale } = await getDictionary();
   const { id } = await params;
@@ -130,6 +143,12 @@ export default async function ListingDetailPage({
   const listingHref = localizePath(`/listings/${listing.id}`, locale);
   const composeHref = localizePath(`/listings/${listing.id}?compose=1`, locale);
   const offerHref = localizePath(`/listings/${listing.id}?offerbox=1`, locale);
+  const ownershipRequestHref = currentUser
+    ? `${listingHref}?claim=1`
+    : `${localizePath("/login", locale)}?redirect=${encodeURIComponent(`/listings/${listing.id}?claim=1`)}`;
+  const removalRequestHref = currentUser
+    ? `${listingHref}?remove=1`
+    : `${localizePath("/login", locale)}?redirect=${encodeURIComponent(`/listings/${listing.id}?remove=1`)}`;
   const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
   const dynamicLeafId = attrs.find((item) => item.attribute_key === ELECTRONICS_DYNAMIC_LEAF_KEY)?.attribute_value_text ?? null;
   const dynamicAttributes = attrs.reduce<Record<string, unknown>>((acc, item) => {
@@ -218,6 +237,36 @@ export default async function ListingDetailPage({
 
   const safeSellerName = listing.contact_name || listing.profile?.full_name || t.listing.sellerFallback;
   const sourceTransparency = getSourceTransparency(listing, locale);
+  const hasAccountSeller = Boolean(listing.user_id)
+    && (!sourceTransparency.isExternal || sourceTransparency.ownershipStatus === "claimed");
+  const canUseSahibashSellerTools = !isOwner && hasAccountSeller;
+  let activeOwnershipClaim: { id: string; status: string } | null = null;
+  let activeRemovalRequest: { id: string; status: string } | null = null;
+  if (currentUser && sourceTransparency.isExternal) {
+    const requestClient = await createSupabaseServerClient();
+    const [claimResult, removalResult] = await Promise.all([
+      requestClient
+        .from("listing_claims")
+        .select("id,status")
+        .eq("listing_id", listing.id)
+        .eq("claimant_user_id", currentUser.id)
+        .in("status", ["initiated", "challenge_sent", "verified"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      requestClient
+        .from("listing_removal_requests")
+        .select("id,status")
+        .eq("listing_id", listing.id)
+        .eq("requester_user_id", currentUser.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    activeOwnershipClaim = claimResult.data as { id: string; status: string } | null;
+    activeRemovalRequest = removalResult.data as { id: string; status: string } | null;
+  }
   const hasContactPhone = Boolean(listing.public_contact_available ?? listing.contact_phone);
   const phonePrivacyLabel = hasContactPhone
     ? locale === "fa" ? "تماس در دسترس است" : locale === "ps" ? "اړیکه شته" : "Contact available"
@@ -637,6 +686,42 @@ export default async function ListingDetailPage({
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      {qp.ownership === "received" ? (
+        <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {locale === "fa"
+            ? "درخواست مالکیت شما ثبت شد. اعلان تنها پس از بررسی مدیر به حساب شما وصل می‌شود."
+            : locale === "ps"
+              ? "ستاسو د مالکیت غوښتنه ثبت شوه. اعلان یوازې د مدیر له تایید وروسته ستاسو حساب ته تړل کېږي."
+              : "Your ownership request was received. The listing will be connected to your account only after administrator verification."}
+        </div>
+      ) : null}
+      {qp.ownership === "invalid" || qp.ownership === "rate-limited" ? (
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {locale === "fa"
+            ? "درخواست مالکیت ثبت نشد. معلومات بررسی را کامل کنید و بعداً دوباره تلاش کنید."
+            : locale === "ps"
+              ? "د مالکیت غوښتنه ثبت نه شوه. د تایید معلومات بشپړ کړئ او وروسته بیا هڅه وکړئ."
+              : "The ownership request was not submitted. Complete the verification details and try again later."}
+        </div>
+      ) : null}
+      {qp.removal === "received" ? (
+        <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {locale === "fa"
+            ? "درخواست حذف ثبت شد. مدیر پس از تأیید مالکیت یا دلیل قانونی، اعلان را از دید عمومی خارج می‌کند."
+            : locale === "ps"
+              ? "د لرې کولو غوښتنه ثبت شوه. مدیر به د مالکیت یا قانوني دلیل له تایید وروسته اعلان له عامه لید څخه وباسي."
+              : "Your removal request was received. An administrator will remove the listing from public view after verifying ownership or a valid rights reason."}
+        </div>
+      ) : null}
+      {qp.removal === "invalid" || qp.removal === "rate-limited" ? (
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {locale === "fa"
+            ? "درخواست حذف ثبت نشد. دلیل و جزئیات لازم را کامل کنید و بعداً دوباره تلاش کنید."
+            : locale === "ps"
+              ? "د لرې کولو غوښتنه ثبت نه شوه. دلیل او اړین معلومات بشپړ کړئ او وروسته بیا هڅه وکړئ."
+              : "The removal request was not submitted. Complete the reason and verification details, then try again later."}
+        </div>
+      ) : null}
       {qp.message === "sent" && (
         <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
           {t.listing.sendMessage}.
@@ -863,11 +948,17 @@ export default async function ListingDetailPage({
           {sourceTransparency.isExternal ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
               <p className="font-semibold">
-                {locale === "fa"
-                  ? "این اعلان از منبع بیرونی یا شریک وارد شده و فروشنده هنوز به‌طور کامل در صاحباش تأیید نشده است."
-                  : locale === "ps"
-                    ? "دا اعلان له بهرنۍ یا شریکې سرچینې راغلی او پلورونکی لا په صاحباش کې بشپړ نه دی تایید شوی."
-                    : "This listing came from an external or partner source and the seller is not fully verified on Sahibash yet."}
+                {sourceTransparency.ownershipStatus === "claimed"
+                  ? locale === "fa"
+                    ? "این اعلان از منبع بیرونی وارد شده، اما مالکیت آن اکنون توسط صاحباش تأیید شده است."
+                    : locale === "ps"
+                      ? "دا اعلان له بهرنۍ سرچینې راغلی، خو مالکیت یې اوس د صاحباش له خوا تایید شوی دی."
+                      : "This listing was imported from an external source, and its ownership is now verified by Sahibash."
+                  : locale === "fa"
+                    ? "این اعلان از منبع بیرونی وارد شده و هنوز به حساب فروشنده در صاحباش وصل نیست. پیام و پیشنهاد پس از تأیید مالک فعال می‌شود."
+                    : locale === "ps"
+                      ? "دا اعلان له بهرنۍ سرچینې راغلی او لا د صاحباش د پلورونکي له حساب سره نه دی تړلی. پیغام او وړاندیز د مالک له تایید وروسته فعالېږي."
+                      : "This listing came from an external source and is not yet connected to a Sahibash seller account. Messaging and offers activate after ownership verification."}
               </p>
               {sourceTransparency.needsAvailabilityWarning ? (
                 <p className="mt-1">
@@ -880,23 +971,31 @@ export default async function ListingDetailPage({
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 {sourceTransparency.ownershipStatus !== "claimed" ? (
-                  <form action={async () => { "use server"; await initiateListingClaimAction(listing.id); }}>
-                    <button className="rounded-lg bg-[var(--ink-1)] px-3 py-2 text-xs font-bold text-white">
-                      {locale === "fa" ? "این اعلان من است" : locale === "ps" ? "دا زما اعلان دی" : "I am the owner"}
-                    </button>
-                  </form>
+                  activeOwnershipClaim ? (
+                    <span role="status" className="rounded-lg bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-800">
+                      {locale === "fa" ? "درخواست مالکیت در حال بررسی است" : locale === "ps" ? "د مالکیت غوښتنه تر کتنې لاندې ده" : "Ownership request under review"}
+                    </span>
+                  ) : (
+                    <Link href={ownershipRequestHref} className="rounded-lg bg-[var(--ink-1)] px-3 py-2 text-xs font-bold text-white">
+                      {locale === "fa" ? "این اعلان من است" : locale === "ps" ? "دا زما اعلان دی" : "This is my listing"}
+                    </Link>
+                  )
                 ) : null}
-                <form action={async () => { "use server"; await recordInventoryContactEventAction(listing.id, "remove_request_click", locale, { source: "listing_detail" }); }}>
-                  <button className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold text-[var(--ink-1)]">
+                {activeRemovalRequest ? (
+                  <span role="status" className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800">
+                    {locale === "fa" ? "درخواست حذف در حال بررسی است" : locale === "ps" ? "د لرې کولو غوښتنه تر کتنې لاندې ده" : "Removal request under review"}
+                  </span>
+                ) : (
+                  <Link href={removalRequestHref} className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold text-[var(--ink-1)]">
                     {locale === "fa" ? "درخواست حذف" : locale === "ps" ? "د لرې کولو غوښتنه" : "Request removal"}
-                  </button>
-                </form>
+                  </Link>
+                )}
               </div>
             </div>
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
+        <section id="listing-contact" className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <h2 className="text-base font-bold">{t.listing.sellerInformation}</h2>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <p><span className="text-[var(--ink-2)]">{t.listing.name}:</span> {listing.user_id ? <Link href={localizePath(`/sellers/${listing.user_id}`, locale)} className="font-semibold text-[var(--accent)] hover:underline">{safeSellerName}</Link> : <span className="font-semibold">{safeSellerName}</span>}</p>
@@ -910,13 +1009,22 @@ export default async function ListingDetailPage({
           ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
           {hasContactPhone ? <ListingContactActions listingId={listing.id} title={displayTitle} locale={locale} canContact={sourceTransparency.canContact} isExternal={sourceTransparency.isExternal} hasPhone={hasContactPhone} whatsappEnabled={whatsappEnabled} /> : null}
-            {!isOwner ? (
+            {canUseSahibashSellerTools ? (
               <Link href={composeHref} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.message}</Link>
             ) : null}
-            {!isOwner ? (
+            {canUseSahibashSellerTools ? (
               <Link href={offerHref} className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">{t.listing.offer}</Link>
             ) : null}
           </div>
+          {sourceTransparency.isExternal && !hasAccountSeller ? (
+            <p className="mt-3 rounded-xl bg-[var(--surface-2)] px-3 py-2 text-xs font-semibold text-[var(--ink-2)]">
+              {locale === "fa"
+                ? "این فروشنده هنوز صندوق پیام صاحباش ندارد. برای پرسش درباره موجودیت فقط از گزینه تماس منبع استفاده کنید و پیش‌پرداخت نفرستید."
+                : locale === "ps"
+                  ? "دا پلورونکی لا د صاحباش د پیغام صندوق نه لري. د شتون پوښتنې لپاره یوازې د سرچینې د اړیکې لاره وکاروئ او مخکې پیسې مه لېږئ."
+                  : "This seller does not have a Sahibash inbox yet. Use the source contact option only to confirm availability, and do not send advance payment."}
+            </p>
+          ) : null}
         </section>
 
         {listing.province_id && listing.district_id && (
@@ -1074,7 +1182,7 @@ export default async function ListingDetailPage({
         <SimilarListingsSection listing={listing} locale={locale} />
       </Suspense>
 
-      {!isOwner ? (
+      {canUseSahibashSellerTools ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur sm:hidden">
           <div className="mx-auto flex w-full max-w-5xl gap-2">
             <Link href={composeHref} className="flex-1 rounded-lg bg-[var(--ink-1)] px-4 py-3 text-center text-sm font-semibold text-white">{t.listing.message}</Link>
@@ -1083,7 +1191,99 @@ export default async function ListingDetailPage({
         </div>
       ) : null}
 
-      {qp.compose === "1" && !isOwner && (
+      {qp.claim === "1" && sourceTransparency.isExternal && sourceTransparency.ownershipStatus !== "claimed" && !activeOwnershipClaim ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-display text-lg font-bold">
+                  {locale === "fa" ? "درخواست مالکیت اعلان" : locale === "ps" ? "د اعلان د مالکیت غوښتنه" : "Claim this listing"}
+                </h3>
+                <p className="mt-1 text-sm text-[var(--ink-2)]">
+                  {locale === "fa"
+                    ? "این کار مالکیت را فوراً منتقل نمی‌کند. معلوماتی بدهید که مدیر بتواند ارتباط شما با اعلان را بدون افشای معلومات خصوصی تأیید کند."
+                    : locale === "ps"
+                      ? "دا کار مالکیت سمدستي نه لېږدوي. داسې معلومات ورکړئ چې مدیر وکولای شي له اعلان سره ستاسو تړاو د شخصي معلوماتو له افشا پرته تایید کړي."
+                      : "This does not transfer ownership immediately. Give the administrator enough information to verify your connection to the listing without exposing private information."}
+                </p>
+              </div>
+              <Link href={listingHref} className="rounded px-2 py-1 text-sm text-[var(--ink-2)] hover:bg-[var(--surface-2)]">{t.listing.close}</Link>
+            </div>
+            <form action={submitExternalListingClaimAction} className="space-y-3">
+              <input type="hidden" name="listingId" value={listing.id} />
+              <label className="block text-sm font-semibold">
+                {locale === "fa" ? "روش تأیید مالکیت" : locale === "ps" ? "د مالکیت د تایید لاره" : "How can we verify ownership?"}
+                <textarea
+                  name="claimantNote"
+                  required
+                  minLength={10}
+                  maxLength={1000}
+                  placeholder={locale === "fa" ? "مثلاً شماره تماس من با اعلان یکسان است یا می‌توانم اسناد مربوط را ارائه کنم." : locale === "ps" ? "لکه: زما د اړیکې شمېره له اعلان سره برابره ده یا اړوند اسناد وړاندې کولی شم." : "For example: my contact number matches the listing, or I can provide supporting documents."}
+                  className="mt-2 min-h-28 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 font-normal"
+                />
+              </label>
+              <p className="text-xs text-[var(--ink-2)]">
+                {locale === "fa" ? "اسناد حساس را در این کادر ننویسید؛ مدیر در صورت نیاز روش امن بعدی را مشخص می‌کند." : locale === "ps" ? "حساس اسناد دلته مه لیکئ؛ مدیر به د اړتیا په صورت کې خوندي بله لاره وښيي." : "Do not paste sensitive documents here; an administrator will provide a secure next step if needed."}
+              </p>
+              <button className="w-full rounded-xl bg-[var(--ink-1)] px-4 py-3 text-sm font-bold text-white">
+                {locale === "fa" ? "ارسال برای بررسی" : locale === "ps" ? "د کتنې لپاره لېږل" : "Submit for review"}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {qp.remove === "1" && sourceTransparency.isExternal && !activeRemovalRequest ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-display text-lg font-bold">
+                  {locale === "fa" ? "درخواست حذف اعلان" : locale === "ps" ? "د اعلان د لرې کولو غوښتنه" : "Request listing removal"}
+                </h3>
+                <p className="mt-1 text-sm text-[var(--ink-2)]">
+                  {locale === "fa"
+                    ? "برای جلوگیری از حذف نادرست، مدیر دلیل و ارتباط شما با اعلان را بررسی می‌کند. اعلان تا تأیید درخواست حذف نمی‌شود."
+                    : locale === "ps"
+                      ? "د ناسم لرې کولو د مخنیوي لپاره، مدیر دلیل او له اعلان سره ستاسو تړاو ګوري. اعلان تر تایید مخکې نه لرې کېږي."
+                      : "To prevent malicious removals, an administrator verifies the reason and your connection to the listing. The listing stays public until approval."}
+                </p>
+              </div>
+              <Link href={listingHref} className="rounded px-2 py-1 text-sm text-[var(--ink-2)] hover:bg-[var(--surface-2)]">{t.listing.close}</Link>
+            </div>
+            <form action={submitExternalListingRemovalAction} className="space-y-3">
+              <input type="hidden" name="listingId" value={listing.id} />
+              <label className="block text-sm font-semibold">
+                {locale === "fa" ? "دلیل درخواست" : locale === "ps" ? "د غوښتنې دلیل" : "Reason for removal"}
+                <select name="reasonCode" required defaultValue="" className="mt-2 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 font-normal">
+                  <option value="" disabled>{locale === "fa" ? "انتخاب کنید" : locale === "ps" ? "غوره کړئ" : "Select a reason"}</option>
+                  <option value="owner_request">{locale === "fa" ? "من مالک این اعلان هستم" : locale === "ps" ? "زه د دې اعلان مالک یم" : "I own this listing"}</option>
+                  <option value="sold_or_unavailable">{locale === "fa" ? "فروخته شده یا دیگر موجود نیست" : locale === "ps" ? "پلورل شوی یا نور نشته" : "Sold or no longer available"}</option>
+                  <option value="privacy_or_rights">{locale === "fa" ? "حریم خصوصی یا حقوق محتوا" : locale === "ps" ? "محرمیت یا د منځپانګې حقونه" : "Privacy or content rights"}</option>
+                  <option value="wrong_information">{locale === "fa" ? "معلومات نادرست است" : locale === "ps" ? "معلومات ناسم دي" : "Information is incorrect"}</option>
+                  <option value="other">{locale === "fa" ? "دلیل دیگر" : locale === "ps" ? "بل دلیل" : "Other"}</option>
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">
+                {locale === "fa" ? "جزئیات برای بررسی" : locale === "ps" ? "د کتنې معلومات" : "Verification details"}
+                <textarea
+                  name="details"
+                  required
+                  minLength={10}
+                  maxLength={1500}
+                  placeholder={locale === "fa" ? "دلیل را توضیح دهید و بگویید مدیر چگونه می‌تواند آن را تأیید کند." : locale === "ps" ? "دلیل تشریح کړئ او ووایئ چې مدیر یې څنګه تاییدولی شي." : "Explain the reason and how an administrator can verify it."}
+                  className="mt-2 min-h-28 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 font-normal"
+                />
+              </label>
+              <button className="w-full rounded-xl bg-red-700 px-4 py-3 text-sm font-bold text-white">
+                {locale === "fa" ? "ارسال درخواست حذف" : locale === "ps" ? "د لرې کولو غوښتنه لېږل" : "Submit removal request"}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {qp.compose === "1" && canUseSahibashSellerTools && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
@@ -1109,7 +1309,7 @@ export default async function ListingDetailPage({
         </div>
       )}
 
-      {qp.offerbox === "1" && !isOwner && (
+      {qp.offerbox === "1" && canUseSahibashSellerTools && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5">
             <div className="mb-4 flex items-center justify-between">

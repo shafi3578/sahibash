@@ -47,11 +47,21 @@ export async function sendListingMessageAction(formData: FormData): Promise<void
 
   const { data: listing, error: listingError } = await supabase
     .from("listings")
-    .select("id, user_id, status")
+    .select("id, user_id, status, publication_status, source_type, ownership_status")
     .eq("id", listingId)
     .single();
 
-  if (listingError || !listing || listing.user_id === user.id || listing.status !== "approved") {
+  const hasAccountSeller = Boolean(listing?.user_id)
+    && (listing?.source_type === "native" || listing?.ownership_status === "claimed");
+  if (
+    listingError
+    || !listing
+    || !hasAccountSeller
+    || !listing.user_id
+    || listing.user_id === user.id
+    || listing.status !== "approved"
+    || listing.publication_status !== "published"
+  ) {
     redirect(listingRedirect(listingId, locale, "error"));
   }
 

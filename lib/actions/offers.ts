@@ -60,11 +60,20 @@ export async function createOfferAction(formData: FormData): Promise<void> {
 
   const { data: listing } = await supabase
     .from("listings")
-    .select("id, user_id, status, currency, minimum_offer, negotiable")
+    .select("id, user_id, status, publication_status, source_type, ownership_status, currency, minimum_offer, negotiable")
     .eq("id", listingId)
     .single();
 
-  if (!listing || listing.user_id === user.id || listing.status !== "approved") {
+  const hasAccountSeller = Boolean(listing?.user_id)
+    && (listing?.source_type === "native" || listing?.ownership_status === "claimed");
+  if (
+    !listing
+    || !hasAccountSeller
+    || !listing.user_id
+    || listing.user_id === user.id
+    || listing.status !== "approved"
+    || listing.publication_status !== "published"
+  ) {
     redirect(`/listings/${listingId}?offer=invalid`);
   }
 

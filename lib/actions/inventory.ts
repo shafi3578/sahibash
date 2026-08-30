@@ -1,13 +1,18 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-import { getCurrentUser, requireSuperAdministrator } from "@/lib/auth";
+import { getCurrentUser, requirePermission, requireSuperAdministrator, requireUser } from "@/lib/auth";
+import { getCurrentLocale } from "@/lib/i18n/server";
+import { localizePath } from "@/lib/i18n/routing";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { assertSafeExternalUrl, candidateIdempotencyKey, normalizeAfghanistanPhone, normalizeInventoryText, normalizePriceToAfn } from "@/lib/inventory/normalization";
 import { scoreDuplicateCandidate, type DuplicateCandidate } from "@/lib/inventory/deduplication";
 import { recordDemandSignalAction } from "@/lib/actions/liquidity";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
+import { createAccountNotification } from "@/lib/notifications/create";
 
 export type InventoryContactEvent =
   | "phone_reveal"
@@ -18,6 +23,30 @@ export type InventoryContactEvent =
   | "report_unavailable"
   | "report_wrong_info"
   | "report_scam";
+
+const CLAIM_ACCEPTED_COPY = {
+  en: { title: "Ownership claim approved", body: "Your ownership claim was approved. The listing is now connected to your account." },
+  fa: { title: "درخواست مالکیت تأیید شد", body: "درخواست مالکیت شما تأیید شد و اعلان اکنون به حساب شما وصل است." },
+  ps: { title: "د مالکیت غوښتنه ومنل شوه", body: "ستاسو د مالکیت غوښتنه ومنل شوه او اعلان اوس ستاسو له حساب سره تړلی دی." },
+} as const;
+
+const CLAIM_REJECTED_COPY = {
+  en: { title: "Ownership claim needs attention", body: "Your ownership claim could not be verified. Review the administrator decision before trying again." },
+  fa: { title: "درخواست مالکیت نیاز به پیگیری دارد", body: "مالکیت شما تأیید نشد. پیش از درخواست دوباره، نتیجه بررسی مدیر را ببینید." },
+  ps: { title: "د مالکیت غوښتنه پاملرنې ته اړتیا لري", body: "ستاسو مالکیت تایید نه شو. له بیا غوښتنې مخکې د مدیر پرېکړه وګورئ." },
+} as const;
+
+const REMOVAL_ACCEPTED_COPY = {
+  en: { title: "External listing removed", body: "The removal request was approved and the listing is no longer public." },
+  fa: { title: "اعلان بیرونی حذف شد", body: "درخواست حذف تأیید شد و اعلان دیگر عمومی نیست." },
+  ps: { title: "بهرنی اعلان لرې شو", body: "د لرې کولو غوښتنه ومنل شوه او اعلان نور عام نه دی." },
+} as const;
+
+const REMOVAL_REJECTED_COPY = {
+  en: { title: "Removal request reviewed", body: "The listing was not removed because the request could not be verified." },
+  fa: { title: "درخواست حذف بررسی شد", body: "چون درخواست قابل تأیید نبود، اعلان حذف نشد." },
+  ps: { title: "د لرې کولو غوښتنه وکتل شوه", body: "ځکه چې غوښتنه تایید نه شوه، اعلان لرې نه شو." },
+} as const;
 
 type TrustedSupabaseClient =
   | ReturnType<typeof createSupabaseAdmin>
@@ -235,9 +264,13 @@ export async function getListingContactPhoneAction(
   return { ok: true, phone };
 }
 
-export async function initiateListingClaimAction(listingId: string) {
-  const user = await getCurrentUser();
-  if (!user) return { ok: false, message: "Authentication required", statusCode: 401 };
+export async function initiateListingClaimAction(listingId: string, claimantNote: string) {
+  const user = await requireUser();
+  const safeListingId = String(listingId ?? "").trim();
+  const safeNote = String(claimantNote ?? "").trim();
+  if (!isUuid(safeListingId) || safeNote.length < 10 || safeNote.length > 1000) {
+    return { ok: false, message: "Invalid ownership request", statusCode: 400 };
+  }
 
   const rateLimit = await consumeRateLimit({
     scope: "inventory.claim",
@@ -247,41 +280,126 @@ export async function initiateListingClaimAction(listingId: string) {
   });
   if (!rateLimit.allowed) return { ok: false, message: "Too many requests", statusCode: 429 };
 
-  const supabase = await createTrustedServerClient();
-  const { data: listing } = await supabase
-    .from("listings")
-    .select("id, source_type, ownership_status, contact_phone")
-    .eq("id", listingId)
-    .maybeSingle();
-
-  if (!listing || (listing as { ownership_status?: string }).ownership_status === "claimed") {
-    return { ok: false, message: "Listing is not eligible for claim" };
-  }
-
-  const phone = normalizeAfghanistanPhone((listing as { contact_phone?: string | null }).contact_phone);
-  const { data: claim, error } = await supabase
-    .from("listing_claims")
-    .insert({
-      listing_id: listingId,
-      claimant_user_id: user.id,
-      status: "initiated",
-      masked_contact_hint: phone.hint,
-      challenge_channel: "staff_review",
-      challenge_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (error || !claim) return { ok: false, message: "Could not start claim" };
-
-  await supabase.rpc("record_listing_provenance_event", {
-    p_listing_id: listingId,
-    p_event_type: "claim_initiated",
-    p_after_state: { claim_id: claim.id },
-    p_reason: "buyer_owner_claim",
+  const supabase = createSupabaseAdmin();
+  const { data: claimId, error } = await supabase.rpc("submit_external_listing_claim_service", {
+    p_listing_id: safeListingId,
+    p_claimant_note: safeNote,
+    p_actor_id: user.id,
   });
 
-  return { ok: true, claimId: claim.id };
+  if (error || !claimId) return { ok: false, message: "Could not submit ownership request", statusCode: 400 };
+  return { ok: true, claimId: String(claimId) };
+}
+
+export async function submitExternalListingClaimAction(formData: FormData): Promise<void> {
+  const locale = await getCurrentLocale();
+  const listingId = String(formData.get("listingId") ?? "").trim();
+  const claimantNote = String(formData.get("claimantNote") ?? "").trim();
+  const result = await initiateListingClaimAction(listingId, claimantNote);
+  const status = result.ok ? "received" : result.statusCode === 429 ? "rate-limited" : "invalid";
+  redirect(localizePath(`/listings/${listingId}?ownership=${status}`, locale));
+}
+
+export async function submitExternalListingRemovalAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const locale = await getCurrentLocale();
+  const listingId = String(formData.get("listingId") ?? "").trim();
+  const reasonCode = String(formData.get("reasonCode") ?? "").trim();
+  const details = String(formData.get("details") ?? "").trim();
+  const validReasons = new Set(["owner_request", "sold_or_unavailable", "privacy_or_rights", "wrong_information", "other"]);
+
+  if (!isUuid(listingId) || !validReasons.has(reasonCode) || details.length < 10 || details.length > 1500) {
+    redirect(localizePath(`/listings/${listingId}?removal=invalid`, locale));
+  }
+
+  const rateLimit = await consumeRateLimit({
+    scope: "inventory.removal",
+    userId: user.id,
+    maxRequests: 10,
+    windowSeconds: 60 * 60,
+  });
+  if (!rateLimit.allowed) {
+    redirect(localizePath(`/listings/${listingId}?removal=rate-limited`, locale));
+  }
+
+  const supabase = createSupabaseAdmin();
+  const { data: requestId, error } = await supabase.rpc("submit_external_listing_removal_request_service", {
+    p_listing_id: listingId,
+    p_reason_code: reasonCode,
+    p_details: details,
+    p_actor_id: user.id,
+  });
+  const status = !error && requestId ? "received" : "invalid";
+  redirect(localizePath(`/listings/${listingId}?removal=${status}`, locale));
+}
+
+type ReviewedExternalRequest = {
+  listing_id: string;
+  requester_user_id: string;
+  outcome: "approve" | "reject";
+};
+
+function firstReviewedRequest(value: unknown): ReviewedExternalRequest | null {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  if (!candidate || typeof candidate !== "object") return null;
+  const row = candidate as Partial<ReviewedExternalRequest>;
+  if (!isUuid(String(row.listing_id ?? "")) || !isUuid(String(row.requester_user_id ?? ""))) return null;
+  if (row.outcome !== "approve" && row.outcome !== "reject") return null;
+  return row as ReviewedExternalRequest;
+}
+
+export async function reviewExternalListingClaimAction(formData: FormData): Promise<void> {
+  const actor = await requirePermission("listings.moderate");
+  const claimId = String(formData.get("claimId") ?? "").trim();
+  const decision = String(formData.get("decision") ?? "").trim();
+  const reviewerNote = String(formData.get("reviewerNote") ?? "").trim();
+  if (!isUuid(claimId) || (decision !== "approve" && decision !== "reject") || reviewerNote.length < 5 || reviewerNote.length > 2000) return;
+
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase.rpc("review_external_listing_claim_service", {
+    p_claim_id: claimId,
+    p_decision: decision,
+    p_reviewer_note: reviewerNote || null,
+    p_actor_id: actor.id,
+  });
+  const reviewed = !error ? firstReviewedRequest(data) : null;
+  if (!reviewed) return;
+
+  await createAccountNotification({
+    userId: reviewed.requester_user_id,
+    type: reviewed.outcome === "approve" ? "claim_accepted" : "claim_rejected",
+    copy: reviewed.outcome === "approve" ? CLAIM_ACCEPTED_COPY : CLAIM_REJECTED_COPY,
+    payload: { listing_id: reviewed.listing_id, claim_id: claimId },
+  });
+  revalidatePath("/admin/inventory");
+  revalidatePath(`/listings/${reviewed.listing_id}`);
+}
+
+export async function reviewExternalListingRemovalAction(formData: FormData): Promise<void> {
+  const actor = await requirePermission("listings.moderate");
+  const requestId = String(formData.get("requestId") ?? "").trim();
+  const decision = String(formData.get("decision") ?? "").trim();
+  const reviewerNote = String(formData.get("reviewerNote") ?? "").trim();
+  if (!isUuid(requestId) || (decision !== "approve" && decision !== "reject") || reviewerNote.length < 5 || reviewerNote.length > 2000) return;
+
+  const supabase = createSupabaseAdmin();
+  const { data, error } = await supabase.rpc("review_external_listing_removal_request_service", {
+    p_request_id: requestId,
+    p_decision: decision,
+    p_reviewer_note: reviewerNote || null,
+    p_actor_id: actor.id,
+  });
+  const reviewed = !error ? firstReviewedRequest(data) : null;
+  if (!reviewed) return;
+
+  await createAccountNotification({
+    userId: reviewed.requester_user_id,
+    type: "system",
+    copy: reviewed.outcome === "approve" ? REMOVAL_ACCEPTED_COPY : REMOVAL_REJECTED_COPY,
+    payload: { listing_id: reviewed.listing_id, removal_request_id: requestId },
+  });
+  revalidatePath("/admin/inventory");
+  revalidatePath(`/listings/${reviewed.listing_id}`);
 }
 
 export async function normalizeIngestCandidateForDryRunAction(candidate: Record<string, unknown>) {
