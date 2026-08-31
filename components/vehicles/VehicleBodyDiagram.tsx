@@ -21,14 +21,16 @@ const PANELS: Record<string, PanelGeometry> = {
   roof: { kind: "path", d: "M141 188 Q181 181 221 188 L222 284 Q181 292 140 284 Z" },
   trunk: { kind: "path", d: "M140 331 Q181 344 222 331 L238 359 Q181 375 124 359 Z" },
   rear_bumper: { kind: "rect", x: 122, y: 377, width: 121, height: 32, rx: 7 },
-  front_left_fender: { kind: "path", d: "M31 48 L55 48 Q91 75 114 123 L139 190 L84 190 L31 174 Z" },
-  front_right_fender: { kind: "path", d: "M332 48 L308 48 Q272 75 249 123 L242 190 L296 190 L332 174 Z" },
-  front_left_door: { kind: "path", d: "M31 174 L84 190 L139 187 L139 245 L85 257 L31 244 Z" },
-  front_right_door: { kind: "path", d: "M332 174 L296 190 L242 187 L242 245 L295 257 L332 244 Z" },
-  rear_left_door: { kind: "path", d: "M31 244 L85 257 L139 245 L139 291 L84 302 L31 288 Z" },
-  rear_right_door: { kind: "path", d: "M332 244 L295 257 L242 245 L242 291 L296 302 L332 288 Z" },
-  rear_left_fender: { kind: "path", d: "M31 288 L84 302 L139 288 Q119 335 84 358 L55 370 L31 369 Z" },
-  rear_right_fender: { kind: "path", d: "M332 288 L296 302 L242 288 Q262 335 296 358 L308 370 L332 369 Z" },
+  // Adjacent side panels share the same boundary coordinates. Keeping the
+  // hit areas edge-to-edge prevents a door from intercepting a fender tap.
+  front_left_fender: { kind: "path", d: "M31 48 L55 48 Q80 65 100 94 L72 108 Q64 128 64 151 L31 151 Z" },
+  front_right_fender: { kind: "path", d: "M332 48 L308 48 Q283 65 263 94 L291 108 Q299 128 299 151 L332 151 Z" },
+  front_left_door: { kind: "path", d: "M31 151 L64 151 Q64 128 72 108 Q106 130 139 190 L139 220 L84 232 L31 220 Z" },
+  front_right_door: { kind: "path", d: "M332 151 L299 151 Q299 128 291 108 Q257 130 242 190 L242 220 L296 232 L332 220 Z" },
+  rear_left_door: { kind: "path", d: "M31 220 L84 232 L139 220 L139 291 L84 302 L31 289 Z" },
+  rear_right_door: { kind: "path", d: "M332 220 L296 232 L242 220 L242 291 L296 302 L332 289 Z" },
+  rear_left_fender: { kind: "path", d: "M31 289 L84 302 L139 291 Q119 335 84 358 L55 370 L31 369 Z" },
+  rear_right_fender: { kind: "path", d: "M332 289 L296 302 L242 291 Q262 335 296 358 L308 370 L332 369 Z" },
 };
 
 const COPY = {
@@ -106,7 +108,7 @@ function Panel({
       ) : null}
 
       {interactive ? (
-        <g fill="transparent" stroke="transparent" strokeWidth="16" pointerEvents="all">
+        <g fill="transparent" pointerEvents="fill">
           <Geometry geometry={geometry} />
         </g>
       ) : null}

@@ -55,6 +55,22 @@ test("buyer report uses the same responsive professional 2D body model as the se
   assert.match(listingDetail, /VehicleDamageCard/);
 });
 
+test("door and fender hit areas are edge-to-edge without overlapping touch strokes", () => {
+  assert.match(bodyDiagram, /pointerEvents="fill"/);
+  assert.doesNotMatch(bodyDiagram, /strokeWidth="16"/);
+
+  for (const boundary of [
+    "M31 151 L64 151",
+    "M31 220 L84 232 L139 220",
+    "M31 289 L84 302 L139 291",
+    "M332 151 L299 151",
+    "M332 220 L296 232 L242 220",
+    "M332 289 L296 302 L242 291",
+  ]) {
+    assert.match(bodyDiagram, new RegExp(boundary));
+  }
+});
+
 test("seller-reported non-original parts remain connected to the buyer 2D report", () => {
   const report = normalizeVehicleDamageParts([
     { key: "hood", condition: "local_painted" },
