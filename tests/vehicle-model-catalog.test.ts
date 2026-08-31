@@ -14,6 +14,7 @@ const bodyDiagram = readFileSync(join(process.cwd(), "components", "vehicles", "
 const buyerCard = readFileSync(join(process.cwd(), "components", "vehicles", "VehicleDamageCard.tsx"), "utf8");
 const listingDetail = readFileSync(join(process.cwd(), "app", "listings", "[id]", "page.tsx"), "utf8");
 const packageJson = readFileSync(join(process.cwd(), "package.json"), "utf8");
+const exactBodyReference = readFileSync(join(process.cwd(), "public", "vehicle-body-reference.svg"), "utf8");
 
 test("normalizes all professional seller body states and rejects unknown input", () => {
   const normalized = normalizeVehicleDamageParts([
@@ -45,9 +46,11 @@ test("shows the seller body-condition diagram only for applicable vehicle branch
 });
 
 test("buyer report uses the same responsive professional 2D body model as the seller", () => {
-  for (const marker of ["viewBox=\"0 0 520 700\"", "role=\"img\"", "aria-label", "aria-pressed", "onKeyDown", "linearGradient", "feDropShadow", "data-vehicle-panel", "front_left_door", "rear_right_fender"]) {
+  for (const marker of ["viewBox=\"0 0 404 433\"", "role=\"img\"", "aria-label", "aria-pressed", "onKeyDown", "vehicle-body-reference.svg", "maskType", "feDropShadow", "data-vehicle-panel", "front_left_door", "rear_right_fender"]) {
     assert.match(bodyDiagram, new RegExp(marker));
   }
+  assert.match(exactBodyReference, /viewBox="0 0 404 433"/);
+  assert.match(exactBodyReference, /data:image\/jpeg;base64,/);
   assert.match(buyerCard, /VehicleBodyDiagram/);
   assert.match(listingDetail, /VehicleDamageCard/);
 });
