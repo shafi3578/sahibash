@@ -45,7 +45,7 @@ test("shows the seller body-condition diagram only for applicable vehicle branch
 });
 
 test("buyer report uses the same responsive professional 2D body model as the seller", () => {
-  for (const marker of ["viewBox=\"0 0 520 620\"", "role=\"img\"", "aria-label", "onKeyDown", "linearGradient", "feDropShadow", "front_left_door", "rear_right_fender"]) {
+  for (const marker of ["viewBox=\"0 0 520 700\"", "role=\"img\"", "aria-label", "aria-pressed", "onKeyDown", "linearGradient", "feDropShadow", "data-vehicle-panel", "front_left_door", "rear_right_fender"]) {
     assert.match(bodyDiagram, new RegExp(marker));
   }
   assert.match(buyerCard, /VehicleBodyDiagram/);
