@@ -12,6 +12,12 @@ import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
 import {
+  getPublishedPostingFields,
+  hasPublishedDetailValue,
+  type PublishedPostingOption,
+} from "@/lib/posting/published-schema-fields";
+import type { ListingSchemaConfig } from "@/lib/listing-schema-config";
+import {
   reconcileSuggestedDetails,
   sanitizeSuggestedDetails,
   shouldApplyCategorySuggestedDetails,
@@ -131,10 +137,14 @@ async function fetchLocationOptions<T extends LocationApiOption>(url: string) {
 type QuickField = {
   key: string;
   label: string;
-  type: "text" | "number" | "select" | "textarea" | "checkbox";
-  options?: string[];
+  type: "text" | "number" | "date" | "select" | "textarea" | "checkbox";
+  options?: Array<string | PublishedPostingOption>;
   required?: boolean;
   placeholder?: string;
+  unit?: string;
+  sectionKey?: string;
+  order?: number;
+  usesPublishedLabel?: boolean;
 };
 
 type AiResponse = {
@@ -222,7 +232,6 @@ const COPY = {
     titleTooShort: "Add a little more detail to the title.",
     price: "Price",
     amount: "Amount",
-    contactForPrice: "Contact for price",
     currency: "Currency",
     transaction: "Transaction",
     forSale: "For Sale",
@@ -277,6 +286,12 @@ const COPY = {
     suggested: "Suggested",
     otherPossibilities: "Other possibilities",
     additionalDetails: "Additional details",
+    requiredDetails: "Required details",
+    optionalDetails: "Optional details",
+    schemaLoading: "Loading the details for this category…",
+    schemaUnavailable: "The details for this category could not be loaded. Try again before publishing.",
+    retrySchema: "Try again",
+    missingRequiredDetail: "Complete this required detail",
     advanced: "Advanced details (optional)",
     moreOptionalDetails: "+ More optional details",
     hideOptionalDetails: "Hide optional details",
@@ -294,7 +309,7 @@ const COPY = {
     aiUnavailable: "AI is optional; smart local suggestions are active.",
     missingPhotos: "Please add at least one clear photo.",
     missingDescription: "Please write at least 20 characters in the description.",
-    missingPrice: "Please enter a price or choose contact for price.",
+    missingPrice: "Please enter a valid price.",
     missingCategory: "Please choose a category so buyers can find it.",
     missingLocation: "Please choose province and district/city.",
     locationMustConfirm: "Please confirm the item location before continuing.",
@@ -334,7 +349,6 @@ const COPY = {
     titleTooShort: "کمی جزئیات بیشتر به عنوان اضافه کنید.",
     price: "قیمت",
     amount: "مبلغ",
-    contactForPrice: "قیمت به تماس",
     currency: "واحد پول",
     transaction: "نوع معامله",
     forSale: "برای فروش",
@@ -389,6 +403,12 @@ const COPY = {
     suggested: "پیشنهادی",
     otherPossibilities: "احتمال‌های دیگر",
     additionalDetails: "جزئیات بیشتر",
+    requiredDetails: "جزئیات ضروری",
+    optionalDetails: "جزئیات اختیاری",
+    schemaLoading: "جزئیات این دسته در حال بارگذاری است…",
+    schemaUnavailable: "جزئیات این دسته بارگذاری نشد. پیش از نشر دوباره تلاش کنید.",
+    retrySchema: "تلاش دوباره",
+    missingRequiredDetail: "این جزئیات ضروری را تکمیل کنید",
     advanced: "جزئیات پیشرفته (اختیاری)",
     moreOptionalDetails: "+ جزئیات اختیاری بیشتر",
     hideOptionalDetails: "پنهان کردن جزئیات اختیاری",
@@ -406,7 +426,7 @@ const COPY = {
     aiUnavailable: "هوش مصنوعی اختیاری است؛ پیشنهادهای هوشمند محلی فعال است.",
     missingPhotos: "لطفاً حداقل یک عکس واضح اضافه کنید.",
     missingDescription: "لطفاً حداقل ۲۰ نویسه در توضیحات بنویسید.",
-    missingPrice: "لطفاً قیمت را وارد کنید یا قیمت به تماس را انتخاب کنید.",
+    missingPrice: "لطفاً یک قیمت معتبر وارد کنید.",
     missingCategory: "لطفاً یک دسته انتخاب کنید تا خریداران اعلان را پیدا کنند.",
     missingLocation: "لطفاً ولایت و ولسوالی/شهر را انتخاب کنید.",
     locationMustConfirm: "لطفاً موقعیت جنس را پیش از ادامه تایید کنید.",
@@ -446,7 +466,6 @@ const COPY = {
     titleTooShort: "سرلیک ته لږ نور تفصیل زیات کړئ.",
     price: "بیه",
     amount: "اندازه",
-    contactForPrice: "بیه په اړیکه",
     currency: "پیسې",
     transaction: "د معاملې ډول",
     forSale: "د پلور لپاره",
@@ -501,6 +520,12 @@ const COPY = {
     suggested: "وړاندیز",
     otherPossibilities: "نور احتمالونه",
     additionalDetails: "نور تفصیلات",
+    requiredDetails: "اړین تفصیلات",
+    optionalDetails: "اختیاري تفصیلات",
+    schemaLoading: "د دې کټګورۍ تفصیلات بارېږي…",
+    schemaUnavailable: "د دې کټګورۍ تفصیلات پورته نه شول. له خپرولو مخکې بیا هڅه وکړئ.",
+    retrySchema: "بیا هڅه",
+    missingRequiredDetail: "دا اړین تفصیلات بشپړ کړئ",
     advanced: "پرمختللي تفصیلات (اختیاري)",
     moreOptionalDetails: "+ نور اختیاري تفصیلات",
     hideOptionalDetails: "اختیاري تفصیلات پټ کړئ",
@@ -518,7 +543,7 @@ const COPY = {
     aiUnavailable: "AI اختیاري دی؛ ځایي هوښیار وړاندیزونه فعال دي.",
     missingPhotos: "مهرباني وکړئ لږ تر لږه یو روښانه انځور زیات کړئ.",
     missingDescription: "مهرباني وکړئ لږ تر لږه ۲۰ توري په تشریح کې ولیکئ.",
-    missingPrice: "مهرباني وکړئ بیه ولیکئ یا بیه په اړیکه وټاکئ.",
+    missingPrice: "مهرباني وکړئ سمه بیه ولیکئ.",
     missingCategory: "مهرباني وکړئ کټګوري وټاکئ چې پېرودونکي یې ومومي.",
     missingLocation: "مهرباني وکړئ ولایت او ولسوالي/ښار وټاکئ.",
     locationMustConfirm: "مهرباني وکړئ د توکي ځای له ادامه مخکې تایید کړئ.",
@@ -678,11 +703,17 @@ const QUICK_OPTION_LABELS: Record<string, { fa: string; ps: string }> = {
 };
 
 function quickFieldLabel(locale: AppLocale, field: QuickField) {
+  if (field.usesPublishedLabel) return field.label;
   if (locale === "en") return field.label;
   return QUICK_FIELD_LABELS[field.key]?.[locale] ?? field.label;
 }
 
-function quickOptionLabel(locale: AppLocale, option: string) {
+function quickOptionValue(option: string | PublishedPostingOption) {
+  return typeof option === "string" ? option : option.value;
+}
+
+function quickOptionLabel(locale: AppLocale, option: string | PublishedPostingOption) {
+  if (typeof option !== "string") return option.label;
   if (locale === "en") return option;
   return QUICK_OPTION_LABELS[option]?.[locale] ?? option;
 }
@@ -863,6 +894,10 @@ function scoreCategoryNode(node: CandidateNode, kind: QuickKind, text: string, a
   if (kind === "housing" && /land|dormitory|student|hostel/.test(normalizedPath)) score -= 25;
 
   return score;
+}
+
+function isEffectiveCategoryLeaf(node: CandidateNode, nodes: CandidateNode[]) {
+  return node.is_leaf || !nodes.some((candidate) => candidate.is_active && candidate.parent_id === node.id);
 }
 
 async function optimizeImageForAI(file: File) {
@@ -1064,7 +1099,6 @@ export default function QuickPostForm({
   const [description, setDescription] = useState("");
   const [priceAmount, setPriceAmount] = useState("");
   const [currency, setCurrency] = useState<"AFN" | "USD">("AFN");
-  const [contactForPrice, setContactForPrice] = useState(false);
   const [transaction, setTransaction] = useState<"sale" | "rent" | "lease">("sale");
   const [rahnGerawyEnabled, setRahnGerawyEnabled] = useState(false);
   const [monthlyRent, setMonthlyRent] = useState("");
@@ -1098,8 +1132,11 @@ export default function QuickPostForm({
   const [categoryCandidates, setCategoryCandidates] = useState<CandidateNode[]>([]);
   const [categoryNodes, setCategoryNodes] = useState<CandidateNode[]>([]);
   const [manualCategoryPath, setManualCategoryPath] = useState("");
-  const [showOptionalDetails, setShowOptionalDetails] = useState(false);
   const [categoryLoading, setCategoryLoading] = useState(false);
+  const [publishedSchema, setPublishedSchema] = useState<ListingSchemaConfig | null>(null);
+  const [publishedSchemaCategoryId, setPublishedSchemaCategoryId] = useState<number | null>(null);
+  const [schemaState, setSchemaState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [schemaRetry, setSchemaRetry] = useState(0);
   const [smartSuggestion, setSmartSuggestion] = useState<SmartPostingParseResult | null>(null);
   const [aiResponse, setAiResponse] = useState<AiResponse | null>(null);
   const [damageParts, setDamageParts] = useState<DamagePart[]>(() => defaultVehicleDamageParts());
@@ -1133,6 +1170,11 @@ export default function QuickPostForm({
   );
   const selectedCategoryId = selectedCategory?.id ?? null;
   const selectedCategoryPath = selectedCategory?.path ?? null;
+  const activeSchemaState = !selectedCategoryId
+    ? "idle"
+    : publishedSchemaCategoryId === selectedCategoryId
+      ? schemaState
+      : "loading";
   const manualCurrentNode = useMemo(
     () => categoryNodes.find((node) => node.path === (manualCategoryPath || selectedRootSlug)) ?? null,
     [categoryNodes, manualCategoryPath, selectedRootSlug],
@@ -1168,17 +1210,22 @@ export default function QuickPostForm({
   const nonOriginalDamageParts = useMemo(() => getNonOriginalVehicleDamageParts(damageParts), [damageParts]);
 
   const priceMode = useMemo(() => {
-    if (contactForPrice) return "contact";
     if (isDormitory) return "dormitory_fee";
     if (isLand && transaction === "lease") return "lease";
     if (isRentHousing && rahnGerawyEnabled) return "gerawy_rahn";
     if (isRentHousing) return "monthly_rent";
     return "fixed";
-  }, [contactForPrice, isDormitory, isLand, isRentHousing, rahnGerawyEnabled, transaction]);
+  }, [isDormitory, isLand, isRentHousing, rahnGerawyEnabled, transaction]);
 
+  const publishedPostingFields = useMemo<QuickField[]>(
+    () => getPublishedPostingFields(publishedSchema, locale, selectedCategoryPath ?? ""),
+    [locale, publishedSchema, selectedCategoryPath],
+  );
   const visibleFields = useMemo<QuickField[]>(() => {
+    if (selectedCategory && activeSchemaState === "loading") return [];
+    if (selectedCategory && activeSchemaState === "ready") return publishedPostingFields;
     return fieldsForQuickKind(quickKind);
-  }, [quickKind]);
+  }, [activeSchemaState, publishedPostingFields, quickKind, selectedCategory]);
 
   const priorityFieldKeys = useMemo(() => {
     if (quickKind === "vehicle") return new Set(["make", "model", "year", "mileageKm", "transmission", "fuelType", "condition", "color"]);
@@ -1189,8 +1236,14 @@ export default function QuickPostForm({
     return new Set(["condition", "type", "brand", "model"]);
   }, [quickKind]);
 
-  const primaryFields = useMemo(() => visibleFields.filter((field) => priorityFieldKeys.has(field.key)), [priorityFieldKeys, visibleFields]);
-  const optionalFields = useMemo(() => visibleFields.filter((field) => !priorityFieldKeys.has(field.key)), [priorityFieldKeys, visibleFields]);
+  const primaryFields = useMemo(
+    () => visibleFields.filter((field) => activeSchemaState === "ready" ? field.required : priorityFieldKeys.has(field.key)),
+    [activeSchemaState, priorityFieldKeys, visibleFields],
+  );
+  const optionalFields = useMemo(
+    () => visibleFields.filter((field) => activeSchemaState === "ready" ? !field.required : !priorityFieldKeys.has(field.key)),
+    [activeSchemaState, priorityFieldKeys, visibleFields],
+  );
 
   const categoryLabel = selectedCategory
     ? localizeCategoryName({
@@ -1257,10 +1310,10 @@ export default function QuickPostForm({
     if (model) items.set("model", model);
     if (year) items.set("year", year);
     if (condition) items.set("condition", condition);
-    if (smartSuggestion?.price && !contactForPrice) items.set("price", `${smartSuggestion.price} ${currency}`);
+    if (smartSuggestion?.price) items.set("price", `${smartSuggestion.price} ${currency}`);
     if (smartSuggestion?.province) items.set("province", smartSuggestion.province);
     return Array.from(items.entries()).map(([key, value]) => ({ key, value }));
-  }, [aiResponse, categoryLabel, contactForPrice, currency, details, rootTouched, selectedCategoryPath, selectedRootSlug, smartSuggestion]);
+  }, [aiResponse, categoryLabel, currency, details, rootTouched, selectedCategoryPath, selectedRootSlug, smartSuggestion]);
 
   const updateDetail = useCallback((key: string, value: DetailValue) => {
     userEditedDetailKeysRef.current.add(key);
@@ -1287,13 +1340,9 @@ export default function QuickPostForm({
   }, []);
 
   const reconcileDetailsForCategoryChange = useCallback((nextRootSlug: string, nextCategoryPath?: string | null) => {
-    const nextKind = inferKind(nextRootSlug, nextCategoryPath, `${title} ${description}`);
-    if (nextRootSlug === selectedRootSlug && nextKind === quickKind) return;
+    if (nextRootSlug === selectedRootSlug && (nextCategoryPath ?? null) === (selectedCategoryPath ?? null)) return;
 
-    const nextFieldKeys = new Set(fieldsForQuickKind(nextKind).map((field) => field.key));
-    const allowedKeys = nextRootSlug === selectedRootSlug
-      ? new Set(visibleFields.filter((field) => nextFieldKeys.has(field.key)).map((field) => field.key))
-      : new Set(["condition", "negotiable"]);
+    const allowedKeys = new Set(["condition", "negotiable"]);
 
     const retainAllowed = (values: SuggestedDetails) => Object.fromEntries(
       Object.entries(values).filter(([key]) => allowedKeys.has(key)),
@@ -1310,7 +1359,7 @@ export default function QuickPostForm({
     setDetails((current) => Object.fromEntries(
       Object.entries(current).filter(([key]) => allowedKeys.has(key)),
     ));
-  }, [description, quickKind, selectedRootSlug, title, visibleFields]);
+  }, [selectedCategoryPath, selectedRootSlug]);
 
   useEffect(() => {
     imagesRef.current = images;
@@ -1350,7 +1399,6 @@ export default function QuickPostForm({
           setDormitoryFee(readDraftString(local.dormitoryFee));
           setLandLeasePrice(readDraftString(local.landLeasePrice));
           setCurrency(readDraftString(local.currency) === "USD" ? "USD" : "AFN");
-          setContactForPrice(readDraftBoolean(local.contactForPrice));
           setTransaction(readDraftString(local.transaction) === "rent" ? "rent" : readDraftString(local.transaction) === "lease" ? "lease" : "sale");
           setRahnGerawyEnabled(readDraftBoolean(local.rahnGerawyEnabled));
           setSuitableForStudents(readDraftBoolean(local.suitableForStudents));
@@ -1443,7 +1491,6 @@ export default function QuickPostForm({
         setDormitoryFee(readDraftString(serverDetails.dormitoryFee));
         setLandLeasePrice(readDraftString(serverDetails.landLeasePrice));
         setCurrency(readDraftString(serverDetails.currency) === "USD" ? "USD" : "AFN");
-        setContactForPrice(readDraftBoolean(serverDetails.contactForPrice));
         setTransaction(readDraftString(serverDetails.transaction) === "rent" ? "rent" : readDraftString(serverDetails.transaction) === "lease" ? "lease" : "sale");
         setRahnGerawyEnabled(readDraftBoolean(serverDetails.rahnGerawyEnabled));
         setSuitableForStudents(readDraftBoolean(serverDetails.suitableForStudents));
@@ -1556,7 +1603,6 @@ export default function QuickPostForm({
       description,
       priceAmount,
       currency,
-      contactForPrice,
       transaction,
       rahnGerawyEnabled,
       monthlyRent,
@@ -1604,7 +1650,6 @@ export default function QuickPostForm({
     window.localStorage.setItem(quickDraftKey, JSON.stringify(localDraft));
   }, [
     areaText,
-    contactForPrice,
     currency,
     damageParts,
     description,
@@ -1666,8 +1711,7 @@ export default function QuickPostForm({
       if (!selectedCategoryPath?.startsWith(nextRoot)) setSelectedCategory(null);
       setSelectedRootSlug(nextRoot);
     }
-    if (suggestion.price && !priceAmount && !contactForPrice) setPriceAmount(String(suggestion.price));
-    if (suggestion.priceType === "contact") setContactForPrice(true);
+    if (suggestion.price && !priceAmount) setPriceAmount(String(suggestion.price));
     const suggestedDetails: SuggestedDetails = {};
     if (suggestion.negotiable) suggestedDetails.negotiable = true;
     const mayApplyCategoryDetails = shouldApplyCategorySuggestedDetails({
@@ -1688,7 +1732,7 @@ export default function QuickPostForm({
       if (suggestion.battery) suggestedDetails.batteryHealth = suggestion.battery.replace("%", "");
     }
     applySuggestedDetails("local", suggestedDetails);
-  }, [applySuggestedDetails, contactForPrice, priceAmount, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, selectedRootSlug]);
+  }, [applySuggestedDetails, priceAmount, reconcileDetailsForCategoryChange, rootChoices, rootTouched, selectedCategoryPath, selectedRootSlug]);
 
   useEffect(() => {
     if (!postingCategorySuggestionsEnabled) return;
@@ -1842,8 +1886,7 @@ export default function QuickPostForm({
             .from("category_nodes")
             .select("id, category_id, parent_id, name, slug, path, level, display_order, is_active, is_leaf")
             .in("id", exactIds)
-            .eq("is_active", true)
-            .eq("is_leaf", true);
+            .eq("is_active", true);
           exactNodes.push(...((exact ?? []) as CandidateNode[]).filter((node) => node.path?.startsWith(selectedRootSlug)));
         }
 
@@ -1858,7 +1901,7 @@ export default function QuickPostForm({
 
         const nodes = ((data ?? []) as CandidateNode[]).filter((node) => node.path?.startsWith(selectedRootSlug));
         const ranked = nodes
-          .filter((node) => node.is_leaf)
+          .filter((node) => isEffectiveCategoryLeaf(node, nodes))
           .map((node) => ({ node, score: scoreCategoryNode(node, kind, text, aiPath) }))
           .sort((a, b) => b.score - a.score || b.node.level - a.node.level || a.node.display_order - b.node.display_order)
           .map((item) => item.node);
@@ -1866,7 +1909,9 @@ export default function QuickPostForm({
           ...aiPaths.map((path) => exactNodes.find((node) => node.path === path)).filter((node): node is CandidateNode => Boolean(node)),
           ...exactNodes,
           ...ranked,
-        ].filter((node, index, all) => all.findIndex((item) => item.id === node.id) === index);
+        ]
+          .filter((node) => isEffectiveCategoryLeaf(node, nodes))
+          .filter((node, index, all) => all.findIndex((item) => item.id === node.id) === index);
 
         if (!cancelled) {
           setCategoryNodes(nodes);
@@ -1885,6 +1930,45 @@ export default function QuickPostForm({
       cancelled = true;
     };
   }, [aiResponse, description, details, postingCategorySuggestionsEnabled, rootTouched, selectedCategoryId, selectedCategoryPath, selectedRootSlug, supabase, title]);
+
+  useEffect(() => {
+    if (!selectedCategoryId || !selectedCategoryPath) return;
+
+    const controller = new AbortController();
+
+    void fetch(`/api/posting/schema?categoryNodeId=${selectedCategoryId}`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json() as { ok?: boolean; config?: ListingSchemaConfig };
+        if (!response.ok || !payload.ok || !payload.config) throw new Error("schema_unavailable");
+        return payload.config;
+      })
+      .then((config) => {
+        if (controller.signal.aborted) return;
+        const allowedKeys = new Set(
+          getPublishedPostingFields(config, "en", selectedCategoryPath).map((field) => field.key),
+        );
+        setDetails((current) => Object.fromEntries(
+          Object.entries(current).filter(([key]) => allowedKeys.has(key)),
+        ));
+        if (allowedKeys.has("areaUnit")) {
+          setDetails((current) => ({ ...current, areaUnit: current.areaUnit || "sqm" }));
+        }
+        setPublishedSchema(config);
+        setPublishedSchemaCategoryId(selectedCategoryId);
+        setSchemaState("ready");
+      })
+      .catch((schemaError) => {
+        if (controller.signal.aborted || (schemaError instanceof DOMException && schemaError.name === "AbortError")) return;
+        setPublishedSchema(null);
+        setPublishedSchemaCategoryId(selectedCategoryId);
+        setSchemaState("error");
+      });
+
+    return () => controller.abort();
+  }, [schemaRetry, selectedCategoryId, selectedCategoryPath]);
 
   const onPickFiles = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -2004,7 +2088,6 @@ export default function QuickPostForm({
       description,
       priceAmount,
       currency,
-      contactForPrice,
       transaction,
       rahnGerawyEnabled,
       monthlyRent,
@@ -2093,8 +2176,8 @@ export default function QuickPostForm({
 
   function validateStepOneBeforeContinue() {
     if (description.trim().length < 20) return c.missingDescription;
-    const submitPrice = parseNumber(contactForPrice ? "0" : priceAmount);
-    if (!contactForPrice && (!submitPrice || submitPrice <= 0)) return c.missingPrice;
+    const submitPrice = parseNumber(priceAmount);
+    if (!submitPrice || submitPrice <= 0) return c.missingPrice;
     if (!selectedProvinceId || !selectedDistrictId) return c.missingLocation;
     if (!locationConfirmed) return c.locationMustConfirm;
     return null;
@@ -2126,7 +2209,6 @@ export default function QuickPostForm({
   }
 
   function priceValueForSubmit() {
-    if (contactForPrice) return "0";
     if (priceMode === "dormitory_fee") return dormitoryFee || priceAmount;
     if (priceMode === "gerawy_rahn") return gerawyAmount || priceAmount;
     if (priceMode === "monthly_rent") return monthlyRent || priceAmount;
@@ -2139,10 +2221,14 @@ export default function QuickPostForm({
     if (images.length === 0) return c.missingPhotos;
     if (description.trim().length < 20) return c.missingDescription;
     if (!selectedCategory) return c.missingCategory;
+    if (activeSchemaState === "loading" || activeSchemaState === "idle") return c.schemaLoading;
+    if (activeSchemaState === "error") return c.schemaUnavailable;
+    const missingRequiredField = primaryFields.find((field) => !hasPublishedDetailValue(details[field.key]));
+    if (missingRequiredField) return `${c.missingRequiredDetail}: ${quickFieldLabel(locale, missingRequiredField)}`;
     if (!selectedProvinceId || !selectedDistrictId) return c.missingLocation;
     if (!locationConfirmed) return c.locationMustConfirm;
     const submitPrice = parseNumber(priceValueForSubmit());
-    if (!contactForPrice && (!submitPrice || submitPrice <= 0)) return c.missingPrice;
+    if (!submitPrice || submitPrice <= 0) return c.missingPrice;
     return null;
   }
 
@@ -2186,7 +2272,7 @@ export default function QuickPostForm({
     formData.set("main_category_id", String(selectedCategory!.category_id));
     formData.set("child_category_id", String(selectedCategory!.id));
     formData.set("price_mode", priceMode);
-    formData.set("price", contactForPrice ? "0" : submitPrice);
+    formData.set("price", submitPrice);
     formData.set("currency", currency);
     formData.set("contact_phone", sellerContactPhone);
     formData.set("contact_name", sellerContactName);
@@ -2338,12 +2424,13 @@ export default function QuickPostForm({
     if (field.type === "select") {
       return (
         <label key={field.key} className="text-sm font-semibold">
-          {label} {field.required ? <span className="text-red-600">*</span> : null}
+          {label} {field.unit ? <span className="font-normal text-[var(--ink-2)]">({field.unit})</span> : null} {field.required ? <span className="text-red-600">*</span> : null}
           <select value={String(value)} onChange={(event) => updateDetail(field.key, event.target.value)} className={commonClass}>
             <option value="">{c.select}</option>
-            {(field.options ?? []).map((option) => (
-              <option key={`${field.key}-${option}`} value={option}>{quickOptionLabel(locale, option)}</option>
-            ))}
+            {(field.options ?? []).map((option) => {
+              const optionValue = quickOptionValue(option);
+              return <option key={`${field.key}-${optionValue}`} value={optionValue}>{quickOptionLabel(locale, option)}</option>;
+            })}
           </select>
         </label>
       );
@@ -2360,7 +2447,7 @@ export default function QuickPostForm({
 
     return (
       <label key={field.key} className="text-sm font-semibold">
-        {label} {field.required ? <span className="text-red-600">*</span> : null}
+        {label} {field.unit ? <span className="font-normal text-[var(--ink-2)]">({field.unit})</span> : null} {field.required ? <span className="text-red-600">*</span> : null}
         <input
           type={field.type}
           value={String(value)}
@@ -2539,7 +2626,6 @@ export default function QuickPostForm({
                   setSelectedCategory(null);
                   setCategoryCandidates([]);
                   setCategoryNodes([]);
-                  setShowOptionalDetails(false);
                   setSelectedRootSlug(category.slug);
                   setManualCategoryPath(category.slug);
                 }}
@@ -2567,7 +2653,6 @@ export default function QuickPostForm({
                         reconcileDetailsForCategoryChange(candidate.path.split("/")[0] ?? selectedRootSlug, candidate.path);
                         setRootTouched(true);
                         setSelectedCategory(candidate);
-                        setShowOptionalDetails(false);
                       }}
                       className={`rounded-2xl border px-3 py-3 text-start text-sm font-bold transition ${
                         isSelected
@@ -2608,21 +2693,21 @@ export default function QuickPostForm({
                   </div>
                   <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto sm:grid-cols-2">
                   {manualChildren.map((candidate) => {
-                    const isSelected = candidate.is_leaf && selectedCategory?.id === candidate.id;
+                    const isLeaf = isEffectiveCategoryLeaf(candidate, categoryNodes);
+                    const isSelected = isLeaf && selectedCategory?.id === candidate.id;
                     return (
                       <button
                         key={`manual-${candidate.id}`}
                         type="button"
                         onClick={() => {
                           setRootTouched(true);
-                          if (candidate.is_leaf) {
+                          if (isLeaf) {
                             reconcileDetailsForCategoryChange(candidate.path.split("/")[0] ?? selectedRootSlug, candidate.path);
                             setSelectedCategory(candidate);
                           } else {
                             setSelectedCategory(null);
                             setManualCategoryPath(candidate.path);
                           }
-                          setShowOptionalDetails(false);
                         }}
                         className={`rounded-xl px-3 py-2 text-start text-sm font-semibold transition ${
                           isSelected
@@ -2631,7 +2716,7 @@ export default function QuickPostForm({
                         }`}
                       >
                         <span>{localizeCategoryName({ locale, fallbackName: candidate.name, slug: candidate.slug, path: candidate.path })}</span>
-                        <span aria-hidden="true" className="float-end opacity-60">{candidate.is_leaf ? "✓" : direction === "rtl" ? "‹" : "›"}</span>
+                        <span aria-hidden="true" className="float-end opacity-60">{isLeaf ? "✓" : direction === "rtl" ? "‹" : "›"}</span>
                       </button>
                     );
                   })}
@@ -2658,7 +2743,7 @@ export default function QuickPostForm({
       <section data-testid="quick-post-price" className="order-40 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <h3 className="font-display text-lg font-bold">{c.price}</h3>
 
-        {showContextualPrice && (isHousing || isLand) && !contactForPrice ? (
+        {showContextualPrice && (isHousing || isLand) ? (
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => setTransaction("sale")} className={`rounded-full border px-4 py-2 text-sm font-bold ${transaction === "sale" ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--line)]"}`}>
               {c.forSale}
@@ -2676,7 +2761,7 @@ export default function QuickPostForm({
           </div>
         ) : null}
 
-        {showContextualPrice && isRentHousing && !contactForPrice ? (
+        {showContextualPrice && isRentHousing ? (
           <label className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-bold">
             <span>{c.rahnGerawy} <span className="text-xs text-[var(--ink-2)]">({c.keepOff})</span></span>
             <input name="rahn_gerawy_enabled" type="checkbox" checked={rahnGerawyEnabled} onChange={(event) => setRahnGerawyEnabled(event.target.checked)} className="h-5 w-5" />
@@ -2684,9 +2769,7 @@ export default function QuickPostForm({
         ) : null}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px]">
-          {contactForPrice ? (
-            <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-bold">{c.contactForPrice}</div>
-          ) : showContextualPrice && priceMode === "monthly_rent" ? (
+          {showContextualPrice && priceMode === "monthly_rent" ? (
             <label className="text-sm font-bold">
               {c.monthlyRent}
               <input type="number" value={monthlyRent} onChange={(event) => setMonthlyRent(event.target.value)} className="mt-1 w-full rounded-2xl border border-[var(--line)] px-3 py-3" />
@@ -2726,11 +2809,6 @@ export default function QuickPostForm({
             </select>
           </label>
         </div>
-
-        <label className="mt-4 flex items-center gap-2 text-sm font-bold">
-          <input name="contact_for_price" type="checkbox" checked={contactForPrice} onChange={(event) => setContactForPrice(event.target.checked)} className="h-4 w-4" />
-          {c.contactForPrice}
-        </label>
 
         {showContextualPrice && isRentHousing ? (
           <label className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-4 py-3 text-sm font-bold">
@@ -2900,30 +2978,29 @@ export default function QuickPostForm({
 
             {selectedCategory ? (
               <div className="mt-4 space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {primaryFields.map(renderField)}
-                  {isRentHousing && suitableForStudents
-                    ? DORMITORY_FIELDS
-                        .filter((field) => ["gender_allowed", "nearby_institution", "distance_to_university", "furnished"].includes(field.key))
-                        .map(renderField)
-                    : null}
-                </div>
-
-                {optionalFields.length > 0 ? (
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowOptionalDetails((current) => !current)}
-                      className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2 text-sm font-black text-[var(--ink-1)]"
-                    >
-                      {showOptionalDetails ? c.hideOptionalDetails : c.moreOptionalDetails}
-                    </button>
-                    {showOptionalDetails ? (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        {optionalFields.map(renderField)}
-                      </div>
-                    ) : null}
+                {activeSchemaState === "loading" ? (
+                  <p role="status" className="rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--ink-2)]">{c.schemaLoading}</p>
+                ) : null}
+                {activeSchemaState === "error" ? (
+                  <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    <p>{c.schemaUnavailable}</p>
+                    <button type="button" onClick={() => {
+                      setSchemaState("loading");
+                      setSchemaRetry((current) => current + 1);
+                    }} className="rounded-xl bg-white px-3 py-2 font-black text-red-800 shadow-sm">{c.retrySchema}</button>
                   </div>
+                ) : null}
+                {activeSchemaState === "ready" && primaryFields.length > 0 ? (
+                  <section>
+                    <h4 className="text-sm font-black text-[var(--ink-1)]">{c.requiredDetails}</h4>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">{primaryFields.map(renderField)}</div>
+                  </section>
+                ) : null}
+                {activeSchemaState === "ready" && optionalFields.length > 0 ? (
+                  <section>
+                    <h4 className="text-sm font-black text-[var(--ink-1)]">{c.optionalDetails}</h4>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">{optionalFields.map(renderField)}</div>
+                  </section>
                 ) : null}
               </div>
             ) : null}
@@ -2989,7 +3066,7 @@ export default function QuickPostForm({
                   transaction,
                   labels: { sale: c.forSale, rent: c.forRent, lease: c.forLease, listing: categoryLabel || "Sahibash listing", near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near" },
                 })}</p>
-                <p className="mt-1 text-[var(--accent)]">{contactForPrice ? c.contactForPrice : `${priceValueForSubmit() || priceAmount || "—"} ${currency}`}</p>
+                <p className="mt-1 text-[var(--accent)]">{`${priceValueForSubmit() || priceAmount || "—"} ${currency}`}</p>
                 <p className="mt-1 text-[var(--ink-2)]">
                   {[provinceOptions.find((item) => item.id === selectedProvinceId)?.name, districtOptions.find((item) => item.id === selectedDistrictId)?.name, areaText, streetText].filter(Boolean).join(" • ") || c.missingLocation}
                 </p>

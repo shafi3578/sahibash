@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ACCOUNT_NAV_ITEMS,
@@ -49,6 +49,18 @@ test("consumer account navigation has no admin entry points", () => {
   assert.ok(hrefs.includes("/dashboard/safety"));
   assert.ok(hrefs.includes("/dashboard/settings"));
   assert.equal(hrefs.some((href) => href.startsWith("/admin") || href.startsWith("/administrator")), false);
+});
+
+test("every My Account navigation destination has a concrete page and localized route", () => {
+  const localeRouter = readFileSync(join(process.cwd(), "app", "[locale]", "[...slug]", "page.tsx"), "utf8");
+  for (const item of ACCOUNT_NAV_ITEMS) {
+    const segments = item.href.split("/").filter(Boolean);
+    assert.equal(segments[0], "dashboard", `${item.href} must stay inside My Account`);
+    assert.equal(existsSync(join(process.cwd(), "app", ...segments, "page.tsx")), true, `${item.href} is missing its page`);
+    assert.equal(localeRouter.includes(`case "${segments[1]}":`), true, `${item.href} is missing from the locale router`);
+    assert.equal(localizeAccountPath(item.href, "fa"), `/fa${item.href}`);
+    assert.equal(localizeAccountPath(item.href, "ps"), `/ps${item.href}`);
+  }
 });
 
 test("social safety actions and messaging enforce block boundaries", () => {

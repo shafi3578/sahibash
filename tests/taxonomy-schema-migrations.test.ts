@@ -15,6 +15,11 @@ const refinementMigration = readFileSync(
   "utf8",
 );
 
+const quickPostAlignmentMigration = readFileSync(
+  join(migrationsDirectory, "20260831021513_align_quick_post_leaf_schema.sql"),
+  "utf8",
+);
+
 test("taxonomy migration covers the major marketplace schema families", () => {
   const requiredFamilies = [
     "car",
@@ -59,4 +64,16 @@ test("compound electronics paths receive specific correction families", () => {
   assert.match(refinementMigration, /satellite-receivers/);
   assert.match(refinementMigration, /'media_device'/);
   assert.match(refinementMigration, /'power_equipment'/);
+});
+
+test("leaf alignment is versioned, non-destructive, and removes known irrelevant controls", () => {
+  assert.match(quickPostAlignmentMigration, /is_leaf = not exists/);
+  assert.match(quickPostAlignmentMigration, /apple-iphone/);
+  assert.match(quickPostAlignmentMigration, /ram_gb/);
+  assert.match(quickPostAlignmentMigration, /bicycle-parts/);
+  assert.match(quickPostAlignmentMigration, /motorcycle-parts/);
+  assert.match(quickPostAlignmentMigration, /electric-motorcycles/);
+  assert.match(quickPostAlignmentMigration, /'fuel_type', 'engine_size', 'engine_cc', 'start_type'/);
+  assert.match(quickPostAlignmentMigration, /set status = 'archived'/);
+  assert.doesNotMatch(quickPostAlignmentMigration, /delete\s+from/i);
 });

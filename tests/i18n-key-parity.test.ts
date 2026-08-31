@@ -6,6 +6,7 @@ import { localizePath } from "@/lib/i18n/routing";
 import { localizeActionMessage, localizeAuthError, USER_COPY } from "@/lib/i18n/user-copy";
 import { USER_EVENT_TEMPLATES } from "@/lib/i18n/system-templates";
 import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
+import { localizeCategoryName } from "@/lib/i18n/category-labels";
 
 type JsonMap = Record<string, unknown>;
 
@@ -107,6 +108,23 @@ test("Dari and Pashto translations do not silently reuse English copy", () => {
       assert.deepEqual(copied, [], `${name} contains English fallback copy in ${locale}: ${copied.join(", ")}`);
     }
   }
+});
+
+test("generic launch category leaves do not fall back to English", () => {
+  const leaves = [
+    ["furnished-apartment", "Furnished Apartment"],
+    ["washing-machine", "Washing Machine"],
+    ["bicycle-parts", "Bicycle Parts"],
+    ["motorcycle-parts", "Motorcycle Parts"],
+    ["other-toyota-model", "Other Toyota Model"],
+  ] as const;
+
+  for (const [slug, fallbackName] of leaves) {
+    for (const locale of ["fa", "ps"] as const) {
+      assert.notEqual(localizeCategoryName({ locale, slug, fallbackName }), fallbackName);
+    }
+  }
+  assert.equal(localizeCategoryName({ locale: "fa", slug: "toyota", fallbackName: "Toyota" }), "Toyota");
 });
 
 test("English dictionary contains English copy", () => {

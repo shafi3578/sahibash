@@ -114,7 +114,7 @@ export default async function HomePage({
               return (
                 <Link key={listing.id} href={href(`/listings/${listing.id}`)} className="group overflow-hidden rounded-3xl border border-white/15 bg-white/10 shadow-2xl backdrop-blur transition hover:-translate-y-1 hover:bg-white/15">
                   <div className="relative h-28 bg-white/10 sm:h-36 lg:h-28">
-                    {image ? <Image src={image} alt={displayTitle} fill className="object-cover transition duration-500 group-hover:scale-105" sizes="(max-width: 1024px) 33vw, 320px" /> : null}
+                    {image ? <Image src={image} alt={displayTitle} fill className="object-contain transition duration-500 group-hover:scale-105" sizes="(max-width: 1024px) 33vw, 320px" /> : null}
                     <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-[10px] font-bold">#{index + 1}</span>
                   </div>
                   <div className="p-3">
@@ -189,7 +189,7 @@ export default async function HomePage({
                 >
                   <div className="relative h-56 w-full bg-slate-100 sm:h-32">
                     {image ? (
-                      <Image src={image} alt={displayTitle} fill className="object-cover" sizes="(max-width: 640px) 160px, 176px" />
+                      <Image src={image} alt={displayTitle} fill className="object-contain" sizes="(max-width: 640px) 160px, 176px" />
                     ) : null}
                     <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">{homeCopy.adBadge}</span>
                   </div>
@@ -242,7 +242,7 @@ export default async function HomePage({
                       src={image}
                       alt={displayTitle}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       sizes="(max-width: 639px) 100vw, 96px"
                       loading={isLikelyLcpImage ? "eager" : undefined}
                       fetchPriority={isLikelyLcpImage ? "high" : undefined}

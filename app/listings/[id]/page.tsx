@@ -6,7 +6,6 @@ import { createReportAction } from "@/lib/actions/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { sendListingMessageAction } from "@/lib/actions/messages";
 import { createOfferAction } from "@/lib/actions/offers";
-import { reportListingTranslationIssueAction } from "@/lib/actions/translations";
 import { getCategoryFieldsWithOptions } from "@/lib/data/queries";
 import { buildListingSpecView } from "@/lib/listings/detailSpecs";
 import { ListingGallery } from "@/components/listings/listing-gallery";
@@ -14,6 +13,7 @@ import { VehicleDamageCard } from "@/components/vehicles/VehicleDamageCard";
 import LocationCard from "@/components/location/LocationCard";
 import type { LocationVisibility } from "@/components/location/LocationCard";
 import { getDictionary } from "@/lib/i18n/server";
+import type { AppLocale } from "@/lib/i18n/translations";
 import { appLocaleToListingLanguage } from "@/lib/listings/translation-service";
 import { recordSearchTelemetryClick } from "@/lib/search/telemetry";
 import { buildActiveListingSchemaView } from "@/lib/listingSchemas";
@@ -33,8 +33,33 @@ import { submitExternalListingClaimAction, submitExternalListingRemovalAction } 
 import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { FavoriteToggleButton } from "@/components/listings/favorite-toggle-button";
+import { getProvinceLabel } from "@/lib/constants/marketplace";
 
-type NamedLocationRelation = { name?: string | null } | null;
+type NamedLocationRelation = {
+  name?: string | null;
+  name_en?: string | null;
+  name_fa?: string | null;
+  name_ps?: string | null;
+} | null;
+
+function localizedLocationName(relation: NamedLocationRelation, locale: AppLocale) {
+  if (!relation) return null;
+  if (locale === "fa") return relation.name_fa || relation.name_en || relation.name || null;
+  if (locale === "ps") return relation.name_ps || relation.name_en || relation.name || null;
+  return relation.name_en || relation.name || null;
+}
+
+function localizedDistrictName(relation: NamedLocationRelation, locale: AppLocale, provinceName: string | null) {
+  const value = localizedLocationName(relation, locale);
+  if (!value || locale === "en") return value;
+  const english = relation?.name_en || relation?.name || value;
+  const localized = locale === "fa" ? relation?.name_fa : relation?.name_ps;
+  if (localized && localized !== english) return localized;
+  if (/\s+City$/i.test(english) && provinceName) {
+    return locale === "fa" ? `شهر ${provinceName}` : `${provinceName} ښار`;
+  }
+  return value;
+}
 type ListingDetail = NonNullable<Awaited<ReturnType<typeof getListingById>>>;
 type ListingDetailLocale = Awaited<ReturnType<typeof getDictionary>>["locale"];
 
@@ -193,9 +218,14 @@ export default async function ListingDetailPage({
   ].filter(Boolean).join(" › ");
   const simpleCategoryKind = getSimpleCategoryKind(listing.category_node?.path ?? undefined, listing.category?.slug ?? null);
   const simpleCategoryConfig = getSimpleCategoryConfig(simpleCategoryKind);
+  const provinceRelation = listing.provinces as NamedLocationRelation;
+  const provinceEnglishName = provinceRelation?.name_en || provinceRelation?.name || listing.province;
+  const localizedProvinceName = provinceEnglishName ? getProvinceLabel(provinceEnglishName, locale) : listing.province;
+  const localizedDistrict = localizedDistrictName(listing.districts as NamedLocationRelation, locale, localizedProvinceName);
+  const localizedAreaName = localizedLocationName(listing.areas as NamedLocationRelation, locale);
   const locationParts = listing.location_visibility === "exact"
-    ? [listing.province, listing.district, listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean)
-    : [listing.province, listing.district].filter(Boolean);
+    ? [localizedProvinceName, localizedDistrict, localizedAreaName || listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean)
+    : [localizedProvinceName, localizedDistrict].filter(Boolean);
   const listingTypeValue = String(
     (listing as { listing_type?: string }).listing_type
     ?? attributeMap.get("listing_type")
@@ -1034,15 +1064,16 @@ export default async function ListingDetailPage({
               provinceId: listing.province_id,
               districtId: listing.district_id,
               areaId: listing.area_id,
-              provinceName: (listing.provinces as NamedLocationRelation)?.name,
-              districtName: (listing.districts as NamedLocationRelation)?.name,
-              areaName: (listing.areas as NamedLocationRelation)?.name,
+              provinceName: localizedProvinceName,
+              districtName: localizedDistrict,
+              areaName: localizedAreaName,
               addressText: listing.location_visibility === "exact" ? listing.address_text : null,
               latitude: listing.location_visibility === "exact" ? listing.latitude : null,
               longitude: listing.location_visibility === "exact" ? listing.longitude : null,
               accuracy: listing.location_accuracy,
               visibility: listing.location_visibility as LocationVisibility,
             }}
+            locale={locale}
           />
         )}
 
@@ -1157,18 +1188,6 @@ export default async function ListingDetailPage({
           </select>
           <input name="details" placeholder={t.listing.optionalDetails} className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm" />
           <button className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.reportListing}</button>
-        </form>
-        <form action={reportListingTranslationIssueAction} className="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="listingId" value={listing.id} />
-          <input type="hidden" name="languageCode" value={viewerLanguageCode} />
-          <input
-            name="details"
-            placeholder={t.listing.reportTranslationIssue}
-            className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm"
-          />
-          <button className="rounded-lg border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">
-            {t.listing.reportTranslationIssue}
-          </button>
         </form>
       </div>
 

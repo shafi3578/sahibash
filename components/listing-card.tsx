@@ -103,7 +103,7 @@ export async function ListingCard({
       <Link href={listingHref}>
         <div className="relative aspect-[4/3] w-full bg-[var(--surface-2)]">
           {image ? (
-            <Image src={image} alt={displayTitle} fill className="object-cover" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" />
+            <Image src={image} alt={displayTitle} fill className="object-contain" sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-[var(--ink-2)]">{t.postAd.photos}</div>
           )}

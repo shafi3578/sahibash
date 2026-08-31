@@ -39,7 +39,6 @@ test("Quick Post is exactly two required steps and preserves existing draft/publ
     '"quick-post-category"',
     'data-testid="quick-post-advanced-details"',
     'data-testid="quick-post-review"',
-    'name="contact_for_price"',
     'name="rahn_gerawy_enabled"',
     'name="suitable_for_students"',
     "saveListingDraftAction",
@@ -68,7 +67,7 @@ test("Step 1 collects universal seller information without category blocking", (
   );
 
   assert.match(stepOneGuard, /description\.trim\(\)\.length < 20/);
-  assert.match(stepOneGuard, /contactForPrice/);
+  assert.match(stepOneGuard, /submitPrice <= 0/);
   assert.match(stepOneGuard, /selectedProvinceId/);
   assert.match(stepOneGuard, /locationConfirmed/);
   assert.doesNotMatch(stepOneGuard, /missingCategory/);
@@ -133,7 +132,8 @@ test("Quick Post localizes category-specific labels without changing canonical s
   assert.match(quickPostForm, /const QUICK_FIELD_LABELS/);
   assert.match(quickPostForm, /const QUICK_OPTION_LABELS/);
   assert.match(quickPostForm, /quickFieldLabel\(locale, field\)/);
-  assert.match(quickPostForm, /value=\{option\}>\{quickOptionLabel\(locale, option\)\}/);
+  assert.match(quickPostForm, /quickOptionValue\(option\)/);
+  assert.match(quickPostForm, /quickOptionLabel\(locale, option\)/);
   assert.match(quickPostForm, /detected: "صاحبش تشخیص داد"/);
   assert.match(quickPostForm, /make: \{ fa: "برند \/ سازنده", ps: "برانډ \/ جوړوونکی" \}/);
   assert.match(quickPostForm, /Automatic: \{ fa: "اتومات", ps: "اتومات" \}/);
@@ -144,10 +144,19 @@ test("Quick Post resolves AI suggestions against canonical taxonomy instead of a
   assert.match(quickPostForm, /\.eq\("is_active", true\)/);
   assert.match(quickPostForm, /json\.suggestions/);
   assert.match(quickPostForm, /manualChildren/);
-  assert.match(quickPostForm, /candidate\.is_leaf/);
+  assert.match(quickPostForm, /isEffectiveCategoryLeaf\(candidate, categoryNodes\)/);
   assert.match(quickPostForm, /setSelectedCategory\(candidate\)/);
   assert.match(quickPostForm, /if \(!selectedCategoryPath\?\.startsWith\(nextRoot\)\) setSelectedCategory\(null\)/);
   assert.doesNotMatch(quickPostForm, /formData\.set\("category_node_id",\s*ai/i);
+});
+
+test("Quick Post loads every selected leaf's published schema and shows optional details immediately", () => {
+  assert.match(quickPostForm, /\/api\/posting\/schema\?categoryNodeId=/);
+  assert.match(quickPostForm, /getPublishedPostingFields\(publishedSchema, locale, selectedCategoryPath/);
+  assert.match(quickPostForm, /optionalFields\.map\(renderField\)/);
+  assert.match(quickPostForm, /missingRequiredField/);
+  assert.doesNotMatch(quickPostForm, /showOptionalDetails/);
+  assert.doesNotMatch(quickPostForm, /name="contact_for_price"/);
 });
 
 test("Quick Post AI uses Vercel OIDC safely and degrades to deterministic matching", () => {
@@ -380,6 +389,11 @@ test("listing cards and detail pages use contextual price display", () => {
     ],
   }, "en");
   assert.equal(gerawy, "Gerawy/Rahn: 200,000 AFN + 3,000 AFN");
+});
+
+test("buyer listing detail omits the unnecessary translation report controls", () => {
+  assert.doesNotMatch(listingDetail, /reportListingTranslationIssueAction/);
+  assert.doesNotMatch(listingDetail, /reportTranslationIssue/);
 });
 
 test("contact-for-price sentinel is excluded from public price filters and price sorting", () => {

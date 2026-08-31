@@ -41,15 +41,16 @@ export function ListingGallery({ images, title, labels = { open: "Open photo", c
 
   return (
     <>
-      <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-black">
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-slate-950">
         <button type="button" aria-label={labels.open} className="relative block aspect-[4/3] w-full" onClick={() => setFullscreen(true)}>
           <Image
             src={src}
             alt={title}
             fill
-            className="object-cover"
+            className="object-contain"
             sizes="(max-width: 768px) 100vw, 900px"
-            priority
+            loading="eager"
+            fetchPriority="high"
           />
         </button>
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
@@ -94,7 +95,6 @@ export function ListingGallery({ images, title, labels = { open: "Open photo", c
                 fill
                 className="object-contain"
                 sizes="100vw"
-                priority
               />
             </div>
             {count > 1 ? (

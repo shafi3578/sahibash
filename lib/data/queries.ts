@@ -265,16 +265,16 @@ const LISTING_DETAIL_PRIVATE_SELECT = `
   category_node:category_node_id(*),
   listing_attributes(*),
   listing_images(id, listing_id, image_url:public_url, public_url, storage_path, is_primary, sort_order, created_at),
-  provinces!province_id(id, name, slug),
-  districts!district_id(id, name, slug),
-  areas!area_id(id, name, slug)
+  provinces!province_id(id, name, name_en, name_fa, name_ps, slug),
+  districts!district_id(id, name, name_en, name_fa, name_ps, slug),
+  areas!area_id(id, name, name_en, name_fa, name_ps, slug)
 `;
 
 const LISTING_DETAIL_PUBLIC_FALLBACK_SELECT = `
   ${PUBLIC_LISTING_SELECT},
-  provinces!province_id(id, name, slug),
-  districts!district_id(id, name, slug),
-  areas!area_id(id, name, slug)
+  provinces!province_id(id, name, name_en, name_fa, name_ps, slug),
+  districts!district_id(id, name, name_en, name_fa, name_ps, slug),
+  areas!area_id(id, name, name_en, name_fa, name_ps, slug)
 `;
 
 async function getCurrentUserCanModerateListings(
