@@ -19,6 +19,10 @@ const featuredUntilGrantMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260825002333_grant_step3_featured_until_public_select.sql"),
   "utf8",
 );
+const listingDetailPolicyMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260831023625_harden_public_listing_detail_policies.sql"),
+  "utf8",
+);
 
 const queries = readFileSync(join(process.cwd(), "lib", "data", "queries.ts"), "utf8");
 const contactActions = readFileSync(join(process.cwd(), "components", "listings", "listing-contact-actions.tsx"), "utf8");
@@ -94,6 +98,22 @@ test("public listing child embeds use trusted visibility checks without exposing
   assert.match(finalHardeningMigration, /grant execute on function private\.can_read_listing_children\(uuid\) to anon, authenticated, service_role/i);
   assert.match(finalHardeningMigration, /using \(private\.can_read_listing_children\(listing_id\)\)/i);
   assert.doesNotMatch(finalHardeningMigration, /grant execute on function public\.can_read_listing_children/i);
+});
+
+test("vehicle, electronics, and promotion detail policies reuse the private listing boundary", () => {
+  for (const policy of [
+    "electronics_listings_select_public_or_owner_or_admin",
+    "listing_promotions_select_owner_or_admin_or_public",
+    "listing_vehicle_features_visible_read",
+    "vehicle_damage_reports_owner_read",
+    "vehicle_damage_parts_owner_read",
+  ]) {
+    assert.match(listingDetailPolicyMigration, new RegExp(`create policy ${policy}`, "i"));
+  }
+
+  assert.match(listingDetailPolicyMigration, /private\.can_read_listing_children\(listing_id\)/i);
+  assert.match(listingDetailPolicyMigration, /private\.can_read_listing_children\(report\.listing_id\)/i);
+  assert.doesNotMatch(listingDetailPolicyMigration, /grant select on public\.listings/i);
 });
 
 test("call and WhatsApp actions are server-side, rate-limited, and audited without a reveal control", () => {
