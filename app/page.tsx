@@ -24,6 +24,7 @@ function getHomePageCopy(
       primaryCta: "دیدن اعلان‌ها",
       secondaryCta: "ثبت اعلان",
       allFeatured: "همه ویژه‌ها",
+      noFeatured: "هنوز اعلان ویژه‌ای فعال نیست.",
       adBadge: "اعلان",
       brandBadge: "صاحبش",
     };
@@ -37,6 +38,7 @@ function getHomePageCopy(
       primaryCta: "اعلانونه وګورئ",
       secondaryCta: "اعلان ثبت کړئ",
       allFeatured: "ټول ځانګړي",
+      noFeatured: "تر اوسه فعال ځانګړی اعلان نشته.",
       adBadge: "اعلان",
       brandBadge: "صاحبش",
     };
@@ -49,6 +51,7 @@ function getHomePageCopy(
     primaryCta: siteSettings.home_primary_cta_label,
     secondaryCta: siteSettings.home_secondary_cta_label,
     allFeatured: "All featured",
+    noFeatured: "No featured ads are active yet.",
     adBadge: "Ad",
     brandBadge: getLocalizedBrandName(locale, siteSettings.site_name),
   };
@@ -81,7 +84,8 @@ export default async function HomePage({
 
   const featured = listings.filter((listing) => isFeaturedCurrentlyActive(listing)).slice(0, 4);
   const latest = listings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const featuredRow = featured.length ? featured : latest.slice(0, 6);
+  const featuredRow = featured;
+  const heroListings = featured.length ? featured : latest.slice(0, 3);
   const totalPages = Math.max(1, Math.min(7, Math.ceil(listings.length / pageSize)));
 
   return (
@@ -108,7 +112,7 @@ export default async function HomePage({
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2 self-end lg:grid-cols-1">
-            {featuredRow.slice(0, 3).map((listing, index) => {
+            {heroListings.slice(0, 3).map((listing, index) => {
               const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
               const displayTitle = listing.translated_title || listing.title;
               return (
@@ -177,32 +181,38 @@ export default async function HomePage({
           <Link href={href("/featured")} className="rounded-full bg-[var(--brand)]/30 px-2 py-1 text-[10px] text-slate-700">{homeCopy.allFeatured}</Link>
         </div>
         <div className="overflow-x-auto px-3 py-3 [scrollbar-width:none]">
-          <div className="flex min-w-max gap-3">
-            {featuredRow.map((listing) => {
-              const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
-              const displayTitle = listing.translated_title || listing.title;
-              return (
-                <Link
-                  key={listing.id}
-                  href={href(`/listings/${listing.id}`)}
-                  className="w-40 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-48 sm:rounded-3xl"
-                >
-                  <div className="relative h-56 w-full bg-slate-100 sm:h-32">
-                    {image ? (
-                      <Image src={image} alt={displayTitle} fill className="object-contain" sizes="(max-width: 640px) 160px, 176px" />
-                    ) : null}
-                    <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">{homeCopy.adBadge}</span>
-                  </div>
-                  <div className="space-y-1 p-2">
-                    <p className="line-clamp-2 text-sm font-medium text-slate-800">{displayTitle}</p>
-                    <p className="text-sm font-semibold text-[var(--accent)]">
-                      {formatListingPrice(listing, locale)}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          {featuredRow.length > 0 ? (
+            <div className="flex min-w-max gap-3">
+              {featuredRow.map((listing) => {
+                const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
+                const displayTitle = listing.translated_title || listing.title;
+                return (
+                  <Link
+                    key={listing.id}
+                    href={href(`/listings/${listing.id}`)}
+                    className="w-40 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-48 sm:rounded-3xl"
+                  >
+                    <div className="relative h-56 w-full bg-slate-100 sm:h-32">
+                      {image ? (
+                        <Image src={image} alt={displayTitle} fill className="object-contain" sizes="(max-width: 640px) 160px, 176px" />
+                      ) : null}
+                      <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-bold text-white sm:hidden">{homeCopy.adBadge}</span>
+                    </div>
+                    <div className="space-y-1 p-2">
+                      <p className="line-clamp-2 text-sm font-medium text-slate-800">{displayTitle}</p>
+                      <p className="text-sm font-semibold text-[var(--accent)]">
+                        {formatListingPrice(listing, locale)}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-600">
+              {homeCopy.noFeatured}
+            </p>
+          )}
         </div>
         {totalPages > 1 ? (
           <div className="flex items-center justify-center gap-2 border-t border-slate-100 bg-white px-3 py-4">

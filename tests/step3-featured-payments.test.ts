@@ -179,3 +179,9 @@ test("featured display derives from a valid future featured_until, not the stale
   assert.match(listingCard, /const isFeatured = isFeaturedCurrentlyActive\(listing\)/);
   assert.doesNotMatch(queries, /featured[^\n]+order|order\([^\n]+featured/i);
 });
+
+test("homepage never presents ordinary latest listings as featured", () => {
+  assert.match(homePage, /const featuredRow = featured;/);
+  assert.doesNotMatch(homePage, /const featuredRow = featured\.length/);
+  assert.match(homePage, /homeCopy\.noFeatured/);
+});
