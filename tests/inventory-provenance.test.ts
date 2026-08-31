@@ -271,6 +271,9 @@ test("candidate review supports all active published leaf schemas and is super-a
   assert.match(externalReviewRetentionMigration, /insert into public\.vehicle_damage_parts/i);
   assert.match(inventoryCandidatePage, /IngestCandidateReviewForm/);
   assert.match(inventoryCandidatePage, /is_super_administrator/);
+  assert.match(inventoryCandidatePage, /\.range\(offset, offset \+ LEAF_CATEGORY_PAGE_SIZE - 1\)/);
+  assert.match(inventoryCandidatePage, /leafData\.push\(\.\.\.rows\)/);
+  assert.doesNotMatch(inventoryCandidatePage, /\.limit\(1000\)/);
 });
 
 test("30-day cleanup is cron-protected and cannot touch normal user listings", () => {

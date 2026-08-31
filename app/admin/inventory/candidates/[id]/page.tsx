@@ -38,8 +38,11 @@ type MediaRow = {
   width: number | null;
   height: number | null;
 };
+type LeafCategoryRow = { id: number; name: string; slug: string; path: string };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LEAF_CATEGORY_PAGE_SIZE = 100;
+const MAX_LEAF_CATEGORIES = 5_000;
 
 function displayText(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -90,16 +93,28 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   const job = jobResult.data as JobRow | null;
   const payload = candidate.normalized_payload ?? {};
   const launchCategoryIds = (launchCategoriesResult.data ?? []).map((category) => Number(category.id));
-  const { data: leafData } = launchCategoryIds.length
-    ? await supabase
+  const leafData: LeafCategoryRow[] = [];
+  if (launchCategoryIds.length) {
+    for (let offset = 0; offset < MAX_LEAF_CATEGORIES; offset += LEAF_CATEGORY_PAGE_SIZE) {
+      const { data: page, error } = await supabase
         .from("category_nodes")
         .select("id,name,slug,path")
         .in("category_id", launchCategoryIds)
         .eq("is_active", true)
         .eq("is_leaf", true)
-        .order("path")
-        .limit(1000)
-    : { data: [] };
+        .order("path", { ascending: true })
+        .order("id", { ascending: true })
+        .range(offset, offset + LEAF_CATEGORY_PAGE_SIZE - 1);
+      if (error) throw new Error(`Unable to load the complete category taxonomy: ${error.message}`);
+
+      const rows = (page ?? []) as LeafCategoryRow[];
+      leafData.push(...rows);
+      if (rows.length < LEAF_CATEGORY_PAGE_SIZE) break;
+      if (offset + LEAF_CATEGORY_PAGE_SIZE >= MAX_LEAF_CATEGORIES) {
+        throw new Error("The category taxonomy exceeds the safe administrator review limit.");
+      }
+    }
+  }
   const { data: initialSchemaData } = candidate.category_node_id
     ? await supabase
         .from("listing_schema_versions")
@@ -145,7 +160,7 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   const sourceHref = safeExternalHref(payload.source_url ?? payload.sourceUrl);
   const initialProvinceId = Number(payload.province_id);
   const initialDistrictId = Number(payload.district_id);
-  const categoryOptions = (leafData ?? []).map((node) => {
+  const categoryOptions = leafData.map((node) => {
     const localizedName = localizeCategoryName({ locale, fallbackName: node.name, slug: node.slug, path: node.path });
     return {
       id: Number(node.id),
