@@ -27,6 +27,20 @@ export function normalizeAfghanistanPhone(input: unknown): NormalizedPhone {
   };
 }
 
+export function extractAfghanistanPhone(input: unknown): NormalizedPhone {
+  const text = String(input ?? "")
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
+  const candidates = text.match(/(?<!\d)(?:(?:\+?93|0093|0)[\s().-]*)?7(?:[\s().-]*\d){8}(?!\d)/g) ?? [];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeAfghanistanPhone(candidate);
+    if (normalized.normalized) return normalized;
+  }
+
+  return { original: "", normalized: null, hint: null };
+}
+
 export function normalizePriceToAfn(price: unknown, currency: unknown = "AFN") {
   const raw = String(price ?? "").replace(/[,،\s]/g, "");
   const numeric = Number(raw.replace(/[^\d.]/g, ""));

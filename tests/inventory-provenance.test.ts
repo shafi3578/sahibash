@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { normalizeAfghanistanPhone, normalizePriceToAfn, assertSafeExternalUrl, candidateIdempotencyKey } from "../lib/inventory/normalization";
+import { extractAfghanistanPhone, normalizeAfghanistanPhone, normalizePriceToAfn, assertSafeExternalUrl, candidateIdempotencyKey } from "../lib/inventory/normalization";
 import { scoreDuplicateCandidate } from "../lib/inventory/deduplication";
 import { getSourceTransparency, shouldShowInNormalDiscovery } from "../lib/inventory/provenance";
 import { scoreMarketplaceListing } from "../lib/ranking/marketplace";
@@ -111,6 +111,8 @@ test("Afghanistan phone normalization preserves original and produces safe hint"
     hint: "+9370••••56",
   });
   assert.equal(normalizeAfghanistanPhone("+1 555 123").normalized, null);
+  assert.equal(extractAfghanistanPhone("واتساپ 0796340598زنګ").normalized, "+93796340598");
+  assert.equal(extractAfghanistanPhone("تماس ۰۷۹۶۳۴۰۵۹۸").normalized, "+93796340598");
 });
 
 test("URL guard rejects unsafe schemes and private network targets", () => {

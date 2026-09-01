@@ -10,6 +10,7 @@ import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { normalizeListingSchemaConfig, type ListingSchemaConfig } from "@/lib/listing-schema-config";
+import { extractAfghanistanPhone, normalizeAfghanistanPhone } from "@/lib/inventory/normalization";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type CandidateRow = {
@@ -158,6 +159,14 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   }))).filter((item): item is MediaRow & { url: string } => item !== null);
   const photoCount = signedMedia.length;
   const sourceHref = safeExternalHref(payload.source_url ?? payload.sourceUrl);
+  const reviewPhone = normalizeAfghanistanPhone(candidate.normalized_phone).normalized
+    ?? extractAfghanistanPhone([
+      payload.contact_phone,
+      payload.phone,
+      payload.description,
+      payload.title,
+    ].join(" ")).normalized
+    ?? "";
   const initialProvinceId = Number(payload.province_id);
   const initialDistrictId = Number(payload.district_id);
   const categoryOptions = leafData.map((node) => {
@@ -226,7 +235,7 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
               categoryNodeId: candidate.category_node_id,
               provinceId: Number.isInteger(initialProvinceId) && initialProvinceId > 0 ? initialProvinceId : null,
               districtId: Number.isInteger(initialDistrictId) && initialDistrictId > 0 ? initialDistrictId : null,
-              normalizedPhone: candidate.normalized_phone ?? "",
+              normalizedPhone: reviewPhone,
               normalizedPriceAfn: candidate.normalized_price_afn,
               payload,
             }}
