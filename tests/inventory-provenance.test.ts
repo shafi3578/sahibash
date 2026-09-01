@@ -274,6 +274,7 @@ test("candidate review supports all active published leaf schemas and is super-a
   assert.match(candidateReviewControl, /\["en", "fa", "ps"\]/);
   assert.match(candidateReviewControl, /category-specific details/i);
   assert.match(candidateReviewControl, /VehicleDamageDiagram/);
+  assert.match(candidateReviewControl, /name="damage_parts_json"[\s\S]*value=\{JSON\.stringify\(damageParts\)\}[\s\S]*readOnly[\s\S]*hidden/);
   assert.match(candidateReviewAction, /normalizeVehicleDamageParts/);
   assert.match(externalReviewRetentionMigration, /insert into public\.vehicle_damage_reports/i);
   assert.match(externalReviewRetentionMigration, /insert into public\.vehicle_damage_parts/i);

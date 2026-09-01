@@ -387,7 +387,12 @@ export function IngestCandidateReviewForm({
         <fieldset className="mt-5 rounded-xl border border-[var(--line)] p-4">
           <legend className="px-2 text-sm font-bold">{copy.bodyReport}</legend>
           <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} locale={locale} />
-          <input type="hidden" name="damage_parts_json" value={JSON.stringify(damageParts)} />
+          <textarea
+            name="damage_parts_json"
+            value={JSON.stringify(damageParts)}
+            readOnly
+            hidden
+          />
           {errors.has("damage_parts_json") ? <span className="mt-2 block text-xs text-red-700">{copy.fieldError}</span> : null}
         </fieldset>
       ) : null}
