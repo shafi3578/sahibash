@@ -146,3 +146,22 @@ test("super-admin MFA readiness uses verified factors from the auth schema", () 
   assert.match(adminRbacData, /\.schema\("auth"\)\s*\.\s*from\("mfa_factors"\)/);
   assert.match(adminRbacData, /\.eq\("status", "verified"\)/);
 });
+
+test("listing detail presents gallery, title, and description before price and specifications", () => {
+  const gallery = listingDetailPage.indexOf("<ListingGallery");
+  const title = listingDetailPage.indexOf("{displayTitle}</h1>");
+  const description = listingDetailPage.indexOf("{displayDescription}</p>");
+  const price = listingDetailPage.indexOf("{formatListingPrice(listing, locale, attributeMap)}");
+  const vehicleDamage = listingDetailPage.indexOf("<VehicleDamageCard");
+  const specifications = listingDetailPage.indexOf("<DynamicDetailSection");
+
+  for (const [label, position] of Object.entries({ gallery, title, description, price, vehicleDamage, specifications })) {
+    assert.ok(position >= 0, `missing ${label} detail marker`);
+  }
+  assert.ok(gallery < title);
+  assert.ok(title < description);
+  assert.ok(description < price);
+  assert.ok(price < vehicleDamage);
+  assert.ok(vehicleDamage < specifications);
+  assert.equal(listingDetailPage.match(/\{displayDescription\}<\/p>/g)?.length, 1);
+});

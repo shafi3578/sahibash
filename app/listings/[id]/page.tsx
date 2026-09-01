@@ -801,10 +801,6 @@ export default async function ListingDetailPage({
       <div className="space-y-4 pb-20 sm:pb-0">
         <ListingGallery images={listing.listing_images ?? []} title={displayTitle} labels={galleryLabels} />
 
-        {isVehicleListing && listing.vehicle_damage ? (
-          <VehicleDamageCard allOriginal={Boolean(listing.vehicle_damage.all_original)} parts={vehicleDamageCardParts} locale={locale} />
-        ) : null}
-
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           {isWanted ? (
             <p className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
@@ -831,12 +827,28 @@ export default async function ListingDetailPage({
               {t.listing.suitableForStudents}
             </p>
           ) : null}
+          <div className="mt-4 border-t border-[var(--line)] pt-4">
+            <h2 className="text-base font-bold">{t.listing.description}</h2>
+            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--ink-1)]">{displayDescription}</p>
+            {videoUrl ? (
+              <div className="mt-4 border-t border-[var(--line)] pt-3 text-sm">
+                <p className="font-semibold">{t.listing.video}</p>
+                <a href={videoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[var(--accent)] underline underline-offset-2">
+                  {t.listing.openVehicleVideo}
+                </a>
+              </div>
+            ) : null}
+          </div>
           <p className="mt-3 text-3xl font-bold text-[var(--accent)]">{formatListingPrice(listing, locale, attributeMap)}</p>
           <div className="mt-4 grid gap-2 border-t border-[var(--line)] pt-3 text-sm text-[var(--ink-2)] sm:grid-cols-2">
             {locationParts.length > 0 ? <p>{locationParts.join(" / ")}</p> : null}
             <p className="sm:text-right">{t.listing.posted}: {postedDate}</p>
           </div>
         </section>
+
+        {isVehicleListing && listing.vehicle_damage ? (
+          <VehicleDamageCard allOriginal={Boolean(listing.vehicle_damage.all_original)} parts={vehicleDamageCardParts} locale={locale} />
+        ) : null}
 
         {shouldRenderDynamicElectronics ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
@@ -1078,19 +1090,6 @@ export default async function ListingDetailPage({
         )}
 
         <ListingAiAssistant locale={locale} facts={aiAssistantFacts} isOwner={Boolean(isOwner)} />
-
-        <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
-          <h2 className="text-base font-bold">{t.listing.description}</h2>
-          <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[var(--ink-1)]">{displayDescription}</p>
-          {videoUrl ? (
-            <div className="mt-4 border-t border-[var(--line)] pt-3 text-sm">
-              <p className="font-semibold">{t.listing.video}</p>
-              <a href={videoUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[var(--accent)] underline underline-offset-2">
-                {t.listing.openVehicleVideo}
-              </a>
-            </div>
-          ) : null}
-        </section>
 
         {selectedFeatures.length > 0 ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">

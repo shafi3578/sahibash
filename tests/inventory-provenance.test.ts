@@ -57,6 +57,14 @@ const externalRetentionRpcFixMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260830204406_fix_external_retention_rpc_ambiguity.sql"),
   "utf8",
 );
+const candidateResolutionMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260901010000_resolve_external_ingest_candidate.sql"),
+  "utf8",
+);
+const candidateResolutionFixMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260901011000_fix_ingest_duplicate_group_resolution.sql"),
+  "utf8",
+);
 const candidateReviewAction = readFileSync(
   join(process.cwd(), "lib", "actions", "inventory-review.ts"),
   "utf8",
@@ -307,4 +315,18 @@ test("retention expiry RPC avoids PL/pgSQL output-column ambiguity", () => {
   assert.doesNotMatch(externalRetentionRpcFixMigration, /returning\s+listing_id/i);
   assert.match(externalRetentionRpcFixMigration, /revoke all on function[\s\S]*from public, anon, authenticated/i);
   assert.match(externalRetentionRpcFixMigration, /grant execute on function[\s\S]*to service_role/i);
+});
+
+test("candidate rejection and duplicate decisions are atomic, auditable, and service-only", () => {
+  assert.match(candidateResolutionMigration, /create or replace function public\.resolve_ingest_candidate/i);
+  assert.match(candidateResolutionFixMigration, /security definer[\s\S]*set search_path = ''/i);
+  assert.match(candidateResolutionFixMigration, /public\.is_super_administrator\(p_actor_id\)/i);
+  assert.match(candidateResolutionFixMigration, /public\.has_admin_permission\(p_actor_id, 'listings\.moderate'\)/i);
+  assert.match(candidateResolutionFixMigration, /insert into public\.listing_duplicate_groups/i);
+  assert.match(candidateResolutionFixMigration, /'canonical_candidate_id', v_canonical\.id/i);
+  assert.match(candidateResolutionFixMigration, /insert into public\.listing_provenance_events/i);
+  assert.match(candidateResolutionFixMigration, /candidate_marked_duplicate|candidate_rejected/i);
+  assert.match(candidateResolutionFixMigration, /sync_ingest_duplicate_group_canonical/i);
+  assert.match(candidateResolutionFixMigration, /revoke all on function[\s\S]*from public, anon, authenticated/i);
+  assert.match(candidateResolutionFixMigration, /grant execute on function[\s\S]*to service_role/i);
 });
