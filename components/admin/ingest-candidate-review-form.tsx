@@ -73,6 +73,7 @@ export function IngestCandidateReviewForm({
   const fa = record(translations.fa);
   const ps = record(translations.ps);
   const details = record(initial.payload.details);
+  const [detailValues, setDetailValues] = useState<Record<string, unknown>>(() => details);
   const vehicle = record(initial.payload.vehicle);
   const reviewNotes = record(initial.payload.review_notes);
   const initialDamageParts = normalizeVehicleDamageParts(vehicle.damage_parts);
@@ -261,6 +262,7 @@ export function IngestCandidateReviewForm({
 
   function selectCategory(nextCategoryNodeId: number) {
     setCategoryNodeId(nextCategoryNodeId);
+    setDetailValues(nextCategoryNodeId === initial.categoryNodeId ? details : {});
     if (nextCategoryNodeId === initial.categoryNodeId) {
       setSchema(initialSchema);
       setSchemaStatus(initialSchema ? "idle" : "error");
@@ -275,14 +277,24 @@ export function IngestCandidateReviewForm({
 
   function fieldInput(field: ListingSchemaConfig["fields"][number]) {
     const name = `detail__${field.key}`;
-    const defaultValue = details[field.key];
+    const value = detailValues[field.key];
+    const setValue = (nextValue: unknown) => {
+      setDetailValues((current) => ({ ...current, [field.key]: nextValue }));
+    };
     const common = "mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm";
     if (field.type === "boolean") {
       return (
         <label key={field.key} className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold">
           <span>{labelForLocale(field.labels, locale)} <small className="text-[var(--ink-2)]">({field.required ? copy.required : copy.optional})</small></span>
           <input type="hidden" name={name} value="false" />
-          <input type="checkbox" name={name} value="true" defaultChecked={defaultValue === true || defaultValue === "true"} className="h-5 w-5" />
+          <input
+            type="checkbox"
+            name={name}
+            value="true"
+            checked={value === true || value === "true"}
+            onChange={(event) => setValue(event.target.checked)}
+            className="h-5 w-5"
+          />
         </label>
       );
     }
@@ -290,12 +302,23 @@ export function IngestCandidateReviewForm({
       <label key={field.key} className="text-sm font-bold">
         {labelForLocale(field.labels, locale)} {field.unit ? <span className="font-normal text-[var(--ink-2)]">({field.unit})</span> : null} <small className="font-normal text-[var(--ink-2)]">({field.required ? copy.required : copy.optional})</small>
         {field.type === "select" ? (
-          <select name={name} defaultValue={String(defaultValue ?? "")} className={common}>
+          <select
+            name={name}
+            value={String(value ?? "")}
+            onChange={(event) => setValue(event.target.value)}
+            className={common}
+          >
             <option value="">{copy.select}</option>
             {field.options.map((option) => <option key={option.value} value={option.value}>{labelForLocale(option.labels, locale)}</option>)}
           </select>
         ) : (
-          <input name={name} type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"} defaultValue={String(defaultValue ?? "")} className={common} />
+          <input
+            name={name}
+            type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+            value={String(value ?? "")}
+            onChange={(event) => setValue(event.target.value)}
+            className={common}
+          />
         )}
         {errors.has(name) ? <span className="mt-1 block text-xs text-red-700">{copy.fieldError}</span> : null}
       </label>
