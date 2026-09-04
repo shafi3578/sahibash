@@ -285,7 +285,8 @@ test("candidate review supports all active published leaf schemas and is super-a
   assert.match(externalReviewRetentionMigration, /insert into public\.vehicle_damage_parts/i);
   assert.match(inventoryCandidatePage, /IngestCandidateReviewForm/);
   assert.match(inventoryCandidatePage, /is_super_administrator/);
-  assert.match(inventoryCandidatePage, /\.gt\("id", lastLeafId\)[\s\S]*\.limit\(LEAF_CATEGORY_PAGE_SIZE\)/);
+  assert.match(inventoryCandidatePage, /for \(const categoryId of launchCategoryIds\)/);
+  assert.match(inventoryCandidatePage, /\.eq\("category_id", categoryId\)[\s\S]*\.gt\("id", lastLeafId\)[\s\S]*\.limit\(LEAF_CATEGORY_PAGE_SIZE\)/);
   assert.match(inventoryCandidatePage, /leafData\.push\(\.\.\.rows\)/);
   assert.match(inventoryCandidatePage, /leafData\.sort\(\(left, right\) => left\.path\.localeCompare\(right\.path\) \|\| left\.id - right\.id\)/);
   assert.doesNotMatch(inventoryCandidatePage, /\.limit\(1000\)/);

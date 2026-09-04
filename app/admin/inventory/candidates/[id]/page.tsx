@@ -95,13 +95,13 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   const payload = candidate.normalized_payload ?? {};
   const launchCategoryIds = (launchCategoriesResult.data ?? []).map((category) => Number(category.id));
   const leafData: LeafCategoryRow[] = [];
-  if (launchCategoryIds.length) {
+  for (const categoryId of launchCategoryIds) {
     let lastLeafId = 0;
     while (leafData.length < MAX_LEAF_CATEGORIES) {
       const { data: page, error } = await supabase
         .from("category_nodes")
         .select("id,name,slug,path")
-        .in("category_id", launchCategoryIds)
+        .eq("category_id", categoryId)
         .eq("is_active", true)
         .eq("is_leaf", true)
         .gt("id", lastLeafId)
@@ -117,8 +117,8 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
         throw new Error("The category taxonomy exceeds the safe administrator review limit.");
       }
     }
-    leafData.sort((left, right) => left.path.localeCompare(right.path) || left.id - right.id);
   }
+  leafData.sort((left, right) => left.path.localeCompare(right.path) || left.id - right.id);
   const { data: initialSchemaData } = candidate.category_node_id
     ? await supabase
         .from("listing_schema_versions")
