@@ -96,25 +96,28 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   const launchCategoryIds = (launchCategoriesResult.data ?? []).map((category) => Number(category.id));
   const leafData: LeafCategoryRow[] = [];
   if (launchCategoryIds.length) {
-    for (let offset = 0; offset < MAX_LEAF_CATEGORIES; offset += LEAF_CATEGORY_PAGE_SIZE) {
+    let lastLeafId = 0;
+    while (leafData.length < MAX_LEAF_CATEGORIES) {
       const { data: page, error } = await supabase
         .from("category_nodes")
         .select("id,name,slug,path")
         .in("category_id", launchCategoryIds)
         .eq("is_active", true)
         .eq("is_leaf", true)
-        .order("path", { ascending: true })
+        .gt("id", lastLeafId)
         .order("id", { ascending: true })
-        .range(offset, offset + LEAF_CATEGORY_PAGE_SIZE - 1);
+        .limit(LEAF_CATEGORY_PAGE_SIZE);
       if (error) throw new Error(`Unable to load the complete category taxonomy: ${error.message}`);
 
       const rows = (page ?? []) as LeafCategoryRow[];
       leafData.push(...rows);
       if (rows.length < LEAF_CATEGORY_PAGE_SIZE) break;
-      if (offset + LEAF_CATEGORY_PAGE_SIZE >= MAX_LEAF_CATEGORIES) {
+      lastLeafId = Number(rows.at(-1)?.id ?? lastLeafId);
+      if (leafData.length >= MAX_LEAF_CATEGORIES) {
         throw new Error("The category taxonomy exceeds the safe administrator review limit.");
       }
     }
+    leafData.sort((left, right) => left.path.localeCompare(right.path) || left.id - right.id);
   }
   const { data: initialSchemaData } = candidate.category_node_id
     ? await supabase
