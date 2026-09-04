@@ -151,8 +151,11 @@ test("super administrator gates require a verified current MFA assurance level",
   assert.match(authModule, /hasVerifiedAuthenticatorAssurance\(data\?\.currentLevel\)/);
   assert.match(mfaAuthorizationModule, /currentLevel === "aal2"/);
   assert.match(superAdminGate, /rpc\("is_super_administrator"/);
-  assert.match(superAdminGate, /await requireFreshPrimaryAuthentication\(user\)/);
-  assert.match(superAdminGate, /await requireVerifiedAuthenticatorAssurance\(supabase\)/);
+  assert.match(
+    superAdminGate,
+    /const authenticationMethods = await requireVerifiedAuthenticatorAssurance\(supabase\)/,
+  );
+  assert.match(superAdminGate, /await requireFreshPrimaryAuthentication\(user, authenticationMethods\)/);
 });
 
 test("paid AI category inference requires a user and bounds uploaded input", () => {

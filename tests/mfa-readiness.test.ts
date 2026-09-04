@@ -100,8 +100,8 @@ test("AAL1 super admin can view read-only admin pages but cannot mutate until AA
   );
   assert.match(
     permissionGate,
-    /if \(requiresPrivilegedMfa\(permission\)\) \{\s*await requireFreshPrimaryAuthentication\(user\);\s*await requireVerifiedAuthenticatorAssurance\(supabase\);/,
-    "fresh primary authentication and AAL2 apply only to privileged permissions",
+    /if \(requiresPrivilegedMfa\(permission\)\) \{\s*const authenticationMethods = await requireVerifiedAuthenticatorAssurance\(supabase\);\s*await requireFreshPrimaryAuthentication\(user, authenticationMethods\);/,
+    "fresh signed authentication-method evidence and AAL2 apply only to privileged permissions",
   );
   assert.doesNotMatch(
     permissionGate.slice(0, permissionGate.indexOf("if (requiresPrivilegedMfa(permission))")),

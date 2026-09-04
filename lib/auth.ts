@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath, normalizeLocaleInput } from "@/lib/i18n/routing";
-import { requiresStepUpAuth } from "@/lib/auth/step-up";
+import { requiresStepUpAuth, type AuthenticationMethodLike } from "@/lib/auth/step-up";
 import type { PermissionKey } from "@/lib/authorization";
 import { isPostAdPath } from "@/lib/auth/protected-routes";
 import { buildLoginRedirectHref, stripLocaleAndQuery } from "@/lib/account/navigation";
@@ -120,9 +120,12 @@ async function getConfiguredStepUpWindowMinutes() {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
 }
 
-async function requireFreshPrimaryAuthentication(user: ServerAuthenticatedUser) {
+async function requireFreshPrimaryAuthentication(
+  user: ServerAuthenticatedUser,
+  authenticationMethods: AuthenticationMethodLike[] = [],
+) {
   const stepUpWindowMinutes = await getConfiguredStepUpWindowMinutes();
-  if (requiresStepUpAuth(user, stepUpWindowMinutes * 60 * 1000)) {
+  if (requiresStepUpAuth(user, stepUpWindowMinutes * 60 * 1000, authenticationMethods)) {
     await redirectToAccount("security");
   }
 }
@@ -133,6 +136,8 @@ async function requireVerifiedAuthenticatorAssurance(supabase: SupabaseServerCli
   if (error || !hasVerifiedAuthenticatorAssurance(data?.currentLevel)) {
     await redirectToAccount("security");
   }
+
+  return data?.currentAuthenticationMethods ?? [];
 }
 
 export async function requirePermission(permission: PermissionKey) {
@@ -149,8 +154,8 @@ export async function requirePermission(permission: PermissionKey) {
   }
 
   if (requiresPrivilegedMfa(permission)) {
-    await requireFreshPrimaryAuthentication(user);
-    await requireVerifiedAuthenticatorAssurance(supabase);
+    const authenticationMethods = await requireVerifiedAuthenticatorAssurance(supabase);
+    await requireFreshPrimaryAuthentication(user, authenticationMethods);
   }
 
   return user;
@@ -184,8 +189,8 @@ export async function requireSuperAdministrator() {
     await redirectToAccount();
   }
 
-  await requireFreshPrimaryAuthentication(user);
-  await requireVerifiedAuthenticatorAssurance(supabase);
+  const authenticationMethods = await requireVerifiedAuthenticatorAssurance(supabase);
+  await requireFreshPrimaryAuthentication(user, authenticationMethods);
 
   return user;
 }
