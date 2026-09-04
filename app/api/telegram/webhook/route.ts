@@ -8,6 +8,13 @@ import {
   TELEGRAM_MEDIA_BUCKET,
   telegramPhotoFingerprint,
 } from "@/lib/inventory/telegram-media";
+import {
+  downloadTelegramPublicPhoto,
+  fetchTelegramPublicPost,
+  parseTelegramPublicPostUrl,
+  telegramPublicPhotoFingerprint,
+  type TelegramPublicPost,
+} from "@/lib/inventory/telegram-public-post";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -93,17 +100,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 403 });
   }
 
-  const text =
+  let text =
     (typeof message.text === "string" ? message.text.trim() : "") ||
     (typeof message.caption === "string" ? message.caption.trim() : "");
   const photo = selectLargestTelegramPhoto(message.photo);
   if (!text && !photo) return NextResponse.json({ ok: true });
 
+  let publicPost: TelegramPublicPost | null = null;
+  const publicPostReference = text ? parseTelegramPublicPostUrl(text) : null;
+  if (publicPostReference && !photo) {
+    try {
+      publicPost = await fetchTelegramPublicPost(publicPostReference);
+      text = publicPost.text;
+    } catch {
+      await sendMessage(chatId, "لینک تلگرام کامل، تازه یا قابل دسترسی نیست.").catch(() => undefined);
+      return NextResponse.json({ ok: false }, { status: 422 });
+    }
+  }
+
   const updateId =
     typeof update.update_id === "number" && Number.isSafeInteger(update.update_id)
       ? String(update.update_id)
       : crypto.randomUUID();
-  const { sourceItemId, mediaGroupId, idempotencyKey } = getTelegramTransferKey(message, updateId);
+  const transfer = getTelegramTransferKey(message, updateId);
+  const sourceItemId = publicPost ? `${publicPost.username}:${publicPost.postId}` : transfer.sourceItemId;
+  const mediaGroupId = publicPost ? `public:${publicPost.username}:${publicPost.postId}` : transfer.mediaGroupId;
+  const idempotencyKey = publicPost
+    ? `telegram:public-post:${publicPost.username.toLowerCase()}:${publicPost.postId}`
+    : transfer.idempotencyKey;
   const supabase = createSupabaseAdmin();
 
   const { data: source, error: sourceError } = await supabase
@@ -152,6 +176,12 @@ export async function POST(request: Request) {
     description: text,
     source_platform: "telegram",
     photo_count: 0,
+    ...(publicPost ? {
+      source_url: publicPost.sourceUrl,
+      source_published_at: publicPost.publishedAt,
+      public_post_username: publicPost.username,
+      public_post_id: publicPost.postId,
+    } : {}),
     ...(mediaGroupId ? { media_group_id: mediaGroupId } : {}),
   };
 
@@ -191,6 +221,12 @@ export async function POST(request: Request) {
     ...existingPayload,
     source_platform: "telegram",
     ...(mediaGroupId ? { media_group_id: mediaGroupId } : {}),
+    ...(publicPost ? {
+      source_url: publicPost.sourceUrl,
+      source_published_at: publicPost.publishedAt,
+      public_post_username: publicPost.username,
+      public_post_id: publicPost.postId,
+    } : {}),
     ...(text ? { title, description: text } : {}),
   };
 
@@ -246,6 +282,53 @@ export async function POST(request: Request) {
       }
     } catch {
       return NextResponse.json({ ok: false }, { status: 502 });
+    }
+  }
+
+  if (publicPost) {
+    for (const [index, photoUrl] of publicPost.photoUrls.entries()) {
+      let storagePath: string | null = null;
+      try {
+        const downloaded = await downloadTelegramPublicPhoto(photoUrl);
+        const fingerprint = telegramPublicPhotoFingerprint(photoUrl);
+        const mediaItemId = `${publicPost.postId + index}`;
+        storagePath = candidateMediaStoragePath(candidate.id, mediaItemId, fingerprint, downloaded.extension);
+        const { error: uploadError } = await supabase.storage
+          .from(TELEGRAM_MEDIA_BUCKET)
+          .upload(storagePath, downloaded.bytes, {
+            cacheControl: "3600",
+            contentType: downloaded.contentType,
+            upsert: true,
+          });
+        if (uploadError) throw new Error("Candidate public photo upload failed");
+
+        const { error: mediaError } = await supabase
+          .from("listing_ingest_candidate_media")
+          .upsert(
+            {
+              candidate_id: candidate.id,
+              source_platform: "telegram",
+              source_item_id: mediaItemId,
+              source_file_fingerprint: fingerprint,
+              storage_bucket: TELEGRAM_MEDIA_BUCKET,
+              storage_path: storagePath,
+              mime_type: downloaded.contentType,
+              byte_size: downloaded.bytes.byteLength,
+              width: null,
+              height: null,
+              sort_order: index,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "candidate_id,source_platform,source_item_id" },
+          );
+        if (mediaError) {
+          await supabase.storage.from(TELEGRAM_MEDIA_BUCKET).remove([storagePath]);
+          throw new Error("Candidate public photo metadata write failed");
+        }
+      } catch {
+        if (storagePath) await supabase.storage.from(TELEGRAM_MEDIA_BUCKET).remove([storagePath]);
+        return NextResponse.json({ ok: false }, { status: 502 });
+      }
     }
   }
 

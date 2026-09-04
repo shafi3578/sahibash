@@ -12,6 +12,10 @@ import {
   selectLargestTelegramPhoto,
   telegramPhotoFingerprint,
 } from "../lib/inventory/telegram-media";
+import {
+  parseTelegramPublicPostHtml,
+  parseTelegramPublicPostUrl,
+} from "../lib/inventory/telegram-public-post";
 
 const migration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260820123009_inventory_provenance_foundation.sql"),
@@ -209,6 +213,52 @@ test("Telegram album messages share one transfer identity and are no longer drop
   assert.doesNotMatch(telegramWebhook, /if \(!text && photos\.length > 0\)/);
   assert.match(telegramWebhook, /selectLargestTelegramPhoto/);
   assert.match(telegramWebhook, /listing_ingest_candidate_media/);
+});
+
+test("Telegram public post links are canonicalized and reject unsafe hosts", () => {
+  assert.deepEqual(parseTelegramPublicPostUrl("https://t.me/CarshoponlineHerat1/519469"), {
+    username: "CarshoponlineHerat1",
+    postId: 519469,
+  });
+  assert.deepEqual(parseTelegramPublicPostUrl("See https://t.me/CarshoponlineHerat1/519469?single"), {
+    username: "CarshoponlineHerat1",
+    postId: 519469,
+  });
+  assert.equal(parseTelegramPublicPostUrl("https://example.com/CarshoponlineHerat1/519469"), null);
+  assert.equal(parseTelegramPublicPostUrl("https://t.me/+private-invite"), null);
+});
+
+test("Telegram public post HTML keeps a complete recent album and caption", () => {
+  const now = Date.parse("2026-09-05T00:00:00Z");
+  const html = `
+    <div class="tgme_widget_message" data-post="CarshoponlineHerat1/519470">
+      <a class="tgme_widget_message_photo_wrap" style="background-image:url('https://cdn5.telesco.pe/file/first.jpg')" href="https://t.me/CarshoponlineHerat1/519469?single"></a>
+      <a class="tgme_widget_message_photo_wrap" style="background-image:url('https://cdn5.telesco.pe/file/second.jpg')" href="https://t.me/CarshoponlineHerat1/519470?single"></a>
+      <div class="tgme_widget_message_text js-message_text" dir="auto"><div class="tgme_widget_message_text js-message_text" dir="auto">Toyota Aqua<br/>قیمت 234000 &amp; قابل جور آمد</div></div>
+      <time datetime="2026-08-31T04:38:32+00:00"></time>
+    </div>`;
+  assert.deepEqual(
+    parseTelegramPublicPostHtml(html, { username: "CarshoponlineHerat1", postId: 519470 }, now),
+    {
+      username: "CarshoponlineHerat1",
+      postId: 519469,
+      sourceUrl: "https://t.me/CarshoponlineHerat1/519469",
+      text: "Toyota Aqua\nقیمت 234000 & قابل جور آمد",
+      publishedAt: "2026-08-31T04:38:32.000Z",
+      photoUrls: [
+        "https://cdn5.telesco.pe/file/first.jpg",
+        "https://cdn5.telesco.pe/file/second.jpg",
+      ],
+    },
+  );
+  assert.equal(
+    parseTelegramPublicPostHtml(html, { username: "DifferentChannel", postId: 519470 }, now),
+    null,
+  );
+  assert.equal(
+    parseTelegramPublicPostHtml(html, { username: "CarshoponlineHerat1", postId: 519470 }, Date.parse("2026-10-10T00:00:00Z")),
+    null,
+  );
 });
 
 test("Telegram intake rejects unsigned or unauthorized forwarding sources", () => {
