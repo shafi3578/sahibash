@@ -37,7 +37,7 @@ const MFA_COPY = {
     verificationCode: "6-digit code",
     verifySetup: "Verify and enable MFA",
     confirmSession: "Confirm this session",
-    confirmHelp: "If you already enrolled MFA, enter the code from your authenticator app to upgrade this session to AAL2.",
+    confirmHelp: "Enter the current code from your authenticator app to confirm or refresh this session for sensitive administrator actions.",
     refresh: "Refresh status",
     cancelSetup: "Cancel setup",
     loading: "Checking MFA status…",
@@ -64,7 +64,7 @@ const MFA_COPY = {
     verificationCode: "کود ۶ رقمی",
     verifySetup: "تأیید و فعال‌سازی MFA",
     confirmSession: "تأیید این نشست",
-    confirmHelp: "اگر MFA را قبلاً فعال کرده‌اید، کود اپلیکیشن تأییدکننده را وارد کنید تا نشست به AAL2 ارتقا یابد.",
+    confirmHelp: "کود فعلی اپلیکیشن تأییدکننده را وارد کنید تا این نشست برای کارهای حساس مدیریتی تأیید یا تازه شود.",
     refresh: "تازه‌سازی وضعیت",
     cancelSetup: "لغو تنظیم",
     loading: "در حال بررسی وضعیت MFA…",
@@ -91,7 +91,7 @@ const MFA_COPY = {
     verificationCode: "۶ عددي کوډ",
     verifySetup: "MFA تایید او فعال کړئ",
     confirmSession: "دا ناسته تایید کړئ",
-    confirmHelp: "که MFA مو مخکې فعال کړی وي، د تایید اپ کوډ دننه کړئ چې ناسته AAL2 ته پورته شي.",
+    confirmHelp: "د تایید اپ اوسنی کوډ دننه کړئ، څو دا ناسته د حساسو اداري کړنو لپاره تایید یا تازه شي.",
     refresh: "وضعیت تازه کړئ",
     cancelSetup: "جوړول لغوه کړئ",
     loading: "د MFA وضعیت کتل کېږي…",
@@ -290,7 +290,7 @@ export function MfaSetupPanel({
           <p className="text-sm text-[var(--ink-2)]">{copy.noVerified}</p>
         )}
 
-        {firstVerifiedFactor && !isAal2 ? (
+        {firstVerifiedFactor && (securityRedirect || !isAal2) ? (
           <div className="mt-4 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] p-4">
             <p className="text-sm text-[var(--ink-2)]">{copy.confirmHelp}</p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">

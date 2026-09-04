@@ -41,6 +41,11 @@ test("administrator MFA warning is never shown to normal users", () => {
   assert.doesNotMatch(mfaPanel, /securityRedirect \|\| \(isPrivilegedUser && !isAal2\)/);
 });
 
+test("a stale AAL2 administrator session can re-confirm its verified factor", () => {
+  assert.match(mfaPanel, /firstVerifiedFactor && \(securityRedirect \|\| !isAal2\)/);
+  assert.match(mfaPanel, /verifyFactor\(firstVerifiedFactor\.id, sessionCode, "MFA_SESSION_CONFIRMED"\)/);
+});
+
 test("MFA audit action records only verified AAL2 admin events", () => {
   assert.match(accountSecurityAction, /MFA_VERIFIED/);
   assert.match(accountSecurityAction, /MFA_SESSION_CONFIRMED/);
