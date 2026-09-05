@@ -37,6 +37,10 @@ const telegramWebhook = readFileSync(
   join(process.cwd(), "app", "api", "telegram", "webhook", "route.ts"),
   "utf8",
 );
+const telegramWebhookAction = readFileSync(
+  join(process.cwd(), "lib", "actions", "telegram-webhook.ts"),
+  "utf8",
+);
 const inventoryActions = readFileSync(
   join(process.cwd(), "lib", "actions", "inventory-media.ts"),
   "utf8",
@@ -269,6 +273,15 @@ test("Telegram intake rejects unsigned or unauthorized forwarding sources", () =
   assert.match(telegramWebhook, /content-length/);
   assert.match(telegramWebhook, /1_000_000/);
   assert.doesNotMatch(telegramWebhook, /console\.(log|error)/);
+});
+
+test("Telegram production webhook repair is AAL2 protected and auditable", () => {
+  assert.match(telegramWebhookAction, /requireSuperAdministrator\(\)/);
+  assert.match(telegramWebhookAction, /VERCEL_PROJECT_PRODUCTION_URL/);
+  assert.match(telegramWebhookAction, /api\.telegram\.org\/bot\$\{token\}\/setWebhook/);
+  assert.match(telegramWebhookAction, /recordAuditEvent/);
+  assert.match(telegramWebhookAction, /SETTING_CHANGED/);
+  assert.doesNotMatch(telegramWebhookAction, /console\.(log|error)/);
 });
 
 test("Telegram candidate photos use a private bucket and permission-protected metadata", () => {
