@@ -275,6 +275,11 @@ test("Telegram intake rejects unsigned or unauthorized forwarding sources", () =
   assert.doesNotMatch(telegramWebhook, /console\.(log|error)/);
 });
 
+test("Telegram rejects invalid public links without poisoning the webhook queue", () => {
+  assert.match(telegramWebhook, /accepted: false, reason: "invalid_public_post"/);
+  assert.doesNotMatch(telegramWebhook, /status:\s*422/);
+});
+
 test("Telegram production webhook repair is AAL2 protected and auditable", () => {
   assert.match(telegramWebhookAction, /requireSuperAdministrator\(\)/);
   assert.match(telegramWebhookAction, /VERCEL_PROJECT_PRODUCTION_URL/);

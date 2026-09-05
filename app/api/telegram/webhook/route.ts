@@ -114,7 +114,10 @@ export async function POST(request: Request) {
       text = publicPost.text;
     } catch {
       await sendMessage(chatId, "لینک تلگرام کامل، تازه یا قابل دسترسی نیست.").catch(() => undefined);
-      return NextResponse.json({ ok: false }, { status: 422 });
+      // Telegram retries every non-2xx webhook response. This input has already
+      // been rejected and acknowledged to the sender, so returning 2xx prevents
+      // one bad public link from blocking every newer update in the queue.
+      return NextResponse.json({ ok: true, accepted: false, reason: "invalid_public_post" });
     }
   }
 
