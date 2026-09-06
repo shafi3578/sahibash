@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { extractAfghanistanPhone, normalizeAfghanistanPhone, normalizePriceToAfn, assertSafeExternalUrl, candidateIdempotencyKey } from "../lib/inventory/normalization";
+import { extractAfghanistanPhone, extractTelegramCandidatePrefill, normalizeAfghanistanPhone, normalizePriceToAfn, assertSafeExternalUrl, candidateIdempotencyKey } from "../lib/inventory/normalization";
 import { scoreDuplicateCandidate } from "../lib/inventory/deduplication";
 import { getSourceTransparency, shouldShowInNormalDiscovery } from "../lib/inventory/provenance";
 import { scoreMarketplaceListing } from "../lib/ranking/marketplace";
@@ -297,6 +297,45 @@ test("Telegram intake rejects unsigned or unauthorized forwarding sources", () =
   assert.match(telegramWebhook, /content-length/);
   assert.match(telegramWebhook, /1_000_000/);
   assert.doesNotMatch(telegramWebhook, /console\.(log|error)/);
+});
+
+test("Telegram candidate intake conservatively prefills explicit review fields", () => {
+  assert.deepEqual(
+    extractTelegramCandidatePrefill("لپتاپ HP در هرات، قیمت ۸,۰۰۰ افغانی، تماس 0795593833"),
+    {
+      normalizedPhone: "+93795593833",
+      priceAmount: 8000,
+      priceCurrency: "AFN",
+      priceAfn: 8000,
+      province: "Herat",
+    },
+  );
+  assert.deepEqual(
+    extractTelegramCandidatePrefill("Toyota Fortuner - Kabul - Price: $14,800 - 0794082961"),
+    {
+      normalizedPhone: "+93794082961",
+      priceAmount: 14800,
+      priceCurrency: "USD",
+      priceAfn: null,
+      province: "Kabul",
+    },
+  );
+  assert.deepEqual(
+    extractTelegramCandidatePrefill("Toyota Corolla 2012 clean 0796809002"),
+    {
+      normalizedPhone: "+93796809002",
+      priceAmount: null,
+      priceCurrency: null,
+      priceAfn: null,
+      province: null,
+    },
+  );
+  assert.equal(extractTelegramCandidatePrefill("بهترین انتخاب و کیفیت غوره").province, null);
+  assert.match(telegramWebhook, /extractTelegramCandidatePrefill/);
+  assert.match(telegramWebhook, /normalized_phone: prefill\.normalizedPhone/);
+  assert.match(telegramWebhook, /normalized_price_afn: prefill\.priceAfn/);
+  assert.match(telegramWebhook, /province_id: detectedProvince\.id/);
+  assert.match(telegramWebhook, /normalized_location: detectedProvince\?\.name \?\? prefill\.province/);
 });
 
 test("Telegram rejects invalid public links without poisoning the webhook queue", () => {

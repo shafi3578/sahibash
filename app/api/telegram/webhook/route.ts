@@ -15,6 +15,7 @@ import {
   telegramPublicPhotoFingerprint,
   type TelegramPublicPost,
 } from "@/lib/inventory/telegram-public-post";
+import { extractTelegramCandidatePrefill } from "@/lib/inventory/normalization";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -174,11 +175,29 @@ export async function POST(request: Request) {
   if (jobError || !job) return NextResponse.json({ ok: false }, { status: 500 });
 
   const title = text.split("\n")[0]?.slice(0, 120) || "Telegram forwarded ad";
+  const prefill = extractTelegramCandidatePrefill(text);
+  const { data: detectedProvince } = prefill.province
+    ? await supabase
+        .from("provinces")
+        .select("id,name")
+        .eq("name", prefill.province)
+        .eq("is_active", true)
+        .maybeSingle()
+    : { data: null };
   const initialPayload: Record<string, unknown> = {
     title,
     description: text,
     source_platform: "telegram",
     photo_count: 0,
+    ...(prefill.normalizedPhone ? { contact_phone: prefill.normalizedPhone } : {}),
+    ...(prefill.priceAmount && prefill.priceCurrency ? {
+      price_original: prefill.priceAmount,
+      currency: prefill.priceCurrency,
+    } : {}),
+    ...(prefill.province ? {
+      detected_province: prefill.province,
+      ...(detectedProvince ? { province_id: detectedProvince.id } : {}),
+    } : {}),
     ...(publicPost ? {
       source_url: publicPost.sourceUrl,
       source_published_at: publicPost.publishedAt,
@@ -201,6 +220,9 @@ export async function POST(request: Request) {
         raw_payload: update,
         normalized_payload: initialPayload,
         normalized_title: title,
+        normalized_phone: prefill.normalizedPhone,
+        normalized_price_afn: prefill.priceAfn,
+        normalized_location: detectedProvince?.name ?? prefill.province,
       },
       { onConflict: "job_id,idempotency_key", ignoreDuplicates: true },
     );
@@ -208,7 +230,7 @@ export async function POST(request: Request) {
 
   const { data: candidate, error: candidateError } = await supabase
     .from("listing_ingest_candidates")
-    .select("id,raw_payload,normalized_payload,normalized_title")
+    .select("id,raw_payload,normalized_payload,normalized_title,normalized_phone,normalized_price_afn,normalized_location")
     .eq("job_id", job.id)
     .eq("idempotency_key", idempotencyKey)
     .single();
@@ -231,6 +253,15 @@ export async function POST(request: Request) {
       public_post_id: publicPost.postId,
     } : {}),
     ...(text ? { title, description: text } : {}),
+    ...(!existingPayload.contact_phone && prefill.normalizedPhone ? { contact_phone: prefill.normalizedPhone } : {}),
+    ...(!existingPayload.price_original && prefill.priceAmount && prefill.priceCurrency ? {
+      price_original: prefill.priceAmount,
+      currency: prefill.priceCurrency,
+    } : {}),
+    ...(!existingPayload.detected_province && prefill.province ? {
+      detected_province: prefill.province,
+      ...(!existingPayload.province_id && detectedProvince ? { province_id: detectedProvince.id } : {}),
+    } : {}),
   };
 
   const { error: mergeError } = await supabase
@@ -239,6 +270,9 @@ export async function POST(request: Request) {
       status: "needs_review",
       normalized_payload: mergedPayload,
       normalized_title: text ? title : candidate.normalized_title,
+      normalized_phone: candidate.normalized_phone ?? prefill.normalizedPhone,
+      normalized_price_afn: candidate.normalized_price_afn ?? prefill.priceAfn,
+      normalized_location: candidate.normalized_location ?? detectedProvince?.name ?? prefill.province,
       ...(!existingText && text ? { raw_payload: update, source_item_id: sourceItemId } : {}),
     })
     .eq("id", candidate.id);
