@@ -344,11 +344,16 @@ test("candidate review supports all active published leaf schemas and is super-a
   assert.match(candidateReviewControl, /\["en", "fa", "ps"\]/);
   assert.match(candidateReviewControl, /category-specific details/i);
   assert.match(candidateReviewControl, /VehicleDamageDiagram/);
+  assert.match(candidateReviewControl, /const \[hasBodyReport, setHasBodyReport\] = useState\(initialDamageParts\.length === 13\)/);
+  assert.match(candidateReviewControl, /initialDamageParts\.length === 13 \? initialDamageParts : \[\]/);
+  assert.match(candidateReviewControl, /value=\{JSON\.stringify\(hasBodyReport \? damageParts : \[\]\)\}/);
   assert.match(candidateReviewControl, /const \[detailValues, setDetailValues\] = useState/);
   assert.match(candidateReviewControl, /value=\{String\(value \?\? ""\)\}[\s\S]*onChange=\{\(event\) => setValue\(event\.target\.value\)\}/);
   assert.match(candidateReviewControl, /checked=\{value === true \|\| value === "true"\}[\s\S]*onChange=\{\(event\) => setValue\(event\.target\.checked\)\}/);
-  assert.match(candidateReviewControl, /name="damage_parts_json"[\s\S]*value=\{JSON\.stringify\(damageParts\)\}[\s\S]*readOnly[\s\S]*hidden/);
+  assert.match(candidateReviewControl, /name="damage_parts_json"[\s\S]*value=\{JSON\.stringify\(hasBodyReport \? damageParts : \[\]\)\}[\s\S]*readOnly[\s\S]*hidden/);
   assert.match(candidateReviewAction, /normalizeVehicleDamageParts/);
+  assert.match(candidateReviewAction, /damageParts\.length !== 0 && damageParts\.length !== VEHICLE_DAMAGE_PARTS\.length/);
+  assert.match(candidateReviewAction, /expectsVehicleDamage && damageParts\.length === VEHICLE_DAMAGE_PARTS\.length/);
   assert.match(externalReviewRetentionMigration, /insert into public\.vehicle_damage_reports/i);
   assert.match(externalReviewRetentionMigration, /insert into public\.vehicle_damage_parts/i);
   assert.match(inventoryCandidatePage, /IngestCandidateReviewForm/);

@@ -9,6 +9,7 @@ import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   normalizeVehicleDamageParts,
   shouldShowVehicleDamageDiagram,
+  VEHICLE_DAMAGE_PARTS,
 } from "@/lib/vehicles/damage-report";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -191,7 +192,9 @@ export async function saveReviewedIngestCandidate(
     } catch {
       damageParts = [];
     }
-    if (damageParts.length !== 13) addError(errors, "damage_parts_json", "invalid");
+    if (damageParts.length !== 0 && damageParts.length !== VEHICLE_DAMAGE_PARTS.length) {
+      addError(errors, "damage_parts_json", "invalid");
+    }
   }
 
   const [{ data: province }, { data: district }, { count: photoCount }] = await Promise.all([
@@ -228,7 +231,7 @@ export async function saveReviewedIngestCandidate(
     price_mode: priceMode,
     details,
     vehicle,
-    ...(expectsVehicleDamage ? {
+    ...(expectsVehicleDamage && damageParts.length === VEHICLE_DAMAGE_PARTS.length ? {
       vehicle_damage: {
         all_original: damageParts.every((part) => part.condition === "original"),
         parts: damageParts,

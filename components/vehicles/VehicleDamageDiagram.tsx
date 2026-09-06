@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { AppLocale } from "@/lib/i18n/translations";
 import {
   VEHICLE_DAMAGE_CONDITIONS,
+  VEHICLE_DAMAGE_PARTS,
   damageCondition,
   damagePartLabel,
   defaultVehicleDamageParts,
@@ -23,7 +24,8 @@ const COPY = {
 export function VehicleDamageDiagram({ value, onChange, locale = "en" }: { value: DamagePart[]; onChange: (parts: DamagePart[]) => void; locale?: AppLocale }) {
   const [activePart, setActivePart] = useState<string | null>(null);
   const partMap = useMemo(() => new Map(value.map((part) => [part.key, part])), [value]);
-  const allOriginal = value.every((part) => part.condition === "original");
+  const allOriginal = value.length === VEHICLE_DAMAGE_PARTS.length
+    && value.every((part) => part.condition === "original");
 
   function setPart(key: string, condition: VehicleDamageCondition) {
     onChange(value.map((part) => part.key === key ? { ...part, condition } : part));

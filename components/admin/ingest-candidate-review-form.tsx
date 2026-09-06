@@ -75,10 +75,12 @@ export function IngestCandidateReviewForm({
   const details = record(initial.payload.details);
   const [detailValues, setDetailValues] = useState<Record<string, unknown>>(() => details);
   const vehicle = record(initial.payload.vehicle);
+  const vehicleDamage = record(initial.payload.vehicle_damage);
   const reviewNotes = record(initial.payload.review_notes);
-  const initialDamageParts = normalizeVehicleDamageParts(vehicle.damage_parts);
+  const initialDamageParts = normalizeVehicleDamageParts(vehicleDamage.parts ?? vehicle.damage_parts);
+  const [hasBodyReport, setHasBodyReport] = useState(initialDamageParts.length === 13);
   const [damageParts, setDamageParts] = useState<DamagePart[]>(() =>
-    initialDamageParts.length === 13 ? initialDamageParts : defaultVehicleDamageParts(),
+    initialDamageParts.length === 13 ? initialDamageParts : [],
   );
   const selectedCategoryPath = categories.find((category) => category.id === categoryNodeId)?.path ?? "";
   const [rootSlug, branchKey] = selectedCategoryPath.split("/");
@@ -125,6 +127,8 @@ export function IngestCandidateReviewForm({
         description: "توضیحات",
         categoryDetails: "جزئیات مخصوص دسته",
         bodyReport: "گزارش تصویری وضعیت بدنه",
+        bodyReportConfirmed: "منبع، وضعیت قطعات بدنه را به‌صراحت گزارش کرده است",
+        bodyReportUnknown: "اگر منبع وضعیت رنگ، ترمیم یا تعویض قطعات را گزارش نکرده است، این گزینه را فعال نکنید. در این حالت هیچ ادعای «بدنه اصلی» نشر نمی‌شود.",
         optional: "اختیاری",
         required: "ضروری",
         bodyNote: "یادداشت وضعیت بدنه (اختیاری)",
@@ -165,6 +169,8 @@ export function IngestCandidateReviewForm({
           description: "تشریح",
           categoryDetails: "د کټګورۍ ځانګړي تفصیلات",
           bodyReport: "د بدنې د حالت انځوریز راپور",
+          bodyReportConfirmed: "سرچینې د بدنې د برخو حالت په څرګند ډول راپور کړی دی",
+          bodyReportUnknown: "که سرچینې د رنګ، ترمیم یا بدلون حالت نه وي ښودلی، دا غوراوی مه فعالوئ. په دې حالت کې د «اصلي بدنې» ادعا نه خپرېږي.",
           optional: "اختیاري",
           required: "اړین",
           bodyNote: "د بدنې د حالت یادښت (اختیاري)",
@@ -204,6 +210,8 @@ export function IngestCandidateReviewForm({
           description: "Description",
           categoryDetails: "Category-specific details",
           bodyReport: "Visual body-condition report",
+          bodyReportConfirmed: "The source explicitly reports the condition of the body panels",
+          bodyReportUnknown: "Leave this off when the source does not state paint, repair, or replacement status. No “all original” claim will be published.",
           optional: "Optional",
           required: "Required",
           bodyNote: "Vehicle body-condition note (optional)",
@@ -409,10 +417,28 @@ export function IngestCandidateReviewForm({
       {showVehicleDamage ? (
         <fieldset className="mt-5 rounded-xl border border-[var(--line)] p-4">
           <legend className="px-2 text-sm font-bold">{copy.bodyReport}</legend>
-          <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} locale={locale} />
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 text-sm font-semibold">
+            <input
+              type="checkbox"
+              checked={hasBodyReport}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setHasBodyReport(checked);
+                setDamageParts(checked ? defaultVehicleDamageParts() : []);
+              }}
+              className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+            />
+            <span>{copy.bodyReportConfirmed}</span>
+          </label>
+          <p className="mt-2 text-xs leading-5 text-[var(--ink-2)]">{copy.bodyReportUnknown}</p>
+          {hasBodyReport ? (
+            <div className="mt-4">
+              <VehicleDamageDiagram value={damageParts} onChange={setDamageParts} locale={locale} />
+            </div>
+          ) : null}
           <textarea
             name="damage_parts_json"
-            value={JSON.stringify(damageParts)}
+            value={JSON.stringify(hasBodyReport ? damageParts : [])}
             readOnly
             hidden
           />
