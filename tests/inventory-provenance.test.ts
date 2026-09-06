@@ -69,6 +69,10 @@ const externalSourcePostedAtMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260906181534_preserve_external_source_posted_at.sql"),
   "utf8",
 );
+const externalObservationPostedAtMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260906182158_preserve_observation_source_posted_at.sql"),
+  "utf8",
+);
 const candidateResolutionMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260901010000_resolve_external_ingest_candidate.sql"),
   "utf8",
@@ -233,6 +237,10 @@ test("external inventory preserves verifiable source dates and rejects stale pub
   assert.match(externalSourcePostedAtMigration, /before insert or update of source_type, source_posted_at, permission_record_id, status, publication_status/i);
   assert.match(externalSourcePostedAtMigration, /update public\.listings listing/i);
   assert.match(externalSourcePostedAtMigration, /revoke all on function public\.set_external_listing_source_posted_at\(\)/i);
+  assert.match(externalObservationPostedAtMigration, /select listing\.source_posted_at into new\.source_posted_at/i);
+  assert.match(externalObservationPostedAtMigration, /update public\.listing_source_observations observation/i);
+  assert.match(externalObservationPostedAtMigration, /without inventing seller consent/i);
+  assert.match(externalObservationPostedAtMigration, /revoke all on function public\.set_external_observation_source_posted_at\(\)/i);
 });
 
 test("Telegram public post links are canonicalized and reject unsafe hosts", () => {
