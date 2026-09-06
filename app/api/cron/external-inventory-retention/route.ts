@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { extractTelegramCandidatePrefill } from "@/lib/inventory/normalization";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -23,6 +24,92 @@ type StorageObject = {
 };
 
 type TelegramWebhookStatus = "configured" | "not_configured" | "failed";
+
+type LegacyTelegramCandidate = {
+  id: string;
+  raw_payload: unknown;
+  normalized_payload: unknown;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return Boolean(value) && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function candidateText(candidate: LegacyTelegramCandidate) {
+  const raw = asRecord(candidate.raw_payload) ?? {};
+  const message = asRecord(raw.message)
+    ?? asRecord(raw.edited_message)
+    ?? asRecord(raw.channel_post)
+    ?? asRecord(raw.edited_channel_post);
+  const payload = asRecord(candidate.normalized_payload) ?? {};
+  return (
+    (typeof message?.text === "string" ? message.text.trim() : "")
+    || (typeof message?.caption === "string" ? message.caption.trim() : "")
+    || (typeof payload.description === "string" ? payload.description.trim() : "")
+  );
+}
+
+async function backfillLegacyTelegramCandidates(
+  supabase: ReturnType<typeof createSupabaseAdmin>,
+) {
+  const result = { scanned: 0, backfilled: 0, failed: 0 };
+  const { data: source, error: sourceError } = await supabase
+    .from("listing_sources")
+    .select("id")
+    .eq("slug", "telegram-forwarded")
+    .eq("source_type", "external_indexed")
+    .eq("platform", "telegram")
+    .maybeSingle();
+  if (sourceError) throw new Error("Telegram source lookup failed");
+  if (!source) return result;
+
+  const [{ data: candidates, error: candidateError }, { data: provinces, error: provinceError }] = await Promise.all([
+    supabase
+      .from("listing_ingest_candidates")
+      .select("id,raw_payload,normalized_payload")
+      .eq("source_id", source.id)
+      .eq("status", "needs_review")
+      .limit(BATCH_SIZE),
+    supabase
+      .from("provinces")
+      .select("id,name")
+      .eq("is_active", true),
+  ]);
+  if (candidateError) throw new Error("Telegram candidate prefill scan failed");
+  if (provinceError) throw new Error("Province prefill lookup failed");
+
+  const provincesByName = new Map(
+    (provinces ?? []).map((province) => [province.name, province]),
+  );
+  result.scanned = candidates?.length ?? 0;
+
+  for (const candidate of (candidates ?? []) as LegacyTelegramCandidate[]) {
+    const text = candidateText(candidate);
+    if (!text) continue;
+    const prefill = extractTelegramCandidatePrefill(text);
+    const province = prefill.province ? provincesByName.get(prefill.province) : undefined;
+    if (!prefill.normalizedPhone && !prefill.priceAmount && !province) continue;
+
+    const { data, error } = await supabase.rpc("backfill_telegram_candidate_prefill", {
+      p_candidate_id: candidate.id,
+      p_normalized_phone: prefill.normalizedPhone,
+      p_price_original: prefill.priceAmount,
+      p_currency: prefill.priceCurrency,
+      p_normalized_price_afn: prefill.priceAfn,
+      p_province: province?.name ?? null,
+      p_province_id: province?.id ?? null,
+    });
+    if (error) {
+      result.failed += 1;
+      continue;
+    }
+    if (data === true) result.backfilled += 1;
+  }
+
+  return result;
+}
 
 function hasValidCronAuthorization(request: Request) {
   const secret = process.env.CRON_SECRET?.trim() ?? "";
@@ -109,6 +196,8 @@ export async function GET(request: Request) {
   const supabase = createSupabaseAdmin();
   const telegramWebhook = await ensureTelegramWebhook(request);
   const result = {
+    prefillScanned: 0,
+    prefillBackfilled: 0,
     expired: 0,
     deleted: 0,
     scrubbed: 0,
@@ -117,6 +206,15 @@ export async function GET(request: Request) {
     telegramWebhook,
   };
   if (telegramWebhook === "failed") result.failed += 1;
+
+  try {
+    const prefill = await backfillLegacyTelegramCandidates(supabase);
+    result.prefillScanned = prefill.scanned;
+    result.prefillBackfilled = prefill.backfilled;
+    result.failed += prefill.failed;
+  } catch {
+    result.failed += 1;
+  }
 
   const { data: dueData, error: dueError } = await supabase.rpc(
     "expire_due_forwarded_external_ads",

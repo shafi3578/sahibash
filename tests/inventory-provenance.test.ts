@@ -65,6 +65,10 @@ const externalRetentionRpcFixMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260830204406_fix_external_retention_rpc_ambiguity.sql"),
   "utf8",
 );
+const telegramPrefillBackfillMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260906210523_backfill_telegram_candidate_prefill.sql"),
+  "utf8",
+);
 const externalSourcePostedAtMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260906181534_preserve_external_source_posted_at.sql"),
   "utf8",
@@ -459,6 +463,21 @@ test("retention expiry RPC avoids PL/pgSQL output-column ambiguity", () => {
   assert.doesNotMatch(externalRetentionRpcFixMigration, /returning\s+listing_id/i);
   assert.match(externalRetentionRpcFixMigration, /revoke all on function[\s\S]*from public, anon, authenticated/i);
   assert.match(externalRetentionRpcFixMigration, /grant execute on function[\s\S]*to service_role/i);
+});
+
+test("legacy Telegram candidate prefill remains review-only and auditable", () => {
+  assert.match(telegramPrefillBackfillMigration, /create or replace function public\.backfill_telegram_candidate_prefill/i);
+  assert.match(telegramPrefillBackfillMigration, /v_source\.source_type <> 'external_indexed'/i);
+  assert.match(telegramPrefillBackfillMigration, /v_source\.platform <> 'telegram'/i);
+  assert.match(telegramPrefillBackfillMigration, /v_candidate\.status <> 'needs_review'/i);
+  assert.match(telegramPrefillBackfillMigration, /candidate_prefill_backfilled/i);
+  assert.match(telegramPrefillBackfillMigration, /insert into public\.listing_provenance_events/i);
+  assert.match(telegramPrefillBackfillMigration, /revoke all on function[\s\S]*from public, anon, authenticated/i);
+  assert.match(telegramPrefillBackfillMigration, /grant execute on function[\s\S]*to service_role/i);
+  assert.doesNotMatch(telegramPrefillBackfillMigration, /status\s*=\s*'publishable'/i);
+  assert.match(retentionRoute, /backfillLegacyTelegramCandidates/);
+  assert.match(retentionRoute, /extractTelegramCandidatePrefill/);
+  assert.match(retentionRoute, /backfill_telegram_candidate_prefill/);
 });
 
 test("candidate rejection and duplicate decisions are atomic, auditable, and service-only", () => {
