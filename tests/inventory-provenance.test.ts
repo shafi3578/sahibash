@@ -65,6 +65,10 @@ const externalRetentionRpcFixMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260830204406_fix_external_retention_rpc_ambiguity.sql"),
   "utf8",
 );
+const externalSourcePostedAtMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260906181534_preserve_external_source_posted_at.sql"),
+  "utf8",
+);
 const candidateResolutionMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260901010000_resolve_external_ingest_candidate.sql"),
   "utf8",
@@ -217,6 +221,18 @@ test("Telegram album messages share one transfer identity and are no longer drop
   assert.doesNotMatch(telegramWebhook, /if \(!text && photos\.length > 0\)/);
   assert.match(telegramWebhook, /selectLargestTelegramPhoto/);
   assert.match(telegramWebhook, /listing_ingest_candidate_media/);
+});
+
+test("external inventory preserves verifiable source dates and rejects stale publication", () => {
+  assert.match(externalSourcePostedAtMigration, /source_published_at/i);
+  assert.match(externalSourcePostedAtMigration, /forward_origin,date/i);
+  assert.match(externalSourcePostedAtMigration, /forward_date/i);
+  assert.match(externalSourcePostedAtMigration, /source_posted_at is null/i);
+  assert.match(externalSourcePostedAtMigration, /older than 30 days/i);
+  assert.match(externalSourcePostedAtMigration, /cannot be in the future/i);
+  assert.match(externalSourcePostedAtMigration, /before insert or update of source_type, source_posted_at, permission_record_id, status, publication_status/i);
+  assert.match(externalSourcePostedAtMigration, /update public\.listings listing/i);
+  assert.match(externalSourcePostedAtMigration, /revoke all on function public\.set_external_listing_source_posted_at\(\)/i);
 });
 
 test("Telegram public post links are canonicalized and reject unsafe hosts", () => {
