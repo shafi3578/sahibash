@@ -117,19 +117,19 @@ export function AuthAwareHeaderLinks({
       </Link>
       {authenticated ? (
         <>
-          <Link href={localizePath("/dashboard", locale)} className="hidden min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm lg:inline-flex">
+          <Link href={localizePath("/dashboard", locale)} className="hidden min-w-0 whitespace-nowrap rounded-full border border-white/20 bg-white px-3 py-2 text-xs font-semibold leading-none text-[var(--ink-1)] sm:text-sm lg:inline-flex">
             {labels.myProfile}
           </Link>
-          <button type="button" onClick={signOut} className="hidden min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm lg:inline-flex">
+          <button type="button" onClick={signOut} className="hidden min-w-0 whitespace-nowrap rounded-full border border-white/20 bg-white px-3 py-2 text-xs font-semibold leading-none text-[var(--ink-1)] sm:text-sm lg:inline-flex">
             {labels.logout}
           </button>
         </>
       ) : (
         <>
-          <Link href={localizePath("/login", locale)} className="hidden min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm lg:inline-flex">
+          <Link href={localizePath("/login", locale)} className="hidden min-w-0 whitespace-nowrap rounded-full border border-white/20 bg-white px-3 py-2 text-xs font-semibold leading-none text-[var(--ink-1)] sm:text-sm lg:inline-flex">
             {labels.login}
           </Link>
-          <Link href={localizePath("/register", locale)} className="hidden min-w-0 whitespace-nowrap rounded-full border border-black/20 bg-white px-3 py-2 text-xs font-semibold leading-none sm:text-sm lg:inline-flex">
+          <Link href={localizePath("/register", locale)} className="hidden min-w-0 whitespace-nowrap rounded-full border border-white/20 bg-white px-3 py-2 text-xs font-semibold leading-none text-[var(--ink-1)] sm:text-sm lg:inline-flex">
             {labels.register}
           </Link>
         </>

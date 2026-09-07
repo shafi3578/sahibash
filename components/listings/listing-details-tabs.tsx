@@ -120,7 +120,7 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-2 text-sm font-semibold ${active ? "bg-[var(--brand)] text-[var(--ink-1)]" : "bg-white text-[var(--ink-2)]"}`}
+      className={`px-3 py-2 text-sm font-semibold ${active ? "bg-[var(--brand)] text-white" : "bg-white text-[var(--ink-2)]"}`}
     >
       {label}
     </button>

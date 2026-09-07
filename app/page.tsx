@@ -95,8 +95,8 @@ export default async function HomePage({
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[linear-gradient(180deg,#eef7f5_0%,#f8fbfa_20%,#f3f7f7_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
-      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#d8b45f_0,#0f766e_25%,#123333_62%,#071b1b_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-sm">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[linear-gradient(180deg,#f8f5ed_0%,#f7f8f5_20%,#eef3f2_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_18%_18%,rgba(199,164,92,0.32)_0,rgba(11,107,101,0.72)_24%,#0a3035_56%,#04131b_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-[0_22px_60px_rgba(4,25,35,0.2)]">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
             <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{homeCopy.tagline}</p>
@@ -129,7 +129,7 @@ export default async function HomePage({
                   </div>
                   <div className="p-3">
                     <p className="line-clamp-2 text-xs font-bold sm:text-sm">{displayTitle}</p>
-                    <p className="mt-1 text-xs font-semibold text-yellow-200">{formatListingPrice(listing, locale)}</p>
+                    <p className="mt-1 text-xs font-semibold text-[#ead39d]">{formatListingPrice(listing, locale)}</p>
                   </div>
                 </Link>
               );
@@ -182,9 +182,9 @@ export default async function HomePage({
       </section>
 
       <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-3xl sm:border sm:shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:bg-gradient-to-r sm:from-amber-50 sm:to-white">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:bg-gradient-to-r sm:from-[#f4ead4] sm:to-white">
           {t.home.featuredListings}
-          <Link href={href("/featured")} className="rounded-full bg-[var(--brand)]/30 px-2 py-1 text-[10px] text-slate-700">{homeCopy.allFeatured}</Link>
+          <Link href={href("/featured")} className="rounded-full bg-[#efe2c5] px-2 py-1 text-[10px] text-[#614c21]">{homeCopy.allFeatured}</Link>
         </div>
         <div className="overflow-x-auto px-3 py-3 [scrollbar-width:none]">
           {featuredRow.length > 0 ? (
@@ -239,7 +239,7 @@ export default async function HomePage({
               <Link
                 key={listing.id}
                 href={href(`/listings/${listing.id}`)}
-                className="block p-0 transition hover:bg-amber-50/40 sm:grid sm:grid-cols-[6rem_1fr_auto] sm:gap-3 sm:p-3"
+                className="block p-0 transition hover:bg-[#f8f3e8] sm:grid sm:grid-cols-[6rem_1fr_auto] sm:gap-3 sm:p-3"
               >
                 <div className="relative aspect-video w-full overflow-hidden bg-slate-100 sm:h-24 sm:w-24 sm:rounded-2xl sm:shadow-sm">
                   {image ? (
@@ -259,7 +259,7 @@ export default async function HomePage({
                   <p className="line-clamp-2 text-base font-semibold text-slate-900 sm:font-normal sm:text-slate-800">{displayTitle}</p>
                   <p className="mt-1 line-clamp-1 text-sm text-slate-500">{location}</p>
                 </div>
-                <p className="px-3 pb-4 text-lg font-bold text-[#1967b1] sm:col-span-1 sm:px-0 sm:pb-0 sm:text-xl">
+                <p className="px-3 pb-4 text-lg font-bold text-[var(--accent)] sm:col-span-1 sm:px-0 sm:pb-0 sm:text-xl">
                   {formatListingPrice(listing, locale)}
                 </p>
               </Link>

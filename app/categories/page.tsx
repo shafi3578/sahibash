@@ -12,7 +12,7 @@ export default async function CategoriesPage() {
 
   return (
     <main className="min-h-screen bg-[var(--surface-1)] pb-24">
-      <header className="bg-[linear-gradient(135deg,#123333,#0b716d)] px-4 py-6 text-white">
+      <header className="bg-[radial-gradient(circle_at_15%_10%,rgba(199,164,92,0.28),transparent_32%),linear-gradient(135deg,#071f2b,#0b6b65)] px-4 py-6 text-white">
         <div className="mx-auto max-w-3xl"><h1 className="font-display text-3xl font-black">{ui.categoriesPage.title}</h1></div>
       </header>
 
@@ -30,7 +30,7 @@ export default async function CategoriesPage() {
         <CategoryHomeList categories={categories} locale={locale} showComingSoon />
 
         <div className="mt-3 px-4">
-          <Link href={localizePath("/", locale)} className="text-sm font-semibold text-[#236dab]">
+          <Link href={localizePath("/", locale)} className="text-sm font-semibold text-[var(--accent)]">
             {ui.categoriesPage.backHome}
           </Link>
         </div>

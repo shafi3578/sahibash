@@ -3,13 +3,14 @@
 :root {
   --font-body: "Segoe UI", Tahoma, Arial, sans-serif;
   --font-display: "Segoe UI", Tahoma, Arial, sans-serif;
-  --surface-1: #f3f7f7;
-  --surface-2: #f8fbfa;
-  --ink-1: #102a2a;
-  --ink-2: #536666;
-  --line: #d8e3e1;
-  --brand: #d8b45f;
-  --accent: #0b716d;
+  --surface-1: #f4f2ec;
+  --surface-2: #fbfaf7;
+  --ink-1: #10242e;
+  --ink-2: #5a686e;
+  --line: #d9d8d1;
+  --brand: #071f2b;
+  --brand-gold: #c7a45c;
+  --accent: #0b6b65;
 }
 
 @theme inline {
@@ -19,7 +20,7 @@
 }
 
 body {
-  background: var(--surface-1);
+  background: linear-gradient(180deg, #fbfaf7 0%, #f4f5f2 45%, #eef2f1 100%) fixed;
   color: var(--ink-1);
   font-family: var(--font-body), sans-serif;
 }
@@ -60,6 +61,6 @@ html[dir="rtl"] select {
 
 .hero-glow {
   background:
-    radial-gradient(circle at 15% 5%, #e8cf8b 0%, transparent 40%),
-    radial-gradient(circle at 85% 20%, #76aaa5 0%, transparent 28%);
+    radial-gradient(circle at 15% 5%, rgb(199 164 92 / 28%) 0%, transparent 38%),
+    radial-gradient(circle at 85% 20%, rgb(47 128 119 / 24%) 0%, transparent 30%);
 }
