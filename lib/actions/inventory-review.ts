@@ -74,7 +74,8 @@ export async function saveReviewedIngestCandidate(
   const priceMode = ["contact", "fixed", "negotiable"].includes(String(formData.get("price_mode")))
     ? String(formData.get("price_mode"))
     : "contact";
-  const priceInput = cleanText(formData.get("price_afn"), 32).replace(/[,،\s]/g, "");
+  const priceCurrency = formData.get("currency") === "USD" ? "USD" : "AFN";
+  const priceInput = cleanText(formData.get("price_amount"), 32).replace(/[,،\s]/g, "");
   const parsedPrice = Number(priceInput);
   const normalizedPrice = priceMode === "contact" ? 0 : parsedPrice;
   const normalizedPhone = normalizeAfghanistanPhone(formData.get("contact_phone"));
@@ -99,7 +100,7 @@ export async function saveReviewedIngestCandidate(
   if (!Number.isInteger(districtId) || districtId <= 0) addError(errors, "district_id", "required");
   if (!normalizedPhone.normalized) addError(errors, "contact_phone", "invalid");
   if (priceMode !== "contact" && (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0)) {
-    addError(errors, "price_afn", "invalid");
+    addError(errors, "price_amount", "invalid");
   }
 
   for (const [language, translation] of Object.entries(translations)) {
@@ -229,6 +230,7 @@ export async function saveReviewedIngestCandidate(
     province_id: String(provinceId),
     district_id: String(districtId),
     price_mode: priceMode,
+    ...(priceMode !== "contact" ? { price_amount: normalizedPrice, currency: priceCurrency } : {}),
     details,
     vehicle,
     ...(expectsVehicleDamage && damageParts.length === VEHICLE_DAMAGE_PARTS.length ? {
@@ -256,7 +258,9 @@ export async function saveReviewedIngestCandidate(
         ? createHash("sha256").update(normalizedPhone.normalized).digest("hex")
         : null,
       p_normalized_location: province && district ? `${province.name} / ${district.name}` : "",
-      p_normalized_price_afn: Number.isFinite(normalizedPrice) ? normalizedPrice : null,
+      p_normalized_price_afn: priceCurrency === "AFN" && Number.isFinite(normalizedPrice)
+        ? normalizedPrice
+        : null,
       p_validation_errors: errors,
       p_mark_publishable: markPublishable,
     },

@@ -149,7 +149,7 @@ export async function publishReviewedIngestCandidate(
     }
 
     const { data: publishedIdData, error: publicationError } = await supabase.rpc(
-      "publish_reviewed_ingest_candidate",
+      "publish_reviewed_ingest_candidate_with_currency",
       {
         p_candidate_id: candidateId,
         p_actor_id: actor.id,

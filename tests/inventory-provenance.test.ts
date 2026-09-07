@@ -77,6 +77,10 @@ const externalObservationPostedAtMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260906182158_preserve_observation_source_posted_at.sql"),
   "utf8",
 );
+const externalCurrencyMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260907182638_preserve_external_listing_currency.sql"),
+  "utf8",
+);
 const candidateResolutionMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260901010000_resolve_external_ingest_candidate.sql"),
   "utf8",
@@ -395,6 +399,23 @@ test("candidate publication action requires stepped-up moderation and cleans upl
   assert.match(inventoryCandidatePage, /candidate\.status === "publishable"/);
   assert.match(inventoryCandidatePage, /IngestCandidatePublish/);
   assert.match(candidatePublicationControl, /useActionState/);
+});
+
+test("external review preserves verified AFN or USD prices without conversion", () => {
+  assert.match(candidateReviewControl, /name="currency"/);
+  assert.match(candidateReviewControl, /<option value="AFN">AFN<\/option><option value="USD">USD<\/option>/);
+  assert.match(candidateReviewControl, /name="price_amount"/);
+  assert.match(candidateReviewAction, /formData\.get\("currency"\) === "USD"/);
+  assert.match(candidateReviewAction, /p_normalized_price_afn:[\s\S]*priceCurrency === "AFN"/);
+  assert.match(candidatePublicationAction, /publish_reviewed_ingest_candidate_with_currency/);
+  assert.match(externalCurrencyMigration, /create or replace function public\.publish_reviewed_ingest_candidate_with_currency/i);
+  assert.match(externalCurrencyMigration, /v_currency not in \('AFN', 'USD'\)/i);
+  assert.match(externalCurrencyMigration, /Preserved the administrator-verified source currency without conversion/i);
+  assert.match(externalCurrencyMigration, /external_listing_currency_corrected/i);
+  assert.match(externalCurrencyMigration, /source_item_id = v_fix\.source_item_id/i);
+  assert.doesNotMatch(externalCurrencyMigration, /where id in \(/i);
+  assert.match(externalCurrencyMigration, /revoke all on function[\s\S]*from public, anon, authenticated/i);
+  assert.match(externalCurrencyMigration, /grant execute on function[\s\S]*to service_role/i);
 });
 
 test("candidate review supports all active published leaf schemas and is super-admin-only", () => {

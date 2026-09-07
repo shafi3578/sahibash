@@ -30,7 +30,8 @@ type Props = {
     provinceId: number | null;
     districtId: number | null;
     normalizedPhone: string;
-    normalizedPriceAfn: number | null;
+    normalizedPriceAmount: number | null;
+    currency: "AFN" | "USD";
     payload: Record<string, unknown>;
   };
   categories: Option[];
@@ -64,6 +65,7 @@ export function IngestCandidateReviewForm({
   const [provinceId, setProvinceId] = useState(initial.provinceId ?? 0);
   const [districtId, setDistrictId] = useState(initial.districtId ?? 0);
   const [priceMode, setPriceMode] = useState(String(initial.payload.price_mode ?? "contact"));
+  const [currency, setCurrency] = useState<"AFN" | "USD">(initial.currency);
   const [schema, setSchema] = useState<ListingSchemaConfig | null>(initialSchema);
   const [schemaStatus, setSchemaStatus] = useState<"idle" | "loading" | "error">(
     initialSchema ? "idle" : "error",
@@ -118,7 +120,8 @@ export function IngestCandidateReviewForm({
         contactPrice: "قیمت به تماس",
         fixed: "قیمت ثابت",
         negotiable: "قابل مذاکره",
-        amount: "قیمت به افغانی",
+        amount: "مقدار قیمت",
+        currency: "واحد پول",
         originalLanguage: "زبان اصلی اعلان",
         english: "انگلیسی",
         dari: "دری",
@@ -160,7 +163,8 @@ export function IngestCandidateReviewForm({
           contactPrice: "بیه په اړیکه",
           fixed: "ټاکلې بیه",
           negotiable: "د خبرو وړ",
-          amount: "بیه په افغانیو",
+          amount: "د بیې اندازه",
+          currency: "اسعار",
           originalLanguage: "د اعلان اصلي ژبه",
           english: "انګلیسي",
           dari: "دري",
@@ -201,7 +205,8 @@ export function IngestCandidateReviewForm({
           contactPrice: "Contact for price",
           fixed: "Fixed price",
           negotiable: "Negotiable",
-          amount: "Price in AFN",
+          amount: "Price amount",
+          currency: "Currency",
           originalLanguage: "Original listing language",
           english: "English",
           dari: "Dari",
@@ -382,8 +387,13 @@ export function IngestCandidateReviewForm({
           </select>
         </label>
         <label className="text-sm font-bold">{copy.amount}
-          <input name="price_afn" type="number" min="1" step="1" disabled={priceMode === "contact"} defaultValue={initial.normalizedPriceAfn && initial.normalizedPriceAfn > 0 ? initial.normalizedPriceAfn : ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 disabled:bg-[var(--surface-2)]" />
-          {errors.has("price_afn") ? <span className="mt-1 block text-xs text-red-700">{copy.fieldError}</span> : null}
+          <input name="price_amount" type="number" min="1" step="1" disabled={priceMode === "contact"} defaultValue={initial.normalizedPriceAmount && initial.normalizedPriceAmount > 0 ? initial.normalizedPriceAmount : ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 disabled:bg-[var(--surface-2)]" />
+          {errors.has("price_amount") ? <span className="mt-1 block text-xs text-red-700">{copy.fieldError}</span> : null}
+        </label>
+        <label className="text-sm font-bold">{copy.currency}
+          <select name="currency" value={currency} onChange={(event) => setCurrency(event.target.value === "USD" ? "USD" : "AFN")} disabled={priceMode === "contact"} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 disabled:bg-[var(--surface-2)]">
+            <option value="AFN">AFN</option><option value="USD">USD</option>
+          </select>
         </label>
       </div>
 
