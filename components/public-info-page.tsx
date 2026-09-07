@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { USER_COPY, type UserInfoPage } from "@/lib/i18n/user-copy";
+import { SupportRequestForm } from "@/components/support-request-form";
 
 export async function PublicInfoPage({ page }: { page: UserInfoPage }) {
   const locale = await getCurrentLocale();
@@ -9,7 +10,7 @@ export async function PublicInfoPage({ page }: { page: UserInfoPage }) {
   const content = copy.info[page];
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 py-8 sm:px-6 lg:px-8">
       <article className="rounded-2xl border border-[var(--line)] bg-white p-6 sm:p-8">
         <h1 className="font-display text-3xl font-bold">{content.title}</h1>
         <p className="mt-3 text-lg font-semibold text-[var(--ink-1)]">{content.intro}</p>
@@ -18,6 +19,7 @@ export async function PublicInfoPage({ page }: { page: UserInfoPage }) {
           {copy.backHome}
         </Link>
       </article>
+      {page === "contact" ? <SupportRequestForm locale={locale} /> : null}
     </main>
   );
 }

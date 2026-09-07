@@ -29,12 +29,8 @@ type LocationCopy = {
   approximateOnly: string;
   exactLocation: string;
   approximateArea: string;
-  mapComingSoon: string;
-  coordinates: string;
   googleMaps: string;
   waze: string;
-  copyCoordinates: string;
-  copiedCoordinates: string;
   kmAway: string;
   exactVisible: string;
   approximateVisible: string;
@@ -48,12 +44,8 @@ const LOCATION_COPY: Record<'en' | 'fa' | 'ps', LocationCopy> = {
     approximateOnly: '📍 Approximate location only. Exact location is hidden by seller.',
     exactLocation: '📍 Exact Location',
     approximateArea: '🌍 Approximate Area',
-    mapComingSoon: 'Map integration coming soon. Open in external map below.',
-    coordinates: 'Coordinates',
-    googleMaps: '🗺️ Google Maps',
-    waze: '🧭 Waze',
-    copyCoordinates: '📋 Copy Coordinates',
-    copiedCoordinates: 'Coordinates copied to clipboard',
+    googleMaps: 'Directions',
+    waze: 'Waze',
     kmAway: 'km away',
     exactVisible: '✓ Full location details are visible to buyers.',
     approximateVisible: '✓ Only approximate area is visible. Exact coordinates are hidden.',
@@ -65,12 +57,8 @@ const LOCATION_COPY: Record<'en' | 'fa' | 'ps', LocationCopy> = {
     approximateOnly: '📍 فقط موقعیت تقریبی نمایش داده می شود. موقعیت دقیق توسط فروشنده پنهان است.',
     exactLocation: '📍 موقعیت دقیق',
     approximateArea: '🌍 محدوده تقریبی',
-    mapComingSoon: 'ادغام نقشه به زودی اضافه می شود. فعلا از نقشه بیرونی استفاده کنید.',
-    coordinates: 'مختصات',
-    googleMaps: '🗺️ گوگل مپس',
-    waze: '🧭 ویز',
-    copyCoordinates: '📋 کپی مختصات',
-    copiedCoordinates: 'مختصات در کلیپ بورد کپی شد',
+    googleMaps: 'مسیریابی',
+    waze: 'ویز',
     kmAway: 'کیلومتر فاصله',
     exactVisible: '✓ موقعیت کامل برای خریدار نمایش داده می شود.',
     approximateVisible: '✓ فقط محدوده تقریبی نمایش داده می شود. مختصات دقیق پنهان است.',
@@ -82,12 +70,8 @@ const LOCATION_COPY: Record<'en' | 'fa' | 'ps', LocationCopy> = {
     approximateOnly: '📍 یوازې نږدې ځای ښکاري. کره ځای د پلورونکي له خوا پټ دی.',
     exactLocation: '📍 کره ځای',
     approximateArea: '🌍 نږدې سیمه',
-    mapComingSoon: 'د نقشې ادغام ژر راځي. تر هغه وخته لاندې بهرنۍ نقشه وکاروئ.',
-    coordinates: 'مختصات',
-    googleMaps: '🗺️ ګوګل مپس',
-    waze: '🧭 وېز',
-    copyCoordinates: '📋 مختصات کاپي کړئ',
-    copiedCoordinates: 'مختصات کلپ بورډ ته کاپي شول',
+    googleMaps: 'لار موندنه',
+    waze: 'وېز',
     kmAway: 'کیلومتر لرې',
     exactVisible: '✓ بشپړ ځای معلومات پېرودونکو ته ښکاري.',
     approximateVisible: '✓ یوازې نږدې سیمه ښکاري. کره مختصات پټ دي.',
@@ -159,47 +143,22 @@ export default function LocationCard({ location, buyerDistance, locale = 'en' }:
     );
   };
 
-  const canShowMap = canUseExactCoordinates;
-
   const canShowDirections = canUseExactCoordinates;
 
   return (
-    <div className="border rounded-lg p-4 bg-white">
-      {/* Header */}
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">{copy.title}</h3>
+    <section className="rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 sm:px-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h3 className="text-sm font-bold text-gray-900">{copy.title}</h3>
 
-      {/* Location Text */}
-      {renderLocationText()}
-
-      {/* Map Preview Placeholder */}
-      {canShowMap && (
-        <div className="mt-4 bg-gray-100 rounded-lg h-48 flex items-center justify-center border border-gray-300">
-          <div className="text-center text-gray-600">
-            <p className="text-sm mb-1">
-              {location.visibility === 'exact' ? copy.exactLocation : copy.approximateArea}
-            </p>
-            <p className="text-xs text-gray-500">
-              {copy.mapComingSoon}
-            </p>
-            {canUseExactCoordinates ? (
-              <p className="text-xs text-gray-500 mt-1">
-                {copy.coordinates}: {location.latitude?.toFixed(4)}, {location.longitude?.toFixed(4)}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      {(canShowDirections || Boolean(getGoogleMapsUrl())) && (
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {canShowDirections && (
-            <>
+        {canShowDirections ? (
+          <div className="flex gap-1.5">
+            {canShowDirections && (
+              <>
               <a
                 href={getGoogleMapsUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg transition-colors"
+                className="rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
               >
                 {copy.googleMaps}
               </a>
@@ -208,33 +167,19 @@ export default function LocationCard({ location, buyerDistance, locale = 'en' }:
                   href={getWazeUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 border border-green-200 rounded-lg transition-colors"
+                  className="rounded-lg border border-green-200 px-2.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-50"
                 >
                   {copy.waze}
                 </a>
               )}
-            </>
-          )}
-          {canShowDirections && (
-            <button
-              onClick={() => {
-                if (location.latitude && location.longitude) {
-                  navigator.clipboard.writeText(
-                    `${location.latitude},${location.longitude}`
-                  );
-                  alert(copy.copiedCoordinates);
-                }
-              }}
-              className="px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors"
-            >
-              {copy.copyCoordinates}
-            </button>
-          )}
-        </div>
-      )}
+              </>
+            )}
+          </div>
+        ) : null}
+      </div>
 
-      {/* Privacy Notice */}
-      <div className="mt-4 p-3 bg-gray-50 rounded text-xs text-gray-600">
+      <div className="mt-1.5">{renderLocationText()}</div>
+      <div className="mt-2 border-t border-gray-100 pt-2 text-[11px] text-gray-500">
         {location.visibility === 'exact' && (
           <p>{copy.exactVisible}</p>
         )}
@@ -245,6 +190,6 @@ export default function LocationCard({ location, buyerDistance, locale = 'en' }:
           <p>{copy.provinceDistrictVisible}</p>
         )}
       </div>
-    </div>
+    </section>
   );
 }

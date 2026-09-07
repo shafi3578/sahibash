@@ -7,6 +7,7 @@ import { getDictionary } from "@/lib/i18n/server";
 type Props = {
   categories: CategoryNodeWithCount[];
   locale?: AppLocale;
+  showComingSoon?: boolean;
 };
 
 const FALLBACK_HOME_ROWS = [
@@ -71,7 +72,7 @@ function CategoryIcon({ slug }: { slug: string }) {
   );
 }
 
-export async function CategoryHomeList({ categories, locale = "en" }: Props) {
+export async function CategoryHomeList({ categories, locale = "en", showComingSoon = false }: Props) {
   const { t } = await getDictionary();
   const rows = categories.length > 0
     ? categories.map((category) => ({
@@ -117,7 +118,21 @@ export async function CategoryHomeList({ categories, locale = "en" }: Props) {
         </div>
       </section>
 
-      {comingSoonRows.length > 0 ? <p className="hidden text-xs text-slate-500 lg:block">{`${comingSoonRows.length} ${t.home.moreCategories} · ${t.home.comingSoon}`}</p> : null}
+      {!showComingSoon && comingSoonRows.length > 0 ? <p className="hidden text-xs text-slate-500 lg:block">{`${comingSoonRows.length} ${t.home.moreCategories} · ${t.home.comingSoon}`}</p> : null}
+      {showComingSoon && comingSoonRows.length > 0 ? (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">{t.home.comingSoon}</div>
+          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
+            {comingSoonRows.map((category) => (
+              <div key={category.id} aria-disabled="true" className="relative flex min-h-24 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-600">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white opacity-65"><CategoryIcon slug={category.slug} /></span>
+                <span className="min-w-0 text-sm font-bold">{category.name}</span>
+                <span className="absolute end-2 top-2 rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-black uppercase">{t.home.comingSoon}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

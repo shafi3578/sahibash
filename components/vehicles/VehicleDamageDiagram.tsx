@@ -49,8 +49,8 @@ export function VehicleDamageDiagram({ value, onChange, locale = "en" }: { value
           ))}
         </div>
 
-        <div className="grid items-center gap-5 p-4 md:grid-cols-[minmax(280px,410px)_1fr] md:p-5">
-          <div className="flex justify-center rounded-2xl border border-slate-200 bg-gradient-to-b from-[#fffdf5] to-[#f4f7fa] p-3 shadow-inner sm:p-5">
+        <div className="grid items-center gap-4 p-3 md:grid-cols-[minmax(260px,380px)_1fr] md:p-4">
+          <div className="flex justify-center rounded-2xl border border-slate-200 bg-gradient-to-b from-[#fffdf5] to-[#f4f7fa] p-2 shadow-inner sm:p-3">
             <VehicleBodyDiagram
               parts={value}
               locale={locale}

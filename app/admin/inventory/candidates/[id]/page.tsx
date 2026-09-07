@@ -148,17 +148,14 @@ export default async function InventoryCandidatePage({ params }: { params: Promi
   const title = displayText(payload.title, candidate.normalized_title || copy.notSet);
   const description = displayText(payload.description, copy.noDescription);
   const categoryLabel = displayText(payload.category_path, candidate.category_node_id ? String(candidate.category_node_id) : copy.notSet);
-  const priceMode = displayText(payload.price_mode, "").toLowerCase();
   const payloadPriceAmount = Number(payload.price_amount ?? payload.price_original);
   const payloadCurrency = payload.currency === "USD" || payload.price_currency === "USD" ? "USD" : "AFN";
   const initialPriceAmount = Number.isFinite(payloadPriceAmount) && payloadPriceAmount > 0
     ? payloadPriceAmount
     : candidate.normalized_price_afn;
-  const priceLabel = priceMode === "contact"
-    ? locale === "fa" ? "برای قیمت تماس بگیرید" : locale === "ps" ? "د بیې لپاره اړیکه ونیسئ" : "Contact for price"
-    : initialPriceAmount === null
-      ? copy.notSet
-      : `${new Intl.NumberFormat(dateLocale).format(initialPriceAmount)} ${payloadCurrency}`;
+  const priceLabel = initialPriceAmount === null
+    ? copy.notSet
+    : `${new Intl.NumberFormat(dateLocale).format(initialPriceAmount)} ${payloadCurrency}`;
   const signedMedia = (await Promise.all(((mediaResult.data ?? []) as MediaRow[]).map(async (item) => {
     const { data: signed } = await supabase.storage
       .from(item.storage_bucket)

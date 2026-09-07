@@ -67,7 +67,7 @@ test("Step 1 collects universal seller information without category blocking", (
   );
 
   assert.match(stepOneGuard, /description\.trim\(\)\.length < 20/);
-  assert.match(stepOneGuard, /submitPrice <= 0/);
+  assert.doesNotMatch(stepOneGuard, /submitPrice <= 0/);
   assert.match(stepOneGuard, /selectedProvinceId/);
   assert.match(stepOneGuard, /locationConfirmed/);
   assert.doesNotMatch(stepOneGuard, /missingCategory/);
@@ -237,7 +237,6 @@ test("Quick Post supports professional item location without exposing device GPS
   for (const marker of [
     "handleUseCurrentLocation",
     "navigator.geolocation.getCurrentPosition",
-    "LocationMapPicker",
     "locationSource",
     "locationVisibility",
     "privacyApproximate",
@@ -251,6 +250,7 @@ test("Quick Post supports professional item location without exposing device GPS
     assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.doesNotMatch(quickPostForm, /toFixed\(6\)/);
+  assert.doesNotMatch(quickPostForm, /LocationMapPicker|setOnMap|mapPinSaved/);
 
   const locationSection = quickPostForm.slice(
     quickPostForm.indexOf('data-testid="quick-post-location"'),
@@ -301,8 +301,8 @@ test("Quick Post exposes only Step 2 launch roots and maps unsupported item dete
 test("server validation relaxes configured required details only for quick mode", () => {
   assert.match(listingValidator, /priceModeEnum/);
   assert.match(listingValidator, /price_mode/);
-  assert.match(listingValidator, /price.*nonnegative/);
-  assert.match(listingValidator, /unless contact-for-price is selected/);
+  assert.match(listingValidator, /price.*positive/);
+  assert.doesNotMatch(listingValidator, /contact-for-price|"contact"/);
   assert.match(listingActions, /function isQuickPostingMode/);
   assert.match(listingActions, /field\.required === true && values\.length === 0 && !quickMode/);
   assert.match(listingActions, /field\.required && !value && !quickMode/);
@@ -365,8 +365,8 @@ test("listing cards and detail pages use contextual price display", () => {
   assert.match(featuredPage, /formatListingPrice\(listing, locale\)/);
   assert.match(detailSpecs, /formatListingPrice\(listing, locale\)/);
 
-  const contact = formatListingPrice({ price: 0, currency: "AFN", listing_attributes: [{ attribute_key: "price_mode", attribute_value_text: "contact" }] }, "en");
-  assert.equal(contact, "Contact for price");
+  const unavailable = formatListingPrice({ price: 0, currency: "AFN" }, "en");
+  assert.equal(unavailable, "Price unavailable");
 
   const dormitory = formatListingPrice({
     price: 2500,
@@ -396,11 +396,11 @@ test("buyer listing detail omits the unnecessary translation report controls", (
   assert.doesNotMatch(listingDetail, /reportTranslationIssue/);
 });
 
-test("contact-for-price sentinel is excluded from public price filters and price sorting", () => {
+test("public feeds always exclude zero-price legacy listings", () => {
   assert.match(listingQueries, /hasPriceBoundaryFilter/);
   assert.match(listingQueries, /hasPriceSort/);
   assert.match(listingQueries, /shouldExcludeContactPriceSentinel/);
   assert.match(listingQueries, /studentQuery = studentQuery\.gt\("price", 0\)/);
   assert.match(listingQueries, /realEstateQuery = realEstateQuery\.gt\("price", 0\)/);
-  assert.match(listingQueries, /query = query\.gt\("price", 0\)/);
+  assert.match(listingQueries, /\.gt\("price", 0\)/);
 });

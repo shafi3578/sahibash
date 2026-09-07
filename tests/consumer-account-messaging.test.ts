@@ -249,3 +249,61 @@ test("mobile account surfaces expose a localized current-session logout", () => 
   assert.match(authActions, /signOut\(\{ scope: "local" \}\)/);
   assert.match(authActions, /redirect\(localizePath\("\/", locale\)\)/);
 });
+
+test("normal users never receive administration navigation while authorized roles do", () => {
+  const dashboard = readFileSync(join(process.cwd(), "app", "dashboard", "page.tsx"), "utf8");
+  assert.match(dashboard, /is_admin/);
+  assert.match(dashboard, /is_super_administrator/);
+  assert.match(dashboard, /isAdministrator \? \[/);
+  assert.match(dashboard, /isSuperAdministrator \? \[/);
+  assert.doesNotMatch(readFileSync(join(process.cwd(), "components", "mobile-menu-sheet.tsx"), "utf8"), /\/admin|\/administrator/);
+});
+
+test("contact support is localized, rate limited, and service-written behind RLS", () => {
+  const publicPage = readFileSync(join(process.cwd(), "components", "public-info-page.tsx"), "utf8");
+  const form = readFileSync(join(process.cwd(), "components", "support-request-form.tsx"), "utf8");
+  const action = readFileSync(join(process.cwd(), "lib", "actions", "support.ts"), "utf8");
+  const migration = readFileSync(join(process.cwd(), "supabase", "migrations", "20260907212933_support_requests.sql"), "utf8");
+  assert.match(publicPage, /SupportRequestForm/);
+  assert.match(form, /useActionState<SupportRequestState, FormData>\(submitSupportRequest/);
+  assert.match(action, /consumeRateLimit/);
+  assert.match(action, /createSupabaseAdmin/);
+  assert.match(migration, /enable row level security/);
+  assert.match(migration, /revoke all on table public\.support_requests from anon, authenticated/);
+  assert.doesNotMatch(migration, /for insert to anon|for insert to authenticated/);
+});
+
+test("listing pagination is server-side and image viewing supports touch navigation", () => {
+  const home = readFileSync(join(process.cwd(), "app", "page.tsx"), "utf8");
+  const localizedHome = readFileSync(join(process.cwd(), "app", "[locale]", "page.tsx"), "utf8");
+  const listings = readFileSync(join(process.cwd(), "app", "listings", "page.tsx"), "utf8");
+  const gallery = readFileSync(join(process.cwd(), "components", "listings", "listing-gallery.tsx"), "utf8");
+  assert.match(home, /limit: pageSize, offset: \(currentPage - 1\) \* pageSize/);
+  assert.match(home, /getApprovedListingCount\(\)/);
+  assert.match(localizedHome, /<HomePage searchParams=\{searchParams\}/);
+  assert.match(listings, /const pageSize = 20/);
+  assert.match(listings, /offset: \(currentPage - 1\) \* pageSize/);
+  assert.match(gallery, /onTouchStart/);
+  assert.match(gallery, /onTouchEnd/);
+  assert.match(gallery, /ArrowLeft/);
+  assert.match(gallery, /ArrowRight/);
+});
+
+test("public listing views are counted without storing raw request fingerprints", () => {
+  const route = readFileSync(join(process.cwd(), "app", "api", "listings", "[id]", "view", "route.ts"), "utf8");
+  const tracker = readFileSync(join(process.cwd(), "components", "listings", "listing-view-tracker.tsx"), "utf8");
+  assert.match(route, /consumeRateLimit/);
+  assert.match(route, /listing\.user_id === user\?\.id/);
+  assert.match(route, /viewer_ip: null, user_agent: null/);
+  assert.match(tracker, /sessionStorage/);
+  assert.match(tracker, /keepalive: true/);
+});
+
+test("SIM inventory and legacy zero-price listings are retired non-destructively", () => {
+  const migration = readFileSync(join(process.cwd(), "supabase", "migrations", "20260907212918_remove_sim_category_and_contact_price.sql"), "utf8");
+  assert.match(migration, /sim-cards-numbers/);
+  assert.match(migration, /set is_active = false/);
+  assert.match(migration, /publication_status = 'archived'/);
+  assert.match(migration, /coalesce\(listing\.price, 0\) <= 0/);
+  assert.doesNotMatch(migration, /delete\s+from/i);
+});

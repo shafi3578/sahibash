@@ -71,13 +71,13 @@ export async function saveReviewedIngestCandidate(
   const originalLanguage = ["en", "fa", "ps"].includes(String(formData.get("original_language")))
     ? String(formData.get("original_language"))
     : "fa";
-  const priceMode = ["contact", "fixed", "negotiable"].includes(String(formData.get("price_mode")))
+  const priceMode = ["fixed", "negotiable"].includes(String(formData.get("price_mode")))
     ? String(formData.get("price_mode"))
-    : "contact";
+    : "fixed";
   const priceCurrency = formData.get("currency") === "USD" ? "USD" : "AFN";
   const priceInput = cleanText(formData.get("price_amount"), 32).replace(/[,،\s]/g, "");
   const parsedPrice = Number(priceInput);
-  const normalizedPrice = priceMode === "contact" ? 0 : parsedPrice;
+  const normalizedPrice = parsedPrice;
   const normalizedPhone = normalizeAfghanistanPhone(formData.get("contact_phone"));
   const translations = {
     en: {
@@ -99,7 +99,7 @@ export async function saveReviewedIngestCandidate(
   if (!Number.isInteger(provinceId) || provinceId <= 0) addError(errors, "province_id", "required");
   if (!Number.isInteger(districtId) || districtId <= 0) addError(errors, "district_id", "required");
   if (!normalizedPhone.normalized) addError(errors, "contact_phone", "invalid");
-  if (priceMode !== "contact" && (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0)) {
+  if (!Number.isFinite(normalizedPrice) || normalizedPrice <= 0) {
     addError(errors, "price_amount", "invalid");
   }
 
@@ -230,7 +230,8 @@ export async function saveReviewedIngestCandidate(
     province_id: String(provinceId),
     district_id: String(districtId),
     price_mode: priceMode,
-    ...(priceMode !== "contact" ? { price_amount: normalizedPrice, currency: priceCurrency } : {}),
+    price_amount: normalizedPrice,
+    currency: priceCurrency,
     details,
     vehicle,
     ...(expectsVehicleDamage && damageParts.length === VEHICLE_DAMAGE_PARTS.length ? {

@@ -64,7 +64,7 @@ export function IngestCandidateReviewForm({
   const [categoryQuery, setCategoryQuery] = useState("");
   const [provinceId, setProvinceId] = useState(initial.provinceId ?? 0);
   const [districtId, setDistrictId] = useState(initial.districtId ?? 0);
-  const [priceMode, setPriceMode] = useState(String(initial.payload.price_mode ?? "contact"));
+  const [priceMode, setPriceMode] = useState(String(initial.payload.price_mode ?? "fixed") === "negotiable" ? "negotiable" : "fixed");
   const [currency, setCurrency] = useState<"AFN" | "USD">(initial.currency);
   const [schema, setSchema] = useState<ListingSchemaConfig | null>(initialSchema);
   const [schemaStatus, setSchemaStatus] = useState<"idle" | "loading" | "error">(
@@ -383,15 +383,15 @@ export function IngestCandidateReviewForm({
         </label>
         <label className="text-sm font-bold">{copy.priceMode}
           <select name="price_mode" value={priceMode} onChange={(event) => setPriceMode(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
-            <option value="contact">{copy.contactPrice}</option><option value="fixed">{copy.fixed}</option><option value="negotiable">{copy.negotiable}</option>
+            <option value="fixed">{copy.fixed}</option><option value="negotiable">{copy.negotiable}</option>
           </select>
         </label>
         <label className="text-sm font-bold">{copy.amount}
-          <input name="price_amount" type="number" min="1" step="1" disabled={priceMode === "contact"} defaultValue={initial.normalizedPriceAmount && initial.normalizedPriceAmount > 0 ? initial.normalizedPriceAmount : ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 disabled:bg-[var(--surface-2)]" />
+          <input name="price_amount" type="number" min="1" step="1" required defaultValue={initial.normalizedPriceAmount && initial.normalizedPriceAmount > 0 ? initial.normalizedPriceAmount : ""} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5" />
           {errors.has("price_amount") ? <span className="mt-1 block text-xs text-red-700">{copy.fieldError}</span> : null}
         </label>
         <label className="text-sm font-bold">{copy.currency}
-          <select name="currency" value={currency} onChange={(event) => setCurrency(event.target.value === "USD" ? "USD" : "AFN")} disabled={priceMode === "contact"} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 disabled:bg-[var(--surface-2)]">
+          <select name="currency" value={currency} onChange={(event) => setCurrency(event.target.value === "USD" ? "USD" : "AFN")} className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
             <option value="AFN">AFN</option><option value="USD">USD</option>
           </select>
         </label>

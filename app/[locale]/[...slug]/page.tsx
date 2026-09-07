@@ -216,7 +216,7 @@ export default async function LocaleCatchAllPage({
     return renderPage(MyAdsPage, { searchParams: resolvedSearchParams });
   }
 
-  if (slug.length === 1 && (first === "privacy" || first === "terms" || first === "safety" || first === "contact")) {
+  if (slug.length === 1 && (first === "privacy" || first === "terms" || first === "safety" || first === "faq" || first === "contact")) {
     return <PublicInfoPage page={first} />;
   }
 

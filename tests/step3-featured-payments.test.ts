@@ -174,14 +174,14 @@ test("featured display derives from a valid future featured_until, not the stale
   assert.match(data, /if \(!listing\.featured\) return false/);
   assert.match(data, /if \(!listing\.featured_until\) return false/);
   assert.match(data, /return !Number\.isNaN\(expiry\.getTime\(\)\) && expiry > new Date\(\)/);
-  assert.match(homePage, /listings\.filter\(\(listing\) => isFeaturedCurrentlyActive\(listing\)\)/);
+  assert.match(homePage, /featured\.filter\(\(listing\) => isFeaturedCurrentlyActive\(listing\)\)/);
   assert.match(featuredPage, /\.filter\(\(listing\) => isFeaturedCurrentlyActive\(listing\)\)/);
   assert.match(listingCard, /const isFeatured = isFeaturedCurrentlyActive\(listing\)/);
   assert.doesNotMatch(queries, /featured[^\n]+order|order\([^\n]+featured/i);
 });
 
 test("homepage never presents ordinary latest listings as featured", () => {
-  assert.match(homePage, /const featuredRow = featured;/);
+  assert.match(homePage, /const featuredRow = featured\.filter\(\(listing\) => isFeaturedCurrentlyActive\(listing\)\)/);
   assert.doesNotMatch(homePage, /const featuredRow = featured\.length/);
   assert.match(homePage, /homeCopy\.noFeatured/);
 });

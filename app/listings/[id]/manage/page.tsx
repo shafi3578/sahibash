@@ -5,6 +5,7 @@ import {
   bumpListingAction,
   updateListingStatusAction,
   deleteListingAction,
+  republishOwnListingAction,
 } from "@/lib/actions/listings";
 import { getListingWithOwnerStats } from "@/lib/data/queries";
 import { getListingFeaturedPaymentSummary, isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
@@ -214,6 +215,14 @@ export default async function ListingManagePage({ params }: PageProps) {
               </button>
             </form>
           )}
+
+          {isExpired && (listing.source_type === "native" || listing.ownership_status === "claimed") ? (
+            <form action={async () => { "use server"; await republishOwnListingAction(listingId); }}>
+              <button type="submit" className="w-full rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800">
+                {locale === "fa" ? "نشر دوباره برای ۳۰ روز" : locale === "ps" ? "د ۳۰ ورځو لپاره بیا خپرول" : "Republish for 30 days"}
+              </button>
+            </form>
+          ) : null}
 
           {/* Delete Listing */}
           <DeleteListingForm listingId={listingId} label={ui.listingManage.deleteListing} />

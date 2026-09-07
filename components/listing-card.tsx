@@ -41,6 +41,18 @@ const CARD_FACT_LABELS = {
 
 const CARD_FACT_ORDER = ["condition", "mileage", "year", "storage", "ram", "rooms", "area_sqm"] as const;
 
+type LocalizedPlace = {
+  name?: string | null;
+  name_en?: string | null;
+  name_fa?: string | null;
+  name_ps?: string | null;
+};
+
+function localizedPlaceName(place: LocalizedPlace | null | undefined, locale: "en" | "fa" | "ps") {
+  if (!place) return "";
+  return String(place[`name_${locale}`] ?? place.name ?? place.name_en ?? "").trim();
+}
+
 function readAttributeValue(attribute: Record<string, unknown> | undefined) {
   if (!attribute) return null;
   return (
@@ -87,7 +99,13 @@ export async function ListingCard({
   const isDormitory = listing.category_node?.path === "real-estate/dormitory" || listing.category_node?.slug === "dormitory";
   const isStudentSuitable = Boolean(listing.suitable_for_students);
   const isFeatured = isFeaturedCurrentlyActive(listing);
-  const fallbackProvince = listing.province ?? listing.district ?? "-";
+  const localizedListing = listing as ListingWithImages & {
+    provinces?: LocalizedPlace | null;
+    districts?: LocalizedPlace | null;
+  };
+  const provinceLabel = localizedPlaceName(localizedListing.provinces, locale) || listing.province || "";
+  const districtLabel = localizedPlaceName(localizedListing.districts, locale) || listing.district || "";
+  const locationLabel = [provinceLabel, districtLabel].filter(Boolean).join(" · ") || "-";
   const attributes = new Map(
     ((listing as ListingWithImages & { listing_attributes?: Array<Record<string, unknown>> }).listing_attributes ?? [])
       .map((attribute) => [String(attribute.attribute_key), attribute])
@@ -133,7 +151,7 @@ export async function ListingCard({
       <div className="space-y-1.5 p-3 sm:p-4">
         <Link href={listingHref}><h3 className="line-clamp-2 text-base font-semibold text-[var(--ink-1)]">{displayTitle}</h3></Link>
         <p className="text-lg font-bold text-[var(--accent)]">{formatListingPrice(listing, locale, attributes)}</p>
-        <p className="line-clamp-1 text-xs text-[var(--ink-2)]">{fallbackProvince}{listing.district ? ` · ${listing.district}` : ""} · {freshness}</p>
+        <p className="line-clamp-1 text-xs text-[var(--ink-2)]">{locationLabel} · {freshness}</p>
         {sourceTransparency.needsAvailabilityWarning ? <p className="text-[11px] font-semibold text-amber-700">{sourceTransparency.freshnessLabel}</p> : null}
         {cardFields.length > 0 ? <div className="flex flex-wrap gap-1.5">{cardFields.slice(0,2).map((field) => <span key={field.key} className="rounded-full bg-[var(--surface-2)] px-2 py-1 text-[10px] text-[var(--ink-2)]">{field.value}</span>)}</div> : null}
         {showStatus ? <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">{listing.status}</p> : null}

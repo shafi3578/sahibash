@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { TouchEvent } from "react";
 import Image from "next/image";
 import type { ListingImage } from "@/types/database";
 
@@ -19,6 +20,7 @@ type Props = {
 export function ListingGallery({ images, title, labels = { open: "Open photo", close: "Close", previous: "Previous", next: "Next", photo: "Photo" } }: Props) {
   const [index, setIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const touchStartX = useRef<number | null>(null);
 
   const ordered = useMemo(() => {
     const list = [...images];
@@ -32,17 +34,41 @@ export function ListingGallery({ images, title, labels = { open: "Open photo", c
 
   const active = ordered[index];
   const src = active?.image_url ?? active?.public_url ?? null;
+  const count = ordered.length;
+  const previous = useCallback(() => setIndex((current) => count > 0 ? (current - 1 + count) % count : 0), [count]);
+  const next = useCallback(() => setIndex((current) => count > 0 ? (current + 1) % count : 0), [count]);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+      if (event.key === "ArrowLeft" && count > 1) previous();
+      if (event.key === "ArrowRight" && count > 1) next();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [count, fullscreen, next, previous]);
 
   if (!src) {
     return <div className="aspect-[4/3] w-full rounded-2xl border border-[var(--line)] bg-[var(--surface-2)]" />;
   }
 
-  const count = ordered.length;
+  const swipeProps = count > 1 ? {
+    onTouchStart: (event: TouchEvent) => { touchStartX.current = event.touches[0]?.clientX ?? null; },
+    onTouchEnd: (event: TouchEvent) => {
+      const start = touchStartX.current;
+      touchStartX.current = null;
+      if (start === null) return;
+      const delta = (event.changedTouches[0]?.clientX ?? start) - start;
+      if (Math.abs(delta) < 45) return;
+      if (delta < 0) next(); else previous();
+    },
+  } : {};
 
   return (
     <>
       <div className="relative overflow-hidden rounded-2xl border border-[var(--line)] bg-slate-950">
-        <button type="button" aria-label={labels.open} className="relative block aspect-[4/3] w-full" onClick={() => setFullscreen(true)}>
+        <button type="button" aria-label={labels.open} className="relative block aspect-[4/3] w-full touch-pan-y" onClick={() => setFullscreen(true)} {...swipeProps}>
           <Image
             src={src}
             alt={title}
@@ -88,7 +114,7 @@ export function ListingGallery({ images, title, labels = { open: "Open photo", c
                 {labels.close}
               </button>
             </div>
-            <div className="relative flex-1">
+            <div className="relative flex-1 touch-pan-y" {...swipeProps}>
               <Image
                 src={src}
                 alt={title}
@@ -102,7 +128,7 @@ export function ListingGallery({ images, title, labels = { open: "Open photo", c
                 <button
                   type="button"
                   aria-label={labels.previous}
-                  onClick={() => setIndex((prev) => (prev - 1 + count) % count)}
+                  onClick={previous}
                   className="min-h-11 rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white"
                 >
                   {labels.previous}
@@ -110,7 +136,7 @@ export function ListingGallery({ images, title, labels = { open: "Open photo", c
                 <button
                   type="button"
                   aria-label={labels.next}
-                  onClick={() => setIndex((prev) => (prev + 1) % count)}
+                  onClick={next}
                   className="min-h-11 rounded-lg border border-white/30 px-4 py-2 text-sm font-semibold text-white"
                 >
                   {labels.next}

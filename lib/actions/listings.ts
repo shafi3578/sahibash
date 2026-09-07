@@ -2011,6 +2011,42 @@ export async function updateListingStatusAction(
   return { ok: true, message: "Listing status updated" };
 }
 
+export async function republishOwnListingAction(listingId: string): Promise<{ ok: boolean; message: string }> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data: listing, error: readError } = await supabase
+    .from("listings")
+    .select("id,user_id,status,expires_at,source_type,ownership_status,price")
+    .eq("id", listingId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (readError || !listing) return { ok: false, message: "Listing not found" };
+  const ownerControlled = listing.source_type === "native" || listing.ownership_status === "claimed";
+  const expired = listing.status === "expired" || new Date(listing.expires_at).getTime() <= Date.now();
+  if (!ownerControlled || !expired || Number(listing.price) <= 0) {
+    return { ok: false, message: "This listing cannot be republished" };
+  }
+
+  const { error } = await supabase.from("listings").update({
+    status: "pending",
+    publication_status: "review",
+    freshness_status: "fresh",
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    archived_at: null,
+    removed_public_at: null,
+    featured: false,
+    featured_until: null,
+    updated_at: new Date().toISOString(),
+  }).eq("id", listingId).eq("user_id", user.id);
+
+  if (error) return { ok: false, message: error.message };
+  revalidatePublicMarketplaceCache(listingId);
+  revalidatePath("/dashboard/my-ads");
+  revalidatePath(`/listings/${listingId}/manage`);
+  return { ok: true, message: "Listing submitted for review" };
+}
+
 export async function deleteListingAction(listingId: string): Promise<{
   ok: boolean;
   message: string;

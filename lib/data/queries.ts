@@ -120,6 +120,7 @@ type ListingFilters = {
   parking?: boolean;
   listingType?: "for_sale" | "wanted";
   postedWithin?: "24h" | "7d" | "30d";
+  featuredOnly?: boolean;
   limit?: number;
   offset?: number;
 };
@@ -256,7 +257,9 @@ const PUBLIC_LISTING_SELECT = `
   category:category_id(id, name, slug, description, display_order, is_active, is_coming_soon, launch_date, created_at, updated_at),
   category_node:category_node_id(id, category_id, parent_id, name, slug, level, path, display_order, sort_order, is_leaf, is_active, description, icon, created_at, updated_at),
   listing_images(id, listing_id, image_url:public_url, public_url, is_primary, sort_order),
-  listing_attributes(id, listing_id, category_field_id, attribute_key, attribute_value_text, attribute_value_number, attribute_value_boolean, attribute_value_json, unit)
+  listing_attributes(id, listing_id, category_field_id, attribute_key, attribute_value_text, attribute_value_number, attribute_value_boolean, attribute_value_json, unit),
+  provinces!province_id(id, name, name_en, name_fa, name_ps, slug),
+  districts!district_id(id, name, name_en, name_fa, name_ps, slug)
 `;
 
 const LISTING_DETAIL_PRIVATE_SELECT = `
@@ -272,8 +275,6 @@ const LISTING_DETAIL_PRIVATE_SELECT = `
 
 const LISTING_DETAIL_PUBLIC_FALLBACK_SELECT = `
   ${PUBLIC_LISTING_SELECT},
-  provinces!province_id(id, name, name_en, name_fa, name_ps, slug),
-  districts!district_id(id, name, name_en, name_fa, name_ps, slug),
   areas!area_id(id, name, name_en, name_fa, name_ps, slug)
 `;
 
@@ -364,6 +365,45 @@ const getCachedSimpleApprovedListings = unstable_cache(
     tags: [PUBLIC_CACHE_TAGS.publicListingFeed],
   }
 );
+
+const getCachedApprovedListingCount = unstable_cache(
+  async (): Promise<number> => {
+    const supabase = createSupabasePublicServerClient();
+    const { data: activeCategories } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("is_active", true)
+      .eq("is_coming_soon", false);
+    const categoryIds = (activeCategories ?? []).map((row) => Number(row.id)).filter(Number.isFinite);
+    if (categoryIds.length === 0) return 0;
+
+    let query = supabase
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved")
+      .in("category_id", categoryIds)
+      .gt("price", 0)
+      .gt("expires_at", new Date().toISOString());
+    query = applyPublicListingQualityFilters(query);
+    const { count, error } = await query;
+    if (error) {
+      reportDataError("approved-listings.count", error);
+      return 0;
+    }
+    return count ?? 0;
+  },
+  ["sahibash-approved-listing-count"],
+  { revalidate: 30, tags: [PUBLIC_CACHE_TAGS.publicListingFeed] }
+);
+
+export async function getApprovedListingCount(): Promise<number> {
+  try {
+    return await getCachedApprovedListingCount();
+  } catch (error) {
+    reportDataError("approved-listings.count-unexpected", error);
+    return 0;
+  }
+}
 
 export async function getApprovedListings(
   filters?: ListingFilters
@@ -797,20 +837,21 @@ async function loadApprovedListings(
 
       const requestedLimit = Math.min(Math.max(filters?.limit ?? 40, 1), 120);
       const requestedOffset = Math.max(filters?.offset ?? 0, 0);
-      const queryLimit = Math.min(requestedLimit + requestedOffset, 120);
+      const isClientRankedSearch = filters?.sort === "relevant" && Boolean(filters.search?.trim());
+      const queryStart = isClientRankedSearch ? 0 : requestedOffset;
+      const queryEnd = isClientRankedSearch
+        ? Math.min(requestedLimit + requestedOffset, 120) - 1
+        : requestedOffset + requestedLimit - 1;
 
       let query = applyPublicListingEmbedLimits(supabase
         .from("listings")
         .select(PUBLIC_LISTING_SELECT as string)
         .eq("status", "approved")
         .in("category_id", lifecycleCategoryIds)
-        .limit(queryLimit));
+        .gt("price", 0)
+        .gt("expires_at", new Date().toISOString()));
 
       query = applyPublicListingQualityFilters(query);
-
-      if (shouldExcludeContactPriceSentinel) {
-        query = query.gt("price", 0);
-      }
 
       if (filters?.province) {
         query = query.eq("province", filters.province);
@@ -959,11 +1000,19 @@ async function loadApprovedListings(
         query = query.order("created_at", { ascending: false });
       }
 
+      if (filters?.featuredOnly) {
+        query = query
+          .eq("featured", true)
+          .gt("featured_until", new Date().toISOString());
+      }
+
+      query = query.range(queryStart, queryEnd);
+
       const { data, error } = await withDataTiming(
         "approved_listings.feed",
         async () => query,
         {
-          limit: queryLimit,
+          limit: requestedLimit,
           offset: requestedOffset,
           cacheable: !hasExpensiveDynamicListingFilters(filters),
           category_id: filters?.categoryId ?? null,
@@ -1028,7 +1077,7 @@ async function loadApprovedListings(
         return scored.map((item) => item.listing).slice(requestedOffset, requestedOffset + requestedLimit);
       }
 
-      return translatedRows.slice(requestedOffset, requestedOffset + requestedLimit);
+      return translatedRows;
     } catch (error) {
       reportDataError("approved-listings.unexpected", error);
       return [];

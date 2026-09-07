@@ -5,12 +5,18 @@ import { getHomepageSections } from "@/lib/actions/homepage-sections";
 import { getSiteSettings } from "@/lib/actions/site-settings";
 import { getHomeCategoryNodes } from "@/lib/categories/getCategories";
 import { resolveHomepageSections } from "@/lib/data/homepage-sections";
-import { getApprovedListings } from "@/lib/data/queries";
+import { getApprovedListingCount, getApprovedListings } from "@/lib/data/queries";
 import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 import { formatListingPrice } from "@/lib/listings/price-display";
+
+type HomePlace = { name?: string | null; name_en?: string | null; name_fa?: string | null; name_ps?: string | null };
+
+function homePlaceName(place: HomePlace | null | undefined, locale: "en" | "fa" | "ps") {
+  return String(place?.[`name_${locale}`] ?? place?.name ?? place?.name_en ?? "").trim();
+}
 
 function getHomePageCopy(
   locale: "en" | "fa" | "ps",
@@ -77,20 +83,20 @@ export default async function HomePage({
   const homepageSections = resolveHomepageSections(await homepageSectionsPromise);
   const postAdHref = href(postAdCreatePath);
 
-  const [listings, mobileCategories] = await Promise.all([
-    getApprovedListings({ locale, limit: 70 }),
+  const [latest, featured, totalListings, mobileCategories] = await Promise.all([
+    getApprovedListings({ locale, limit: pageSize, offset: (currentPage - 1) * pageSize }),
+    getApprovedListings({ locale, featuredOnly: true, limit: 4 }),
+    getApprovedListingCount(),
     getHomeCategoryNodes(),
   ]);
 
-  const featured = listings.filter((listing) => isFeaturedCurrentlyActive(listing)).slice(0, 4);
-  const latest = listings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const featuredRow = featured;
+  const featuredRow = featured.filter((listing) => isFeaturedCurrentlyActive(listing));
   const heroListings = featured.length ? featured : latest.slice(0, 3);
-  const totalPages = Math.max(1, Math.min(7, Math.ceil(listings.length / pageSize)));
+  const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[linear-gradient(180deg,#fff7ed_0%,#f8fafc_18%,#eef2ff_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
-      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#ffe08a_0,#f97316_22%,#0f172a_58%,#020617_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-sm">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[linear-gradient(180deg,#eef7f5_0%,#f8fbfa_20%,#f3f7f7_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#d8b45f_0,#0f766e_25%,#123333_62%,#071b1b_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-sm">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
             <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{homeCopy.tagline}</p>
@@ -214,20 +220,6 @@ export default async function HomePage({
             </p>
           )}
         </div>
-        {totalPages > 1 ? (
-          <div className="flex items-center justify-center gap-2 border-t border-slate-100 bg-white px-3 py-4">
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
-              <Link
-                key={page}
-                href={href(page === 1 ? "/" : `/?page=${page}`)}
-                aria-current={page === currentPage ? "page" : undefined}
-                className={`grid h-9 w-9 place-items-center rounded-full text-sm font-bold ${page === currentPage ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"}`}
-              >
-                {page}
-              </Link>
-            ))}
-          </div>
-        ) : null}
       </section>
 
       <section className="overflow-hidden bg-white sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm">
@@ -238,7 +230,10 @@ export default async function HomePage({
           {latest.map((listing, index) => {
             const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
             const displayTitle = listing.translated_title || listing.title;
-            const province = listing.province ?? listing.district ?? "-";
+            const localizedListing = listing as typeof listing & { provinces?: HomePlace | null; districts?: HomePlace | null };
+            const province = homePlaceName(localizedListing.provinces, locale) || listing.province || "";
+            const district = homePlaceName(localizedListing.districts, locale) || listing.district || "";
+            const location = [province, district].filter(Boolean).join(" · ") || "-";
             const isLikelyLcpImage = index === 0 && Boolean(image);
             return (
               <Link
@@ -262,7 +257,7 @@ export default async function HomePage({
                 </div>
                 <div className="min-w-0 px-3 pb-2 pt-2 sm:px-0 sm:pb-0 sm:pt-0">
                   <p className="line-clamp-2 text-base font-semibold text-slate-900 sm:font-normal sm:text-slate-800">{displayTitle}</p>
-                  <p className="mt-1 line-clamp-1 text-sm text-slate-500">{province}</p>
+                  <p className="mt-1 line-clamp-1 text-sm text-slate-500">{location}</p>
                 </div>
                 <p className="px-3 pb-4 text-lg font-bold text-[#1967b1] sm:col-span-1 sm:px-0 sm:pb-0 sm:text-xl">
                   {formatListingPrice(listing, locale)}
@@ -271,6 +266,20 @@ export default async function HomePage({
             );
           })}
         </div>
+        {totalPages > 1 ? (
+          <nav aria-label="Latest listing pages" className="flex flex-wrap items-center justify-center gap-2 border-t border-slate-100 bg-white px-3 py-4">
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+              <Link
+                key={page}
+                href={href(page === 1 ? "/" : `/?page=${page}`)}
+                aria-current={page === currentPage ? "page" : undefined}
+                className={`grid h-9 w-9 place-items-center rounded-full text-sm font-bold transition ${page === currentPage ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700 hover:border-[var(--accent)]"}`}
+              >
+                {page}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
       </section>
 
       <section className="px-4 sm:px-0">

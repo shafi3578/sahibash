@@ -139,7 +139,7 @@ export function VehicleBodyDiagram({
   return (
     <svg
       viewBox="0 0 404 433"
-      className={`h-auto w-full select-none ${compact ? "max-w-[404px]" : "max-w-[440px]"}`}
+      className={`h-auto w-full select-none ${compact ? "max-w-[280px] sm:max-w-[320px]" : "max-w-[360px] sm:max-w-[400px]"}`}
       role="img"
       aria-label={copy.label}
     >

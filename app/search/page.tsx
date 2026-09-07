@@ -620,7 +620,6 @@ export default async function SearchPage({
         title: "جستجوی صاحبش",
         placeholder: "مثلاً کرولا در کابل زیر 400000",
         button: "جستجوی هوشمند",
-        normalButton: "جستجو",
         interpreted: "برداشت صاحبش",
         confidence: "اعتماد",
       }
@@ -629,7 +628,6 @@ export default async function SearchPage({
           title: "د صاحبش لټون",
           placeholder: "لکه Corolla in Kabul under 400000",
           button: "هوښیار لټون",
-          normalButton: "لټون",
           interpreted: "د صاحبش برداشت",
           confidence: "باور",
         }
@@ -637,7 +635,6 @@ export default async function SearchPage({
           title: "Search Sahibash",
           placeholder: "a Corolla in Kabul under 400000",
           button: "AI search",
-          normalButton: "Search",
           interpreted: "Sahibash understood",
           confidence: "Confidence",
         };
@@ -650,7 +647,7 @@ export default async function SearchPage({
       </p>
 
       <section className="mt-4 rounded-2xl border border-[var(--line)] bg-white p-2 shadow-sm">
-        <form action={localizePath("/search", locale)} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+        <form action={localizePath("/search", locale)} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           <label className="sr-only" htmlFor="marketplace-search-query">{aiCopy.title}</label>
           <input
             id="marketplace-search-query"
@@ -660,14 +657,9 @@ export default async function SearchPage({
             maxLength={240}
             className="min-h-12 min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-4 text-base"
           />
-          <button name="mode" value="normal" className="min-h-12 rounded-xl bg-[var(--ink-1)] px-5 text-sm font-bold text-white">
-            {aiCopy.normalButton}
+          <button name="mode" value="ai" className="min-h-12 rounded-xl bg-[var(--accent)] px-5 text-sm font-bold text-white hover:brightness-95">
+            ✨ {aiCopy.button}
           </button>
-          {aiFlags.aiSearchEnabled ? (
-            <button name="mode" value="ai" className="min-h-12 rounded-xl border border-indigo-200 bg-indigo-50 px-5 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
-              ✨ {aiCopy.button}
-            </button>
-          ) : null}
           <SearchHiddenFields params={params} exclude={["q", "query", "mode", "aiQuery", "mobileFilters"]} />
         </form>
         {aiParsed ? (

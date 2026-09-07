@@ -57,7 +57,7 @@ test("AI parse telemetry stores a hash and interpreted filters, not raw query te
   assert.match(telemetry, /interpreted_filters/);
   assert.doesNotMatch(telemetry, /raw_query:\s*args\.rawQuery/);
   assert.match(searchPage, /aiFlags\.aiSearchEnabled/);
-  assert.match(searchPage, /name="mode" value="normal"/);
+  assert.doesNotMatch(searchPage, /name="mode" value="normal"/);
   assert.match(searchPage, /name="mode" value="ai"/);
   assert.match(searchPage, /logAiSearchParseTelemetry/);
 });

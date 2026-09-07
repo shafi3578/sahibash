@@ -44,24 +44,11 @@ type QuickPostProps = {
   postingImageDetectionEnabled?: boolean;
 };
 
-type LocationMapPickerProps = {
-  onLocationSelected: (location: { latitude: number; longitude: number; accuracy?: number }) => void;
-  initialLocation?: { latitude?: number; longitude?: number; accuracy?: number };
-};
-
 type VehicleDamageDiagramProps = {
   value: DamagePart[];
   onChange: (parts: DamagePart[]) => void;
   locale?: AppLocale;
 };
-
-const LocationMapPicker = dynamic<LocationMapPickerProps>(
-  () => import("@/components/location/LocationMapPicker"),
-  {
-    ssr: false,
-    loading: () => <div className="h-32 animate-pulse rounded-2xl bg-[var(--surface-2)]" aria-hidden="true" />,
-  }
-);
 
 const VehicleDamageDiagram = dynamic<VehicleDamageDiagramProps>(
   () => import("@/components/vehicles/VehicleDamageDiagram").then((mod) => mod.VehicleDamageDiagram),
@@ -83,10 +70,12 @@ type LocationApiOption = {
   province_id?: number | string;
   name?: string | null;
   name_en?: string | null;
+  name_fa?: string | null;
+  name_ps?: string | null;
 };
 type LocationApiResponse<T> = { success?: boolean; data?: T[] };
 type QuickStep = 1 | 2;
-type QuickLocationSource = "manual" | "device" | "map_pin";
+type QuickLocationSource = "manual" | "device";
 type QuickLocationVisibility = "exact" | "approximate" | "province_district" | "hidden";
 
 type StagedImage = {
@@ -108,20 +97,20 @@ type QuickKind =
 
 type DetailValue = string | boolean;
 
-function readLocationOptionName(option: LocationApiOption) {
-  return String(option.name ?? option.name_en ?? "").trim();
+function readLocationOptionName(option: LocationApiOption, locale: AppLocale) {
+  return String(option[`name_${locale}`] ?? option.name ?? option.name_en ?? "").trim();
 }
 
-function toProvinceOption(option: LocationApiOption): ProvinceOption | null {
+function toProvinceOption(option: LocationApiOption, locale: AppLocale): ProvinceOption | null {
   const id = Number(option.id);
-  const name = readLocationOptionName(option);
+  const name = readLocationOptionName(option, locale);
   return Number.isFinite(id) && name ? { id, name } : null;
 }
 
-function toDistrictOption(option: LocationApiOption): DistrictOption | null {
+function toDistrictOption(option: LocationApiOption, locale: AppLocale): DistrictOption | null {
   const id = Number(option.id);
   const provinceId = Number(option.province_id);
-  const name = readLocationOptionName(option);
+  const name = readLocationOptionName(option, locale);
   return Number.isFinite(id) && Number.isFinite(provinceId) && name
     ? { id, province_id: provinceId, name }
     : null;
@@ -255,12 +244,8 @@ const COPY = {
     locationRequired: "Required",
     locationConfirmedLabel: "Confirmed",
     gpsDenied: "Location permission was denied. You can continue by choosing manually.",
-    gpsUnavailable: "We could not detect your location right now. Choose manually or set a map pin.",
-    setOnMap: "Set on map",
-    hideMap: "Hide map",
-    mapPinSaved: "Map pin saved. Please confirm province and district.",
+    gpsUnavailable: "We could not detect your location right now. Choose the province and district manually.",
     locationPrivacy: "Public location privacy",
-    privacyExact: "Exact map pin",
     privacyApproximate: "Approximate area (recommended)",
     privacyDistrict: "District / city only",
     privacyHidden: "Hidden",
@@ -372,12 +357,8 @@ const COPY = {
     locationRequired: "ضروری",
     locationConfirmedLabel: "تایید شد",
     gpsDenied: "اجازه موقعیت داده نشد. می‌توانید دستی ادامه دهید.",
-    gpsUnavailable: "فعلاً نتوانستیم موقعیت را تشخیص دهیم. دستی انتخاب کنید یا پین نقشه بگذارید.",
-    setOnMap: "تعیین روی نقشه",
-    hideMap: "بستن نقشه",
-    mapPinSaved: "پین نقشه ذخیره شد. لطفاً ولایت و ولسوالی را تایید کنید.",
+    gpsUnavailable: "فعلاً نتوانستیم موقعیت را تشخیص دهیم. ولایت و ولسوالی را دستی انتخاب کنید.",
     locationPrivacy: "حریم خصوصی موقعیت عمومی",
-    privacyExact: "پین دقیق نقشه",
     privacyApproximate: "محدوده تقریبی (پیشنهادی)",
     privacyDistrict: "فقط شهر / ولسوالی",
     privacyHidden: "پنهان",
@@ -489,12 +470,8 @@ const COPY = {
     locationRequired: "اړین",
     locationConfirmedLabel: "تایید شو",
     gpsDenied: "د ځای اجازه رد شوه. تاسو لاسي انتخاب سره ادامه ورکولای شئ.",
-    gpsUnavailable: "اوس ځای ونه موندل شو. لاسي انتخاب وکړئ یا د نقشې پین وټاکئ.",
-    setOnMap: "په نقشه کې وټاکئ",
-    hideMap: "نقشه پټه کړئ",
-    mapPinSaved: "د نقشې پین خوندي شو. مهرباني وکړئ ولایت او ولسوالي تایید کړئ.",
+    gpsUnavailable: "اوس ځای ونه موندل شو. ولایت او ولسوالي په لاسي ډول وټاکئ.",
     locationPrivacy: "د عامه ځای محرمیت",
-    privacyExact: "دقیق نقشه پین",
     privacyApproximate: "نږدې سیمه (سپارښتنه)",
     privacyDistrict: "یوازې ښار / ولسوالي",
     privacyHidden: "پټ",
@@ -1124,7 +1101,6 @@ export default function QuickPostForm({
   const [locationConfirmed, setLocationConfirmed] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationHint, setLocationHint] = useState<string | null>(null);
-  const [showMapPicker, setShowMapPicker] = useState(false);
   const [showLocationDetails, setShowLocationDetails] = useState(false);
   const [selectedRootSlug, setSelectedRootSlug] = useState(() => normalizeQuickPostRootSlug(initialRootSlug));
   const [rootTouched, setRootTouched] = useState(Boolean(normalizeQuickPostRootSlug(initialRootSlug)));
@@ -1414,9 +1390,7 @@ export default function QuickPostForm({
             setLocationVisibility(nextVisibility as QuickLocationVisibility);
           }
           const nextSource = readDraftString(location.locationSource);
-          if (["manual", "device", "map_pin"].includes(nextSource)) {
-            setLocationSource(nextSource as QuickLocationSource);
-          }
+          setLocationSource(nextSource === "device" ? "device" : "manual");
           setLatitude(readDraftNumber(location.latitude));
           setLongitude(readDraftNumber(location.longitude));
           setLocationAccuracy(readDraftNumber(location.locationAccuracy));
@@ -1530,9 +1504,7 @@ export default function QuickPostForm({
           setLocationVisibility(serverVisibility as QuickLocationVisibility);
         }
         const serverSource = readDraftString(serverLocation.locationSource);
-        if (["manual", "device", "map_pin"].includes(serverSource)) {
-          setLocationSource(serverSource as QuickLocationSource);
-        }
+        setLocationSource(serverSource === "device" ? "device" : "manual");
         setLatitude(readDraftNumber(serverLocation.latitude));
         setLongitude(readDraftNumber(serverLocation.longitude));
         setLocationAccuracy(readDraftNumber(serverLocation.locationAccuracy));
@@ -1564,12 +1536,12 @@ export default function QuickPostForm({
   useEffect(() => {
     async function loadProvinces() {
       const data = (await fetchLocationOptions("/api/location/provinces"))
-        .map(toProvinceOption)
+        .map((option) => toProvinceOption(option, locale))
         .filter((row): row is ProvinceOption => Boolean(row));
       setProvinceOptions(data);
     }
     void loadProvinces();
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     if (!selectedProvinceId) {
@@ -1581,7 +1553,7 @@ export default function QuickPostForm({
       const data = (await fetchLocationOptions(
         `/api/location/districts?province_id=${encodeURIComponent(String(selectedProvinceId))}`
       ))
-        .map(toDistrictOption)
+        .map((option) => toDistrictOption(option, locale))
         .filter((row): row is DistrictOption => Boolean(row));
       if (!cancelled) setDistrictOptions(data);
     }
@@ -1589,7 +1561,7 @@ export default function QuickPostForm({
     return () => {
       cancelled = true;
     };
-  }, [selectedProvinceId]);
+  }, [locale, selectedProvinceId]);
 
   useEffect(() => {
     if (!draftLoaded) return;
@@ -2010,7 +1982,7 @@ export default function QuickPostForm({
   }, []);
 
   const confirmManualLocationIfReady = useCallback((provinceId: number | null, districtId: number | null) => {
-    setLocationSource((current) => current === "device" || current === "map_pin" ? current : "manual");
+    setLocationSource((current) => current === "device" ? current : "manual");
     setLocationConfirmed(Boolean(provinceId && districtId));
   }, []);
 
@@ -2176,8 +2148,6 @@ export default function QuickPostForm({
 
   function validateStepOneBeforeContinue() {
     if (description.trim().length < 20) return c.missingDescription;
-    const submitPrice = parseNumber(priceAmount);
-    if (!submitPrice || submitPrice <= 0) return c.missingPrice;
     if (!selectedProvinceId || !selectedDistrictId) return c.missingLocation;
     if (!locationConfirmed) return c.locationMustConfirm;
     return null;
@@ -2200,6 +2170,7 @@ export default function QuickPostForm({
       }
     }
     setStep(2);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   }
 
   function goBackToStepOne() {
@@ -2597,7 +2568,7 @@ export default function QuickPostForm({
             <p className="mt-1 text-xs text-[var(--ink-2)]">{postingCategorySuggestionsEnabled ? c.detectionHint : c.manualCategory}</p>
           </div>
           {postingCategorySuggestionsEnabled ? <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-bold text-[var(--ink-2)]">
-            {aiStatus === "working" ? c.aiWorking : aiStatus === "unavailable" ? c.aiUnavailable : categoryLoading ? c.aiWorking : "AI"}
+            {aiStatus === "unavailable" ? c.aiUnavailable : "AI"}
           </span> : null}
         </div>
 
@@ -2725,21 +2696,21 @@ export default function QuickPostForm({
                 </div>
               ) : (
                 <p className="mt-2 rounded-2xl bg-[var(--surface-2)] px-3 py-3 text-sm text-[var(--ink-2)]">
-                  {categoryLoading ? c.aiWorking : c.noSubcategories}
+                  {categoryLoading ? null : c.noSubcategories}
                 </p>
               )}
             </div>
           </div>
           {categoryLabel ? (
             <p className="mt-2 text-xs font-semibold text-[var(--ink-2)]">
-              {categoryLoading ? c.aiWorking : `${c.selectedSubcategory}: ${categoryLabel}`}
+              {`${c.selectedSubcategory}: ${categoryLabel}`}
             </p>
           ) : null}
         </div>
       </section>
       ) : null}
 
-      {step === 1 ? (
+      {step === 2 ? (
       <section data-testid="quick-post-price" className="order-40 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
         <h3 className="font-display text-lg font-bold">{c.price}</h3>
 
@@ -2820,19 +2791,19 @@ export default function QuickPostForm({
       ) : null}
 
       {step === 1 ? (
-      <section data-testid="quick-post-location" className="order-30 rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm sm:p-5">
+      <section data-testid="quick-post-location" className="order-30 rounded-2xl border border-[var(--line)] bg-white p-3 shadow-sm sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="font-display text-lg font-bold">{c.location}</h3>
-            <p className="mt-0.5 text-xs leading-5 text-[var(--ink-2)]">{c.currentLocationHint}</p>
+            <h3 className="font-display text-base font-bold">{c.location}</h3>
+            <p className="mt-0.5 line-clamp-1 text-[11px] text-[var(--ink-2)]">{c.currentLocationHint}</p>
           </div>
           <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${locationConfirmed ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
             {locationConfirmed ? c.locationConfirmedLabel : c.locationRequired}
           </span>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <label className="text-sm font-bold">
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <label className="text-xs font-bold">
             {c.province}
             <select
               value={selectedProvinceId ?? ""}
@@ -2843,7 +2814,7 @@ export default function QuickPostForm({
                 confirmManualLocationIfReady(nextProvinceId, null);
                 if (!nextProvinceId) setDistrictOptions([]);
               }}
-              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5"
+              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-white px-2.5 py-2 text-sm"
             >
               <option value="">{c.select}</option>
               {provinceOptions.map((province) => (
@@ -2851,7 +2822,7 @@ export default function QuickPostForm({
               ))}
             </select>
           </label>
-          <label className="text-sm font-bold">
+          <label className="text-xs font-bold">
             {c.district}
             <select
               value={selectedDistrictId ?? ""}
@@ -2861,7 +2832,7 @@ export default function QuickPostForm({
                 confirmManualLocationIfReady(selectedProvinceId, nextDistrictId);
               }}
               disabled={!selectedProvinceId}
-              className="mt-1 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 disabled:bg-[var(--surface-2)]"
+              className="mt-1 w-full rounded-lg border border-[var(--line)] bg-white px-2.5 py-2 text-sm disabled:bg-[var(--surface-2)]"
             >
               <option value="">{c.select}</option>
               {districtOptions.map((district) => (
@@ -2871,12 +2842,12 @@ export default function QuickPostForm({
           </label>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={handleUseCurrentLocation}
             disabled={isDetectingLocation}
-            className="min-h-10 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
+            className="min-h-9 flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[11px] font-black text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
           >
             {isDetectingLocation ? c.detectingLocation : c.useCurrentLocation}
           </button>
@@ -2885,7 +2856,7 @@ export default function QuickPostForm({
             onClick={() => setShowLocationDetails((current) => !current)}
             aria-expanded={showLocationDetails}
             aria-controls="quick-post-location-optional-details"
-            className="min-h-10 flex-1 rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold transition hover:bg-[var(--surface-2)]"
+            className="min-h-9 flex-1 rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-[11px] font-bold transition hover:bg-[var(--surface-2)]"
           >
             {showLocationDetails ? c.hideLocationOptions : c.moreLocationOptions}
           </button>
@@ -2910,31 +2881,6 @@ export default function QuickPostForm({
 
         {showLocationDetails ? (
           <div id="quick-post-location-optional-details" className="mt-3 space-y-3 border-t border-[var(--line)] pt-3">
-            <button
-              type="button"
-              onClick={() => setShowMapPicker((current) => !current)}
-              className="min-h-10 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-xs font-bold transition hover:bg-[var(--surface-2)]"
-            >
-              {showMapPicker ? c.hideMap : c.setOnMap}
-            </button>
-
-            {showMapPicker ? (
-              <div className="overflow-hidden rounded-2xl border border-[var(--line)]">
-                <LocationMapPicker
-                  initialLocation={{ latitude: latitude ?? undefined, longitude: longitude ?? undefined, accuracy: locationAccuracy ?? undefined }}
-                  onLocationSelected={(location) => {
-                    setLatitude(location.latitude);
-                    setLongitude(location.longitude);
-                    setLocationAccuracy(location.accuracy ?? null);
-                    setLocationSource("map_pin");
-                    setLocationVisibility((current) => current === "hidden" ? current : "approximate");
-                    setLocationConfirmed(Boolean(selectedProvinceId && selectedDistrictId));
-                    setLocationHint(c.mapPinSaved);
-                  }}
-                />
-              </div>
-            ) : null}
-
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-bold">
                 {c.area}
@@ -2955,7 +2901,6 @@ export default function QuickPostForm({
                   <option value="approximate">{c.privacyApproximate}</option>
                   <option value="province_district">{c.privacyDistrict}</option>
                   <option value="hidden">{c.privacyHidden}</option>
-                  <option value="exact">{c.privacyExact}</option>
                 </select>
                 <span className="mt-1 block text-xs font-normal text-[var(--ink-2)]">{c.exactHidden}</span>
               </label>

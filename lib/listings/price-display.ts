@@ -49,24 +49,24 @@ function readNumber(listing: PriceDisplayListing, key: string, fallbackAttribute
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function label(locale: AppLocale, key: "contact" | "monthly" | "gerawy" | "dormitory" | "lease") {
+function label(locale: AppLocale, key: "unavailable" | "monthly" | "gerawy" | "dormitory" | "lease") {
   const labels = {
     en: {
-      contact: "Contact for price",
+      unavailable: "Price unavailable",
       monthly: "Monthly rent",
       gerawy: "Gerawy/Rahn",
       dormitory: "Dorm fee",
       lease: "Lease price",
     },
     fa: {
-      contact: "قیمت به تماس",
+      unavailable: "قیمت موجود نیست",
       monthly: "کرایه ماهانه",
       gerawy: "گروی/رهن",
       dormitory: "فیس خوابگاه",
       lease: "قیمت اجاره",
     },
     ps: {
-      contact: "بیه په اړیکه",
+      unavailable: "بیه نشته",
       monthly: "میاشتنۍ کرایه",
       gerawy: "ګروۍ/رهن",
       dormitory: "د لیلیې فیس",
@@ -100,31 +100,31 @@ export function formatListingPrice(
   const priceMode = readText(listing, "price_mode", fallbackAttributes).toLowerCase();
   const paymentPeriod = readText(listing, "payment_period", fallbackAttributes) || listing.payment_period || "";
 
-  if (priceMode === "contact" || listing.price <= 0) {
-    return label(locale, "contact");
+  if (listing.price <= 0) {
+    return label(locale, "unavailable");
   }
 
   if (priceMode === "monthly_rent") {
     const amount = formatAmount(readNumber(listing, "monthly_rent", fallbackAttributes) ?? listing.price, listing, locale);
-    return amount ? `${label(locale, "monthly")}: ${amount}` : label(locale, "contact");
+    return amount ? `${label(locale, "monthly")}: ${amount}` : label(locale, "unavailable");
   }
 
   if (priceMode === "gerawy_rahn") {
     const gerawyAmount = formatAmount(readNumber(listing, "gerawy_amount", fallbackAttributes) ?? listing.price, listing, locale);
     const monthlyRent = formatAmount(readNumber(listing, "monthly_rent", fallbackAttributes), listing, locale);
     if (gerawyAmount && monthlyRent) return `${label(locale, "gerawy")}: ${gerawyAmount} + ${monthlyRent}`;
-    return gerawyAmount ? `${label(locale, "gerawy")}: ${gerawyAmount}` : label(locale, "contact");
+    return gerawyAmount ? `${label(locale, "gerawy")}: ${gerawyAmount}` : label(locale, "unavailable");
   }
 
   if (priceMode === "dormitory_fee") {
     const amount = formatAmount(readNumber(listing, "dormitory_fee", fallbackAttributes) ?? listing.price, listing, locale);
     const period = paymentPeriod ? ` / ${periodLabel(locale, paymentPeriod)}` : "";
-    return amount ? `${label(locale, "dormitory")}: ${amount}${period}` : label(locale, "contact");
+    return amount ? `${label(locale, "dormitory")}: ${amount}${period}` : label(locale, "unavailable");
   }
 
   if (priceMode === "lease") {
     const amount = formatAmount(readNumber(listing, "land_lease_price", fallbackAttributes) ?? listing.price, listing, locale);
-    return amount ? `${label(locale, "lease")}: ${amount}` : label(locale, "contact");
+    return amount ? `${label(locale, "lease")}: ${amount}` : label(locale, "unavailable");
   }
 
   return formatCurrencyAmount(listing.price, listing.currency, locale);

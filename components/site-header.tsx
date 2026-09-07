@@ -7,6 +7,7 @@ import { getSiteSettings } from "@/lib/actions/site-settings";
 import { localizeNavigationLabel } from "@/lib/i18n/navigation-labels";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 import { AuthAwareHeaderLinks, AuthAwareNotificationLink } from "@/components/auth-aware-header-actions";
+import { MobileMenuSheet } from "@/components/mobile-menu-sheet";
 
 export async function SiteHeader() {
   const [{ locale, t }, siteSettings, navigationItems] = await Promise.all([
@@ -35,8 +36,9 @@ export async function SiteHeader() {
             ))}
           </nav>
           <div className="flex min-w-0 items-center justify-end gap-1.5 sm:gap-2">
-            <AuthAwareNotificationLink locale={locale} label={mobileLabels.notifications} />
             <MobileSearchSheet locale={locale} />
+            <MobileMenuSheet locale={locale} />
+            <AuthAwareNotificationLink locale={locale} label={mobileLabels.notifications} />
 
             <AuthAwareHeaderLinks locale={locale} labels={t.header} />
           </div>

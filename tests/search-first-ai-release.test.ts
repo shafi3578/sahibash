@@ -101,11 +101,11 @@ test("AI feature mutations require RBAC, AAL2-backed RLS, Gateway verification, 
   assert.match(flagAction, /audit-failed/);
 });
 
-test("normal search is default and never enters the AI interpreter without explicit AI mode", () => {
+test("the single smart-search action enters AI only when explicitly submitted and enabled", () => {
   assert.match(searchPage, /rawParams\.mode === "ai"/);
   assert.match(searchPage, /const aiParsed = aiRequested[\s\S]*interpretAiSearch/);
-  assert.match(searchPage, /name="mode" value="normal"/);
-  assert.match(searchPage, /aiFlags\.aiSearchEnabled \? \(/);
+  assert.match(searchPage, /const aiRequested = aiFlags\.aiSearchEnabled/);
+  assert.doesNotMatch(searchPage, /name="mode" value="normal"/);
   assert.match(searchPage, /name="mode" value="ai"/);
   assert.match(searchPage, /getFilterDefinitionsForNode\(effectiveCategoryNodeId, locale\)/);
   assert.doesNotMatch(searchPage, /bg-gradient-to-br from-indigo-50/);
