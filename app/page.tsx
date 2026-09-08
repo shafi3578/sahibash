@@ -95,7 +95,7 @@ export default async function HomePage({
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[linear-gradient(180deg,#f8f5ed_0%,#f7f8f5_20%,#eef3f2_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_8%_0%,rgba(213,184,111,0.14),transparent_24%),linear-gradient(180deg,#fcfaf5_0%,#f4f1e9_36%,#edf3f1_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
       <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_18%_18%,rgba(199,164,92,0.32)_0,rgba(11,107,101,0.72)_24%,#0a3035_56%,#04131b_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-[0_22px_60px_rgba(4,25,35,0.2)]">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>

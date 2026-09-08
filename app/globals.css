@@ -3,14 +3,14 @@
 :root {
   --font-body: "Segoe UI", Tahoma, Arial, sans-serif;
   --font-display: "Segoe UI", Tahoma, Arial, sans-serif;
-  --surface-1: #f4f2ec;
-  --surface-2: #fbfaf7;
-  --ink-1: #10242e;
-  --ink-2: #5a686e;
-  --line: #d9d8d1;
-  --brand: #071f2b;
-  --brand-gold: #c7a45c;
-  --accent: #0b6b65;
+  --surface-1: #f2eee5;
+  --surface-2: #fcfaf5;
+  --ink-1: #0c2530;
+  --ink-2: #59676b;
+  --line: #ddd6c8;
+  --brand: #061c29;
+  --brand-gold: #d5b86f;
+  --accent: #08736c;
 }
 
 @theme inline {
@@ -20,7 +20,9 @@
 }
 
 body {
-  background: linear-gradient(180deg, #fbfaf7 0%, #f4f5f2 45%, #eef2f1 100%) fixed;
+  background:
+    radial-gradient(circle at 8% 0%, rgb(213 184 111 / 13%) 0%, transparent 28%),
+    linear-gradient(180deg, #fcfaf5 0%, #f3f1eb 48%, #edf3f1 100%) fixed;
   color: var(--ink-1);
   font-family: var(--font-body), sans-serif;
 }

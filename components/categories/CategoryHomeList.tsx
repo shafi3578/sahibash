@@ -34,7 +34,16 @@ function CategoryIcon({ slug }: { slug: string }) {
   };
   if (launchIcon[slug]) {
     return (
-      <Image src={launchIcon[slug]} alt="" width={56} height={56} quality={75} className="h-14 w-14 object-contain" />
+      <Image
+        src={launchIcon[slug]}
+        alt=""
+        aria-hidden="true"
+        width={72}
+        height={72}
+        loading="eager"
+        unoptimized
+        className="h-[4.25rem] w-[4.25rem] object-contain drop-shadow-[0_10px_10px_rgba(3,18,26,0.22)] sm:h-[4.5rem] sm:w-[4.5rem]"
+      />
     );
   }
   return (
@@ -76,18 +85,18 @@ export async function CategoryHomeList({ categories, locale = "en", showComingSo
 
   return (
     <div className="space-y-3">
-      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-2xl sm:border">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          {t.home.mainCategories}
-          <a href={localizePath("/categories", locale)} className="text-[var(--accent)]">{t.home.openCategoryBrowser}</a>
+      <section className="mx-3 overflow-hidden rounded-[1.75rem] border border-[#d5b86f]/45 bg-[radial-gradient(circle_at_15%_0%,rgba(213,184,111,0.20),transparent_32%),linear-gradient(145deg,#061c29_0%,#0a3037_58%,#082126_100%)] shadow-[0_18px_45px_-26px_rgba(2,20,29,0.9)] sm:mx-0">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#ead9aa] sm:text-xs">
+          <span>{t.home.mainCategories}</span>
+          <a href={localizePath("/categories", locale)} className="rounded-full border border-[#d5b86f]/40 bg-white/[0.07] px-3 py-1.5 text-end tracking-normal text-white transition hover:border-[#ead9aa] hover:bg-white/[0.12]">{t.home.openCategoryBrowser}</a>
         </div>
-        <div className="grid grid-cols-4 gap-2 p-3">
+        <div className="grid grid-cols-4 gap-1.5 p-2.5 sm:gap-3 sm:p-4">
           {launchRows.slice(0, 4).map((category) => (
-            <a key={category.id} href={localizePath(`/categories/${category.slug}`, locale)} className="group flex min-h-24 flex-col items-center justify-center gap-2 rounded-3xl bg-white p-2 text-center transition active:bg-slate-100">
-              <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-2xl bg-slate-50 shadow-sm ring-1 ring-slate-200 transition group-hover:scale-105">
+            <a key={category.id} href={localizePath(`/categories/${category.slug}`, locale)} className="group flex min-h-28 min-w-0 flex-col items-center justify-start gap-2 rounded-[1.35rem] border border-white/10 bg-white/[0.065] px-1.5 pb-2.5 pt-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition hover:-translate-y-0.5 hover:border-[#d5b86f]/55 hover:bg-white/[0.11] active:scale-[0.98] sm:min-h-32 sm:rounded-[1.6rem] sm:p-3">
+              <span aria-hidden="true" className="grid h-[4.6rem] w-full max-w-[5rem] place-items-center rounded-[1.15rem] bg-[linear-gradient(145deg,#fffdf8,#eee5d3)] shadow-[0_10px_24px_-13px_rgba(0,0,0,0.9)] ring-1 ring-[#ead9aa]/70 transition duration-300 group-hover:scale-[1.04] sm:h-20">
                 <CategoryIcon slug={category.slug} />
               </span>
-              <span className="line-clamp-2 text-xs font-bold">{category.name}</span>
+              <span className="line-clamp-2 text-[11px] font-extrabold leading-4 text-white sm:text-sm">{category.name}</span>
             </a>
           ))}
         </div>
@@ -100,7 +109,7 @@ export async function CategoryHomeList({ categories, locale = "en", showComingSo
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
             {comingSoonRows.map((category) => (
               <div key={category.id} aria-disabled="true" className="relative flex min-h-24 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-600">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white opacity-65"><CategoryIcon slug={category.slug} /></span>
+                <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white opacity-65"><CategoryIcon slug={category.slug} /></span>
                 <span className="min-w-0 text-sm font-bold">{category.name}</span>
                 <span className="absolute end-2 top-2 rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-black uppercase">{t.home.comingSoon}</span>
               </div>
