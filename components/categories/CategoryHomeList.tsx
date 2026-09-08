@@ -27,10 +27,10 @@ const FALLBACK_HOME_ROWS = [
 
 function CategoryIcon({ slug }: { slug: string }) {
   const launchIcon: Record<string, string> = {
-    vehicles: "/category-vehicles-v2.webp",
-    "real-estate": "/category-real-estate-v2.webp",
-    "mobile-phones-tablets": "/category-mobile-phones-tablets-v2.webp",
-    "second-hand-items": "/category-second-hand-items-v2.webp",
+    vehicles: "/category-vehicles-v3.webp",
+    "real-estate": "/category-real-estate-v3.webp",
+    "mobile-phones-tablets": "/category-mobile-phones-tablets-v3.webp",
+    "second-hand-items": "/category-second-hand-items-v3.webp",
   };
   if (launchIcon[slug]) {
     return (
