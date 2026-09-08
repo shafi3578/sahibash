@@ -9,6 +9,7 @@ import { scoreMarketplaceListing } from "../lib/ranking/marketplace";
 import {
   candidateMediaStoragePath,
   getTelegramTransferKey,
+  getTelegramSourceProvenance,
   selectLargestTelegramPhoto,
   telegramPhotoFingerprint,
 } from "../lib/inventory/telegram-media";
@@ -35,6 +36,14 @@ const telegramMediaMigration = readFileSync(
 );
 const telegramWebhook = readFileSync(
   join(process.cwd(), "app", "api", "telegram", "webhook", "route.ts"),
+  "utf8",
+);
+const sourcePermissionPage = readFileSync(
+  join(process.cwd(), "app", "admin", "inventory", "sources", "[id]", "page.tsx"),
+  "utf8",
+);
+const sourcePermissionAction = readFileSync(
+  join(process.cwd(), "lib", "actions", "inventory-source-permissions.ts"),
   "utf8",
 );
 const telegramWebhookAction = readFileSync(
@@ -67,6 +76,10 @@ const externalRetentionRpcFixMigration = readFileSync(
 );
 const telegramPrefillBackfillMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260906210523_backfill_telegram_candidate_prefill.sql"),
+  "utf8",
+);
+const verifiedSourcePermissionsMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260908084500_verified_external_source_permissions.sql"),
   "utf8",
 );
 const externalSourcePostedAtMigration = readFileSync(
@@ -233,6 +246,49 @@ test("Telegram album messages share one transfer identity and are no longer drop
   assert.doesNotMatch(telegramWebhook, /if \(!text && photos\.length > 0\)/);
   assert.match(telegramWebhook, /selectLargestTelegramPhoto/);
   assert.match(telegramWebhook, /listing_ingest_candidate_media/);
+});
+
+test("Telegram forwards preserve canonical source identity without claiming seller consent", () => {
+  const message = {
+    message_id: 90,
+    forward_origin: {
+      type: "channel",
+      date: 1_788_700_000,
+      message_id: 2295,
+      chat: { id: -1001234567890, title: "Herat Market", username: "HeratMarket" },
+    },
+  };
+  const provenance = getTelegramSourceProvenance(message);
+  const transfer = getTelegramTransferKey(message, "500");
+
+  assert.equal(provenance.sourceSlug, "telegram-heratmarket");
+  assert.equal(provenance.sourceName, "Herat Market");
+  assert.equal(provenance.sourceAccountId, "-1001234567890");
+  assert.equal(provenance.sourceItemId, "HeratMarket:2295");
+  assert.equal(provenance.sourceUrl, "https://t.me/HeratMarket/2295");
+  assert.match(provenance.sourcePublishedAt ?? "", /^2026-/);
+  assert.equal(transfer.sourceItemId, "HeratMarket:2295");
+  assert.equal(transfer.idempotencyKey, "telegram:source-item:HeratMarket:2295");
+  assert.match(telegramWebhook, /permission_basis: "administrator_authorized_forward"/);
+  assert.doesNotMatch(telegramWebhook, /permission_basis: "owner_forwarded_message"/);
+});
+
+test("external publication requires a source-scoped verified rights record", () => {
+  assert.match(verifiedSourcePermissionsMigration, /create table if not exists public\.listing_source_permissions/i);
+  assert.match(verifiedSourcePermissionsMigration, /source\.slug <> 'telegram-forwarded'/i);
+  assert.match(verifiedSourcePermissionsMigration, /permission\.status = 'verified'/i);
+  assert.match(verifiedSourcePermissionsMigration, /Verified source rights permission is required before publication/i);
+  assert.match(verifiedSourcePermissionsMigration, /provenance_status := 'authorized'/i);
+  assert.match(verifiedSourcePermissionsMigration, /permission_record_id := v_permission\.id::text/i);
+  assert.match(verifiedSourcePermissionsMigration, /LISTING_SOURCE_PERMISSION_VERIFIED/i);
+  assert.match(verifiedSourcePermissionsMigration, /provenance_status in \('permission_pending', 'authorized'\)/i);
+  assert.match(verifiedSourcePermissionsMigration, /revoke all on function public\.register_listing_source_permission_service/i);
+  assert.match(verifiedSourcePermissionsMigration, /to service_role/i);
+  assert.match(sourcePermissionAction, /requirePermission\("listings\.moderate"\)/i);
+  assert.match(sourcePermissionAction, /register_listing_source_permission_service/i);
+  assert.match(sourcePermissionPage, /AAL2 MFA \+ listings\.moderate/i);
+  assert.match(sourcePermissionPage, /disabled=\{isMixedSource\}/i);
+  assert.match(inventoryPage, /Manage source rights/i);
 });
 
 test("external inventory preserves verifiable source dates and rejects stale publication", () => {

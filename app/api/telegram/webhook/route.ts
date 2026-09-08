@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   candidateMediaStoragePath,
   downloadTelegramPhoto,
+  getTelegramSourceProvenance,
   getTelegramTransferKey,
   selectLargestTelegramPhoto,
   TELEGRAM_MEDIA_BUCKET,
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
       ? String(update.update_id)
       : crypto.randomUUID();
   const transfer = getTelegramTransferKey(message, updateId);
+  const forwardedSource = getTelegramSourceProvenance(message);
   const sourceItemId = publicPost ? `${publicPost.username}:${publicPost.postId}` : transfer.sourceItemId;
   const mediaGroupId = publicPost ? `public:${publicPost.username}:${publicPost.postId}` : transfer.mediaGroupId;
   const idempotencyKey = publicPost
@@ -139,10 +141,12 @@ export async function POST(request: Request) {
     .upsert(
       {
         source_type: "external_indexed",
-        name: "Telegram forwarded ads",
-        slug: "telegram-forwarded",
+        name: publicPost ? `@${publicPost.username}` : forwardedSource.sourceName,
+        slug: publicPost
+          ? `telegram-${publicPost.username.toLowerCase()}`.slice(0, 120)
+          : forwardedSource.sourceSlug,
         platform: "telegram",
-        permission_basis: "owner_forwarded_message",
+        permission_basis: "administrator_authorized_forward",
         ingest_method: "webhook",
         status: "active",
         kill_switch_enabled: false,
@@ -203,7 +207,11 @@ export async function POST(request: Request) {
       source_published_at: publicPost.publishedAt,
       public_post_username: publicPost.username,
       public_post_id: publicPost.postId,
-    } : {}),
+    } : {
+      ...(forwardedSource.sourceAccountId ? { source_account_id: forwardedSource.sourceAccountId } : {}),
+      ...(forwardedSource.sourceUrl ? { source_url: forwardedSource.sourceUrl } : {}),
+      ...(forwardedSource.sourcePublishedAt ? { source_published_at: forwardedSource.sourcePublishedAt } : {}),
+    }),
     ...(mediaGroupId ? { media_group_id: mediaGroupId } : {}),
   };
 
@@ -251,7 +259,11 @@ export async function POST(request: Request) {
       source_published_at: publicPost.publishedAt,
       public_post_username: publicPost.username,
       public_post_id: publicPost.postId,
-    } : {}),
+    } : {
+      ...(forwardedSource.sourceAccountId ? { source_account_id: forwardedSource.sourceAccountId } : {}),
+      ...(forwardedSource.sourceUrl ? { source_url: forwardedSource.sourceUrl } : {}),
+      ...(forwardedSource.sourcePublishedAt ? { source_published_at: forwardedSource.sourcePublishedAt } : {}),
+    }),
     ...(text ? { title, description: text } : {}),
     ...(!existingPayload.contact_phone && prefill.normalizedPhone ? { contact_phone: prefill.normalizedPhone } : {}),
     ...(!existingPayload.price_original && prefill.priceAmount && prefill.priceCurrency ? {

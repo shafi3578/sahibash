@@ -19,6 +19,98 @@ export type DownloadedTelegramPhoto = {
   extension: "jpg" | "png" | "webp";
 };
 
+export type TelegramSourceProvenance = {
+  sourceSlug: string;
+  sourceName: string;
+  sourceAccountId: string | null;
+  sourceItemId: string | null;
+  sourceUrl: string | null;
+  sourcePublishedAt: string | null;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return Boolean(value) && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function telegramTimestamp(value: unknown) {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) return null;
+  const timestamp = new Date(value * 1_000);
+  return Number.isNaN(timestamp.getTime()) ? null : timestamp.toISOString();
+}
+
+function telegramChatIdentity(value: unknown) {
+  const chat = asRecord(value);
+  if (!chat) return null;
+
+  const username = typeof chat.username === "string"
+    ? chat.username.trim().replace(/^@/, "")
+    : "";
+  const numericId = typeof chat.id === "number" && Number.isSafeInteger(chat.id)
+    ? String(chat.id)
+    : "";
+  if (!username && !numericId) return null;
+
+  const stableKey = username
+    ? username.toLowerCase()
+    : `chat-${numericId.replace(/^-/, "")}`;
+  const title = typeof chat.title === "string" && chat.title.trim()
+    ? chat.title.trim().slice(0, 160)
+    : username
+      ? `@${username}`
+      : "Telegram source";
+
+  return {
+    username: username || null,
+    accountId: numericId || null,
+    slug: `telegram-${stableKey}`.slice(0, 120),
+    name: title,
+  };
+}
+
+/**
+ * Extracts only provenance Telegram itself supplies. It never treats a forward
+ * as seller consent; the source remains administrator-reviewed and unclaimed.
+ */
+export function getTelegramSourceProvenance(message: Record<string, unknown>): TelegramSourceProvenance {
+  const origin = asRecord(message.forward_origin);
+  const originChat = origin && (origin.type === "channel" || origin.type === "chat")
+    ? telegramChatIdentity(origin.chat ?? origin.sender_chat)
+    : null;
+  const legacyChat = telegramChatIdentity(message.forward_from_chat);
+  const source = originChat ?? legacyChat;
+  const originalMessageId = positiveInteger(origin?.message_id)
+    ?? positiveInteger(message.forward_from_message_id);
+  const sourcePublishedAt = telegramTimestamp(origin?.date ?? message.forward_date);
+
+  if (!source) {
+    return {
+      sourceSlug: "telegram-forwarded",
+      sourceName: "Telegram forwarded ads",
+      sourceAccountId: null,
+      sourceItemId: null,
+      sourceUrl: null,
+      sourcePublishedAt,
+    };
+  }
+
+  const sourceItemId = originalMessageId
+    ? `${source.username ?? source.accountId}:${originalMessageId}`
+    : null;
+
+  return {
+    sourceSlug: source.slug,
+    sourceName: source.name,
+    sourceAccountId: source.accountId,
+    sourceItemId,
+    sourceUrl: source.username && originalMessageId
+      ? `https://t.me/${source.username}/${originalMessageId}`
+      : null,
+    sourcePublishedAt,
+  };
+}
+
 function positiveInteger(value: unknown) {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0
     ? value
@@ -54,7 +146,7 @@ export function selectLargestTelegramPhoto(value: unknown): TelegramPhoto | null
 }
 
 export function getTelegramTransferKey(message: Record<string, unknown>, updateId: string) {
-  const sourceItemId =
+  const targetMessageId =
     typeof message.message_id === "number" && Number.isSafeInteger(message.message_id)
       ? String(message.message_id)
       : updateId;
@@ -62,13 +154,19 @@ export function getTelegramTransferKey(message: Record<string, unknown>, updateI
     typeof message.media_group_id === "string" && message.media_group_id.trim()
       ? message.media_group_id.trim()
       : null;
+  const provenance = getTelegramSourceProvenance(message);
+  const sourceItemId = !mediaGroupId && provenance.sourceItemId
+    ? provenance.sourceItemId
+    : targetMessageId;
 
   return {
     sourceItemId,
     mediaGroupId,
     idempotencyKey: mediaGroupId
       ? `telegram:media-group:${mediaGroupId}`
-      : `telegram:message:${sourceItemId}`,
+      : provenance.sourceItemId
+        ? `telegram:source-item:${provenance.sourceItemId}`
+        : `telegram:message:${sourceItemId}`,
   };
 }
 

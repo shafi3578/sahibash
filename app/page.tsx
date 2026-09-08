@@ -95,8 +95,8 @@ export default async function HomePage({
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_8%_0%,rgba(213,184,111,0.14),transparent_24%),linear-gradient(180deg,#fcfaf5_0%,#f4f1e9_36%,#edf3f1_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
-      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_18%_18%,rgba(199,164,92,0.32)_0,rgba(11,107,101,0.72)_24%,#0a3035_56%,#04131b_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-[0_22px_60px_rgba(4,25,35,0.2)]">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_8%_0%,rgba(209,180,112,0.20),transparent_27%),radial-gradient(circle_at_95%_22%,rgba(18,112,103,0.10),transparent_30%),linear-gradient(180deg,#fbf8f0_0%,#f3efe5_38%,#eaf1ef_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_18%_16%,rgba(218,190,124,0.35)_0,rgba(19,117,106,0.63)_25%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(133,88,38,0.18),transparent_38%),linear-gradient(135deg,#071924_0%,#0a3436_56%,#040f17_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#d8bd7a]/25 sm:shadow-[0_24px_65px_-22px_rgba(1,18,27,0.62)]">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
             <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{homeCopy.tagline}</p>
