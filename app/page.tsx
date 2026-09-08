@@ -95,8 +95,8 @@ export default async function HomePage({
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_8%_0%,rgba(209,180,112,0.20),transparent_27%),radial-gradient(circle_at_95%_22%,rgba(18,112,103,0.10),transparent_30%),linear-gradient(180deg,#fbf8f0_0%,#f3efe5_38%,#eaf1ef_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
-      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_18%_16%,rgba(218,190,124,0.35)_0,rgba(19,117,106,0.63)_25%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(133,88,38,0.18),transparent_38%),linear-gradient(135deg,#071924_0%,#0a3436_56%,#040f17_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#d8bd7a]/25 sm:shadow-[0_24px_65px_-22px_rgba(1,18,27,0.62)]">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_7%_0%,rgba(201,169,98,0.16),transparent_25%),radial-gradient(circle_at_96%_21%,rgba(15,105,98,0.09),transparent_29%),linear-gradient(180deg,#fbfaf7_0%,#f4f2ed_42%,#edf2f0_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_17%_10%,rgba(207,174,101,0.30)_0,rgba(10,93,88,0.50)_24%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(173,126,55,0.16),transparent_38%),linear-gradient(135deg,#06131d_0%,#082a30_54%,#030c13_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#d8bd7a]/35 sm:shadow-[0_28px_72px_-25px_rgba(1,15,24,0.70),0_1px_0_rgba(255,255,255,0.1)_inset]">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
             <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{homeCopy.tagline}</p>
