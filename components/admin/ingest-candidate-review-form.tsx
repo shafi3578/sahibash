@@ -89,15 +89,10 @@ export function IngestCandidateReviewForm({
   const showVehicleDamage = shouldShowVehicleDamageDiagram(rootSlug, branchKey);
   const visibleCategories = useMemo(() => {
     const normalizedQuery = categoryQuery.trim().toLocaleLowerCase();
-    const matches = normalizedQuery
+    return normalizedQuery
       ? categories.filter((category) => `${category.label} ${category.path ?? ""}`.toLocaleLowerCase().includes(normalizedQuery))
       : categories;
-    const limited = matches.slice(0, 100);
-    const selected = categories.find((category) => category.id === categoryNodeId);
-    return selected && !limited.some((category) => category.id === selected.id)
-      ? [selected, ...limited]
-      : limited;
-  }, [categories, categoryNodeId, categoryQuery]);
+  }, [categories, categoryQuery]);
   const visibleDistricts = useMemo(
     () => districts.filter((district) => district.provinceId === provinceId),
     [districts, provinceId],

@@ -507,6 +507,8 @@ test("candidate review supports all active published leaf schemas and is super-a
   assert.match(inventoryCandidatePage, /leafData\.push\(\.\.\.rows\)/);
   assert.match(inventoryCandidatePage, /leafData\.sort\(\(left, right\) => left\.path\.localeCompare\(right\.path\) \|\| left\.id - right\.id\)/);
   assert.doesNotMatch(inventoryCandidatePage, /\.limit\(1000\)/);
+  assert.match(candidateReviewControl, /categories\.filter\(\(category\) =>/);
+  assert.doesNotMatch(candidateReviewControl, /matches\.slice\(0, 100\)/);
 });
 
 test("30-day cleanup is cron-protected and cannot touch normal user listings", () => {
