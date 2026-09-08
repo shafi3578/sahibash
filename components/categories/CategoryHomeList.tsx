@@ -40,8 +40,8 @@ function CategoryIcon({ slug }: { slug: string }) {
         aria-hidden="true"
         width={448}
         height={448}
-        sizes="(max-width: 639px) 104px, 132px"
-        className="h-[6.5rem] w-[6.5rem] object-contain drop-shadow-[0_14px_14px_rgba(4,15,24,0.28)] transition duration-500 group-hover:scale-[1.06] sm:h-[8.25rem] sm:w-[8.25rem]"
+        sizes="(max-width: 639px) 68px, 112px"
+        className="h-[4.25rem] w-[4.25rem] object-contain drop-shadow-[0_12px_12px_rgba(0,0,0,0.42)] transition duration-500 group-hover:scale-[1.07] sm:h-28 sm:w-28"
       />
     );
   }
@@ -84,25 +84,29 @@ export async function CategoryHomeList({ categories, locale = "en", showComingSo
 
   return (
     <div className="space-y-3">
-      <section className="relative mx-3 w-[calc(100%_-_1.5rem)] overflow-hidden rounded-[1.75rem] border border-[#c7a968]/55 bg-[radial-gradient(circle_at_8%_-20%,rgba(221,193,129,0.28),transparent_34%),radial-gradient(circle_at_94%_115%,rgba(18,123,111,0.30),transparent_40%),linear-gradient(135deg,#071722_0%,#0a2530_46%,#06151e_100%)] shadow-[0_28px_70px_-34px_rgba(3,16,25,0.88),0_1px_0_rgba(255,255,255,0.12)_inset] sm:mx-0 sm:w-full">
-        <div aria-hidden="true" className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#f0d99f] to-transparent" />
-        <div className="relative flex items-center justify-between gap-3 border-b border-[#d8bd7a]/20 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#f2dfad] sm:px-5 sm:py-4 sm:text-xs">
+      <section className="relative mx-3 w-[calc(100%_-_1.5rem)] overflow-hidden rounded-[1.75rem] border border-[#c9a860]/55 bg-[radial-gradient(circle_at_6%_-15%,rgba(217,184,111,0.22),transparent_32%),radial-gradient(circle_at_96%_120%,rgba(19,132,116,0.25),transparent_42%),linear-gradient(145deg,#020b12_0%,#071c24_48%,#092b2a_100%)] shadow-[0_30px_72px_-36px_rgba(0,9,15,0.92),0_1px_0_rgba(255,255,255,0.11)_inset] sm:mx-0 sm:w-full">
+        <div aria-hidden="true" className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#f1d590] to-transparent" />
+        <div className="relative flex items-center justify-between gap-3 border-b border-[#d8bd7a]/20 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#f3dda6] sm:px-5 sm:py-4 sm:text-xs">
           <span>{t.home.mainCategories}</span>
-          <a href={localizePath("/categories", locale)} className="min-w-0 max-w-[9rem] truncate rounded-full border border-[#d8bd7a]/45 bg-[#f8f2e5]/[0.08] px-3 py-1.5 text-end tracking-normal text-[#fffaf0] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition hover:border-[#f0d99f] hover:bg-white/[0.14] sm:max-w-none">
+          <a href={localizePath("/categories", locale)} className="min-w-0 max-w-[9rem] truncate rounded-full border border-[#d8bd7a]/50 bg-[#d8bd7a]/10 px-3 py-1.5 text-end tracking-normal text-[#fff9eb] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition hover:border-[#f0d99f] hover:bg-[#d8bd7a]/20 sm:max-w-none">
             <span className="sm:hidden">{t.search.allCategories}</span>
             <span className="hidden sm:inline">{t.home.openCategoryBrowser}</span>
           </a>
         </div>
-        <div className="relative grid grid-cols-2 gap-2 p-2.5 sm:grid-cols-4 sm:gap-3 sm:p-4">
-          {launchRows.slice(0, 4).map((category) => (
-            <a key={category.id} href={localizePath(`/categories/${category.slug}`, locale)} className={`group relative flex min-h-[9.5rem] min-w-0 flex-col items-center justify-between overflow-hidden rounded-[1.2rem] border border-[#eadbb8]/75 bg-gradient-to-b ${CATEGORY_CARD_GLOW[category.slug] ?? "from-[#f5f1e8] to-[#e8e3d8]"} px-1 pb-2.5 pt-1 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_35px_-24px_rgba(0,0,0,0.85)] transition duration-300 hover:-translate-y-1 hover:border-[#efd89d] hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),0_24px_45px_-24px_rgba(0,0,0,0.9)] active:scale-[0.98] sm:min-h-[11.5rem] sm:rounded-[1.6rem] sm:px-3 sm:pb-4 sm:pt-2`}>
-              <span aria-hidden="true" className="grid h-[7.1rem] w-full place-items-center transition duration-300 sm:h-[8.7rem]">
-                <CategoryIcon slug={category.slug} />
-              </span>
-              <span className="line-clamp-2 text-xs font-black leading-4 text-[#102b34] sm:text-[15px]">{category.name}</span>
-              <span aria-hidden="true" className="absolute inset-x-5 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#b58b3f]/70 to-transparent" />
-            </a>
-          ))}
+        <div className="relative grid grid-cols-4 gap-1.5 p-2.5 sm:gap-3 sm:p-4">
+          {launchRows.slice(0, 4).map((category) => {
+            const style = CATEGORY_CARD_STYLE[category.slug] ?? CATEGORY_CARD_FALLBACK;
+            return (
+              <a key={category.id} href={localizePath(`/categories/${category.slug}`, locale)} className="group relative flex min-h-[7.6rem] min-w-0 flex-col items-center justify-between overflow-hidden rounded-[1.15rem] border border-[#dfc781]/30 bg-[linear-gradient(155deg,rgba(255,255,255,0.12),rgba(255,255,255,0.035))] px-1 pb-2.5 pt-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.13),0_18px_32px_-24px_rgba(0,0,0,0.95)] transition duration-300 hover:-translate-y-1 hover:border-[#efd89d]/75 hover:bg-[linear-gradient(155deg,rgba(255,255,255,0.17),rgba(255,255,255,0.055))] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_24px_44px_-24px_rgba(0,0,0,0.95)] active:scale-[0.98] sm:min-h-[10.5rem] sm:rounded-[1.55rem] sm:px-3 sm:pb-3 sm:pt-3">
+                <span aria-hidden="true" className={`absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-[70%] rounded-full blur-2xl sm:h-32 sm:w-32 ${style.halo}`} />
+                <span aria-hidden="true" className="relative grid h-[4.7rem] w-full place-items-center transition duration-300 sm:h-[7.4rem]">
+                  <CategoryIcon slug={category.slug} />
+                </span>
+                <span className="relative line-clamp-2 text-[10px] font-black leading-3 text-[#fff9eb] sm:text-sm sm:leading-5">{category.name}</span>
+                <span aria-hidden="true" className={`absolute inset-x-4 bottom-0 h-[2px] bg-gradient-to-r from-transparent ${style.line} to-transparent sm:inset-x-8`} />
+              </a>
+            );
+          })}
         </div>
       </section>
 
@@ -125,9 +129,14 @@ export async function CategoryHomeList({ categories, locale = "en", showComingSo
   );
 }
 
-const CATEGORY_CARD_GLOW: Record<string, string> = {
-  vehicles: "from-[#d7f1e8] via-[#f9f6ed] to-[#e8eee9]",
-  "real-estate": "from-[#f6e4bc] via-[#fbf7ef] to-[#ece7dc]",
-  "mobile-phones-tablets": "from-[#dbe7f7] via-[#f8f6f0] to-[#e8e8ef]",
-  "second-hand-items": "from-[#e7dccd] via-[#faf6ee] to-[#ece6dd]",
+const CATEGORY_CARD_FALLBACK = {
+  halo: "bg-[#d8bd7a]/20",
+  line: "via-[#d8bd7a]/80",
+};
+
+const CATEGORY_CARD_STYLE: Record<string, typeof CATEGORY_CARD_FALLBACK> = {
+  vehicles: { halo: "bg-[#20a48f]/30", line: "via-[#55d5bd]" },
+  "real-estate": { halo: "bg-[#d8a34d]/30", line: "via-[#f0c773]" },
+  "mobile-phones-tablets": { halo: "bg-[#5b83c7]/30", line: "via-[#8db2ed]" },
+  "second-hand-items": { halo: "bg-[#9f7652]/30", line: "via-[#d5ab7a]" },
 };

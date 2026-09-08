@@ -95,7 +95,7 @@ export default async function HomePage({
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_7%_0%,rgba(201,169,98,0.16),transparent_25%),radial-gradient(circle_at_96%_21%,rgba(15,105,98,0.09),transparent_29%),linear-gradient(180deg,#fbfaf7_0%,#f4f2ed_42%,#edf2f0_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_4%_0%,rgba(190,145,63,0.18),transparent_27%),radial-gradient(circle_at_98%_18%,rgba(8,103,91,0.12),transparent_31%),linear-gradient(180deg,#faf7f0_0%,#eee7dc_46%,#eef3f0_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
       <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_17%_10%,rgba(207,174,101,0.30)_0,rgba(10,93,88,0.50)_24%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(173,126,55,0.16),transparent_38%),linear-gradient(135deg,#06131d_0%,#082a30_54%,#030c13_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#d8bd7a]/35 sm:shadow-[0_28px_72px_-25px_rgba(1,15,24,0.70),0_1px_0_rgba(255,255,255,0.1)_inset]">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
@@ -155,22 +155,22 @@ export default async function HomePage({
         </section>
       ) : null}
 
-      <section className="hidden border-y border-slate-200 bg-white sm:block sm:rounded-2xl sm:border sm:shadow-sm">
+      <section className="hidden border-y border-[#d7c49a] bg-[#fffdf8] sm:block sm:rounded-2xl sm:border sm:shadow-[0_18px_45px_-34px_rgba(4,27,34,0.55)]">
         <form action={href("/search")} className="grid grid-cols-[1fr_auto] gap-2 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-4">
           <input
             name="q"
             placeholder={t.home.searchPlaceholder}
-            className="min-w-0 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm"
+            className="min-w-0 rounded-xl border border-[#d8c7a3] bg-[#f8f4eb] px-3 py-2.5 text-sm text-[#0a2630] outline-none transition focus:border-[#a98843] focus:ring-2 focus:ring-[#d8bd7a]/25"
           />
           <button
             type="submit"
-            className="rounded-xl bg-[var(--ink-1)] px-4 py-2.5 text-sm font-semibold text-white"
+            className="rounded-xl bg-[#073b3a] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(3,58,56,0.9)] transition hover:bg-[#09504c]"
           >
             {t.home.searchButton}
           </button>
           <Link
             href={postAdHref}
-            className="col-span-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-center text-sm font-semibold sm:col-span-1"
+            className="col-span-2 rounded-xl border border-[#b9974d] bg-[#fffaf0] px-4 py-2.5 text-center text-sm font-semibold text-[#5f481d] transition hover:bg-[#f4e8cc] sm:col-span-1"
           >
             {t.home.postAd}
           </Link>
@@ -181,8 +181,8 @@ export default async function HomePage({
         <CategoryHomeList categories={mobileCategories} locale={locale} />
       </section>
 
-      <section className="overflow-hidden border-y border-slate-200 bg-white sm:rounded-3xl sm:border sm:shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:bg-gradient-to-r sm:from-[#f4ead4] sm:to-white">
+      <section className="overflow-hidden border-y border-[#d9c8a3] bg-[#fffdf9] sm:rounded-3xl sm:border sm:shadow-[0_22px_52px_-40px_rgba(3,28,35,0.62)]">
+        <div className="flex items-center justify-between border-b border-[#d9c8a3] bg-[linear-gradient(90deg,#efe1c1_0%,#fbf7ef_48%,#f4f7f4_100%)] px-4 py-3 text-xs font-black uppercase tracking-wide text-[#18343a]">
           {t.home.featuredListings}
           <Link href={href("/featured")} className="rounded-full bg-[#efe2c5] px-2 py-1 text-[10px] text-[#614c21]">{homeCopy.allFeatured}</Link>
         </div>
@@ -222,8 +222,8 @@ export default async function HomePage({
         </div>
       </section>
 
-      <section className="overflow-hidden bg-white sm:rounded-3xl sm:border sm:border-slate-200 sm:shadow-sm">
-        <div className="border-y border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:border-b sm:border-t-0 sm:bg-slate-50">
+      <section className="overflow-hidden bg-[#fffdf9] sm:rounded-3xl sm:border sm:border-[#d9c8a3] sm:shadow-[0_22px_52px_-40px_rgba(3,28,35,0.62)]">
+        <div className="border-y border-[#d9c8a3] bg-[linear-gradient(90deg,#f2e6cd_0%,#fffdf9_54%,#edf3f0_100%)] px-4 py-3 text-xs font-black uppercase tracking-wide text-[#18343a] sm:border-b sm:border-t-0">
           {t.home.latestListings}
         </div>
         <div className="divide-y divide-slate-100 sm:divide-slate-200">
