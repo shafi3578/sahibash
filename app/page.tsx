@@ -95,7 +95,7 @@ export default async function HomePage({
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_4%_0%,rgba(190,145,63,0.18),transparent_27%),radial-gradient(circle_at_98%_18%,rgba(8,103,91,0.12),transparent_31%),linear-gradient(180deg,#faf7f0_0%,#eee7dc_46%,#eef3f0_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_4%_0%,rgba(202,158,72,0.22),transparent_28%),radial-gradient(circle_at_98%_18%,rgba(7,117,105,0.13),transparent_32%),linear-gradient(180deg,#fcf8ef_0%,#efe7d9_46%,#eef4f1_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
       <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_17%_10%,rgba(207,174,101,0.30)_0,rgba(10,93,88,0.50)_24%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(173,126,55,0.16),transparent_38%),linear-gradient(135deg,#06131d_0%,#082a30_54%,#030c13_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#d8bd7a]/35 sm:shadow-[0_28px_72px_-25px_rgba(1,15,24,0.70),0_1px_0_rgba(255,255,255,0.1)_inset]">
         <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
           <div>
