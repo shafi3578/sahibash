@@ -12,6 +12,7 @@ import type { AppLocale } from "@/lib/i18n/translations";
 import Link from "next/link";
 import { isFeaturedPaymentTargetEligible, type FeaturedPaymentTarget } from "@/lib/payments/featured-eligibility";
 import { FEATURED_EXTENSION_CONSENT_VERSION, featuredExtensionConsentCopy, getFeaturedPaymentInstructions, hasFeaturedExtensionConsent, isClosedFeaturedPaymentRequest } from "@/lib/payments/featured-consent";
+import { FEATURED_PAYMENT_UNAVAILABLE_COPY, isFeaturedPaymentDestinationReady } from "@/lib/payments/featured-readiness";
 
 type Copy = {
   success: string;
@@ -164,6 +165,9 @@ export function FeaturedPromotionPanel({
   const canRequest = isFeaturedPaymentTargetEligible({ ...listing, status: listingStatus });
   const requestStatus = request?.status;
   const hasConsent = request ? hasFeaturedExtensionConsent(request) : false;
+  const campaignDestinationReady = isFeaturedPaymentDestinationReady(config?.merchant_reference);
+  const requestDestinationReady = isFeaturedPaymentDestinationReady(request?.merchant_reference);
+  const paymentDestinationReady = request ? requestDestinationReady : campaignDestinationReady;
 
   return (
     <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-4 shadow-sm">
@@ -204,6 +208,12 @@ export function FeaturedPromotionPanel({
         </div>
       )}
 
+      {!isActive && (request || config) && !paymentDestinationReady ? (
+        <p role="status" className="mt-4 rounded-xl border border-amber-200 bg-white p-3 text-sm text-amber-900">
+          {FEATURED_PAYMENT_UNAVAILABLE_COPY[locale].seller}
+        </p>
+      ) : null}
+
       {isActive ? (
         <div className={`mt-4 rounded-xl border px-3 py-2 text-sm ${statusTone("approved")}`}>
           <strong>{copy.status}: {copy.active}</strong>
@@ -215,7 +225,7 @@ export function FeaturedPromotionPanel({
         </div>
       ) : null}
 
-      {!isActive && !request && config && canRequest ? (
+      {!isActive && !request && config && canRequest && campaignDestinationReady ? (
         <div className="mt-4 flex flex-wrap gap-2">
           <form action={requestFeaturedPromotionAction.bind(null, listingId)} className="grid w-full gap-3">
             <input type="hidden" name="consent_duration_days" value={config.duration_days} />
@@ -255,7 +265,7 @@ export function FeaturedPromotionPanel({
 
       {!isActive && request && !hasConsent ? <p className="mt-4 rounded-xl border border-amber-200 bg-white p-3 text-sm text-amber-900">{copy.consentMissing}</p> : null}
 
-      {!isActive && request && hasConsent && config && canRequest && ["pending_payment", "rejected"].includes(request.status) ? (
+      {!isActive && request && hasConsent && config && canRequest && requestDestinationReady && ["pending_payment", "rejected"].includes(request.status) ? (
         <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
           <div>
             <p className="text-sm font-bold text-slate-950">{copy.hesabPayInstructions}</p>

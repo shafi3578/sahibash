@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { isFeaturedPaymentTargetEligible, type FeaturedPaymentTarget } from "@/lib/payments/featured-eligibility";
 import { FEATURED_EXTENSION_CONSENT_VERSION, featuredConsentRequiredMessage, featuredExtensionConsentCopy, getFeaturedPaymentInstructions, hasFeaturedExtensionConsent, isClosedFeaturedPaymentRequest, matchesFeaturedConsentTerms } from "@/lib/payments/featured-consent";
+import { FEATURED_PAYMENT_UNAVAILABLE_COPY, isFeaturedPaymentDestinationReady } from "@/lib/payments/featured-readiness";
 
 const root = process.cwd();
 const migration = readFileSync(
@@ -40,6 +41,71 @@ const mfa = readFileSync(join(root, "lib", "auth", "mfa-authorization.ts"), "utf
 const listingActions = readFileSync(join(root, "lib", "actions", "listings.ts"), "utf8");
 const listingValidator = readFileSync(join(root, "lib", "validators", "listing.ts"), "utf8");
 const queries = readFileSync(join(root, "lib", "data", "queries.ts"), "utf8");
+
+test("Featured destination readiness rejects missing setup without imposing a merchant ID format", () => {
+  const placeholder = "Configure merchant destination in Super Admin before launch";
+  for (const value of [null, undefined, 0, {}, "", " \t\n\r", placeholder, placeholder.toUpperCase()]) {
+    assert.equal(isFeaturedPaymentDestinationReady(value), false);
+  }
+  // Match ECMAScript whitespace in the SQL boundary, not locale-specific SQL \s.
+  for (const codePoint of [9, 10, 11, 12, 13, 32, 0xa0, 0x1680, ...Array.from({ length: 11 }, (_, index) => 0x2000 + index), 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff]) {
+    const whitespace = String.fromCodePoint(codePoint);
+    assert.equal(isFeaturedPaymentDestinationReady(whitespace), false);
+    assert.equal(isFeaturedPaymentDestinationReady(`${whitespace}${placeholder.replaceAll(" ", whitespace)}${whitespace}`), false);
+  }
+  for (const value of ["MERCHANT-42", "account:afn/merchant_42", "+93700000000", "مقصد-۴۲", "  merchant account 42  "]) {
+    assert.equal(isFeaturedPaymentDestinationReady(value), true);
+  }
+});
+
+test("unavailable payment destinations have EN/FA/PS guidance without claiming merchant verification", () => {
+  for (const audience of ["seller", "admin"] as const) {
+    const messages = ["en", "fa", "ps"].map((locale) => FEATURED_PAYMENT_UNAVAILABLE_COPY[locale as "en" | "fa" | "ps"][audience]);
+    assert.equal(new Set(messages).size, 3);
+    assert.ok(messages.every((message) => message.length > 80));
+  }
+  assert.match(FEATURED_PAYMENT_UNAVAILABLE_COPY.en.seller, /Do not pay or upload proof/);
+  assert.match(FEATURED_PAYMENT_UNAVAILABLE_COPY.en.seller, /Free posting remains available/);
+  assert.match(FEATURED_PAYMENT_UNAVAILABLE_COPY.en.admin, /does not verify merchant ownership/);
+});
+
+test("destination readiness gates new requests and saved proof destinations without altering active promotions", () => {
+  const requestAction = actions.slice(actions.indexOf("export async function requestFeaturedPromotionAction"), actions.indexOf("export async function submitFeaturedPaymentProofAction"));
+  const proofAction = actions.slice(actions.indexOf("export async function submitFeaturedPaymentProofAction"), actions.indexOf("export async function adminApprove"));
+  const requestGuard = requestAction.indexOf("!isFeaturedPaymentDestinationReady(config.merchant_reference)");
+  const proofGuard = proofAction.indexOf("!isFeaturedPaymentDestinationReady(request.merchant_reference)");
+  assert.ok(requestGuard > 0 && requestGuard < requestAction.indexOf(".insert("));
+  assert.ok(proofGuard > 0 && proofGuard < proofAction.indexOf(".upload("));
+  assert.ok(proofGuard < proofAction.indexOf(".update("));
+  assert.match(paymentPanel, /campaignDestinationReady = isFeaturedPaymentDestinationReady\(config\?\.merchant_reference\)/);
+  assert.match(paymentPanel, /requestDestinationReady = isFeaturedPaymentDestinationReady\(request\?\.merchant_reference\)/);
+  assert.match(paymentPanel, /paymentDestinationReady = request \? requestDestinationReady : campaignDestinationReady/);
+  assert.match(paymentPanel, /!isActive && !request && config && canRequest && campaignDestinationReady/);
+  assert.match(paymentPanel, /!isActive && request && hasConsent && config && canRequest && requestDestinationReady/);
+  assert.match(paymentPanel, /!isActive && \(request \|\| config\) && !paymentDestinationReady/);
+  assert.match(paymentPanel, /\{isActive \? \([\s\S]*copy\.active/);
+  assert.match(paymentPanel, /FEATURED_PAYMENT_UNAVAILABLE_COPY\[locale\]\.seller/);
+  assert.match(superAdminPage, /!isFeaturedPaymentDestinationReady\(config\?\.merchant_reference\)/);
+  assert.match(superAdminPage, /FEATURED_PAYMENT_UNAVAILABLE_COPY\[locale\]\.admin/);
+});
+
+test("database destination readiness remains a private insert-only guard without authorization or data rewrites", () => {
+  const sql = readFileSync(join(root, "supabase", "migrations", "20260916220149_featured_merchant_destination_readiness.sql"), "utf8")
+    .replace(/--[^\r\n]*/g, "");
+  assert.match(sql, /create\s+function\s+private\.guard_featured_merchant_destination\s*\(\s*\)\s+returns\s+trigger/i);
+  assert.match(sql, /security\s+invoker\s+set\s+search_path\s*=\s*''/i);
+  assert.match(sql, /create\s+trigger\s+guard_featured_merchant_destination\s+before\s+insert\s+on\s+public\.promotion_payment_requests\s+for\s+each\s+row\s+execute\s+function\s+private\.guard_featured_merchant_destination\s*\(\s*\)/i);
+  const revoked = sql.match(/revoke\s+all\s+on\s+function\s+private\.guard_featured_merchant_destination\s*\(\s*\)\s+from\s+([^;]+);/i);
+  assert.ok(revoked, "the trigger must not become a callable privileged API");
+  assert.deepEqual(revoked[1].split(",").map((role) => role.trim().toLowerCase()).sort(), ["anon", "authenticated", "public", "service_role"]);
+  const body = sql.match(/as\s+\$\$([\s\S]*?)\$\$/i)?.[1] ?? "";
+  assert.match(body, /coalesce\s*\(\s*new\.merchant_reference\s*,\s*''\s*\)/i);
+  assert.match(body, /pg_catalog\.lower[\s\S]*pg_catalog\.btrim[\s\S]*pg_catalog\.regexp_replace/i);
+  assert.match(body, /if\s+v_destination\s*=\s*''\s+or\s+v_destination\s*=\s*'configure merchant destination in super admin before launch'\s+then\s+raise\s+exception\s+'featured payment destination is not configured'\s+using\s+errcode\s*=\s*'22023'/i);
+  assert.match(body, /return\s+new\s*;/i);
+  assert.doesNotMatch(sql, /\b(?:security\s+definer|update|delete|truncate|insert\s+into|alter|grant|create\s+policy|drop)\b/i);
+  assert.doesNotMatch(body, /new\.[a-z_]+\s*:=|\bauth\.|has_admin_permission|require_aal2|is_aal2/i);
+});
 
 test("Step 3 migration creates a dedicated private payment request domain", () => {
   assert.match(migration, /create table if not exists public\.promotion_campaign_configs/);
@@ -233,7 +299,7 @@ test("request, correction, and direct approval all enforce public target eligibi
   assert.match(paymentSafetyMigration, /perform 1 from public\.listings where id = new\.listing_id for update/);
   assert.doesNotMatch(paymentSafetyMigration, /set\s+expires_at\s*=/i);
   assert.match(myAdsPage, /isFeaturedPaymentTargetEligible\(listing\)/);
-  assert.match(paymentPanel, /config && canRequest && \["pending_payment", "rejected"\]/);
+  assert.match(paymentPanel, /config && canRequest && requestDestinationReady && \["pending_payment", "rejected"\]/);
 });
 
 test("rejected proof correction clears only a real owner's prior review fields", () => {
@@ -272,11 +338,17 @@ test("payment audit evidence stays restricted to payment-authorized administrato
   assert.doesNotMatch(paymentSafetyMigration, /drop policy if exists audit_logs_admin_only|alter policy audit_logs_admin_only|grant (?:select|all).*audit_logs/i);
 });
 
-test("proof action cannot notify or report success when its conditional update affects no row", async () => {
+test("proof action preserves invalid-destination evidence and requires a persisted update before notifying", async () => {
   const { transpileModule, ScriptTarget } = await import("typescript");
   const action = actions.slice(actions.indexOf("export async function submitFeaturedPaymentProofAction"), actions.indexOf("export async function adminApprove"));
   const executable = transpileModule(action.replace("export async function", "async function"), { compilerOptions: { target: ScriptTarget.ES2022 } }).outputText;
-  for (const persisted of [false, true]) {
+  for (const { persisted, merchantReference } of [
+    { persisted: false, merchantReference: "MERCHANT-42" },
+    { persisted: true, merchantReference: "MERCHANT-42" },
+    { persisted: true, merchantReference: null },
+    { persisted: true, merchantReference: "Configure merchant destination in Super Admin before launch" },
+  ]) {
+    const ready = isFeaturedPaymentDestinationReady(merchantReference);
     let notifications = 0;
     let reads = 0;
     const mutationFilters: unknown[][] = [];
@@ -290,7 +362,7 @@ test("proof action cannot notify or report success when its conditional update a
       select: () => readQuery,
       eq: () => readQuery,
       maybeSingle: async () => ({ data: reads++ === 0
-        ? { id: "request", listing_id: "listing", user_id: "owner", status: "rejected", amount: 30, currency: "AFN", extension_consent_version: FEATURED_EXTENSION_CONSENT_VERSION, extension_consented_at: "2026-09-16T00:00:00Z", purchased_duration_days: 30 }
+        ? { id: "request", listing_id: "listing", user_id: "owner", status: "rejected", amount: 30, currency: "AFN", merchant_reference: merchantReference, extension_consent_version: FEATURED_EXTENSION_CONSENT_VERSION, extension_consented_at: "2026-09-16T00:00:00Z", purchased_duration_days: 30 }
         : { title: "Listing", status: "approved", publication_status: "published", expires_at: "2099-01-01T00:00:00Z", price: 100 }, error: null }),
       update: () => updateQuery,
     };
@@ -300,16 +372,18 @@ test("proof action cannot notify or report success when its conditional update a
       createSupabaseServerClient: async () => ({ from: () => readQuery }),
       isFeaturedPaymentTargetEligible,
       hasFeaturedExtensionConsent,
+      isFeaturedPaymentDestinationReady,
       notifyAdminsForFeaturedReview: async () => { notifications++; },
       revalidatePath: () => {},
       redirect: (path: string) => { throw new Error(`redirect:${path}`); },
     }) as (formData: FormData) => Promise<void>;
-    await assert.rejects(invoke(new FormData()), persisted ? /featured=submitted/ : /Unable to submit Featured payment proof/);
-    assert.equal(notifications, persisted ? 1 : 0);
-    assert.deepEqual(JSON.parse(JSON.stringify(mutationFilters)), [
+    await assert.rejects(invoke(new FormData()), !ready ? /featured=not-configured/ : persisted ? /featured=submitted/ : /Unable to submit Featured payment proof/);
+    assert.equal(notifications, ready && persisted ? 1 : 0);
+    assert.equal(reads, ready ? 2 : 1);
+    assert.deepEqual(JSON.parse(JSON.stringify(mutationFilters)), ready ? [
       ["eq", "id", "request"], ["eq", "user_id", "owner"],
       ["in", "status", ["pending_payment", "rejected"]], ["select", "id"],
-    ]);
+    ] : []);
   }
 });
 
@@ -396,7 +470,7 @@ test("closed payment requests allow a new consent form without reopening pending
   for (const status of ["pending_payment", "pending_review", "rejected", "unknown", ""]) assert.equal(isClosedFeaturedPaymentRequest(status), false);
   assert.match(paymentPanel, /summary\.request && \(isActive \|\| !isClosedFeaturedPaymentRequest\(summary\.request\.status\)\) \? summary\.request : null/);
   assert.match(paymentPanel, /!isActive && !request && config && canRequest/);
-  assert.match(paymentPanel, /request && hasConsent && config && canRequest && \["pending_payment", "rejected"\]/);
+  assert.match(paymentPanel, /request && hasConsent && config && canRequest && requestDestinationReady && \["pending_payment", "rejected"\]/);
 });
 
 test("repeat purchases use a new attempt key and duplicate failures cannot fabricate success", async () => {
@@ -410,7 +484,7 @@ test("repeat purchases use a new attempt key and duplicate failures cannot fabri
   form.set("extension_consent", FEATURED_EXTENSION_CONSENT_VERSION);
   form.set("consent_config_id", config.id); form.set("consent_config_updated_at", config.updated_at);
   form.set("consent_currency", config.currency); form.set("consent_duration_days", "30"); form.set("consent_amount", "30");
-  const run = async (status: string | null, previousId = "closed-request", duplicate?: "pending" | "missing") => {
+  const run = async (status: string | null, previousId = "closed-request", duplicate?: "pending" | "missing", merchantReference: unknown = "MERCHANT-42") => {
     let insertCount = 0;
     let key = "";
     let reads = 0;
@@ -423,13 +497,14 @@ test("repeat purchases use a new attempt key and duplicate failures cannot fabri
     const invoke = runInNewContext(`${executable}\nrequestFeaturedPromotionAction`, {
       createHash, FEATURED_EXTENSION_CONSENT_VERSION, UUID_PATTERN: /^[0-9a-f-]{36}$/,
       requireUser: async () => ({ id: "owner" }), createSupabaseServerClient: async () => ({ from: () => query }),
-      getActiveConfig: async () => config, matchesFeaturedConsentTerms, isClosedFeaturedPaymentRequest, isFeaturedPaymentTargetEligible,
+      getActiveConfig: async () => ({ ...config, merchant_reference: merchantReference }), matchesFeaturedConsentTerms, isClosedFeaturedPaymentRequest, isFeaturedPaymentTargetEligible, isFeaturedPaymentDestinationReady,
       revalidatePath: () => {}, redirect: (path: string) => { throw new Error(`redirect:${path}`); },
     }) as (id: string, form: FormData) => Promise<void>;
-    const expected = status && !isClosedFeaturedPaymentRequest(status) ? `featured=${status}`
+    const ready = isFeaturedPaymentDestinationReady(merchantReference);
+    const expected = !ready ? "featured=not-configured" : status && !isClosedFeaturedPaymentRequest(status) ? `featured=${status}`
       : duplicate === "pending" ? "featured=pending_payment" : duplicate === "missing" ? "Unable to create Featured payment request" : "featured=requested";
     await assert.rejects(invoke(listingId, form), new RegExp(expected));
-    assert.equal(insertCount, status && !isClosedFeaturedPaymentRequest(status) ? 0 : 1);
+    assert.equal(insertCount, !ready || status && !isClosedFeaturedPaymentRequest(status) ? 0 : 1);
     return key;
   };
   const first = await run(null);
@@ -440,4 +515,7 @@ test("repeat purchases use a new attempt key and duplicate failures cannot fabri
   for (const state of ["cancelled", "expired", "pending_payment", "pending_review", "rejected"]) await run(state);
   await run("cancelled", "closed-request", "pending");
   await run("cancelled", "closed-request", "missing");
+  for (const destination of [null, "", "Configure merchant destination in Super Admin before launch", "  CONFIGURE\tmerchant destination\nIN super admin BEFORE launch  "]) {
+    await run(null, "closed-request", undefined, destination);
+  }
 });

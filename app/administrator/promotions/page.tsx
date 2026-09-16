@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { formatDate, formatNumber } from "@/lib/i18n/format";
 import { adminPath } from "@/lib/admin/routing";
+import { FEATURED_PAYMENT_UNAVAILABLE_COPY, isFeaturedPaymentDestinationReady } from "@/lib/payments/featured-readiness";
 
 const COPY = {
   en: {
@@ -267,6 +268,11 @@ export default async function AdministratorPromotionsPage({
       <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
         <h2 className="text-xl font-black text-amber-950">{copy.featured}</h2>
         <p className="mt-1 text-sm text-amber-900">{copy.noSecrets}</p>
+        {!isFeaturedPaymentDestinationReady(config?.merchant_reference) ? (
+          <p role="status" className="mt-4 rounded-xl border border-amber-300 bg-white p-3 text-sm font-semibold text-amber-950">
+            {FEATURED_PAYMENT_UNAVAILABLE_COPY[locale].admin}
+          </p>
+        ) : null}
         {config ? (
           <div className="mt-4 grid gap-2 rounded-2xl bg-white p-4 text-sm text-slate-700 sm:grid-cols-3">
             <p>

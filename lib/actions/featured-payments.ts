@@ -16,6 +16,7 @@ import {
 import type { AppLocale } from "@/lib/i18n/translations";
 import { isFeaturedPaymentTargetEligible } from "@/lib/payments/featured-eligibility";
 import { FEATURED_EXTENSION_CONSENT_VERSION, hasFeaturedExtensionConsent, isClosedFeaturedPaymentRequest, matchesFeaturedConsentTerms } from "@/lib/payments/featured-consent";
+import { isFeaturedPaymentDestinationReady } from "@/lib/payments/featured-readiness";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_RECEIPT_TYPES: Record<string, string> = {
@@ -274,7 +275,7 @@ export async function requestFeaturedPromotionAction(listingId: string, formData
   }
 
   const config = await getActiveConfig(supabase);
-  if (!config) {
+  if (!config || !isFeaturedPaymentDestinationReady(config.merchant_reference)) {
     redirect(`/listings/${listingId}/manage?featured=not-configured`);
   }
 
@@ -355,7 +356,7 @@ export async function submitFeaturedPaymentProofAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const { data: request, error: requestError } = await supabase
     .from("promotion_payment_requests")
-    .select("id, listing_id, user_id, status, amount, currency, extension_consent_version, extension_consented_at, purchased_duration_days")
+    .select("id, listing_id, user_id, status, amount, currency, merchant_reference, extension_consent_version, extension_consented_at, purchased_duration_days")
     .eq("id", requestId)
     .maybeSingle();
 
@@ -364,6 +365,9 @@ export async function submitFeaturedPaymentProofAction(formData: FormData) {
   }
 
   const listingId = String(request.listing_id);
+  if (!isFeaturedPaymentDestinationReady(request.merchant_reference)) {
+    redirect(`/listings/${listingId}/manage?featured=not-configured`);
+  }
   if (!hasFeaturedExtensionConsent(request)) {
     redirect(`/listings/${listingId}/manage?featured=consent-required`);
   }

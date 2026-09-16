@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useId, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { updateSchemaCategoryStatusAction } from "@/lib/actions/listing-schema";
+import { getSchemaCategoryNavigationHref, getSchemaCategoryOptions } from "@/lib/admin/schema-category-navigation";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { SCHEMA_BUILDER_COPY } from "@/lib/i18n/schema-builder-copy";
 
@@ -11,19 +12,19 @@ export type SchemaCategoryNode = { id: number; name: string; path: string; level
 export function CategoryNavigator({ nodes, selectedId, locale }: { nodes: SchemaCategoryNode[]; selectedId: number; locale: AppLocale }) {
   const router = useRouter();
   const pathname = usePathname();
+  const categorySelectId = useId();
   const [search, setSearch] = useState("");
   const [isLoading, startTransition] = useTransition();
   const copy = SCHEMA_BUILDER_COPY[locale];
-  const selected = nodes.find((node) => node.id === selectedId);
-  const filtered = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return query ? nodes.filter((node) => `${node.name} ${node.path}`.toLocaleLowerCase().includes(query)) : nodes;
-  }, [nodes, search]);
+  const { selected, retainedSelection, options, matchCount } = useMemo(
+    () => getSchemaCategoryOptions(nodes, selectedId, search),
+    [nodes, selectedId, search],
+  );
 
   function selectNode(value: string) {
-    const nextId = Number(value);
-    if (!Number.isInteger(nextId) || nextId === selectedId) return;
-    startTransition(() => router.replace(`${pathname}?node=${nextId}`, { scroll: false }));
+    const href = getSchemaCategoryNavigationHref(pathname, selectedId, value);
+    if (!href) return;
+    startTransition(() => router.replace(href, { scroll: false }));
   }
 
   return <section className="mt-6 rounded-2xl border border-[var(--line)] bg-white p-4 shadow-sm" aria-busy={isLoading}>
@@ -31,11 +32,12 @@ export function CategoryNavigator({ nodes, selectedId, locale }: { nodes: Schema
       <label className="text-sm font-bold">{copy.findCategory}
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={copy.searchPlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 font-normal" />
       </label>
-      <label className="text-sm font-bold">{copy.categoryOrSubcategory}
-        <select value={selectedId} onChange={(event) => selectNode(event.target.value)} disabled={isLoading} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 font-normal disabled:opacity-60">
-          {filtered.map((node) => <option key={node.id} value={node.id}>{`${"— ".repeat(Math.max(0, node.level - 1))}${node.path} — ${node.name}${node.is_active ? "" : ` (${copy.inactive})`}`}</option>)}
+      <div className="text-sm font-bold">
+        <label htmlFor={categorySelectId}>{copy.categoryOrSubcategory}</label>
+        <select id={categorySelectId} value={selectedId} onChange={(event) => selectNode(event.target.value)} disabled={isLoading} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2.5 font-normal disabled:opacity-60">
+          {options.map((node) => <option key={node.id} value={node.id}>{`${node.id === retainedSelection?.id ? `${copy.selected}: ` : ""}${"— ".repeat(Math.max(0, node.level - 1))}${node.path} — ${node.name}${node.is_active ? "" : ` (${copy.inactive})`}`}</option>)}
         </select>
-      </label>
+      </div>
     </div>
     <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--line)] pt-3 text-sm">
       <span className={`rounded-full px-2.5 py-1 font-semibold ${selected?.is_active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{selected?.is_active ? copy.activeCategory : copy.inactiveCategory}</span>
@@ -53,6 +55,6 @@ export function CategoryNavigator({ nodes, selectedId, locale }: { nodes: Schema
         {selected.is_active ? copy.deactivate : copy.activate}
       </button>
     </form> : null}
-    <p className="mt-2 text-xs text-[var(--ink-2)]">{copy.showing} {filtered.length} {copy.of} {nodes.length} {copy.categoryCount}</p>
+    <p className="mt-2 text-xs text-[var(--ink-2)]">{copy.matchingCategories}: {matchCount} {copy.of} {nodes.length} {copy.categoryCount}</p>
   </section>;
 }
