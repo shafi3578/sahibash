@@ -15,6 +15,7 @@ import {
 } from "@/lib/data/featured-payments";
 import type { AppLocale } from "@/lib/i18n/translations";
 import { isFeaturedPaymentTargetEligible } from "@/lib/payments/featured-eligibility";
+import { FEATURED_EXTENSION_CONSENT_VERSION, hasFeaturedExtensionConsent, isClosedFeaturedPaymentRequest, matchesFeaturedConsentTerms } from "@/lib/payments/featured-consent";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_RECEIPT_TYPES: Record<string, string> = {
@@ -47,9 +48,9 @@ function receiptExtension(file: File) {
   return SAFE_RECEIPT_TYPES[file.type] ?? "";
 }
 
-function buildRequestIdempotencyKey(userId: string, listingId: string, configId: string) {
+function buildRequestIdempotencyKey(userId: string, listingId: string, configId: string, previousRequestId: string | null) {
   return createHash("sha256")
-    .update(`featured:${userId}:${listingId}:${configId}`)
+    .update(`featured:${userId}:${listingId}:${configId}:${previousRequestId ?? "initial"}`)
     .digest("hex")
     .slice(0, 64);
 }
@@ -244,7 +245,7 @@ async function getActiveConfig(supabase: Awaited<ReturnType<typeof createSupabas
   return data as unknown as FeaturedCampaignConfig;
 }
 
-export async function requestFeaturedPromotionAction(listingId: string) {
+export async function requestFeaturedPromotionAction(listingId: string, formData: FormData) {
   const user = await requireUser();
   if (!UUID_PATTERN.test(listingId)) {
     redirect("/dashboard/my-ads?featured=invalid");
@@ -277,21 +278,30 @@ export async function requestFeaturedPromotionAction(listingId: string) {
     redirect(`/listings/${listingId}/manage?featured=not-configured`);
   }
 
-  const { data: existing } = await supabase
+  if (!matchesFeaturedConsentTerms(formData, config)) {
+    redirect(`/listings/${listingId}/manage?featured=consent-required`);
+  }
+
+  const { data: existing, error: existingError } = await supabase
     .from("promotion_payment_requests")
     .select("id, status")
     .eq("listing_id", listingId)
     .eq("user_id", user.id)
     .eq("promotion_type", "featured")
-    .in("status", ["pending_payment", "pending_review"])
     .order("created_at", { ascending: false })
     .limit(1);
 
-  if (existing?.[0]) {
-    redirect(`/listings/${listingId}/manage?featured=${existing[0].status}`);
+  if (existingError) {
+    throw new Error("Unable to check Featured payment requests.");
+  }
+  const previousRequest = existing?.[0];
+  if (previousRequest && !isClosedFeaturedPaymentRequest(String(previousRequest.status))) {
+    redirect(`/listings/${listingId}/manage?featured=${previousRequest.status}`);
   }
 
-  const idempotencyKey = buildRequestIdempotencyKey(user.id, listingId, config.id);
+  // The last closed request identifies this purchase attempt: duplicate clicks
+  // share a key, while a later purchase never collides with historical evidence.
+  const idempotencyKey = buildRequestIdempotencyKey(user.id, listingId, config.id, previousRequest?.id ?? null);
   const { error } = await supabase.from("promotion_payment_requests").insert({
     listing_id: listingId,
     user_id: user.id,
@@ -304,9 +314,26 @@ export async function requestFeaturedPromotionAction(listingId: string) {
     merchant_reference: config.merchant_reference,
     status: "pending_payment",
     idempotency_key: idempotencyKey,
+    extension_consent_version: FEATURED_EXTENSION_CONSENT_VERSION,
+    purchased_duration_days: config.duration_days,
+    consented_config_updated_at: config.updated_at,
   });
 
-  if (error && error.code !== "23505") {
+  if (error?.code === "23505") {
+    const { data: pending, error: pendingError } = await supabase
+      .from("promotion_payment_requests")
+      .select("id, status")
+      .eq("listing_id", listingId)
+      .eq("user_id", user.id)
+      .eq("promotion_type", "featured")
+      .in("status", ["pending_payment", "pending_review"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (!pendingError && pending?.[0]) {
+      redirect(`/listings/${listingId}/manage?featured=${pending[0].status}`);
+    }
+  }
+  if (error) {
     throw new Error("Unable to create Featured payment request.");
   }
 
@@ -328,7 +355,7 @@ export async function submitFeaturedPaymentProofAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const { data: request, error: requestError } = await supabase
     .from("promotion_payment_requests")
-    .select("id, listing_id, user_id, status, amount, currency")
+    .select("id, listing_id, user_id, status, amount, currency, extension_consent_version, extension_consented_at, purchased_duration_days")
     .eq("id", requestId)
     .maybeSingle();
 
@@ -337,6 +364,9 @@ export async function submitFeaturedPaymentProofAction(formData: FormData) {
   }
 
   const listingId = String(request.listing_id);
+  if (!hasFeaturedExtensionConsent(request)) {
+    redirect(`/listings/${listingId}/manage?featured=consent-required`);
+  }
   if (!["pending_payment", "rejected"].includes(String(request.status))) {
     redirect(`/listings/${listingId}/manage?featured=not-editable`);
   }

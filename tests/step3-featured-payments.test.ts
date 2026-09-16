@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInNewContext } from "node:vm";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { isFeaturedPaymentTargetEligible, type FeaturedPaymentTarget } from "@/lib/payments/featured-eligibility";
+import { FEATURED_EXTENSION_CONSENT_VERSION, featuredConsentRequiredMessage, featuredExtensionConsentCopy, getFeaturedPaymentInstructions, hasFeaturedExtensionConsent, isClosedFeaturedPaymentRequest, matchesFeaturedConsentTerms } from "@/lib/payments/featured-consent";
 
 const root = process.cwd();
 const migration = readFileSync(
@@ -24,6 +26,7 @@ const paymentSafetyMigration = readFileSync(
   "utf8"
 );
 const paymentPanel = readFileSync(join(root, "components", "payments", "featured-promotion-panel.tsx"), "utf8");
+const consentMigration = readFileSync(join(root, "supabase", "migrations", "20260916144729_featured_full_term_extension_consent.sql"), "utf8");
 const data = readFileSync(join(root, "lib", "data", "featured-payments.ts"), "utf8");
 const managePage = readFileSync(join(root, "app", "listings", "[id]", "manage", "page.tsx"), "utf8");
 const myAdsPage = readFileSync(join(root, "app", "dashboard", "my-ads", "page.tsx"), "utf8");
@@ -96,7 +99,8 @@ test("Step 3 foreign keys have covering indexes for Advisor performance", () => 
 
 test("seller and admin UI expose the Step 3 Featured workflow", () => {
   assert.match(managePage, /FeaturedPromotionPanel/);
-  assert.match(myAdsPage, /requestFeaturedPromotionAction/);
+  assert.match(myAdsPage, /href=\{`\/listings\/\$\{listing\.id\}\/manage`\}/);
+  assert.doesNotMatch(myAdsPage, /requestFeaturedPromotionAction/);
   assert.match(adminQueuePage, /getAdminFeaturedPaymentQueue/);
   assert.match(adminQueuePage, /adminApproveFeaturedPaymentRequestAction/);
   assert.match(adminQueuePage, /adminRejectFeaturedPaymentRequestAction/);
@@ -286,7 +290,7 @@ test("proof action cannot notify or report success when its conditional update a
       select: () => readQuery,
       eq: () => readQuery,
       maybeSingle: async () => ({ data: reads++ === 0
-        ? { id: "request", listing_id: "listing", user_id: "owner", status: "rejected", amount: 30, currency: "AFN" }
+        ? { id: "request", listing_id: "listing", user_id: "owner", status: "rejected", amount: 30, currency: "AFN", extension_consent_version: FEATURED_EXTENSION_CONSENT_VERSION, extension_consented_at: "2026-09-16T00:00:00Z", purchased_duration_days: 30 }
         : { title: "Listing", status: "approved", publication_status: "published", expires_at: "2099-01-01T00:00:00Z", price: 100 }, error: null }),
       update: () => updateQuery,
     };
@@ -295,6 +299,7 @@ test("proof action cannot notify or report success when its conditional update a
       uuid: () => "request", text: () => "corrected-reference", File: class {},
       createSupabaseServerClient: async () => ({ from: () => readQuery }),
       isFeaturedPaymentTargetEligible,
+      hasFeaturedExtensionConsent,
       notifyAdminsForFeaturedReview: async () => { notifications++; },
       revalidatePath: () => {},
       redirect: (path: string) => { throw new Error(`redirect:${path}`); },
@@ -306,4 +311,133 @@ test("proof action cannot notify or report success when its conditional update a
       ["in", "status", ["pending_payment", "rejected"]], ["select", "id"],
     ]);
   }
+});
+
+test("full-term consent is explicit, versioned, and bound to the displayed configured terms", () => {
+  const form = new FormData();
+  const config = { id: "campaign", updated_at: "2026-09-16T00:00:00Z", currency: "AFN", duration_days: 30, amount: 30 };
+  form.set("consent_duration_days", "30");
+  form.set("consent_amount", "30");
+  form.set("consent_config_id", config.id);
+  form.set("consent_config_updated_at", config.updated_at);
+  form.set("consent_currency", config.currency);
+  for (const choice of ["", "on", "true", "old-version"]) {
+    form.set("extension_consent", choice);
+    assert.equal(matchesFeaturedConsentTerms(form, config), false);
+  }
+  form.set("extension_consent", FEATURED_EXTENSION_CONSENT_VERSION);
+  assert.equal(matchesFeaturedConsentTerms(form, config), true);
+  assert.equal(matchesFeaturedConsentTerms(form, { ...config, duration_days: 7 }), false);
+  assert.equal(matchesFeaturedConsentTerms(form, { ...config, amount: 31 }), false);
+  assert.equal(matchesFeaturedConsentTerms(form, { ...config, currency: "USD" }), false);
+  assert.equal(matchesFeaturedConsentTerms(form, { ...config, id: "replacement" }), false);
+  assert.equal(matchesFeaturedConsentTerms(form, { ...config, updated_at: "2026-09-17T00:00:00Z" }), false);
+  assert.equal(hasFeaturedExtensionConsent({}), false);
+  const recorded = { extension_consent_version: FEATURED_EXTENSION_CONSENT_VERSION, extension_consented_at: "2026-09-16T00:00:00Z", purchased_duration_days: 30 };
+  assert.equal(hasFeaturedExtensionConsent(recorded), true);
+  for (const change of [{ extension_consent_version: "old" }, { extension_consented_at: null }, { extension_consented_at: "invalid" }, { purchased_duration_days: 0 }, { purchased_duration_days: 366 }, { purchased_duration_days: 2.5 }]) {
+    assert.equal(hasFeaturedExtensionConsent({ ...recorded, ...change }), false);
+  }
+  for (const locale of ["en", "fa", "ps"] as const) {
+    assert.ok(featuredExtensionConsentCopy(locale, 17).includes("17"));
+    assert.notEqual(featuredExtensionConsentCopy(locale, 17), featuredExtensionConsentCopy(locale, 30));
+  }
+  const checkbox = paymentPanel.match(/<input type="checkbox"[^>]+>/)?.[0] ?? "";
+  assert.match(checkbox, /name="extension_consent"[\s\S]*required/);
+  assert.doesNotMatch(checkbox, /defaultChecked|\schecked/);
+  assert.match(paymentPanel, /request && hasConsent && config && canRequest/);
+  assert.match(actions, /matchesFeaturedConsentTerms\(formData, config\)/);
+  assert.match(actions, /extension_consent_version: FEATURED_EXTENSION_CONSENT_VERSION,\s+purchased_duration_days: config\.duration_days/);
+  assert.doesNotMatch(actions, /extension_consented_at:\s*new Date/);
+  assert.equal(getFeaturedPaymentInstructions({ payment_instructions_snapshot: { en: "Original instructions" } }, "en"), "Original instructions");
+  assert.match(paymentPanel, /getFeaturedPaymentInstructions\(request, locale\)/);
+  assert.match(paymentPanel, /request\.merchant_reference/);
+  assert.doesNotMatch(paymentPanel, /config\.merchant_reference|config\.payment_method|getCampaignInstructions\(config/);
+});
+
+test("database consent cannot be backfilled and every approval uses the immutable purchased term", () => {
+  assert.match(consentMigration, /new\.extension_consented_at := clock_timestamp\(\)/);
+  assert.match(consentMigration, /new\.purchased_duration_days := v_config\.duration_days/);
+  assert.match(consentMigration, /only the listing owner can consent/);
+  assert.match(consentMigration, /new\.extension_consent_version is distinct from old\.extension_consent_version/);
+  assert.match(consentMigration, /new\.listing_id is distinct from old\.listing_id/);
+  assert.match(consentMigration, /consent and purchased terms are immutable/);
+  assert.match(consentMigration, /new\.status = 'approved' and old\.status <> 'approved'/);
+  assert.match(consentMigration, /perform private\.require_aal2\(\)/);
+  assert.match(consentMigration, /from public\.listings where id = new\.listing_id for update/);
+  assert.match(consentMigration, /v_expiry <= v_approved_at/);
+  assert.match(consentMigration, /v_featured_until := v_approved_at \+ make_interval\(days => new\.purchased_duration_days\)/);
+  assert.match(consentMigration, /greatest\(v_expiry, v_featured_until\)/);
+  assert.match(consentMigration, /'extension_consent',[\s\S]*'listing_expiry',[\s\S]*'before', new\.approval_expires_at_before, 'after', new\.approval_expires_at_after/);
+  assert.doesNotMatch(consentMigration, /update public\.listings\s+set\s+(?:status|publication_status|freshness_status)/);
+  assert.doesNotMatch(consentMigration, /create policy|alter policy|drop policy/);
+});
+
+test("consent-required redirects show only a localized safe alert and never preselect consent", () => {
+  const messages = ["en", "fa", "ps"].map((locale) => featuredConsentRequiredMessage("consent-required", locale as "en" | "fa" | "ps"));
+  assert.equal(new Set(messages).size, 3);
+  assert.ok(messages.every((message) => typeof message === "string" && message.length > 80));
+  assert.match(messages[0]!, /current price, duration and expiry-extension terms/);
+  assert.match(messages[0]!, /unchecked consent box/);
+  for (const status of [undefined, "", "requested", "pending_review", "<script>alert(1)</script>", ["consent-required"], ["consent-required", "requested"]]) {
+    assert.equal(featuredConsentRequiredMessage(status, "en"), null);
+  }
+  assert.match(managePage, /searchParams: Promise<\{ featured\?: string \| string\[\] \}>/);
+  assert.match(managePage, /featuredConsentRequiredMessage\(\(await searchParams\)\.featured, locale\)/);
+  assert.match(managePage, /\{consentMessage \? \([\s\S]*role="alert"[\s\S]*\{consentMessage\}/);
+  assert.doesNotMatch(managePage, /\{\s*\(await searchParams\)\.featured\s*\}/);
+  const checkbox = paymentPanel.match(/<input type="checkbox"[^>]+>/)?.[0] ?? "";
+  assert.match(checkbox, /name="extension_consent"[\s\S]*required/);
+  assert.doesNotMatch(checkbox, /defaultChecked|\schecked/);
+});
+
+test("closed payment requests allow a new consent form without reopening pending or rejected evidence", () => {
+  for (const status of ["approved", "cancelled", "expired"]) assert.equal(isClosedFeaturedPaymentRequest(status), true);
+  for (const status of ["pending_payment", "pending_review", "rejected", "unknown", ""]) assert.equal(isClosedFeaturedPaymentRequest(status), false);
+  assert.match(paymentPanel, /summary\.request && \(isActive \|\| !isClosedFeaturedPaymentRequest\(summary\.request\.status\)\) \? summary\.request : null/);
+  assert.match(paymentPanel, /!isActive && !request && config && canRequest/);
+  assert.match(paymentPanel, /request && hasConsent && config && canRequest && \["pending_payment", "rejected"\]/);
+});
+
+test("repeat purchases use a new attempt key and duplicate failures cannot fabricate success", async () => {
+  const { transpileModule, ScriptTarget } = await import("typescript");
+  const keySource = actions.slice(actions.indexOf("function buildRequestIdempotencyKey"), actions.indexOf("function getAdminClient"));
+  const actionSource = actions.slice(actions.indexOf("export async function requestFeaturedPromotionAction"), actions.indexOf("export async function submitFeaturedPaymentProofAction"));
+  const executable = transpileModule(`${keySource}\n${actionSource.replace("export async function", "async function")}`, { compilerOptions: { target: ScriptTarget.ES2022 } }).outputText;
+  const listingId = "10000000-0000-4000-8000-000000000001";
+  const config = { id: "campaign", updated_at: "2026-09-16T00:00:00Z", currency: "AFN", duration_days: 30, amount: 30 };
+  const form = new FormData();
+  form.set("extension_consent", FEATURED_EXTENSION_CONSENT_VERSION);
+  form.set("consent_config_id", config.id); form.set("consent_config_updated_at", config.updated_at);
+  form.set("consent_currency", config.currency); form.set("consent_duration_days", "30"); form.set("consent_amount", "30");
+  const run = async (status: string | null, previousId = "closed-request", duplicate?: "pending" | "missing") => {
+    let insertCount = 0;
+    let key = "";
+    let reads = 0;
+    const query = {
+      select: () => query, eq: () => query, in: () => query, order: () => query,
+      maybeSingle: async () => ({ data: { id: listingId, user_id: "owner", status: "approved", price: 100, expires_at: "2099-01-01T00:00:00Z" }, error: null }),
+      limit: async () => ({ data: reads++ === 0 ? (status ? [{ id: previousId, status }] : []) : duplicate === "pending" ? [{ id: "racing-request", status: "pending_payment" }] : [], error: null }),
+      insert: async (payload: { idempotency_key: string }) => { insertCount++; key = payload.idempotency_key; return { error: duplicate ? { code: "23505" } : null }; },
+    };
+    const invoke = runInNewContext(`${executable}\nrequestFeaturedPromotionAction`, {
+      createHash, FEATURED_EXTENSION_CONSENT_VERSION, UUID_PATTERN: /^[0-9a-f-]{36}$/,
+      requireUser: async () => ({ id: "owner" }), createSupabaseServerClient: async () => ({ from: () => query }),
+      getActiveConfig: async () => config, matchesFeaturedConsentTerms, isClosedFeaturedPaymentRequest, isFeaturedPaymentTargetEligible,
+      revalidatePath: () => {}, redirect: (path: string) => { throw new Error(`redirect:${path}`); },
+    }) as (id: string, form: FormData) => Promise<void>;
+    const expected = status && !isClosedFeaturedPaymentRequest(status) ? `featured=${status}`
+      : duplicate === "pending" ? "featured=pending_payment" : duplicate === "missing" ? "Unable to create Featured payment request" : "featured=requested";
+    await assert.rejects(invoke(listingId, form), new RegExp(expected));
+    assert.equal(insertCount, status && !isClosedFeaturedPaymentRequest(status) ? 0 : 1);
+    return key;
+  };
+  const first = await run(null);
+  const repeated = await run("approved");
+  assert.notEqual(first, repeated);
+  assert.equal(repeated, await run("approved"));
+  assert.notEqual(repeated, await run("approved", "next-closed-request"));
+  for (const state of ["cancelled", "expired", "pending_payment", "pending_review", "rejected"]) await run(state);
+  await run("cancelled", "closed-request", "pending");
+  await run("cancelled", "closed-request", "missing");
 });

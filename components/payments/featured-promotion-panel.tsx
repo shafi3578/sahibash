@@ -1,5 +1,4 @@
 import {
-  getCampaignInstructions,
   getCampaignName,
   isFeaturedCurrentlyActive,
   type FeaturedPaymentSummary,
@@ -12,6 +11,7 @@ import { formatDate, formatNumber } from "@/lib/i18n/format";
 import type { AppLocale } from "@/lib/i18n/translations";
 import Link from "next/link";
 import { isFeaturedPaymentTargetEligible, type FeaturedPaymentTarget } from "@/lib/payments/featured-eligibility";
+import { FEATURED_EXTENSION_CONSENT_VERSION, featuredExtensionConsentCopy, getFeaturedPaymentInstructions, hasFeaturedExtensionConsent, isClosedFeaturedPaymentRequest } from "@/lib/payments/featured-consent";
 
 type Copy = {
   success: string;
@@ -40,6 +40,7 @@ type Copy = {
   unavailableHelp: string;
   listingStatusBlocked: string;
   freePathNote: string;
+  consentMissing: string;
 };
 
 const COPY: Record<AppLocale, Copy> = {
@@ -70,6 +71,7 @@ const COPY: Record<AppLocale, Copy> = {
     unavailableHelp: "A Super Admin must configure the launch campaign and HesabPay destination first.",
     listingStatusBlocked: "Featured is available only for approved, publicly visible, unexpired listings. Renew an expired ad before requesting promotion.",
     freePathNote: "Free posting remains active. Featured is optional.",
+    consentMissing: "This request has no recorded full-term consent. Do not pay or send proof; contact support to cancel it and start a new request.",
   },
   fa: {
     success: "اعلان شما با موفقیت ثبت شد.",
@@ -98,6 +100,7 @@ const COPY: Record<AppLocale, Copy> = {
     unavailableHelp: "ابتدا سوپر ادمین باید کمپاین آغازین و مقصد HesabPay را تنظیم کند.",
     listingStatusBlocked: "ویژه‌سازی فقط برای اعلان‌های تأییدشده، قابل نمایش عمومی و منقضی‌نشده ممکن است. ابتدا اعلان منقضی‌شده را تمدید کنید.",
     freePathNote: "ثبت رایگان اعلان فعال است. ویژه‌سازی اختیاری است.",
+    consentMissing: "رضایت تمدید کامل برای این درخواست ثبت نشده است. پرداخت یا رسید ارسال نکنید؛ برای لغو آن و ثبت درخواست تازه با پشتیبانی تماس بگیرید.",
   },
   ps: {
     success: "ستاسو اعلان په بریالیتوب ثبت شو.",
@@ -126,6 +129,7 @@ const COPY: Record<AppLocale, Copy> = {
     unavailableHelp: "سوپر اډمین باید لومړی د پیل کمپاین او د HesabPay ځای تنظیم کړي.",
     listingStatusBlocked: "ځانګړی کول یوازې د تایید شویو، عامو او نه منقضي شویو اعلانونو لپاره شوني دي. لومړی منقضي شوی اعلان نوی کړئ.",
     freePathNote: "وړیا اعلان ورکول فعال دي. ځانګړی کول اختیاري دي.",
+    consentMissing: "د دې غوښتنې لپاره د بشپړې مودې رضایت نه دی ثبت شوی. تادیه یا رسید مه لېږئ؛ د لغوه کولو او نوې غوښتنې لپاره له ملاتړ سره اړیکه ونیسئ.",
   },
 };
 
@@ -153,10 +157,13 @@ export function FeaturedPromotionPanel({
 }) {
   const copy = COPY[locale];
   const config = summary.config;
-  const request = summary.request;
   const isActive = summary.activePromotion || isFeaturedCurrentlyActive(listing);
+  // Closed requests retain their evidence in history, but do not block a new
+  // explicitly consented purchase once the previous promotion has ended.
+  const request = summary.request && (isActive || !isClosedFeaturedPaymentRequest(summary.request.status)) ? summary.request : null;
   const canRequest = isFeaturedPaymentTargetEligible({ ...listing, status: listingStatus });
   const requestStatus = request?.status;
+  const hasConsent = request ? hasFeaturedExtensionConsent(request) : false;
 
   return (
     <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-4 shadow-sm">
@@ -183,11 +190,11 @@ export function FeaturedPromotionPanel({
           <div className="flex items-center justify-between gap-3">
             <span>{getCampaignName(config, locale)}</span>
             <strong className="text-amber-700">
-              {copy.launchPrice}: {formatNumber(config.amount, locale)} {config.currency}
+              {copy.launchPrice}: {formatNumber(request?.amount ?? config.amount, locale)} {request?.currency ?? config.currency}
             </strong>
           </div>
           <div className="text-xs text-slate-500">
-            {copy.duration}: {formatNumber(config.duration_days, locale)} {locale === "en" ? "days" : locale === "ps" ? "ورځې" : "روز"}
+            {copy.duration}: {formatNumber(request?.purchased_duration_days ?? config.duration_days, locale)} {locale === "en" ? "days" : locale === "ps" ? "ورځې" : "روز"}
           </div>
         </div>
       ) : (
@@ -210,7 +217,16 @@ export function FeaturedPromotionPanel({
 
       {!isActive && !request && config && canRequest ? (
         <div className="mt-4 flex flex-wrap gap-2">
-          <form action={requestFeaturedPromotionAction.bind(null, listingId)}>
+          <form action={requestFeaturedPromotionAction.bind(null, listingId)} className="grid w-full gap-3">
+            <input type="hidden" name="consent_duration_days" value={config.duration_days} />
+            <input type="hidden" name="consent_amount" value={config.amount} />
+            <input type="hidden" name="consent_currency" value={config.currency} />
+            <input type="hidden" name="consent_config_id" value={config.id} />
+            <input type="hidden" name="consent_config_updated_at" value={config.updated_at} />
+            <label className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+              <input type="checkbox" name="extension_consent" value={FEATURED_EXTENSION_CONSENT_VERSION} required className="mt-1 size-4 shrink-0" />
+              <span>{featuredExtensionConsentCopy(locale, config.duration_days)}</span>
+            </label>
             <button className="min-h-11 rounded-xl bg-amber-600 px-4 text-sm font-bold text-white shadow-sm hover:bg-amber-700">
               {copy.makeFeatured}
             </button>
@@ -237,25 +253,27 @@ export function FeaturedPromotionPanel({
         </div>
       ) : null}
 
-      {!isActive && request && config && canRequest && ["pending_payment", "rejected"].includes(request.status) ? (
+      {!isActive && request && !hasConsent ? <p className="mt-4 rounded-xl border border-amber-200 bg-white p-3 text-sm text-amber-900">{copy.consentMissing}</p> : null}
+
+      {!isActive && request && hasConsent && config && canRequest && ["pending_payment", "rejected"].includes(request.status) ? (
         <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
           <div>
             <p className="text-sm font-bold text-slate-950">{copy.hesabPayInstructions}</p>
             <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700">
-              {getCampaignInstructions(config, locale)}
+              {getFeaturedPaymentInstructions(request, locale)}
             </p>
           </div>
           <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
-            {config.payment_method ? (
+            {request.payment_method ? (
               <p className="rounded-xl bg-slate-50 p-2">
                 <span className="block font-semibold text-slate-900">{copy.paymentMethod}</span>
-                {config.payment_method}
+                {request.payment_method}
               </p>
             ) : null}
-            {config.merchant_reference ? (
+            {request.merchant_reference ? (
               <p className="rounded-xl bg-slate-50 p-2">
                 <span className="block font-semibold text-slate-900">{copy.merchantReference}</span>
-                {config.merchant_reference}
+                {request.merchant_reference}
               </p>
             ) : null}
           </div>

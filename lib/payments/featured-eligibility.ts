@@ -8,7 +8,7 @@ export type FeaturedPaymentTarget = {
 };
 
 // Category eligibility is checked by the server query and again in the database.
-// Promotion never renews an ad or makes an unpublished ad publicly visible.
+// Consent can extend a still-active ad on approval, never reactivate or republish it.
 export function isFeaturedPaymentTargetEligible(listing: FeaturedPaymentTarget, now = Date.now()) {
   const expiresAt = Date.parse(listing.expires_at ?? "");
   return listing.status === "approved"

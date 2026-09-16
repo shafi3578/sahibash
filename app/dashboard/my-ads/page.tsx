@@ -7,7 +7,6 @@ import {
   updateListingStatusAction,
   uploadListingImageFormAction,
 } from "@/lib/actions/listings";
-import { requestFeaturedPromotionAction } from "@/lib/actions/featured-payments";
 import { getMyListings } from "@/lib/data/queries";
 import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 import { getCurrentLocale } from "@/lib/i18n/server";
@@ -142,11 +141,9 @@ export default async function MyAdsPage({
 
             <div className="flex flex-wrap gap-2">
               {isFeaturedPaymentTargetEligible(listing) && !isFeaturedCurrentlyActive(listing) ? (
-                <form action={requestFeaturedPromotionAction.bind(null, listing.id)}>
-                  <button className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white">
+                <Link href={`/listings/${listing.id}/manage`} className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white">
                     {locale === "fa" ? "ویژه‌سازی" : locale === "ps" ? "ځانګړی کول" : "Make Featured"}
-                  </button>
-                </form>
+                </Link>
               ) : null}
               <form
                 action={async () => {

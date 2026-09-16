@@ -39,6 +39,7 @@ const read = (suffix) => {
 const foundation = read('_step3_featured_payments_ai_foundation.sql');
 const boundary = read('_enforce_step3_payment_aal2_boundary.sql');
 const safety = read('_featured_payment_target_and_resubmission_safety.sql');
+const consentMigration = read('_featured_full_term_extension_consent.sql');
 const table = (name) => {
   const start = foundation.indexOf(`create table if not exists public.${name} (`);
   assert.ok(start >= 0);
@@ -76,6 +77,9 @@ const createRequest = async (n, user = owner) => sql(`insert into public.promoti
 const submit = (n) => `update public.promotion_payment_requests set status='pending_review',transaction_reference='synthetic-proof',submitted_at=now() where id='${request(n)}'`;
 const approve = (n) => `select * from public.approve_featured_payment_request('${request(n)}','synthetic approval')`;
 const reject = (n) => `select public.reject_featured_payment_request('${request(n)}','synthetic unclear proof','synthetic prior review')`;
+const consentedRequest = (n, { user = owner, days = 30, version = 'featured-full-term-v1', timestamp = 'null', configVersion = `(select updated_at from public.promotion_campaign_configs where id='${config}')` } = {}) => `insert into public.promotion_payment_requests
+  (id,listing_id,user_id,campaign_config_id,amount,payment_method,merchant_reference,idempotency_key,extension_consent_version,purchased_duration_days,extension_consented_at,consented_config_updated_at)
+  values('${request(n)}','${listing(n)}','${user}','${config}',30,'manual','synthetic-merchant','synthetic-request-${n}','${version}',${days},${timestamp},${configVersion})`;
 
 try {
   await db.exec(`
@@ -182,6 +186,107 @@ try {
   assert.deepEqual((await sql(`select action from public.audit_logs where entity_id='${request(32)}' order by id`)).rows.map(x=>x.action),['FEATURED_PAYMENT_PROOF_SUBMITTED','FEATURED_PAYMENT_REJECTED','FEATURED_PAYMENT_PROOF_RESUBMITTED']);checks++;
   await system();await sql("select set_config('request.jwt.claims','{}',false)");await db.exec('set role service_role');
   await fails(approve(32),/forbidden/);
+
+  // Apply the full-term migration to the same database: legacy rows must stay unsigned.
+  await system();
+  // Mirror the deployed listing UPDATE AAL2/admin boundary. Other real listing
+  // triggers are UPDATE OF status/source/category/price, not the activation columns.
+  await db.exec(`
+    alter table public.listings add column urgent boolean default false, add column approved_by uuid, add column approved_at timestamptz;
+    alter table public.listings enable row level security;
+    create policy listing_visibility on public.listings for select to authenticated
+      using(status='approved' or user_id=auth.uid() or public.is_admin(auth.uid()));
+    create policy listings_update_owner_limited_or_admin on public.listings for update to authenticated
+      using(user_id=auth.uid() or (private.is_aal2() and public.is_admin(auth.uid())))
+      with check((private.is_aal2() and public.is_admin(auth.uid())) or
+        (user_id=auth.uid() and featured=false and urgent=false and approved_by is null and approved_at is null and status in ('pending','rejected','sold','expired')));
+    create function public.set_updated_at() returns trigger language plpgsql set search_path=public,pg_temp as $$begin new.updated_at=now();return new;end;$$;
+    create trigger trg_listings_updated_at before update on public.listings for each row execute function public.set_updated_at();
+  `);
+  await db.exec(consentMigration);await actor(admin,'aal2');
+  await fails(approve(32),/recorded owner extension consent required/);
+  await fails(`update public.promotion_payment_requests set extension_consent_version='featured-full-term-v1',extension_consented_at=now(),purchased_duration_days=30 where id='${request(32)}'`,/immutable/);
+  await seedListing(40,"expires_at=now()+interval '1 day'");await actor(owner);
+  await fails(`insert into public.promotion_payment_requests(id,listing_id,user_id,campaign_config_id,amount,payment_method,merchant_reference,idempotency_key) values('${request(40)}','${listing(40)}','${owner}','${config}',30,'manual','synthetic-merchant','synthetic-request-40')`,/explicit owner extension consent required/);
+  await fails(consentedRequest(40,{version:'forged-version'}),/explicit owner extension consent required/);
+  await fails(consentedRequest(40,{days:365}),/consented campaign terms changed/);
+  await fails(consentedRequest(40,{configVersion:"'2020-01-01T00:00:00Z'"}),/consented campaign terms changed/);
+  await fails(consentedRequest(40,{timestamp:"'2020-01-01T00:00:00Z'"}),/explicit owner extension consent required/);
+  await actor(other);await fails(consentedRequest(40,{user:other}),/only the listing owner can consent/);
+  await actor(admin,'aal2');await fails(consentedRequest(40),/only the listing owner can consent/);
+  await actor(owner);await sql(consentedRequest(40));
+  const signed = (await sql(`select extension_consent_version,extension_consented_at,purchased_duration_days from public.promotion_payment_requests where id='${request(40)}'`)).rows[0];
+  assert.equal(signed.extension_consent_version,'featured-full-term-v1');
+  assert.equal(signed.purchased_duration_days,30);
+  assert.ok(Math.abs(Date.now()-Date.parse(signed.extension_consented_at))<60000);checks++;
+  const beforeExpiry = (await sql(`select expires_at from public.listings where id='${listing(40)}'`)).rows[0].expires_at;
+  assert.ok(Date.parse(beforeExpiry)<Date.now()+2*86400000);checks++;
+  for (const caller of [owner,admin]) {
+    await actor(caller,caller===admin?'aal2':'aal1');
+    for (const alteration of ["purchased_duration_days=365","extension_consented_at=now()","extension_consent_version='forged'",`listing_id='${listing(2)}'`,`user_id='${other}'`,"amount=1","approval_expires_at_after=now()","consented_config_updated_at=now()","payment_instructions_snapshot='{}'::jsonb"])
+      await fails(`update public.promotion_payment_requests set ${alteration} where id='${request(40)}'`,/immutable/);
+  }
+  await actor(owner);await sql(submit(40));await fails(approve(40),/forbidden/);
+  await fails(`update public.promotion_payment_requests set status='approved' where id='${request(40)}'`,/forbidden/);
+  await actor(admin);await fails(approve(40),/aal2 required/);
+  await actor(admin,'aal2');await sql(reject(40));await actor(owner);await sql(submit(40));
+  assert.deepEqual((await sql(`select extension_consent_version,extension_consented_at,purchased_duration_days from public.promotion_payment_requests where id='${request(40)}'`)).rows[0],signed);checks++;
+  await system();await sql(`update public.promotion_campaign_configs set duration_days=7,instructions_en='changed instructions' where id='${config}'`);
+  await actor(admin,'aal2');await sql(approve(40));
+  const fullTerm = (await sql(`select l.expires_at,l.featured_until,l.featured,p.starts_at,p.ends_at,r.approval_expires_at_before,r.approval_expires_at_after
+    from public.listings l join public.promotion_payment_requests r on r.listing_id=l.id join public.listing_promotions p on p.payment_request_id=r.id where r.id='${request(40)}'`)).rows[0];
+  assert.equal(Date.parse(fullTerm.ends_at)-Date.parse(fullTerm.starts_at),30*86400000);
+  assert.deepEqual(fullTerm.expires_at,fullTerm.ends_at);assert.deepEqual(fullTerm.featured_until,fullTerm.ends_at);
+  assert.deepEqual(fullTerm.approval_expires_at_before,beforeExpiry);assert.deepEqual(fullTerm.approval_expires_at_after,fullTerm.expires_at);
+  assert.equal(fullTerm.featured,true);checks++;
+  assert.equal((await sql(`select payment_instructions_snapshot->>'en' as instructions from public.promotion_payment_requests where id='${request(40)}'`)).rows[0].instructions,'synthetic');checks++;
+  const approvalAudit = (await sql(`select safe_changes from public.audit_logs where entity_id='${request(40)}' and action='FEATURED_PAYMENT_APPROVED'`)).rows[0].safe_changes;
+  assert.equal(approvalAudit.extension_consent.version,'featured-full-term-v1');
+  assert.equal(approvalAudit.extension_consent.duration_days,30);
+  assert.equal(new Date(approvalAudit.listing_expiry.before).getTime(),new Date(beforeExpiry).getTime());
+  assert.equal(new Date(approvalAudit.listing_expiry.after).getTime(),new Date(fullTerm.expires_at).getTime());checks++;
+  await sql(approve(40));
+  assert.deepEqual((await sql(`select expires_at from public.listings where id='${listing(40)}'`)).rows[0].expires_at,fullTerm.expires_at);
+  assert.equal((await sql(`select count(*)::int as n from public.listing_promotions where payment_request_id='${request(40)}'`)).rows[0].n,1);
+  assert.equal((await sql(`select count(*)::int as n from public.audit_logs where entity_id='${request(40)}'`)).rows[0].n,4);checks++;
+  await fails(`update public.promotion_payment_requests set status='pending_review' where id='${request(40)}'`,/cannot be reopened/);
+
+  // A new request buys the new configured duration; a longer listing is never shortened.
+  await seedListing(41);await actor(owner);await sql(consentedRequest(41,{days:7}));await sql(submit(41));
+  const longExpiry = (await sql(`select expires_at from public.listings where id='${listing(41)}'`)).rows[0].expires_at;
+  await actor(admin,'aal2');await sql(approve(41));
+  assert.deepEqual((await sql(`select expires_at from public.listings where id='${listing(41)}'`)).rows[0].expires_at,longExpiry);
+  assert.equal((await sql(`select extract(epoch from ends_at-starts_at)::int as seconds from public.listing_promotions where payment_request_id='${request(41)}'`)).rows[0].seconds,7*86400);checks++;
+  await system();await sql(`update public.promotion_campaign_configs set duration_days=30 where id='${config}'`);
+
+  // Direct authorized REST-style UPDATE has the same consent, activation and audit boundaries.
+  await seedListing(42,"expires_at=now()+interval '1 day'");await actor(owner);await sql(consentedRequest(42));await sql(submit(42));
+  await actor(admin);await fails(`update public.promotion_payment_requests set status='approved' where id='${request(42)}'`,/aal2 required/);
+  await actor(admin,'aal2');await sql(`update public.promotion_payment_requests set status='approved' where id='${request(42)}'`);
+  assert.equal((await sql(`select featured and expires_at=featured_until as extended from public.listings where id='${listing(42)}'`)).rows[0].extended,true);
+  assert.equal((await sql(`select count(*)::int as n from public.listing_promotions where payment_request_id='${request(42)}'`)).rows[0].n,1);checks++;
+
+  // Eligibility must still hold at approval, even with real consent already recorded.
+  const lostEligibility = ["expires_at=now()-interval '1 second'","status='sold'","status='deleted'","publication_status='archived'","removed_public_at=now()","freshness_status='sold_confirmed'","category_id=2"];
+  for (let i=0;i<lostEligibility.length;i++) {
+    const n=50+i;await seedListing(n);await actor(owner);await sql(consentedRequest(n));await sql(submit(n));
+    await system();await sql(`update public.listings set ${lostEligibility[i]} where id='${listing(n)}'`);await actor(admin,'aal2');
+    await fails(approve(n),/not eligible/);
+    assert.equal((await sql(`select status from public.promotion_payment_requests where id='${request(n)}'`)).rows[0].status,'pending_review');checks++;
+  }
+
+  // A later audit error rolls back listing expiry, promotion creation and approval together.
+  await seedListing(60,"expires_at=now()+interval '1 day'");await actor(owner);await sql(consentedRequest(60));await sql(submit(60));
+  const atomicBefore = (await sql(`select expires_at from public.listings where id='${listing(60)}'`)).rows[0].expires_at;
+  await system();await sql("alter table public.audit_logs add constraint forced_approval_failure check(action<>'FEATURED_PAYMENT_APPROVED') not valid");
+  await actor(admin,'aal2');await fails(approve(60),/forced_approval_failure/);
+  assert.deepEqual((await sql(`select status,approval_expires_at_before,approval_expires_at_after from public.promotion_payment_requests where id='${request(60)}'`)).rows[0],{status:'pending_review',approval_expires_at_before:null,approval_expires_at_after:null});
+  assert.deepEqual((await sql(`select expires_at,featured from public.listings where id='${listing(60)}'`)).rows[0],{expires_at:atomicBefore,featured:false});
+  assert.equal((await sql(`select count(*)::int as n from public.listing_promotions where payment_request_id='${request(60)}'`)).rows[0].n,0);checks++;
+  await system();await sql('alter table public.audit_logs drop constraint forced_approval_failure');
+  assert.equal((await sql("select has_function_privilege('authenticated','private.guard_featured_extension_consent()','EXECUTE') as allowed")).rows[0].allowed,false);checks++;
+  await actor(contentAdmin);assert.equal((await sql("select count(*)::int as n from public.audit_logs where entity_type='promotion_payment_request'")).rows[0].n,0);checks++;
+  await system();await sql("select set_config('request.jwt.claims','{}',false)");await db.exec('set role service_role');await fails(approve(60),/forbidden/);
   console.log(JSON.stringify({passed:checks,productionWrites:0,fixtureScope:'in-memory PGlite; synthetic identities only'}));
 } catch (error) { console.error(error.message); process.exitCode = 1; }
 finally { await db.close(); }

@@ -68,7 +68,7 @@ export async function blockUserAction(userId: string) {
   const limit = await consumeRateLimit({ scope: "social.block", userId: user.id, maxRequests: 20, windowSeconds: 3600 });
   if (!limit.allowed) return { ok: false as const, message: "Too many requests" };
   const supabase = await createSupabaseServerClient();
-  await supabase.from("user_follows").delete().or(`and(follower_user_id.eq.${user.id},following_user_id.eq.${userId}),and(follower_user_id.eq.${userId},following_user_id.eq.${user.id})`);
+  // The database removes both follow directions atomically with the block.
   const { error } = await supabase.from("user_blocks").insert({ blocker_user_id: user.id, blocked_user_id: userId });
   if (error && error.code !== "23505") return { ok: false as const, message: "Could not block" };
   await revalidateSellerRelationshipPaths(userId);

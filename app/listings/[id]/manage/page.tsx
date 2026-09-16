@@ -13,15 +13,18 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getUiTranslations } from "@/lib/i18n/ui";
 import { FeaturedPromotionPanel } from "@/components/payments/featured-promotion-panel";
+import { featuredConsentRequiredMessage } from "@/lib/payments/featured-consent";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ featured?: string | string[] }>;
 }
 
-export default async function ListingManagePage({ params }: PageProps) {
+export default async function ListingManagePage({ params, searchParams }: PageProps) {
   const { id: listingId } = await params;
   const locale = await getCurrentLocale();
   const ui = getUiTranslations(locale);
+  const consentMessage = featuredConsentRequiredMessage((await searchParams).featured, locale);
 
   const user = await getCurrentUser();
 
@@ -64,6 +67,12 @@ export default async function ListingManagePage({ params }: PageProps) {
           {ui.listingManage.backToListings}
         </Link>
       </div>
+
+      {consentMessage ? (
+        <p role="alert" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          {consentMessage}
+        </p>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         {/* Main Content */}

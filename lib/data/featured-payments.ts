@@ -3,6 +3,7 @@ import "server-only";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppLocale } from "@/lib/i18n/translations";
+import type { FeaturedExtensionConsent } from "@/lib/payments/featured-consent";
 
 export const PAYMENT_RECEIPTS_BUCKET = "payment-receipts";
 export const FEATURED_CAMPAIGN_KEY = "featured_launch";
@@ -37,7 +38,9 @@ export type FeaturedCampaignConfig = {
   updated_at: string;
 };
 
-export type FeaturedPaymentRequest = {
+export type FeaturedPaymentRequest = FeaturedExtensionConsent & {
+  consented_config_updated_at: string | null;
+  payment_instructions_snapshot: Record<AppLocale, string> | null;
   id: string;
   listing_id: string;
   user_id: string;
@@ -196,6 +199,13 @@ function asPaymentRequest(row: Record<string, unknown> | null | undefined): Feat
     reviewed_by: typeof row.reviewed_by === "string" ? row.reviewed_by : null,
     admin_note: typeof row.admin_note === "string" ? row.admin_note : null,
     rejection_reason: typeof row.rejection_reason === "string" ? row.rejection_reason : null,
+    extension_consent_version: typeof row.extension_consent_version === "string" ? row.extension_consent_version : null,
+    extension_consented_at: typeof row.extension_consented_at === "string" ? row.extension_consented_at : null,
+    purchased_duration_days: typeof row.purchased_duration_days === "number" ? row.purchased_duration_days : null,
+    consented_config_updated_at: typeof row.consented_config_updated_at === "string" ? row.consented_config_updated_at : null,
+    payment_instructions_snapshot: row.payment_instructions_snapshot && typeof row.payment_instructions_snapshot === "object"
+      ? Object.fromEntries(["en", "fa", "ps"].map((locale) => [locale, String((row.payment_instructions_snapshot as Record<string, unknown>)[locale] ?? "")])) as Record<AppLocale, string>
+      : null,
     expires_at: String(row.expires_at ?? ""),
     idempotency_key: String(row.idempotency_key ?? ""),
     created_at: String(row.created_at ?? ""),
