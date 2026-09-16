@@ -16,7 +16,7 @@ import CategoryPage from "@/app/categories/[slug]/page";
 import ListingsPage from "@/app/listings/page";
 import ListingsCreatePage from "@/app/listings/create/page";
 import ListingsEditPage from "@/app/listings/edit/page";
-import ListingPage from "@/app/listings/[id]/page";
+import ListingPage, { getListingMetadata } from "@/app/listings/[id]/page";
 import ListingEditPage from "@/app/listings/[id]/edit/page";
 import ListingManagePage from "@/app/listings/[id]/manage/page";
 import ListingPriceHistoryPage from "@/app/listings/[id]/price-history/page";
@@ -44,12 +44,17 @@ import MyAdsPage from "@/app/my-ads/page";
 import PublicSellerPage from "@/app/sellers/[id]/page";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { getPublishedStaticPageBySlug } from "@/lib/data/static-pages";
-import type { AppLocale } from "@/lib/i18n/translations";
 import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
+import { normalizeLocaleInput } from "@/lib/i18n/routing";
 import { PublicInfoPage } from "@/components/public-info-page";
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: AppLocale; slug?: string[] }> }) {
-  const { locale, slug } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug?: string[] }> }) {
+  const { locale: rawLocale, slug } = await params;
+  const locale = normalizeLocaleInput(rawLocale);
+  if (!locale) return {};
+  if (slug?.length === 2 && slug[0] === "listings") {
+    return getListingMetadata(slug[1], locale);
+  }
   return buildLocalizedMetadata(locale, slug);
 }
 
@@ -64,10 +69,11 @@ export default async function LocaleCatchAllPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ slug?: string[] }>;
+  params: Promise<{ locale: string; slug?: string[] }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const resolvedParams = await params;
+  if (!normalizeLocaleInput(resolvedParams.locale)) notFound();
   const resolvedSearchParams = await searchParams;
   const slug = resolvedParams.slug ?? [];
   const [first, second, third] = slug;

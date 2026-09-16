@@ -36,7 +36,7 @@ export const DEFAULT_SITE_SETTINGS = {
   contact_email: "hello@afghan.com",
   contact_phone: "+93700000000",
   default_locale: "fa",
-  home_hero_title: "Discover trusted listings across Afghanistan",
+  home_hero_title: "Fresh listings with clear sources",
   home_hero_subtitle: "Buy, sell, and browse with local-first controls and multilingual search.",
   home_primary_cta_label: "Browse listings",
   home_primary_cta_path: "/listings",
@@ -94,7 +94,10 @@ export function normalizeSiteSettings(input: Record<string, unknown>): Partial<S
   const contactEmail = typeof input.contact_email === "string" ? input.contact_email.trim() : "";
   const defaultLocale = typeof input.default_locale === "string" ? input.default_locale.trim() : "";
   const siteTagline = typeof input.site_tagline === "string" ? input.site_tagline.trim() : "";
-  const contactPhone = typeof input.contact_phone === "string" ? input.contact_phone.trim() : "";
+  const rawContactPhone = typeof input.contact_phone === "string" ? input.contact_phone.trim() : "";
+  const contactPhone = /^\d+\+$/.test(rawContactPhone)
+    ? `+${rawContactPhone.slice(0, -1)}`
+    : rawContactPhone;
   const homeHeroTitle = typeof input.home_hero_title === "string" ? input.home_hero_title.trim() : "";
   const homeHeroSubtitle = typeof input.home_hero_subtitle === "string" ? input.home_hero_subtitle.trim() : "";
   const homePrimaryCtaLabel = typeof input.home_primary_cta_label === "string" ? input.home_primary_cta_label.trim() : "";

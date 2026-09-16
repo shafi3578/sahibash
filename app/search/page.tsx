@@ -12,14 +12,12 @@ import {
 import { interpretAiSearch } from "@/lib/ai/search-interpreter";
 import { getAiFeatureFlags } from "@/lib/ai/feature-flags";
 import { detectSearchIntent } from "@/lib/search/intent";
-import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
-import type { SearchRewriteClient } from "@/lib/search/rewrite";
+import { resolveCachedSearchRewriteContext } from "@/lib/search/rewrite-server";
 import { logAiSearchParseTelemetry, logSearchTelemetry } from "@/lib/search/telemetry";
 import { ListingCard } from "@/components/listing-card";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { localizePath } from "@/lib/i18n/routing";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { saveSearchAction } from "@/lib/actions/saved-searches";
 import { createWantedRequestAction } from "@/lib/actions/liquidity";
 import { wantedCopy } from "@/lib/liquidity/wanted";
@@ -528,22 +526,7 @@ export default async function SearchPage({
   );
 
   const rewriteContextPromise = hasSearchSignal
-    ? (async () => {
-        try {
-          const supabase = await createSupabaseServerClient();
-          return resolveSearchRewriteContext({
-            supabase: supabase as unknown as SearchRewriteClient,
-            queryText: params.q,
-            categoryScope: effectiveNode?.path ?? null,
-          });
-        } catch {
-          return {
-            normalizedQuery: String(params.q ?? "").trim().toLowerCase(),
-            variants: [],
-            rewrittenTerms: [],
-          };
-        }
-      })()
+    ? resolveCachedSearchRewriteContext(params.q, effectiveNode?.path ?? null)
     : Promise.resolve({ normalizedQuery: "", variants: [], rewrittenTerms: [] });
 
   const [siblings, initialListings, rewriteContext] = await Promise.all([

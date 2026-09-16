@@ -278,7 +278,8 @@ test("listing pagination is server-side and image viewing supports touch navigat
   const localizedHome = readFileSync(join(process.cwd(), "app", "[locale]", "page.tsx"), "utf8");
   const listings = readFileSync(join(process.cwd(), "app", "listings", "page.tsx"), "utf8");
   const gallery = readFileSync(join(process.cwd(), "components", "listings", "listing-gallery.tsx"), "utf8");
-  assert.match(home, /limit: pageSize, offset: \(currentPage - 1\) \* pageSize/);
+  assert.match(home, /limit: currentPage === 1 \? pageSize \+ 4 : pageSize, offset: \(currentPage - 1\) \* pageSize/);
+  assert.match(home, /latestCandidates\.filter\(\(listing\) => !featuredIds\.has\(listing\.id\)\)/);
   assert.match(home, /getApprovedListingCount\(\)/);
   assert.match(localizedHome, /<HomePage searchParams=\{searchParams\}/);
   assert.match(listings, /const pageSize = 20/);

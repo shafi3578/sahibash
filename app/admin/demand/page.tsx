@@ -32,7 +32,7 @@ export default async function AdminDemandPage() {
   const copy = locale === "fa"
     ? {
         title: "تقاضا و کمبود عرضه",
-        subtitle: "نمای خصوصی و تجمیعی از جاهایی که صاحباش باید موجودی بیشتری جذب کند.",
+        subtitle: "نمای خصوصی و تجمیعی از جاهایی که صاحبش باید موجودی بیشتری جذب کند.",
         back: "بازگشت به ادمین",
         market: "بازار",
         signals: "سیگنال‌ها",
@@ -42,7 +42,7 @@ export default async function AdminDemandPage() {
     : locale === "ps"
       ? {
           title: "تقاضا او د عرضې تشه",
-          subtitle: "خصوصي او ټولیز لید چې صاحباش چیرته باید نوره موجودي راجلب کړي.",
+          subtitle: "خصوصي او ټولیز لید چې صاحبش چیرته باید نوره موجودي راجلب کړي.",
           back: "ادمین ته بېرته",
           market: "بازار",
           signals: "سیګنالونه",

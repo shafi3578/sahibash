@@ -45,7 +45,7 @@ export function wantedCopy(locale: AppLocale) {
       soon: "به‌زودی",
       urgent: "فوری",
       channels: "روش اطلاع‌رسانی",
-      inApp: "داخل صاحباش",
+      inApp: "داخل صاحبش",
       email: "ایمیل",
       whatsapp: "واتساپ",
     };
@@ -62,7 +62,7 @@ export function wantedCopy(locale: AppLocale) {
       soon: "ژر",
       urgent: "بیړنی",
       channels: "د خبرتیا لارې",
-      inApp: "په صاحباش کې",
+      inApp: "په صاحبش کې",
       email: "ایمیل",
       whatsapp: "واټس‌اپ",
     };

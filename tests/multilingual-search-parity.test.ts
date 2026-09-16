@@ -35,6 +35,11 @@ const FIXTURES: FixtureListing[] = [
     title: "تویوتا آکوا ۲۰۱۲ برای فروش در هرات",
     description: "Toyota Aqua in clean condition",
   },
+  {
+    id: "listing-corolla-core",
+    title: "Toyota Corolla 2012 کرولا",
+    description: "موتر فروشی در کابل",
+  },
 ];
 
 function findRelevantListingIds(query: string): string[] {
@@ -145,6 +150,10 @@ test("Aqua alef variants return equivalent relevant listings", () => {
     "آکوا",
     "اکوا",
   ]);
+});
+
+test("common Corolla misspellings recover the same listing", () => {
+  expectEquivalentResults("corolla typo", ["Corolla", "Corola", "کرولا", "کرلا", "کورولا"]);
 });
 
 test("Dari and Pashto orthographic character variants normalize identically", () => {

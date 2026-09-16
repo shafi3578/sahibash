@@ -155,7 +155,7 @@ export default async function AdministratorSettingsPage() {
           </label>
           <label className="text-sm font-semibold md:col-span-2">
             {copy.title}
-            <input name="title" placeholder="Trusted marketplace" className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+            <input name="title" placeholder="Clear marketplace source labels" className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
           </label>
           <label className="text-sm font-semibold md:col-span-2">
             {copy.body}

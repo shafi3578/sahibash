@@ -3,15 +3,15 @@ export const LAUNCH_ACTIVE_CATEGORY_SLUGS = [
   "real-estate",
   "mobile-phones-tablets",
   "second-hand-items",
+] as const;
+
+export const COMING_SOON_HOME_CATEGORY_SLUGS = [
   "jobs",
   "services",
   "electronics-computers",
   "home-furniture-appliances",
   "farm-animals",
   "wanted-request-ads",
-] as const;
-
-export const COMING_SOON_HOME_CATEGORY_SLUGS = [
   "business-industry",
   "education",
   "sports-hobbies",

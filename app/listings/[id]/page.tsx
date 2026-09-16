@@ -25,7 +25,7 @@ import { labelForLocale } from "@/lib/listing-schema-config";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { ListingContactActions } from "@/components/listings/listing-contact-actions";
 import { ListingCard } from "@/components/listing-card";
-import { formatCurrencyAmount } from "@/lib/i18n/format";
+import { formatCurrencyAmount, formatDate } from "@/lib/i18n/format";
 import { formatListingPrice } from "@/lib/listings/price-display";
 import { getSourceTransparency } from "@/lib/inventory/provenance";
 import { submitExternalListingClaimAction, submitExternalListingRemovalAction } from "@/lib/actions/inventory";
@@ -33,7 +33,9 @@ import { localizePath } from "@/lib/i18n/routing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { FavoriteToggleButton } from "@/components/listings/favorite-toggle-button";
 import { ListingViewTracker } from "@/components/listings/listing-view-tracker";
-import { getProvinceLabel } from "@/lib/constants/marketplace";
+import type { Metadata } from "next";
+import { localizeFilterOptionLabel } from "@/lib/i18n/filter-labels";
+import { getLocalizedListingLocation } from "@/lib/i18n/location-labels";
 
 type NamedLocationRelation = {
   name?: string | null;
@@ -49,19 +51,65 @@ function localizedLocationName(relation: NamedLocationRelation, locale: AppLocal
   return relation.name_en || relation.name || null;
 }
 
-function localizedDistrictName(relation: NamedLocationRelation, locale: AppLocale, provinceName: string | null) {
-  const value = localizedLocationName(relation, locale);
-  if (!value || locale === "en") return value;
-  const english = relation?.name_en || relation?.name || value;
-  const localized = locale === "fa" ? relation?.name_fa : relation?.name_ps;
-  if (localized && localized !== english) return localized;
-  if (/\s+City$/i.test(english) && provinceName) {
-    return locale === "fa" ? `شهر ${provinceName}` : `${provinceName} ښار`;
+function listingLanguageName(code: string | null | undefined, locale: AppLocale) {
+  const normalized = String(code ?? "en").toLowerCase();
+  const language = normalized.startsWith("fa") ? "fa" : normalized.startsWith("ps") ? "ps" : "en";
+  const labels = {
+    en: { en: "English", fa: "انگلیسی", ps: "انګلیسي" },
+    fa: { en: "Dari", fa: "دری", ps: "دري" },
+    ps: { en: "Pashto", fa: "پشتو", ps: "پښتو" },
+  } as const;
+  return labels[language][locale];
+}
+
+function listingLanguageBadge(
+  locale: AppLocale,
+  originalLanguage: string | null | undefined,
+  isTranslated: boolean
+) {
+  const language = listingLanguageName(originalLanguage, locale);
+  if (isTranslated) {
+    if (locale === "fa") return `ترجمه‌شده از ${language}`;
+    if (locale === "ps") return `له ${language} ژباړل شوی`;
+    return `Translated from ${language}`;
   }
-  return value;
+  if (locale === "fa") return `زبان اصلی: ${language}`;
+  if (locale === "ps") return `اصلي ژبه: ${language}`;
+  return `Original language: ${language}`;
 }
 type ListingDetail = NonNullable<Awaited<ReturnType<typeof getListingById>>>;
 type ListingDetailLocale = Awaited<ReturnType<typeof getDictionary>>["locale"];
+
+export async function getListingMetadata(id: string, locale: AppLocale): Promise<Metadata> {
+  const listing = await getListingById(id, locale);
+  if (!listing) return {};
+
+  const title = String(listing.translated_title || listing.title || "Sahibash").trim().slice(0, 80);
+  const description = String(listing.translated_description || listing.description || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+  const canonical = localizePath(`/listings/${listing.id}`, locale);
+  const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
+
+  return {
+    title,
+    description: description || undefined,
+    alternates: { canonical },
+    robots: listing.noindex_external ? { index: false, follow: true } : undefined,
+    openGraph: {
+      title,
+      description: description || undefined,
+      type: "website",
+      images: image ? [{ url: image, alt: title }] : undefined,
+    },
+  };
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const [{ id }, { locale }] = await Promise.all([params, getDictionary()]);
+  return getListingMetadata(id, locale);
+}
 
 async function SimilarListingsSection({
   listing,
@@ -87,7 +135,7 @@ async function SimilarListingsSection({
 }
 
 function readAttributeValue(value: unknown, locale: "en" | "fa" | "ps") {
-  if (typeof value === "string") return value;
+  if (typeof value === "string") return localizeFilterOptionLabel(value, value, locale);
   if (typeof value === "number") return String(value);
   if (typeof value === "boolean") {
     if (locale === "fa") return value ? "بلی" : "خیر";
@@ -150,6 +198,11 @@ export default async function ListingDetailPage({
   const viewerLanguageCode = appLocaleToListingLanguage(locale);
   const showOriginal = qp.view === "original";
   const translationUnavailable = !showOriginal && viewerLanguageCode !== listing.display_language;
+  const originalLanguageCode = listing.original_locale ?? listing.display_language ?? "en";
+  const isTranslatedView = !showOriginal
+    && listing.display_language === viewerLanguageCode
+    && listing.display_language !== originalLanguageCode;
+  const languageBadge = listingLanguageBadge(locale, originalLanguageCode, isTranslatedView);
   const displayTitle = showOriginal
     ? (listing.original_title || listing.title)
     : (listing.translated_title || listing.title);
@@ -170,10 +223,10 @@ export default async function ListingDetailPage({
   const offerHref = localizePath(`/listings/${listing.id}?offerbox=1`, locale);
   const ownershipRequestHref = currentUser
     ? `${listingHref}?claim=1`
-    : `${localizePath("/login", locale)}?redirect=${encodeURIComponent(`/listings/${listing.id}?claim=1`)}`;
+    : `${localizePath("/login", locale)}?redirect=${encodeURIComponent(`${listingHref}?claim=1`)}`;
   const removalRequestHref = currentUser
     ? `${listingHref}?remove=1`
-    : `${localizePath("/login", locale)}?redirect=${encodeURIComponent(`/listings/${listing.id}?remove=1`)}`;
+    : `${localizePath("/login", locale)}?redirect=${encodeURIComponent(`${listingHref}?remove=1`)}`;
   const attrs = (listing.listing_attributes ?? []).filter((item) => Boolean(item.attribute_key));
   const dynamicLeafId = attrs.find((item) => item.attribute_key === ELECTRONICS_DYNAMIC_LEAF_KEY)?.attribute_value_text ?? null;
   const dynamicAttributes = attrs.reduce<Record<string, unknown>>((acc, item) => {
@@ -218,10 +271,9 @@ export default async function ListingDetailPage({
   ].filter(Boolean).join(" › ");
   const simpleCategoryKind = getSimpleCategoryKind(listing.category_node?.path ?? undefined, listing.category?.slug ?? null);
   const simpleCategoryConfig = getSimpleCategoryConfig(simpleCategoryKind);
-  const provinceRelation = listing.provinces as NamedLocationRelation;
-  const provinceEnglishName = provinceRelation?.name_en || provinceRelation?.name || listing.province;
-  const localizedProvinceName = provinceEnglishName ? getProvinceLabel(provinceEnglishName, locale) : listing.province;
-  const localizedDistrict = localizedDistrictName(listing.districts as NamedLocationRelation, locale, localizedProvinceName);
+  const localizedLocation = getLocalizedListingLocation(listing, locale);
+  const localizedProvinceName = localizedLocation.province;
+  const localizedDistrict = localizedLocation.district;
   const localizedAreaName = localizedLocationName(listing.areas as NamedLocationRelation, locale);
   const locationParts = listing.location_visibility === "exact"
     ? [localizedProvinceName, localizedDistrict, localizedAreaName || listing.neighborhood || attributeMap.get("neighborhood") || listing.address_optional].filter(Boolean)
@@ -267,6 +319,9 @@ export default async function ListingDetailPage({
 
   const safeSellerName = listing.contact_name || listing.profile?.full_name || t.listing.sellerFallback;
   const sourceTransparency = getSourceTransparency(listing, locale);
+  const sourceLastChecked = sourceTransparency.isExternal && listing.source_last_seen_at
+    ? formatDate(listing.source_last_seen_at, locale, { year: "numeric", month: "short", day: "numeric" })
+    : null;
   const hasAccountSeller = Boolean(listing.user_id)
     && (!sourceTransparency.isExternal || sourceTransparency.ownershipStatus === "claimed");
   const canUseSahibashSellerTools = !isOwner && hasAccountSeller;
@@ -299,7 +354,9 @@ export default async function ListingDetailPage({
   }
   const hasContactPhone = Boolean(listing.public_contact_available ?? listing.contact_phone);
   const phonePrivacyLabel = hasContactPhone
-    ? locale === "fa" ? "تماس در دسترس است" : locale === "ps" ? "اړیکه شته" : "Contact available"
+    ? sourceTransparency.isExternal
+      ? locale === "fa" ? "تماس منبع در دسترس است" : locale === "ps" ? "د سرچینې اړیکه شته" : "Source contact available"
+      : locale === "fa" ? "تماس در دسترس است" : locale === "ps" ? "اړیکه شته" : "Contact available"
     : t.listing.notProvided;
   const whatsappEnabled = Boolean((listing as unknown as { whatsapp_enabled?: boolean }).whatsapp_enabled);
 
@@ -786,14 +843,14 @@ export default async function ListingDetailPage({
           <h1 className="mt-1 font-display text-2xl font-bold leading-tight sm:text-3xl">{displayTitle}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1 text-[var(--ink-2)]">
-              {listing.translation_note || t.listing.originalLanguage}
+              {languageBadge}
             </span>
             {showOriginal ? (
-              <Link href={`/listings/${listing.id}`} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
+              <Link href={listingHref} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
                 {t.listing.showTranslated}
               </Link>
             ) : (
-              <Link href={`/listings/${listing.id}?view=original`} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
+              <Link href={`${listingHref}?view=original`} className="rounded-full border border-[var(--line)] px-2 py-1 font-semibold">
                 {t.listing.viewOriginal}
               </Link>
             )}
@@ -961,21 +1018,27 @@ export default async function ListingDetailPage({
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4 sm:p-5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-xs font-bold text-[var(--ink-1)]">{sourceTransparency.sourceLabel}</span>
+            <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold text-[var(--ink-2)]">{sourceTransparency.ownershipLabel}</span>
             <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold text-[var(--ink-2)]">{sourceTransparency.freshnessLabel}</span>
           </div>
+          {sourceLastChecked ? (
+            <p className="mt-2 text-xs text-[var(--ink-2)]">
+              {locale === "fa" ? "آخرین بررسی منبع" : locale === "ps" ? "د سرچینې وروستۍ کتنه" : "Source last checked"}: {sourceLastChecked}
+            </p>
+          ) : null}
           {sourceTransparency.isExternal ? (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
               <p className="font-semibold">
                 {sourceTransparency.ownershipStatus === "claimed"
                   ? locale === "fa"
-                    ? "این اعلان از منبع بیرونی وارد شده، اما مالکیت آن اکنون توسط صاحباش تأیید شده است."
+                    ? "این اعلان از منبع بیرونی وارد شده، اما مالکیت آن اکنون توسط صاحبش تأیید شده است."
                     : locale === "ps"
-                      ? "دا اعلان له بهرنۍ سرچینې راغلی، خو مالکیت یې اوس د صاحباش له خوا تایید شوی دی."
+                      ? "دا اعلان له بهرنۍ سرچینې راغلی، خو مالکیت یې اوس د صاحبش له خوا تایید شوی دی."
                       : "This listing was imported from an external source, and its ownership is now verified by Sahibash."
                   : locale === "fa"
-                    ? "این اعلان از منبع بیرونی وارد شده و هنوز به حساب فروشنده در صاحباش وصل نیست. پیام و پیشنهاد پس از تأیید مالک فعال می‌شود."
+                    ? "این اعلان از منبع بیرونی وارد شده و هنوز به حساب فروشنده در صاحبش وصل نیست. پیام و پیشنهاد پس از تأیید مالک فعال می‌شود."
                     : locale === "ps"
-                      ? "دا اعلان له بهرنۍ سرچینې راغلی او لا د صاحباش د پلورونکي له حساب سره نه دی تړلی. پیغام او وړاندیز د مالک له تایید وروسته فعالېږي."
+                      ? "دا اعلان له بهرنۍ سرچینې راغلی او لا د صاحبش د پلورونکي له حساب سره نه دی تړلی. پیغام او وړاندیز د مالک له تایید وروسته فعالېږي."
                       : "This listing came from an external source and is not yet connected to a Sahibash seller account. Messaging and offers activate after ownership verification."}
               </p>
               {sourceTransparency.needsAvailabilityWarning ? (
@@ -1037,9 +1100,9 @@ export default async function ListingDetailPage({
           {sourceTransparency.isExternal && !hasAccountSeller ? (
             <p className="mt-3 rounded-xl bg-[var(--surface-2)] px-3 py-2 text-xs font-semibold text-[var(--ink-2)]">
               {locale === "fa"
-                ? "این فروشنده هنوز صندوق پیام صاحباش ندارد. برای پرسش درباره موجودیت فقط از گزینه تماس منبع استفاده کنید و پیش‌پرداخت نفرستید."
+                ? "این فروشنده هنوز صندوق پیام صاحبش ندارد. برای پرسش درباره موجودیت فقط از گزینه تماس منبع استفاده کنید و پیش‌پرداخت نفرستید."
                 : locale === "ps"
-                  ? "دا پلورونکی لا د صاحباش د پیغام صندوق نه لري. د شتون پوښتنې لپاره یوازې د سرچینې د اړیکې لاره وکاروئ او مخکې پیسې مه لېږئ."
+                  ? "دا پلورونکی لا د صاحبش د پیغام صندوق نه لري. د شتون پوښتنې لپاره یوازې د سرچینې د اړیکې لاره وکاروئ او مخکې پیسې مه لېږئ."
                   : "This seller does not have a Sahibash inbox yet. Use the source contact option only to confirm availability, and do not send advance payment."}
             </p>
           ) : null}
@@ -1146,7 +1209,7 @@ export default async function ListingDetailPage({
           addLabel={t.listing.addToFavorites}
           removeLabel={t.listing.removeFromFavorites}
         />
-        <form action={createReportAction} className="flex flex-wrap items-center gap-2">
+        {currentUser ? <form action={createReportAction} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="listingId" value={listing.id} />
           <select name="reason" required defaultValue="" className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm">
             <option value="" disabled>{t.listing.selectReportReason}</option>
@@ -1161,7 +1224,16 @@ export default async function ListingDetailPage({
           </select>
           <input name="details" placeholder={t.listing.optionalDetails} className="rounded-lg border border-[var(--line)] bg-white px-3 py-2 text-sm" />
           <button className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">{t.listing.reportListing}</button>
-        </form>
+        </form> : (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-[var(--ink-2)]">
+              {locale === "fa" ? "برای ثبت گزارش باید وارد حساب شوید." : locale === "ps" ? "د راپور ثبتولو لپاره باید حساب ته ننوځئ." : "Sign in is required to submit a report."}
+            </span>
+            <Link href={`${localizePath("/login", locale)}?redirect=${encodeURIComponent(listingHref)}`} className="rounded-lg bg-[var(--ink-1)] px-4 py-2 text-sm font-semibold text-white">
+              {locale === "fa" ? "ورود برای گزارش" : locale === "ps" ? "د راپور لپاره ننوتل" : "Sign in to report"}
+            </Link>
+          </div>
+        )}
       </div>
 
       {(qp.translation === "unavailable" || translationUnavailable) ? (

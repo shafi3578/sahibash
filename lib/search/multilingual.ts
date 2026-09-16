@@ -58,6 +58,7 @@ const SYNONYM_GROUPS: string[][] = [
   ["xiaomi", "redmi", "شیائومی", "شاومی", "شیاومی", "ردمی", "ریدمی"],
   ["huawei", "هواوی", "هواوي"],
   ["toyota", "تویوتا", "تایوتا"],
+  ["corolla", "corola", "کرولا", "کرلا", "کورولا", "تویوتا کرولا"],
   ["fielder", "فیلدر", "فیلډر"],
   ["honda", "هوندا", "هندا"],
   ["dell", "دل"],
@@ -143,6 +144,28 @@ function buildAliasLookup() {
 
 const ALIAS_LOOKUP = buildAliasLookup();
 
+export function isSearchTypoMatch(left: string, right: string): boolean {
+  const a = normalizeSearchText(left).replace(/\s+/g, "");
+  const b = normalizeSearchText(right).replace(/\s+/g, "");
+  if (!a || !b || a === b) return a === b;
+  if (Math.abs(a.length - b.length) > 1 || Math.min(a.length, b.length) < 4) return false;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= a.length; row += 1) {
+    const current = [row];
+    let rowMinimum = row;
+    for (let column = 1; column <= b.length; column += 1) {
+      const substitution = previous[column - 1] + (a[row - 1] === b[column - 1] ? 0 : 1);
+      const value = Math.min(previous[column] + 1, current[column - 1] + 1, substitution);
+      current.push(value);
+      rowMinimum = Math.min(rowMinimum, value);
+    }
+    if (rowMinimum > 1) return false;
+    previous = current;
+  }
+  return previous[b.length] <= 1;
+}
+
 function hasPersoArabicScript(value: string): boolean {
   return /[\u0600-\u06ff]/.test(value);
 }
@@ -182,6 +205,13 @@ export function expandSearchVariants(query: string): string[] {
       for (const alias of ALIAS_LOOKUP.get(token) ?? []) {
         variants.add(alias);
       }
+    }
+  }
+
+  for (const token of tokens) {
+    for (const [knownTerm, aliases] of ALIAS_LOOKUP) {
+      if (!isSearchTypoMatch(token, knownTerm)) continue;
+      for (const alias of aliases) variants.add(alias);
     }
   }
 

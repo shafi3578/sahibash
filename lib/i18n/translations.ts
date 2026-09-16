@@ -360,7 +360,7 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
     },
     footer: {
       platform: "Sahibash",
-      tagline: "Afghanistan marketplace for trusted listings.",
+      tagline: "Afghanistan marketplace with clear listing sources.",
       quickLinks: "Quick links",
     },
     auth: {
@@ -756,7 +756,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
     },
     footer: {
       platform: "افغان",
-      tagline: "بازار آنلاین افغانستان با اعلان های قابل اعتماد.",
+      tagline: "بازار آنلاین افغانستان با منبع روشن اعلان‌ها.",
       quickLinks: "پیوندهای سریع",
     },
     auth: {
@@ -874,7 +874,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
     },
     footer: {
       platform: "افغان",
-      tagline: "د افغانستان بازار د باوري اعلانونو لپاره.",
+      tagline: "د افغانستان بازار له روښانه اعلان سرچینو سره.",
       quickLinks: "چټک تړونونه",
     },
     auth: {

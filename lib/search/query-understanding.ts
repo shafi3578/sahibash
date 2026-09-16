@@ -52,7 +52,7 @@ const STORAGE_NUMBERS = new Set([16, 32, 64, 128, 256, 512, 1024, 2048]);
 
 const CRITICAL_PRODUCT_HINTS: ProductAlias[] = [
   { canonical: "Toyota Fielder", categoryScope: "vehicles", aliases: ["fielder", "fildr", "filder", "فیلدر", "فیلډر", "فلدر"] },
-  { canonical: "Toyota Corolla", categoryScope: "vehicles", aliases: ["corolla", "corola", "کرولا", "کورولا", "تویوتا کرولا"] },
+  { canonical: "Toyota Corolla", categoryScope: "vehicles", aliases: ["corolla", "corola", "کرولا", "کرلا", "کورولا", "تویوتا کرولا"] },
   { canonical: "Toyota Hilux", categoryScope: "vehicles", aliases: ["hilux", "hilex", "هایلکس", "هیلکس"] },
   { canonical: "iPhone", categoryScope: "mobile-phones-tablets", aliases: ["iphone", "i phone", "آیفون", "ایفون"] },
   { canonical: "Samsung Galaxy", categoryScope: "mobile-phones-tablets", aliases: ["samsung", "samson", "galaxy", "سامسونگ", "سامسنګ", "گلکسی"] },

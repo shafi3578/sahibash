@@ -82,6 +82,10 @@ const verifiedSourcePermissionsMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260908084500_verified_external_source_permissions.sql"),
   "utf8",
 );
+const unauthorizedExternalArchiveMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "20260916000959_archive_unauthorized_external_publications.sql"),
+  "utf8",
+);
 const externalSourcePostedAtMigration = readFileSync(
   join(process.cwd(), "supabase", "migrations", "20260906181534_preserve_external_source_posted_at.sql"),
   "utf8",
@@ -291,6 +295,16 @@ test("external publication requires a source-scoped verified rights record", () 
   assert.match(inventoryPage, /Manage source rights/i);
 });
 
+test("legacy external publications without current source rights are archived, not deleted", () => {
+  assert.match(unauthorizedExternalArchiveMigration, /source_type = 'external_indexed'/i);
+  assert.match(unauthorizedExternalArchiveMigration, /permission\.status = 'verified'/i);
+  assert.match(unauthorizedExternalArchiveMigration, /status = 'expired'/i);
+  assert.match(unauthorizedExternalArchiveMigration, /publication_status = 'archived'/i);
+  assert.match(unauthorizedExternalArchiveMigration, /external_rights_publication_archived/i);
+  assert.match(unauthorizedExternalArchiveMigration, /before insert or update of/i);
+  assert.doesNotMatch(unauthorizedExternalArchiveMigration, /delete\s+from\s+public\.listings/i);
+});
+
 test("external inventory preserves verifiable source dates and rejects stale publication", () => {
   assert.match(externalSourcePostedAtMigration, /source_published_at/i);
   assert.match(externalSourcePostedAtMigration, /forward_origin,date/i);
@@ -461,6 +475,7 @@ test("external review preserves verified AFN or USD prices without conversion", 
   assert.match(candidateReviewControl, /name="currency"/);
   assert.match(candidateReviewControl, /<option value="AFN">AFN<\/option><option value="USD">USD<\/option>/);
   assert.match(candidateReviewControl, /name="price_amount"/);
+  assert.doesNotMatch(candidateReviewControl, /contactPrice|Contact for price|قیمت به تماس|بیه په اړیکه/i);
   assert.match(candidateReviewAction, /formData\.get\("currency"\) === "USD"/);
   assert.match(candidateReviewAction, /p_normalized_price_afn:[\s\S]*priceCurrency === "AFN"/);
   assert.match(candidatePublicationAction, /publish_reviewed_ingest_candidate_with_currency/);

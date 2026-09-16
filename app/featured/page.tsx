@@ -5,6 +5,7 @@ import { isFeaturedCurrentlyActive } from "@/lib/data/featured-payments";
 import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { formatListingPrice } from "@/lib/listings/price-display";
+import { getLocalizedListingLocation } from "@/lib/i18n/location-labels";
 
 export default async function FeaturedPage() {
   const { locale, t } = await getDictionary();
@@ -34,7 +35,7 @@ export default async function FeaturedPage() {
               </div>
               <div className="p-3">
                 <p className="line-clamp-2 text-base font-bold text-slate-950">{displayTitle}</p>
-                <p className="mt-1 text-sm text-slate-500">{listing.province ?? listing.district ?? "-"}</p>
+                <p className="mt-1 text-sm text-slate-500">{getLocalizedListingLocation(listing, locale).label}</p>
                 <p className="mt-2 text-lg font-black text-[#2563eb]">{formatListingPrice(listing, locale)}</p>
               </div>
             </Link>

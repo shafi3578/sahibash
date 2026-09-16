@@ -37,6 +37,13 @@ test("normalizeSiteSettings keeps required values and strips empty ones", () => 
   });
 });
 
+test("normalizeSiteSettings repairs a legacy RTL-reversed international phone", () => {
+  assert.equal(
+    normalizeSiteSettings({ contact_phone: "93796428657+" }).contact_phone,
+    "+93796428657",
+  );
+});
+
 test("resolveSiteSettingsVersionSnapshot falls back to public defaults", () => {
   const snapshot = resolveSiteSettingsVersionSnapshot({
     site_name: "Control Center",
@@ -47,7 +54,7 @@ test("resolveSiteSettingsVersionSnapshot falls back to public defaults", () => {
   assert.equal(snapshot.site_tagline, "Marketplace for Afghanistan");
   assert.equal(snapshot.contact_phone, "+93700000000");
   assert.equal(snapshot.default_locale, "fa");
-  assert.equal(snapshot.home_hero_title, "Discover trusted listings across Afghanistan");
+  assert.equal(snapshot.home_hero_title, "Fresh listings with clear sources");
   assert.deepEqual(snapshot.navigation_links, [
     { label: "Listings", path: "/listings" },
     { label: "Categories", path: "/categories" },

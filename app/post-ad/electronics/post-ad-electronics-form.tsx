@@ -659,7 +659,6 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
       const destination = `/listings/${created.listingId}/manage`;
       router.push(destination);
       router.refresh();
-      window.location.assign(destination);
     });
   }
 

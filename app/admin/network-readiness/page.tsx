@@ -101,7 +101,7 @@ export default async function AdminNetworkReadinessPage() {
   const copy = locale === "fa"
     ? {
         back: "بازگشت به ادمین",
-        title: "آمادگی شبکه صاحباش",
+        title: "آمادگی شبکه صاحبش",
         subtitle: "نمای تجمیعی و بدون اطلاعات شخصی برای نقدینگی بازار، کاهش وابستگی به موجودی خارجی، قیمت، اعتماد و سلامت منبع.",
         nextBest: "بازارهای پیشنهادی بعدی",
         retirement: "شبیه‌سازی کاهش موجودی خارجی",
@@ -113,7 +113,7 @@ export default async function AdminNetworkReadinessPage() {
     : locale === "ps"
       ? {
           back: "ادمین ته بېرته",
-          title: "د صاحباش شبکې چمتووالی",
+          title: "د صاحبش شبکې چمتووالی",
           subtitle: "د بازار مایعیت، بهرني موجودي کمولو، بیې، باور او سرچینې روغتیا لپاره ټولیز او بې‌PII لید.",
           nextBest: "راتلونکي غوره بازارونه",
           retirement: "د بهرني موجودي کمولو شبیه‌سازي",

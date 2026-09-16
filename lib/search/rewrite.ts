@@ -1,4 +1,4 @@
-import { expandSearchVariants, normalizeSearchText } from "@/lib/search/multilingual";
+import { expandSearchVariants, isSearchTypoMatch, normalizeSearchText } from "@/lib/search/multilingual";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type SearchAliasDictionaryRow = {
@@ -60,7 +60,9 @@ export function expandWithAdminDictionary(
       continue;
     }
 
-    const hit = cluster.some((term) => Array.from(variants).some((variant) => variant.includes(term) || term.includes(variant)));
+    const hit = cluster.some((term) => Array.from(variants).some((variant) =>
+      variant.includes(term) || term.includes(variant) || isSearchTypoMatch(variant, term)
+    ));
     if (!hit) {
       continue;
     }

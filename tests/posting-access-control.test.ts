@@ -83,6 +83,16 @@ test("Vercel telemetry assets bypass locale routing", () => {
   assert.equal(isProxyExcludedPath("/_vercel/speed-insights/script.js"), true);
 });
 
+test("the locale catch-all rejects invalid route segments before metadata lookup", () => {
+  const catchAll = readFileSync(
+    join(process.cwd(), "app", "[locale]", "[...slug]", "page.tsx"),
+    "utf8",
+  );
+  assert.match(catchAll, /const locale = normalizeLocaleInput\(rawLocale\)/);
+  assert.match(catchAll, /if \(!locale\) return \{\}/);
+  assert.match(catchAll, /if \(!normalizeLocaleInput\(resolvedParams\.locale\)\) notFound\(\)/);
+});
+
 test("final category selection exposes a direct details action above mobile navigation", () => {
   assert.match(canonicalPostingForm, /data-testid="category-continue-to-details"/);
   assert.match(canonicalPostingForm, /data-testid="posting-step-actions"/);

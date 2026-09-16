@@ -23,6 +23,12 @@ test("unclaimed external listings do not expose in-app message or offer controls
   assert.doesNotMatch(listingPage, /remove_request_click/);
 });
 
+test("external claim and removal authentication redirects preserve the active locale", () => {
+  assert.match(listingPage, /encodeURIComponent\(`\$\{listingHref\}\?claim=1`\)/);
+  assert.match(listingPage, /encodeURIComponent\(`\$\{listingHref\}\?remove=1`\)/);
+  assert.doesNotMatch(listingPage, /encodeURIComponent\(`\/listings\/\$\{listing\.id\}\?(?:claim|remove)=1`\)/);
+});
+
 test("message and offer actions re-read accountable seller state", () => {
   for (const source of [messageActions, offerActions]) {
     assert.match(source, /publication_status, source_type, ownership_status/);

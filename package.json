@@ -7,13 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:i18n-parity": "node --import tsx --test tests/i18n-key-parity.test.ts",
+    "test:i18n-parity": "node --import tsx --test tests/i18n-key-parity.test.ts tests/location-labels.test.ts",
     "test:search-parity": "node --import tsx --test tests/multilingual-search-parity.test.ts",
     "test:posting-access": "node --import tsx --test tests/posting-access-control.test.ts tests/listing-image-validation.test.ts tests/vehicle-model-catalog.test.ts",
     "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts tests/suggested-details.test.ts",
     "test:step2-quick-post": "node --import tsx --test tests/simple-category-details.test.ts tests/step2-quick-post.test.ts tests/location-reverse-match.test.ts tests/ai-category-pilot.test.ts",
     "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts tests/taxonomy-schema-migrations.test.ts",
-    "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/auth-step-up.test.ts tests/production-fixture-guard.test.ts tests/location-privacy.test.ts tests/production-sanity-sql.test.ts tests/storage-hardening.test.ts tests/rate-limit-foundation.test.ts tests/marketplace-ranking.test.ts tests/public-listing-boundary.test.ts tests/mfa-readiness.test.ts tests/step1-foundation.test.ts",
+    "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/auth-step-up.test.ts tests/production-fixture-guard.test.ts tests/location-privacy.test.ts tests/production-sanity-sql.test.ts tests/storage-hardening.test.ts tests/rate-limit-foundation.test.ts tests/marketplace-ranking.test.ts tests/public-listing-boundary.test.ts tests/mfa-readiness.test.ts tests/step1-foundation.test.ts tests/security-headers-config.test.ts",
     "test:mfa-live": "node --import tsx --test tests/live-mfa-e2e.test.ts",
     "test:inventory-provenance": "node --import tsx --test --test-concurrency=1 tests/inventory-provenance.test.ts tests/inventory-source-scopes.test.ts tests/external-listing-interactions.test.ts",
     "test:liquidity": "node --import tsx --test tests/liquidity-foundation.test.ts",
@@ -31,10 +31,11 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "leaflet": "^1.9.4",
-    "next": "^16.2.11",
+    "next": "16.3.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "sharp": "0.35.4"
   },
   "devDependencies": {
     "@gltf-transform/core": "4.4.2",
@@ -43,13 +44,16 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.11",
+    "eslint-config-next": "16.3.5",
     "supabase": "^2.107.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5"
   },
   "overrides": {
+    "baseline-browser-mapping": "2.11.24",
+    "browserslist": "4.28.7",
+    "js-yaml": "4.3.2",
     "nanoid": "3.3.18"
   }
 }

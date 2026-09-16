@@ -33,8 +33,7 @@ import {
 import type { AppLocale } from "@/lib/i18n/translations";
 import { localizeFilterLabel } from "@/lib/i18n/filter-labels";
 import { buildSearchKeywordIndex, normalizeSearchText } from "@/lib/search/multilingual";
-import { resolveSearchRewriteContext } from "@/lib/search/rewrite";
-import type { SearchRewriteClient } from "@/lib/search/rewrite";
+import { resolveCachedSearchRewriteContext } from "@/lib/search/rewrite-server";
 import { understandSearchQuery } from "@/lib/search/query-understanding";
 import { getSimpleCategoryConfig, getSimpleCategoryKind } from "@/lib/posting/simple-category-details";
 import {
@@ -366,6 +365,15 @@ const getCachedSimpleApprovedListings = unstable_cache(
   }
 );
 
+const getCachedSearchApprovedListings = unstable_cache(
+  async (filters: ListingFilters) => loadApprovedListings(filters),
+  ["sahibash-search-approved-listings"],
+  {
+    revalidate: 30,
+    tags: [PUBLIC_CACHE_TAGS.publicListingFeed],
+  }
+);
+
 const getCachedApprovedListingCount = unstable_cache(
   async (): Promise<number> => {
     const supabase = createSupabasePublicServerClient();
@@ -412,6 +420,10 @@ export async function getApprovedListings(
     return getCachedSimpleApprovedListings(filters);
   }
 
+  if (filters?.search?.trim()) {
+    return getCachedSearchApprovedListings(filters);
+  }
+
   return loadApprovedListings(filters);
 }
 
@@ -421,7 +433,7 @@ async function loadApprovedListings(
     try {
       const supabase = createSupabasePublicServerClient();
 
-      const lifecycleCategoryIds = await (async () => {
+      const lifecycleCategoryIdsPromise = (async () => {
         const lifecycle = await supabase
           .from("categories")
           .select("id")
@@ -444,6 +456,16 @@ async function loadApprovedListings(
         return (fallback.data as Array<{ id: number }>).map((row) => row.id);
       })();
 
+      const rewriteContextPromise = resolveCachedSearchRewriteContext(
+        filters?.search?.trim() ?? "",
+        null
+      );
+
+      const [lifecycleCategoryIds, rewriteContext] = await Promise.all([
+        lifecycleCategoryIdsPromise,
+        rewriteContextPromise,
+      ]);
+
       if (lifecycleCategoryIds.length === 0) {
         return [];
       }
@@ -458,11 +480,6 @@ async function loadApprovedListings(
 
       let attributeScopedListingIds: string[] | null = null;
       let translatedSearchListingIds: string[] = [];
-      const rewriteContext = await resolveSearchRewriteContext({
-        supabase: supabase as unknown as SearchRewriteClient,
-        queryText: filters?.search?.trim() ?? "",
-        categoryScope: null,
-      });
       const searchVariants = rewriteContext.variants.slice(0, 20);
       const understoodSearch = understandSearchQuery(filters?.search ?? "");
       const hasPriceBoundaryFilter = typeof filters?.minPrice === "number" || typeof filters?.maxPrice === "number";
@@ -1084,22 +1101,26 @@ async function loadApprovedListings(
     }
 }
 
-export async function getListingById(
+async function loadListingById(
   id: string,
   locale: AppLocale = "en"
 ): Promise<ListingWithRelations | null> {
   try {
     const supabase = await createSupabaseServerClient();
-    const currentUser = await getCurrentUser();
-    const canModerateListings = await getCurrentUserCanModerateListings(supabase, currentUser?.id);
     const trustedSupabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : null;
     const listingReadClient = trustedSupabase ?? supabase;
-
-    const { data, error } = await listingReadClient
+    const currentUserPromise = getCurrentUser();
+    const listingPromise = listingReadClient
       .from("listings")
       .select((trustedSupabase ? LISTING_DETAIL_PRIVATE_SELECT : LISTING_DETAIL_PUBLIC_FALLBACK_SELECT) as string)
       .eq("id", id)
       .maybeSingle();
+
+    const currentUser = await currentUserPromise;
+    const [{ data, error }, canModerateListings] = await Promise.all([
+      listingPromise,
+      getCurrentUserCanModerateListings(supabase, currentUser?.id),
+    ]);
 
     if (error || !data) {
       return null;
@@ -1383,6 +1404,8 @@ export async function getListingById(
     return null;
   }
 }
+
+export const getListingById = cache(loadListingById);
 
 function applyPublicListingEmbedLimits<T>(query: T): T {
   type EmbeddedQuery = {

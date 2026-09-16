@@ -183,5 +183,8 @@ test("featured display derives from a valid future featured_until, not the stale
 test("homepage never presents ordinary latest listings as featured", () => {
   assert.match(homePage, /const featuredRow = featured\.filter\(\(listing\) => isFeaturedCurrentlyActive\(listing\)\)/);
   assert.doesNotMatch(homePage, /const featuredRow = featured\.length/);
-  assert.match(homePage, /homeCopy\.noFeatured/);
+  assert.match(homePage, /const heroListings = featuredRow\.slice\(0, 3\)/);
+  assert.match(homePage, /latestCandidates\.filter\(\(listing\) => !featuredIds\.has\(listing\.id\)\)/);
+  assert.match(homePage, /\{featuredRow\.length > 0 \? <section/);
+  assert.doesNotMatch(homePage, /No featured ads are active yet/);
 });

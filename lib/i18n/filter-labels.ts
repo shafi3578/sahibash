@@ -79,6 +79,21 @@ const FILTER_LABELS: Record<string, LocalizedText> = {
 };
 
 const OPTION_LABELS: Record<string, LocalizedText> = {
+  white: { fa: "سفید", ps: "سپین" },
+  black: { fa: "سیاه", ps: "تور" },
+  red: { fa: "سرخ", ps: "سور" },
+  blue: { fa: "آبی", ps: "آبي" },
+  "sky blue": { fa: "آسمانی", ps: "اسماني" },
+  silver: { fa: "نقره‌ای", ps: "سپین زرین" },
+  gray: { fa: "خاکستری", ps: "خړ" },
+  grey: { fa: "خاکستری", ps: "خړ" },
+  gold: { fa: "طلایی", ps: "طلایي" },
+  green: { fa: "سبز", ps: "شین" },
+  yellow: { fa: "زرد", ps: "ژېړ" },
+  brown: { fa: "نصواری", ps: "نسواري" },
+  beige: { fa: "کِرِم", ps: "کريمي" },
+  orange: { fa: "نارنجی", ps: "نارنجي" },
+  purple: { fa: "بنفش", ps: "ارغواني" },
   automatic: { fa: "اتومات", ps: "اتومات" },
   manual: { fa: "دستی", ps: "لاسي" },
   petrol: { fa: "پترول", ps: "پټرول" },

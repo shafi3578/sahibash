@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { followUserAction, unfollowUserAction } from "@/lib/actions/social";
 import { BlockUserButton } from "@/components/social/block-user-button";
+import { getLocalizedListingLocation } from "@/lib/i18n/location-labels";
 
 export default async function PublicSellerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,7 +18,7 @@ export default async function PublicSellerPage({ params }: { params: Promise<{ i
   const admin = createSupabaseAdmin();
   const currentUser = await getCurrentUser();
   const [{ data: listings }, followerResult, followingResult] = await Promise.all([
-    admin.from("listings").select("id,title,price,currency,province,district,contact_name,created_at,listing_images(public_url,is_primary,sort_order)").eq("user_id", id).eq("status", "approved").order("created_at", { ascending: false }).limit(48),
+    admin.from("listings").select("id,title,price,currency,province,district,contact_name,created_at,provinces!province_id(name,name_en,name_fa,name_ps),districts!district_id(name,name_en,name_fa,name_ps),listing_images(public_url,is_primary,sort_order)").eq("user_id", id).eq("status", "approved").order("created_at", { ascending: false }).limit(48),
     supabase.from("user_follows").select("follower_user_id", { count: "exact", head: true }).eq("following_user_id", id),
     supabase.from("user_follows").select("following_user_id", { count: "exact", head: true }).eq("follower_user_id", id),
   ]);
@@ -45,6 +46,6 @@ export default async function PublicSellerPage({ params }: { params: Promise<{ i
       </div>
       <div className="mt-4 flex gap-4 text-sm"><span><strong>{followerResult.count ?? 0}</strong> {text.followers}</span><span><strong>{followingResult.count ?? 0}</strong> {text.following}</span></div>
     </section>
-    <section><h2 className="mb-3 font-display text-xl font-black">{text.listings}</h2>{(listings ?? []).length === 0 ? <p className="rounded-2xl border border-dashed border-[var(--line)] p-5 text-[var(--ink-2)]">{text.empty}</p> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(listings ?? []).map((listing) => { const images=[...(listing.listing_images ?? [])].sort((a,b)=>Number(Boolean(b.is_primary))-Number(Boolean(a.is_primary))||Number(a.sort_order??0)-Number(b.sort_order??0)); const image=images[0]?.public_url; return <Link key={listing.id} href={localizePath(`/listings/${listing.id}`,locale)} className="overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-sm"><div className="relative aspect-video bg-[var(--surface-2)]">{image?<Image src={image} alt={listing.title} fill className="object-cover" sizes="(max-width: 640px) 100vw, 33vw"/>:null}</div><div className="p-3"><h3 className="line-clamp-2 font-bold">{listing.title}</h3><p className="mt-1 text-sm font-bold text-[var(--accent)]">{Number(listing.price).toLocaleString()} {listing.currency}</p><p className="mt-1 text-xs text-[var(--ink-2)]">{[listing.province,listing.district].filter(Boolean).join(" · ")}</p></div></Link>; })}</div>}</section>
+    <section><h2 className="mb-3 font-display text-xl font-black">{text.listings}</h2>{(listings ?? []).length === 0 ? <p className="rounded-2xl border border-dashed border-[var(--line)] p-5 text-[var(--ink-2)]">{text.empty}</p> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(listings ?? []).map((listing) => { const images=[...(listing.listing_images ?? [])].sort((a,b)=>Number(Boolean(b.is_primary))-Number(Boolean(a.is_primary))||Number(a.sort_order??0)-Number(b.sort_order??0)); const image=images[0]?.public_url; const location=getLocalizedListingLocation(listing,locale).label; return <Link key={listing.id} href={localizePath(`/listings/${listing.id}`,locale)} className="overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-sm"><div className="relative aspect-video bg-[var(--surface-2)]">{image?<Image src={image} alt={listing.title} fill className="object-cover" sizes="(max-width: 640px) 100vw, 33vw"/>:null}</div><div className="p-3"><h3 className="line-clamp-2 font-bold">{listing.title}</h3><p className="mt-1 text-sm font-bold text-[var(--accent)]">{Number(listing.price).toLocaleString()} {listing.currency}</p><p className="mt-1 text-xs text-[var(--ink-2)]">{location}</p></div></Link>; })}</div>}</section>
   </main>;
 }

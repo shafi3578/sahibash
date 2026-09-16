@@ -6,15 +6,15 @@ import { USER_COPY, type UserInfoPage } from "@/lib/i18n/user-copy";
 export const SITE_METADATA: Record<AppLocale, { titleSuffix: string; description: string }> = {
   en: {
     titleSuffix: "Buy and Sell in Afghanistan",
-    description: "Afghanistan's trusted marketplace for vehicles, real estate, electronics, services, jobs, and second-hand items.",
+    description: "Afghanistan marketplace for vehicles, real estate, electronics, services, jobs, and second-hand items, with clear listing sources.",
   },
   fa: {
     titleSuffix: "خرید و فروش در افغانستان",
-    description: "بازار آنلاین قابل اعتماد افغانستان برای وسایط، املاک، الکترونیک، خدمات، وظایف و اجناس دست دوم.",
+    description: "بازار آنلاین افغانستان برای وسایط، املاک، الکترونیک، خدمات، وظایف و اجناس دست دوم با منبع روشن اعلان‌ها.",
   },
   ps: {
     titleSuffix: "په افغانستان کې پېر او پلور",
-    description: "د موټرو، املاکو، الکترونیک، خدمتونو، دندو او دوهم لاس توکو لپاره د افغانستان باوري آنلاین بازار.",
+    description: "د موټرو، املاکو، الکترونیک، خدمتونو، دندو او دوهم لاس توکو لپاره د افغانستان بازار، د اعلانونو له روښانه سرچینو سره.",
   },
 };
 

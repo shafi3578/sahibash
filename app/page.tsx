@@ -11,12 +11,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { localizePath } from "@/lib/i18n/routing";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 import { formatListingPrice } from "@/lib/listings/price-display";
-
-type HomePlace = { name?: string | null; name_en?: string | null; name_fa?: string | null; name_ps?: string | null };
-
-function homePlaceName(place: HomePlace | null | undefined, locale: "en" | "fa" | "ps") {
-  return String(place?.[`name_${locale}`] ?? place?.name ?? place?.name_en ?? "").trim();
-}
+import { getLocalizedListingLocation } from "@/lib/i18n/location-labels";
 
 function getHomePageCopy(
   locale: "en" | "fa" | "ps",
@@ -25,41 +20,41 @@ function getHomePageCopy(
   if (locale === "fa") {
     return {
       tagline: "بازار آنلاین افغانستان",
-      heroTitle: "اعلان‌های قابل اعتماد در سراسر افغانستان",
-      heroSubtitle: "خرید، فروش و جستجو با دسته‌بندی‌های محلی، فیلترهای دقیق و پشتیبانی دری و پشتو.",
+      heroTitle: "اعلان‌های تازه با منبع روشن",
+      heroSubtitle: "اعلان‌های فروشندگان صاحبش و منابع بیرونی با برچسب روشن؛ موجودیت اعلان‌ها در هر ولایت متفاوت است.",
       primaryCta: "دیدن اعلان‌ها",
       secondaryCta: "ثبت اعلان",
       allFeatured: "همه ویژه‌ها",
-      noFeatured: "هنوز اعلان ویژه‌ای فعال نیست.",
       adBadge: "اعلان",
       brandBadge: "صاحبش",
+      paginationLabel: "صفحه‌های جدیدترین اعلان‌ها",
     };
   }
 
   if (locale === "ps") {
     return {
       tagline: "د افغانستان آنلاین بازار",
-      heroTitle: "په ټول افغانستان کې باوري اعلانونه",
-      heroSubtitle: "واخلئ، وپلورئ او د محلي کټګوریو، دقیقو فلټرونو او دري/پښتو ملاتړ سره اعلانونه ولټوئ.",
+      heroTitle: "تازه اعلانونه له روښانه سرچینې سره",
+      heroSubtitle: "د صاحبش د پلورونکو او روښانه نښه شویو بهرنیو سرچینو اعلانونه؛ د اعلانونو شتون په هر ولایت کې توپیر لري.",
       primaryCta: "اعلانونه وګورئ",
       secondaryCta: "اعلان ثبت کړئ",
       allFeatured: "ټول ځانګړي",
-      noFeatured: "تر اوسه فعال ځانګړی اعلان نشته.",
       adBadge: "اعلان",
       brandBadge: "صاحبش",
+      paginationLabel: "د تازه اعلانونو پاڼې",
     };
   }
 
   return {
     tagline: siteSettings.site_tagline,
-    heroTitle: siteSettings.home_hero_title,
-    heroSubtitle: siteSettings.home_hero_subtitle,
+    heroTitle: "Fresh listings with clear sources",
+    heroSubtitle: "Browse Sahibash sellers and clearly labeled external sources. Listing availability varies by province.",
     primaryCta: siteSettings.home_primary_cta_label,
     secondaryCta: siteSettings.home_secondary_cta_label,
     allFeatured: "All featured",
-    noFeatured: "No featured ads are active yet.",
     adBadge: "Ad",
     brandBadge: getLocalizedBrandName(locale, siteSettings.site_name),
+    paginationLabel: "Latest listing pages",
   };
 }
 
@@ -83,21 +78,26 @@ export default async function HomePage({
   const homepageSections = resolveHomepageSections(await homepageSectionsPromise);
   const postAdHref = href(postAdCreatePath);
 
-  const [latest, featured, totalListings, mobileCategories] = await Promise.all([
-    getApprovedListings({ locale, limit: pageSize, offset: (currentPage - 1) * pageSize }),
+  const [latestCandidates, featured, totalListings, mobileCategories] = await Promise.all([
+    getApprovedListings({ locale, limit: currentPage === 1 ? pageSize + 4 : pageSize, offset: (currentPage - 1) * pageSize }),
     getApprovedListings({ locale, featuredOnly: true, limit: 4 }),
     getApprovedListingCount(),
     getHomeCategoryNodes(),
   ]);
 
   const featuredRow = featured.filter((listing) => isFeaturedCurrentlyActive(listing));
-  const heroListings = featured.length ? featured : latest.slice(0, 3);
+  const heroListings = featuredRow.slice(0, 3);
+  const featuredIds = new Set(featuredRow.map((listing) => listing.id));
+  const latest = (currentPage === 1
+    ? latestCandidates.filter((listing) => !featuredIds.has(listing.id))
+    : latestCandidates
+  ).slice(0, pageSize);
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_4%_0%,rgba(202,158,72,0.22),transparent_28%),radial-gradient(circle_at_98%_18%,rgba(7,117,105,0.13),transparent_32%),linear-gradient(180deg,#fcf8ef_0%,#efe7d9_46%,#eef4f1_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
       <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_17%_10%,rgba(207,174,101,0.30)_0,rgba(10,93,88,0.50)_24%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(173,126,55,0.16),transparent_38%),linear-gradient(135deg,#06131d_0%,#082a30_54%,#030c13_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#d8bd7a]/35 sm:shadow-[0_28px_72px_-25px_rgba(1,15,24,0.70),0_1px_0_rgba(255,255,255,0.1)_inset]">
-        <div className="grid gap-6 px-4 py-7 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-10">
+        <div className={`grid gap-6 px-4 py-7 sm:px-6 lg:px-8 lg:py-10 ${heroListings.length > 0 ? "lg:grid-cols-[1.1fr_0.9fr]" : ""}`}>
           <div>
             <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{homeCopy.tagline}</p>
             <h1 className="mt-4 max-w-2xl font-display text-4xl font-black leading-tight sm:text-5xl">
@@ -117,7 +117,7 @@ export default async function HomePage({
               ) : null}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 self-end lg:grid-cols-1">
+          {heroListings.length > 0 ? <div className="grid grid-cols-3 gap-2 self-end lg:grid-cols-1">
             {heroListings.slice(0, 3).map((listing, index) => {
               const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
               const displayTitle = listing.translated_title || listing.title;
@@ -134,7 +134,7 @@ export default async function HomePage({
                 </Link>
               );
             })}
-          </div>
+          </div> : null}
         </div>
       </section>
 
@@ -181,14 +181,13 @@ export default async function HomePage({
         <CategoryHomeList categories={mobileCategories} locale={locale} />
       </section>
 
-      <section className="overflow-hidden border-y border-[#d9c8a3] bg-[#fffdf9] sm:rounded-3xl sm:border sm:shadow-[0_22px_52px_-40px_rgba(3,28,35,0.62)]">
+      {featuredRow.length > 0 ? <section className="overflow-hidden border-y border-[#d9c8a3] bg-[#fffdf9] sm:rounded-3xl sm:border sm:shadow-[0_22px_52px_-40px_rgba(3,28,35,0.62)]">
         <div className="flex items-center justify-between border-b border-[#d9c8a3] bg-[linear-gradient(90deg,#efe1c1_0%,#fbf7ef_48%,#f4f7f4_100%)] px-4 py-3 text-xs font-black uppercase tracking-wide text-[#18343a]">
           {t.home.featuredListings}
           <Link href={href("/featured")} className="rounded-full bg-[#efe2c5] px-2 py-1 text-[10px] text-[#614c21]">{homeCopy.allFeatured}</Link>
         </div>
         <div className="overflow-x-auto px-3 py-3 [scrollbar-width:none]">
-          {featuredRow.length > 0 ? (
-            <div className="flex min-w-max gap-3">
+          <div className="flex min-w-max gap-3">
               {featuredRow.map((listing) => {
                 const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
                 const displayTitle = listing.translated_title || listing.title;
@@ -213,14 +212,9 @@ export default async function HomePage({
                   </Link>
                 );
               })}
-            </div>
-          ) : (
-            <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm font-semibold text-slate-600">
-              {homeCopy.noFeatured}
-            </p>
-          )}
+          </div>
         </div>
-      </section>
+      </section> : null}
 
       <section className="overflow-hidden bg-[#fffdf9] sm:rounded-3xl sm:border sm:border-[#d9c8a3] sm:shadow-[0_22px_52px_-40px_rgba(3,28,35,0.62)]">
         <div className="border-y border-[#d9c8a3] bg-[linear-gradient(90deg,#f2e6cd_0%,#fffdf9_54%,#edf3f0_100%)] px-4 py-3 text-xs font-black uppercase tracking-wide text-[#18343a] sm:border-b sm:border-t-0">
@@ -230,10 +224,7 @@ export default async function HomePage({
           {latest.map((listing, index) => {
             const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
             const displayTitle = listing.translated_title || listing.title;
-            const localizedListing = listing as typeof listing & { provinces?: HomePlace | null; districts?: HomePlace | null };
-            const province = homePlaceName(localizedListing.provinces, locale) || listing.province || "";
-            const district = homePlaceName(localizedListing.districts, locale) || listing.district || "";
-            const location = [province, district].filter(Boolean).join(" · ") || "-";
+            const location = getLocalizedListingLocation(listing, locale).label;
             const isLikelyLcpImage = index === 0 && Boolean(image);
             return (
               <Link
@@ -267,7 +258,7 @@ export default async function HomePage({
           })}
         </div>
         {totalPages > 1 ? (
-          <nav aria-label="Latest listing pages" className="flex flex-wrap items-center justify-center gap-2 border-t border-slate-100 bg-white px-3 py-4">
+          <nav aria-label={homeCopy.paginationLabel} className="flex flex-wrap items-center justify-center gap-2 border-t border-slate-100 bg-white px-3 py-4">
             {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
               <Link
                 key={page}

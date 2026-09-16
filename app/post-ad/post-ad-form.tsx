@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
 import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
@@ -296,6 +297,7 @@ export default function PostAdForm({
     sellerProfile?: SellerProfileContact | null;
     draftOwnerId?: string | null;
   }) {
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const draftOwnerScope = draftOwnerId || "guest";
@@ -1583,11 +1585,11 @@ export default function PostAdForm({
       const supabase = createSupabaseBrowserClient();
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        window.location.assign(`/login?redirect=${encodeURIComponent("/post-ad/create?posting=sell")}&reason=post`);
+        router.push(`/login?redirect=${encodeURIComponent("/post-ad/create?posting=sell")}&reason=post`);
         return;
       }
     } catch {
-      window.location.assign(`/login?redirect=${encodeURIComponent("/post-ad/create?posting=sell")}&reason=post`);
+      router.push(`/login?redirect=${encodeURIComponent("/post-ad/create?posting=sell")}&reason=post`);
       return;
     }
 
@@ -1688,7 +1690,7 @@ export default function PostAdForm({
         if (!uploaded.ok) {
           // The listing already exists at this point. Move to its management
           // page so retrying cannot accidentally create a duplicate listing.
-          window.location.assign(`/listings/${created.listingId}/manage?upload=partial`);
+          router.push(`/listings/${created.listingId}/manage?upload=partial`);
           return;
         }
       }
@@ -1706,7 +1708,7 @@ export default function PostAdForm({
       await deleteMyDraftAction();
       setStatus(t.postAd.publishing);
       const destination = `/listings/${created.listingId}/manage`;
-      window.location.assign(destination);
+      router.push(destination);
     });
   }
 

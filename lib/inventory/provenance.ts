@@ -50,13 +50,13 @@ export type BridgeListingLike = {
 };
 
 const SOURCE_COPY: Record<ListingSourceType, Record<AppLocale, string>> = {
-  native: { en: "Sahibash seller", fa: "فروشنده صاحباش", ps: "د صاحباش پلورونکی" },
+  native: { en: "Sahibash seller", fa: "فروشنده صاحبش", ps: "د صاحبش پلورونکی" },
   dealer_managed: { en: "Dealer inventory", fa: "موجودی فروشگاه", ps: "د دوکان موجودي" },
   partner_feed: { en: "Partner inventory", fa: "موجودی شریک", ps: "د شریک موجودي" },
   seller_approved_import: { en: "Seller-approved import", fa: "واردشده با تأیید فروشنده", ps: "د پلورونکي په تایید وارد شوی" },
   scout_assisted: { en: "Staff-assisted listing", fa: "ثبت با کمک کارمند", ps: "د کارکوونکي په مرسته اعلان" },
   external_indexed: { en: "External listing", fa: "اعلان بیرونی", ps: "بهرنی اعلان" },
-  migrated_legacy: { en: "Legacy Sahibash listing", fa: "اعلان قدیمی صاحباش", ps: "پخوانی د صاحباش اعلان" },
+  migrated_legacy: { en: "Legacy Sahibash listing", fa: "اعلان قدیمی صاحبش", ps: "پخوانی د صاحبش اعلان" },
 };
 
 const FRESHNESS_COPY: Record<ListingFreshnessStatus, Record<AppLocale, string>> = {
@@ -68,6 +68,23 @@ const FRESHNESS_COPY: Record<ListingFreshnessStatus, Record<AppLocale, string>> 
   sold_confirmed: { en: "Sold", fa: "فروخته شد", ps: "پلورل شوی" },
   expired: { en: "Expired", fa: "منقضی شده", ps: "تېر شوی" },
 };
+
+const OWNERSHIP_COPY: Record<ListingOwnershipStatus, Record<AppLocale, string>> = {
+  unclaimed: { en: "Seller account not connected", fa: "حساب فروشنده وصل نیست", ps: "د پلورونکي حساب نه دی تړل شوی" },
+  claim_pending: { en: "Ownership review pending", fa: "مالکیت در حال بررسی", ps: "مالکیت تر کتنې لاندې دی" },
+  claimed: { en: "Claimed seller", fa: "فروشنده مالکیت را تأیید کرده", ps: "پلورونکي مالکیت تایید کړی" },
+  partner_managed: { en: "Partner managed", fa: "مدیریت‌شده توسط شریک", ps: "د شریک له خوا اداره کېږي" },
+  staff_managed: { en: "Staff managed", fa: "مدیریت‌شده توسط صاحبش", ps: "د صاحبش له خوا اداره کېږي" },
+  disputed: { en: "Ownership disputed", fa: "مالکیت مورد اختلاف", ps: "مالکیت لانجمن دی" },
+  removed: { en: "Removed", fa: "حذف‌شده", ps: "لرې شوی" },
+  opted_out: { en: "Seller opted out", fa: "فروشنده انصراف داده", ps: "پلورونکی وتلی" },
+};
+
+function normalizeOwnershipStatus(value: unknown, sourceType: ListingSourceType): ListingOwnershipStatus {
+  const fallback = sourceType === "native" ? "claimed" : "unclaimed";
+  const status = String(value ?? fallback) as ListingOwnershipStatus;
+  return status in OWNERSHIP_COPY ? status : fallback;
+}
 
 export function normalizeSourceType(value: unknown): ListingSourceType {
   const source = String(value ?? "native");
@@ -102,7 +119,7 @@ export function normalizeFreshnessStatus(value: unknown): ListingFreshnessStatus
 export function getSourceTransparency(listing: BridgeListingLike, locale: AppLocale) {
   const sourceType = normalizeSourceType(listing.source_type);
   const freshnessStatus = normalizeFreshnessStatus(listing.freshness_status);
-  const ownershipStatus = String(listing.ownership_status ?? (sourceType === "native" ? "claimed" : "unclaimed")) as ListingOwnershipStatus;
+  const ownershipStatus = normalizeOwnershipStatus(listing.ownership_status, sourceType);
   const confidence = Number(listing.provenance_confidence ?? (sourceType === "native" ? 1 : 0.5));
   const isExternal = sourceType !== "native" && sourceType !== "migrated_legacy";
   const hasContact =
@@ -121,6 +138,7 @@ export function getSourceTransparency(listing: BridgeListingLike, locale: AppLoc
     needsAvailabilityWarning,
     sourceLabel: SOURCE_COPY[sourceType][locale],
     freshnessLabel: FRESHNESS_COPY[freshnessStatus][locale],
+    ownershipLabel: OWNERSHIP_COPY[ownershipStatus][locale],
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0.5,
   };
 }

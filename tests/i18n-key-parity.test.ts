@@ -7,6 +7,8 @@ import { localizeActionMessage, localizeAuthError, USER_COPY } from "@/lib/i18n/
 import { USER_EVENT_TEMPLATES } from "@/lib/i18n/system-templates";
 import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
+import { getLocalizedBrandName } from "@/lib/i18n/brand";
+import { localizeFilterOptionLabel } from "@/lib/i18n/filter-labels";
 
 type JsonMap = Record<string, unknown>;
 
@@ -166,4 +168,17 @@ test("localized metadata preserves route and exposes canonical language alternat
     "ps-AF": "/ps/search",
     "x-default": "/en/search",
   });
+});
+
+test("brand identity cannot fall back to a legacy runtime name", () => {
+  assert.equal(getLocalizedBrandName("en", "yawzai"), "Sahibash");
+  assert.equal(getLocalizedBrandName("fa", "yawzai"), "صاحبش");
+  assert.equal(getLocalizedBrandName("ps", "yawzai"), "صاحبش");
+  assert.doesNotMatch(JSON.stringify([TRANSLATIONS, UI_TRANSLATIONS, USER_COPY, USER_EVENT_TEMPLATES]), /صاحباش/);
+});
+
+test("common stored enum and color values never leak English into RTL listing details", () => {
+  assert.equal(localizeFilterOptionLabel("needs_repair", "needs_repair", "fa"), "نیاز به ترمیم");
+  assert.equal(localizeFilterOptionLabel("Sky blue", "Sky blue", "fa"), "آسمانی");
+  assert.equal(localizeFilterOptionLabel("Sky blue", "Sky blue", "ps"), "اسماني");
 });

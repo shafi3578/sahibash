@@ -22,7 +22,7 @@ export function buildListingShareOutput(listing: ShareListing, locale: AppLocale
   url.searchParams.set("utm_medium", "seller_share");
   url.searchParams.set("utm_campaign", "post_once_share_everywhere");
 
-  const title = listing.title?.trim() || (locale === "en" ? "Sahibash listing" : locale === "fa" ? "اعلان صاحباش" : "د صاحباش اعلان");
+  const title = listing.title?.trim() || (locale === "en" ? "Sahibash listing" : locale === "fa" ? "اعلان صاحبش" : "د صاحبش اعلان");
   const place = [listing.province, listing.district].filter(Boolean).join(" / ");
   const price = listing.price ? `${listing.price} ${listing.currency ?? "AFN"}` : "";
 
@@ -30,8 +30,8 @@ export function buildListingShareOutput(listing: ShareListing, locale: AppLocale
     locale === "en"
       ? "I posted this on Sahibash:"
       : locale === "fa"
-        ? "این اعلان را در صاحباش ثبت کردم:"
-        : "دا اعلان مې په صاحباش کې ثبت کړی:";
+        ? "این اعلان را در صاحبش ثبت کردم:"
+        : "دا اعلان مې په صاحبش کې ثبت کړی:";
 
   const parts = [lead, title, price, place, url.toString()].filter(Boolean);
   return {
