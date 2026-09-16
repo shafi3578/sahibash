@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHmac, randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
+import { assertNonProductionSupabaseFixtureTarget } from "../lib/testing/production-fixture-guard";
 import {
   canUseAdminPermissionWithAssurance,
   type AuthenticatorAssuranceLevel,
@@ -70,6 +71,7 @@ test("live Supabase MFA: AAL1 super admin can view only; AAL2 can mutate", {
   const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
   assert.ok(url, "NEXT_PUBLIC_SUPABASE_URL is required");
+  assertNonProductionSupabaseFixtureTarget(url, env);
   assert.ok(anonKey, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required");
   assert.ok(serviceRoleKey, "SUPABASE_SERVICE_ROLE_KEY is required");
 

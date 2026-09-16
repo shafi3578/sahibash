@@ -11,7 +11,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data: https://images.unsplash.com https://*.supabase.co",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.vercel-insights.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.vercel-insights.com https://nominatim.openstreetmap.org",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",

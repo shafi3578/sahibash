@@ -21,3 +21,8 @@ test("production sanity checks are read-only and cover launch contamination risk
   assert.match(sanitySql, /real-estate\/land%/i);
   assert.match(sanitySql, /slug in \('vehicles','real-estate','mobile-phones-tablets','second-hand-items'\)/i);
 });
+
+test("promotion sanity checks use the live promotion type instead of a nonexistent status column", () => {
+  assert.match(sanitySql, /lp\.promotion_type/);
+  assert.doesNotMatch(sanitySql, /lp\.status/);
+});

@@ -2,6 +2,7 @@
 
 import { type LocationVisibility } from '@/components/location/LocationPrivacy';
 import { sanitizePublicLocation } from '@/lib/location/privacy';
+import { applyPublicLocationVisibility } from '@/lib/location/public-query';
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -89,7 +90,7 @@ export async function getNearbyListings(
   // cos(lat1) * cos(lat2) * cos(lon2-lon1) + sin(lat1) * sin(lat2)
   // This is a basic implementation; for production, consider PostGIS
 
-  const { data, error } = await supabase
+  let query = applyPublicLocationVisibility(supabase
     .from('listings')
     .select(
       `
@@ -107,14 +108,19 @@ export async function getNearbyListings(
       address_text,
       created_at,
       user_id,
-      category_id
+      category_id,
+      category:category_id!inner(is_active,is_coming_soon)
       `
-    )
-    .eq('status', filters?.status || 'approved')
+    ))
     .in('location_visibility', ['exact', 'approximate'])
     .not('latitude', 'is', null)
-    .not('longitude', 'is', null)
-    .limit(filters?.limit || 50);
+    .not('longitude', 'is', null);
+
+  // These are public-only actions, even when a service-role client is available.
+  // In particular, a caller-provided status must never reveal private listings.
+  if (filters?.categoryId) query = query.eq('category_id', filters.categoryId);
+  if (filters?.provinceId) query = query.eq('province_id', filters.provinceId);
+  const { data, error } = await query.limit(Math.max(1, Math.min(filters?.limit || 50, 100)));
 
   if (error) {
     throw new Error(`Failed to fetch nearby listings: ${error.message}`);
@@ -173,7 +179,7 @@ export async function getListingsByLocation(
 ) {
   const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
 
-  let query = supabase
+  let query = applyPublicLocationVisibility(supabase
     .from('listings')
     .select(
       `
@@ -190,11 +196,11 @@ export async function getListingsByLocation(
       longitude,
       created_at,
       favorites_count,
-      views_count
+      views_count,
+      category:category_id!inner(is_active,is_coming_soon)
       `,
       { count: 'exact' }
-    )
-    .eq('status', 'approved');
+    ));
 
   if (filters.provinceId) {
     query = query.eq('province_id', filters.provinceId);
@@ -235,7 +241,7 @@ export async function getListingsByLocation(
 export async function getListingLocationInfo(listingId: string) {
   const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY ? createSupabaseAdmin() : await createSupabaseServerClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await applyPublicLocationVisibility(supabase
     .from('listings')
     .select(
       `
@@ -251,11 +257,12 @@ export async function getListingLocationInfo(listingId: string) {
       location_visibility,
       provinces!province_id(name, slug),
       districts!district_id(name, slug),
-      areas!area_id(name, slug)
+      areas!area_id(name, slug),
+      category:category_id!inner(is_active,is_coming_soon)
       `
-    )
+    ))
     .eq('id', listingId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     throw new Error(`Failed to fetch location: ${error.message}`);

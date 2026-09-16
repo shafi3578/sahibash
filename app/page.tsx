@@ -78,8 +78,8 @@ export default async function HomePage({
   const homepageSections = resolveHomepageSections(await homepageSectionsPromise);
   const postAdHref = href(postAdCreatePath);
 
-  const [latestCandidates, featured, totalListings, mobileCategories] = await Promise.all([
-    getApprovedListings({ locale, limit: currentPage === 1 ? pageSize + 4 : pageSize, offset: (currentPage - 1) * pageSize }),
+  const [latest, featured, totalListings, mobileCategories] = await Promise.all([
+    getApprovedListings({ locale, limit: pageSize, offset: (currentPage - 1) * pageSize }),
     getApprovedListings({ locale, featuredOnly: true, limit: 4 }),
     getApprovedListingCount(),
     getHomeCategoryNodes(),
@@ -87,11 +87,6 @@ export default async function HomePage({
 
   const featuredRow = featured.filter((listing) => isFeaturedCurrentlyActive(listing));
   const heroListings = featuredRow.slice(0, 3);
-  const featuredIds = new Set(featuredRow.map((listing) => listing.id));
-  const latest = (currentPage === 1
-    ? latestCandidates.filter((listing) => !featuredIds.has(listing.id))
-    : latestCandidates
-  ).slice(0, pageSize);
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (

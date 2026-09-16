@@ -8,6 +8,9 @@ export type PublicLocationRow = {
 };
 
 function toFiniteCoordinate(value: unknown) {
+  if (value === null || value === undefined
+    || (typeof value !== "number" && typeof value !== "string")
+    || (typeof value === "string" && value.trim() === "")) return null;
   const coordinate = Number(value);
   return Number.isFinite(coordinate) ? coordinate : null;
 }

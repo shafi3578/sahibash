@@ -192,7 +192,7 @@ order by la.id desc;
 select
   lp.id,
   lp.listing_id,
-  lp.status,
+  lp.promotion_type,
   lp.created_at
 from public.listing_promotions lp
 left join public.listings l on l.id = lp.listing_id

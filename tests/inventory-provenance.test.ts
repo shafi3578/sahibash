@@ -83,7 +83,7 @@ const verifiedSourcePermissionsMigration = readFileSync(
   "utf8",
 );
 const unauthorizedExternalArchiveMigration = readFileSync(
-  join(process.cwd(), "supabase", "migrations", "20260916000959_archive_unauthorized_external_publications.sql"),
+  join(process.cwd(), "supabase", "migrations", "20260916075729_archive_unauthorized_external_publications.sql"),
   "utf8",
 );
 const externalSourcePostedAtMigration = readFileSync(
@@ -296,13 +296,81 @@ test("external publication requires a source-scoped verified rights record", () 
 });
 
 test("legacy external publications without current source rights are archived, not deleted", () => {
-  assert.match(unauthorizedExternalArchiveMigration, /source_type = 'external_indexed'/i);
-  assert.match(unauthorizedExternalArchiveMigration, /permission\.status = 'verified'/i);
-  assert.match(unauthorizedExternalArchiveMigration, /status = 'expired'/i);
-  assert.match(unauthorizedExternalArchiveMigration, /publication_status = 'archived'/i);
-  assert.match(unauthorizedExternalArchiveMigration, /external_rights_publication_archived/i);
+  const archiveStatement = unauthorizedExternalArchiveMigration.split(/create or replace function/i)[0];
+  assert.match(archiveStatement, /source_type = 'external_indexed'/i);
+  assert.match(archiveStatement, /permission\.status = 'verified'/i);
+  assert.match(archiveStatement, /status = 'expired'/i);
+  assert.match(archiveStatement, /publication_status = 'archived'/i);
+  assert.match(archiveStatement, /external_rights_publication_archived/i);
+  assert.match(archiveStatement, /for update of listing/i);
   assert.match(unauthorizedExternalArchiveMigration, /before insert or update of/i);
-  assert.doesNotMatch(unauthorizedExternalArchiveMigration, /delete\s+from\s+public\.listings/i);
+  assert.doesNotMatch(archiveStatement, /delete\s+from/i);
+});
+
+test("rights archival records actual before and post-trigger publication fields without private listing payloads", () => {
+  const archiveStatement = unauthorizedExternalArchiveMigration.split(/create or replace function/i)[0];
+  const snapshots = [...archiveStatement.matchAll(/jsonb_build_object\(([\s\S]*?)\) as (before_state|after_state)/gi)];
+  assert.equal(snapshots.length, 2);
+  for (const snapshot of snapshots) {
+    for (const field of [
+      "status", "publication_status", "provenance_status", "permission_record_id",
+      "allow_contact_display", "noindex_external", "removed_public_at", "updated_at",
+      "freshness_status", "source_posted_at",
+    ]) {
+      assert.match(snapshot[1], new RegExp(`'${field}', listing\\.${field}\\b`, "i"));
+    }
+    assert.doesNotMatch(snapshot[1], /contact_phone|contact_name|latitude|longitude|address_text|raw_payload/i);
+  }
+  assert.match(archiveStatement, /returning listing\.id, jsonb_build_object\(/i);
+  assert.match(archiveStatement, /unauthorized\.before_state,\s+archived\.after_state/i);
+  assert.doesNotMatch(archiveStatement, /to_jsonb\(listing\)/i);
+});
+
+function retentionFunctionBody(sql: string, name: string) {
+  const match = sql.match(new RegExp(`create or replace function public\\.${name}\\([\\s\\S]*?as \\$\\$([\\s\\S]*?)\\$\\$;`, "i"));
+  assert.ok(match, `Missing retention function ${name}`);
+  return match[1];
+}
+
+test("rights-review preservation holds apply before both retention selection and destructive purge", () => {
+  const due = retentionFunctionBody(unauthorizedExternalArchiveMigration, "expire_due_forwarded_external_ads");
+  const purge = retentionFunctionBody(unauthorizedExternalArchiveMigration, "purge_expired_forwarded_external_ad");
+
+  assert.match(due, /and not\s*\(\s*listing\.provenance_status = 'permission_pending'\s+and exists\s*\(/i);
+  assert.match(purge, /if v_listing\.provenance_status = 'permission_pending' and exists\s*\(/i);
+  for (const [body, alias] of [[due, "listing"], [purge, "v_listing"]]) {
+    assert.match(body, new RegExp(`event\\.listing_id = ${alias}\\.id`, "i"));
+    assert.match(body, /event\.event_type = 'external_rights_publication_archived'/i);
+    assert.match(body, /event\.source_type = 'external_indexed'/i);
+    assert.match(body, /event\.actor_user_id is null/i);
+    assert.match(body, new RegExp(`${alias}\\.source_type = 'external_indexed'`, "i"));
+    assert.match(body, new RegExp(`${alias}\\.source_platform = 'telegram'`, "i"));
+    assert.match(body, new RegExp(`${alias}\\.ownership_status = 'unclaimed'`, "i"));
+    assert.match(body, new RegExp(`${alias}\\.provenance_status in \\('permission_pending', 'authorized'\\)`, "i"));
+    assert.match(body, new RegExp(`${alias}\\.expires_at is not null`, "i"));
+    assert.match(body, new RegExp(`${alias}\\.expires_at <= now\\(\\)`, "i"));
+  }
+  assert.ok(due.indexOf("external_rights_publication_archived") < due.indexOf("limit p_limit"));
+  assert.ok(purge.indexOf("Listing is held for source-rights review") < purge.indexOf("insert into private."));
+  assert.ok(purge.indexOf("Listing is held for source-rights review") < purge.indexOf("delete from"));
+  assert.match(purge, /v_listing\.status = 'expired'/i);
+  assert.match(purge, /v_listing\.publication_status = 'archived'\s*\) is not true then/i);
+  assert.match(due, /p_limit is null or p_limit < 1 or p_limit > 500/i);
+  assert.match(due, /for update skip locked/i);
+});
+
+test("rights hold leaves normal 30-day purge and user-history preservation unchanged and service-only", () => {
+  const previousPurge = retentionFunctionBody(externalReviewRetentionMigration, "purge_expired_forwarded_external_ad");
+  const hardenedPurge = retentionFunctionBody(unauthorizedExternalArchiveMigration, "purge_expired_forwarded_external_ad");
+  const unchangedPurgeTail = (body: string) => body.slice(body.indexOf("select * into v_candidate"))
+    .replace(/--[^\n]*/g, "").replace(/\s+/g, " ").trim();
+  assert.equal(unchangedPurgeTail(hardenedPurge), unchangedPurgeTail(previousPurge));
+  for (const signature of ["expire_due_forwarded_external_ads\\(integer\\)", "purge_expired_forwarded_external_ad\\(uuid\\)"]) {
+    assert.match(unauthorizedExternalArchiveMigration, new RegExp(`revoke all on function public\\.${signature}\\s+from public, anon, authenticated`, "i"));
+    assert.match(unauthorizedExternalArchiveMigration, new RegExp(`grant execute on function public\\.${signature}\\s+to service_role`, "i"));
+  }
+  assert.match(unauthorizedExternalArchiveMigration, /'retention_days', 30/i);
+  assert.doesNotMatch(unauthorizedExternalArchiveMigration, /set\s+expires_at\s*=|disable trigger|session_replication_role/i);
 });
 
 test("external inventory preserves verifiable source dates and rejects stale publication", () => {

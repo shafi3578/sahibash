@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 
 import nextConfig, { securityHeaders } from "../next.config";
@@ -25,4 +27,27 @@ test("all application routes receive the required browser security headers", asy
   assert.match(values.get("Content-Security-Policy") ?? "", /object-src 'none'/);
   assert.match(values.get("Content-Security-Policy") ?? "", /https:\/\/\*\.supabase\.co/);
   assert.equal(nextConfig.poweredByHeader, false);
+});
+
+test("CSP permits the reverse-geocoding origin used by both client posting forms", async () => {
+  const configured = await nextConfig.headers?.();
+  const csp = configured?.[0]?.headers.find((header) => header.key === "Content-Security-Policy")?.value;
+  assert.ok(csp);
+  const connectSources = csp.split(";")
+    .map((directive) => directive.trim().split(/\s+/))
+    .find(([name]) => name === "connect-src")?.slice(1) ?? [];
+
+  for (const relativePath of [
+    "app/post-ad/post-ad-form.tsx",
+    "app/post-ad/electronics/post-ad-electronics-form.tsx",
+  ]) {
+    const source = readFileSync(join(process.cwd(), relativePath), "utf8");
+    const reverseUrl = source.match(/https:\/\/[^/`\s]+\/reverse\?/u)?.[0];
+    assert.ok(reverseUrl, `${relativePath} must expose its reverse-geocoding endpoint`);
+    const origin = new URL(reverseUrl).origin;
+    assert.ok(connectSources.includes(origin), `${origin} must be permitted for ${relativePath}`);
+  }
+
+  assert.ok(!connectSources.includes("*"), "do not permit arbitrary connections");
+  assert.ok(!connectSources.includes("https:"), "allow the provider origin, not every HTTPS endpoint");
 });

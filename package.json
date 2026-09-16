@@ -13,7 +13,8 @@
     "test:smart-posting": "node --import tsx --test tests/smart-posting-parser.test.ts tests/suggested-details.test.ts",
     "test:step2-quick-post": "node --import tsx --test tests/simple-category-details.test.ts tests/step2-quick-post.test.ts tests/location-reverse-match.test.ts tests/ai-category-pilot.test.ts",
     "test:listing-schema": "node --import tsx --test tests/listing-schema-config.test.ts tests/taxonomy-schema-migrations.test.ts",
-    "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/auth-step-up.test.ts tests/production-fixture-guard.test.ts tests/location-privacy.test.ts tests/production-sanity-sql.test.ts tests/storage-hardening.test.ts tests/rate-limit-foundation.test.ts tests/marketplace-ranking.test.ts tests/public-listing-boundary.test.ts tests/mfa-readiness.test.ts tests/step1-foundation.test.ts tests/security-headers-config.test.ts",
+    "test:catalog-admin": "tsx --tsconfig tests/tsconfig.json --test --test-concurrency=1 tests/admin-rbac.test.ts tests/category-schema.test.ts tests/electronics-leaf-resolution.test.ts tests/electronics-localized-route.test.ts tests/homepage-sections.test.ts tests/moderation-workflow.test.ts tests/navigation-builder.test.ts tests/public-site-settings.test.ts tests/site-settings.test.ts tests/static-pages.test.ts",
+    "test:security": "node --import tsx --test tests/authorization-hardening.test.ts tests/admin-mfa-policy-hardening.test.ts tests/auth-step-up.test.ts tests/production-fixture-guard.test.ts tests/location-privacy.test.ts tests/production-sanity-sql.test.ts tests/storage-hardening.test.ts tests/rate-limit-foundation.test.ts tests/marketplace-ranking.test.ts tests/public-listing-boundary.test.ts tests/mfa-readiness.test.ts tests/step1-foundation.test.ts tests/security-headers-config.test.ts",
     "test:mfa-live": "node --import tsx --test tests/live-mfa-e2e.test.ts",
     "test:inventory-provenance": "node --import tsx --test --test-concurrency=1 tests/inventory-provenance.test.ts tests/inventory-source-scopes.test.ts tests/external-listing-interactions.test.ts",
     "test:liquidity": "node --import tsx --test tests/liquidity-foundation.test.ts",
@@ -21,7 +22,7 @@
     "test:consumer-account": "node --import tsx --test tests/consumer-account-messaging.test.ts",
     "test:step3": "node --import tsx --test tests/step3-featured-payments.test.ts tests/step3-ai-search.test.ts tests/search-first-ai-release.test.ts tests/step3-control-center.test.ts tests/step3-performance-hardening.test.ts",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:i18n-parity && npm run test:search-parity && npm run test:posting-access && npm run test:smart-posting && npm run test:step2-quick-post && npm run test:listing-schema && npm run test:security && npm run test:inventory-provenance && npm run test:liquidity && npm run test:network-readiness && npm run test:consumer-account && npm run test:step3"
+    "test": "npm run test:i18n-parity && npm run test:search-parity && npm run test:posting-access && npm run test:smart-posting && npm run test:step2-quick-post && npm run test:listing-schema && npm run test:catalog-admin && npm run test:security && npm run test:inventory-provenance && npm run test:liquidity && npm run test:network-readiness && npm run test:consumer-account && npm run test:step3"
   },
   "dependencies": {
     "@huggingface/inference": "^4.13.19",
