@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { runInNewContext } from "node:vm";
 import test from "node:test";
+import { isFeaturedPaymentTargetEligible, type FeaturedPaymentTarget } from "@/lib/payments/featured-eligibility";
 
 const root = process.cwd();
 const migration = readFileSync(
@@ -17,6 +19,11 @@ const aal2BoundaryMigration = readFileSync(
   "utf8"
 );
 const actions = readFileSync(join(root, "lib", "actions", "featured-payments.ts"), "utf8");
+const paymentSafetyMigration = readFileSync(
+  join(root, "supabase", "migrations", "20260916135905_featured_payment_target_and_resubmission_safety.sql"),
+  "utf8"
+);
+const paymentPanel = readFileSync(join(root, "components", "payments", "featured-promotion-panel.tsx"), "utf8");
 const data = readFileSync(join(root, "lib", "data", "featured-payments.ts"), "utf8");
 const managePage = readFileSync(join(root, "app", "listings", "[id]", "manage", "page.tsx"), "utf8");
 const myAdsPage = readFileSync(join(root, "app", "dashboard", "my-ads", "page.tsx"), "utf8");
@@ -51,8 +58,8 @@ test("featured activation is server-reviewed, idempotent, audited, and time-boun
   assert.match(migration, /on conflict \(payment_request_id\)/);
   assert.match(migration, /set featured = true,[\s\S]*featured_until = v_featured_until/);
   assert.match(actions, /requirePermission\("payments\.review"\)/);
-  assert.match(actions, /recordAuditEvent\(\{[\s\S]*FEATURED_PAYMENT_APPROVED/);
-  assert.match(actions, /recordAuditEvent\(\{[\s\S]*FEATURED_PAYMENT_REJECTED/);
+  assert.match(paymentSafetyMigration, /FEATURED_PAYMENT_APPROVED/);
+  assert.match(paymentSafetyMigration, /FEATURED_PAYMENT_REJECTED/);
 });
 
 test("seller cannot set payment review fields or featured from client payload", () => {
@@ -187,4 +194,116 @@ test("homepage never presents ordinary latest listings as featured", () => {
   assert.match(homePage, /getApprovedListings\(\{ locale, featuredOnly: true, limit: 4 \}\)/);
   assert.match(homePage, /\{featuredRow\.length > 0 \? <section/);
   assert.doesNotMatch(homePage, /No featured ads are active yet/);
+});
+
+test("paid promotion eligibility fails closed for expired or non-public targets", () => {
+  const now = Date.parse("2026-09-16T12:00:00Z");
+  const eligible: FeaturedPaymentTarget = {
+    status: "approved", publication_status: "published", freshness_status: "seller_confirmed",
+    removed_public_at: null, expires_at: "2026-09-17T12:00:00Z", price: 100,
+  };
+  assert.equal(isFeaturedPaymentTargetEligible(eligible, now), true);
+  assert.equal(isFeaturedPaymentTargetEligible({ ...eligible, publication_status: null }, now), true);
+  const blocked: Partial<FeaturedPaymentTarget>[] = [
+    ...["pending", "draft", "rejected", "sold", "deleted"].map((status) => ({ status })),
+    ...["archived", "removed", "pending_review", "hidden"].map((publication_status) => ({ publication_status })),
+    ...["expired", "source_missing", "sold_confirmed"].map((freshness_status) => ({ freshness_status })),
+    { removed_public_at: "2026-09-15T12:00:00Z" },
+    { expires_at: "2026-09-15T12:00:00Z" }, { expires_at: "2026-09-16T12:00:00Z" },
+    { expires_at: null }, { expires_at: "invalid" }, { price: 0 }, { price: null }, { price: -1 },
+  ];
+  for (const override of blocked) {
+    assert.equal(isFeaturedPaymentTargetEligible({ ...eligible, ...override }, now), false, JSON.stringify(override));
+  }
+});
+
+test("request, correction, and direct approval all enforce public target eligibility", () => {
+  const submit = actions.slice(actions.indexOf("export async function submitFeaturedPaymentProofAction"), actions.indexOf("export async function adminApprove"));
+  assert.match(actions, /if \(!isFeaturedPaymentTargetEligible\(listing\)\)/);
+  assert.ok(submit.indexOf("isFeaturedPaymentTargetEligible(listing)") < submit.indexOf(".upload("));
+  assert.match(submit, /category:categories!inner\(is_active,is_coming_soon\)/);
+  assert.match(paymentSafetyMigration, /new\.status in \('pending_payment', 'pending_review', 'approved'\)[\s\S]*private\.is_featured_payment_target_eligible\(new\.listing_id\)/);
+  for (const predicate of ["l.status = 'approved'", "l.removed_public_at is null", "l.expires_at > now()", "l.price > 0", "c.is_active = true", "c.is_coming_soon = false"]) {
+    assert.ok(paymentSafetyMigration.includes(predicate), predicate);
+  }
+  assert.match(paymentSafetyMigration, /perform 1 from public\.listings where id = new\.listing_id for update/);
+  assert.doesNotMatch(paymentSafetyMigration, /set\s+expires_at\s*=/i);
+  assert.match(myAdsPage, /isFeaturedPaymentTargetEligible\(listing\)/);
+  assert.match(paymentPanel, /config && canRequest && \["pending_payment", "rejected"\]/);
+});
+
+test("rejected proof correction clears only a real owner's prior review fields", () => {
+  const guard = paymentSafetyMigration.slice(paymentSafetyMigration.indexOf("create or replace function public.guard_promotion"), paymentSafetyMigration.indexOf("create or replace function private.audit_featured"));
+  assert.match(guard, /v_actor is null or old\.user_id <> v_actor or new\.user_id <> old\.user_id/);
+  assert.match(guard, /old\.status not in \('pending_payment', 'rejected'\) or new\.status <> 'pending_review'/);
+  assert.match(guard, /if old\.status = 'rejected' then/);
+  for (const field of ["reviewed_at", "reviewed_by", "admin_note", "rejection_reason", "provider_status"]) {
+    assert.ok(guard.includes(`new.${field} := null;`), field);
+  }
+  assert.match(guard, /new\.provider_status is distinct from old\.provider_status/);
+  assert.match(guard, /new\.admin_note is distinct from old\.admin_note and new\.admin_note is not null/);
+  assert.match(guard, /v_is_reviewer and not v_is_reviewer_aal2[\s\S]*aal2 required/);
+  assert.match(guard, /client cannot change configured payment terms/);
+});
+
+test("every payment review transition is atomically audited without public definer access", () => {
+  const audit = paymentSafetyMigration.slice(paymentSafetyMigration.indexOf("create or replace function private.audit_featured"));
+  for (const event of ["FEATURED_PAYMENT_PROOF_SUBMITTED", "FEATURED_PAYMENT_PROOF_RESUBMITTED", "FEATURED_PAYMENT_APPROVED", "FEATURED_PAYMENT_REJECTED"]) {
+    assert.ok(audit.includes(event), event);
+  }
+  assert.match(audit, /security definer\s+set search_path = ''/);
+  assert.match(audit, /insert into public\.audit_logs/);
+  assert.match(audit, /'previous_review',[\s\S]*'admin_note', old\.admin_note[\s\S]*'rejection_reason', old\.rejection_reason/);
+  assert.match(audit, /'previous_proof',[\s\S]*'transaction_reference', old\.transaction_reference[\s\S]*'receipt_storage_path', old\.receipt_storage_path/);
+  assert.match(audit, /'proof',[\s\S]*'transaction_reference', new\.transaction_reference[\s\S]*'receipt_storage_path', new\.receipt_storage_path/);
+  assert.match(audit, /after update on public\.promotion_payment_requests/);
+  assert.match(audit, /revoke all on function private\.audit_featured_payment_transition\(\) from public, anon, authenticated, service_role/);
+  assert.doesNotMatch(audit, /exception\s+when/i);
+  assert.doesNotMatch(actions, /action: "FEATURED_PAYMENT_(APPROVED|REJECTED)"/);
+});
+
+test("payment audit evidence stays restricted to payment-authorized administrators", () => {
+  assert.match(paymentSafetyMigration, /create policy audit_logs_payment_evidence_read\s+on public\.audit_logs\s+as restrictive\s+for select\s+to authenticated/);
+  assert.match(paymentSafetyMigration, /entity_type is distinct from 'promotion_payment_request'\s+or \(select public\.has_admin_permission\(auth\.uid\(\), 'payments\.view'\)\)\s+or \(select public\.has_admin_permission\(auth\.uid\(\), 'payments\.review'\)\)/);
+  assert.doesNotMatch(paymentSafetyMigration, /drop policy if exists audit_logs_admin_only|alter policy audit_logs_admin_only|grant (?:select|all).*audit_logs/i);
+});
+
+test("proof action cannot notify or report success when its conditional update affects no row", async () => {
+  const { transpileModule, ScriptTarget } = await import("typescript");
+  const action = actions.slice(actions.indexOf("export async function submitFeaturedPaymentProofAction"), actions.indexOf("export async function adminApprove"));
+  const executable = transpileModule(action.replace("export async function", "async function"), { compilerOptions: { target: ScriptTarget.ES2022 } }).outputText;
+  for (const persisted of [false, true]) {
+    let notifications = 0;
+    let reads = 0;
+    const mutationFilters: unknown[][] = [];
+    const updateQuery = {
+      eq: (...args: unknown[]) => { mutationFilters.push(["eq", ...args]); return updateQuery; },
+      in: (...args: unknown[]) => { mutationFilters.push(["in", ...args]); return updateQuery; },
+      select: (...args: unknown[]) => { mutationFilters.push(["select", ...args]); return updateQuery; },
+      maybeSingle: async () => ({ data: persisted ? { id: "request" } : null, error: null }),
+    };
+    const readQuery = {
+      select: () => readQuery,
+      eq: () => readQuery,
+      maybeSingle: async () => ({ data: reads++ === 0
+        ? { id: "request", listing_id: "listing", user_id: "owner", status: "rejected", amount: 30, currency: "AFN" }
+        : { title: "Listing", status: "approved", publication_status: "published", expires_at: "2099-01-01T00:00:00Z", price: 100 }, error: null }),
+      update: () => updateQuery,
+    };
+    const invoke = runInNewContext(`${executable}\nsubmitFeaturedPaymentProofAction`, {
+      requireUser: async () => ({ id: "owner" }),
+      uuid: () => "request", text: () => "corrected-reference", File: class {},
+      createSupabaseServerClient: async () => ({ from: () => readQuery }),
+      isFeaturedPaymentTargetEligible,
+      notifyAdminsForFeaturedReview: async () => { notifications++; },
+      revalidatePath: () => {},
+      redirect: (path: string) => { throw new Error(`redirect:${path}`); },
+    }) as (formData: FormData) => Promise<void>;
+    await assert.rejects(invoke(new FormData()), persisted ? /featured=submitted/ : /Unable to submit Featured payment proof/);
+    assert.equal(notifications, persisted ? 1 : 0);
+    assert.deepEqual(JSON.parse(JSON.stringify(mutationFilters)), [
+      ["eq", "id", "request"], ["eq", "user_id", "owner"],
+      ["in", "status", ["pending_payment", "rejected"]], ["select", "id"],
+    ]);
+  }
 });

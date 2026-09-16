@@ -14,6 +14,7 @@ import {
   type FeaturedCampaignConfig,
 } from "@/lib/data/featured-payments";
 import type { AppLocale } from "@/lib/i18n/translations";
+import { isFeaturedPaymentTargetEligible } from "@/lib/payments/featured-eligibility";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_RECEIPT_TYPES: Record<string, string> = {
@@ -252,15 +253,17 @@ export async function requestFeaturedPromotionAction(listingId: string) {
   const supabase = await createSupabaseServerClient();
   const { data: listing, error: listingError } = await supabase
     .from("listings")
-    .select("id, user_id, title, status, featured, featured_until, publication_status")
+    .select("id, user_id, title, status, featured, featured_until, publication_status, freshness_status, removed_public_at, expires_at, price, category:categories!inner(is_active,is_coming_soon)")
     .eq("id", listingId)
+    .eq("category.is_active", true)
+    .eq("category.is_coming_soon", false)
     .maybeSingle();
 
   if (listingError || !listing || listing.user_id !== user.id) {
     redirect("/dashboard/my-ads?featured=unauthorized");
   }
 
-  if (!["pending", "approved"].includes(String(listing.status))) {
+  if (!isFeaturedPaymentTargetEligible(listing)) {
     redirect(`/listings/${listingId}/manage?featured=listing-status`);
   }
 
@@ -338,6 +341,18 @@ export async function submitFeaturedPaymentProofAction(formData: FormData) {
     redirect(`/listings/${listingId}/manage?featured=not-editable`);
   }
 
+  const { data: listing } = await supabase
+    .from("listings")
+    .select("title, status, publication_status, freshness_status, removed_public_at, expires_at, price, category:categories!inner(is_active,is_coming_soon)")
+    .eq("id", listingId)
+    .eq("user_id", user.id)
+    .eq("category.is_active", true)
+    .eq("category.is_coming_soon", false)
+    .maybeSingle();
+  if (!listing || !isFeaturedPaymentTargetEligible(listing)) {
+    redirect(`/listings/${listingId}/manage?featured=listing-status`);
+  }
+
   let receiptStoragePath: string | null = null;
   let receiptMimeType: string | null = null;
   let receiptFileSize: number | null = null;
@@ -369,13 +384,7 @@ export async function submitFeaturedPaymentProofAction(formData: FormData) {
     redirect(`/listings/${listingId}/manage?featured=proof-required`);
   }
 
-  const { data: listing } = await supabase
-    .from("listings")
-    .select("title")
-    .eq("id", listingId)
-    .maybeSingle();
-
-  const { error: updateError } = await supabase
+  const { data: updatedRequest, error: updateError } = await supabase
     .from("promotion_payment_requests")
     .update({
       status: "pending_review",
@@ -385,9 +394,13 @@ export async function submitFeaturedPaymentProofAction(formData: FormData) {
       receipt_mime_type: receiptMimeType,
       receipt_file_size: receiptFileSize,
     })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("user_id", user.id)
+    .in("status", ["pending_payment", "rejected"])
+    .select("id")
+    .maybeSingle();
 
-  if (updateError) {
+  if (updateError || !updatedRequest) {
     throw new Error("Unable to submit Featured payment proof.");
   }
 
@@ -407,7 +420,7 @@ export async function submitFeaturedPaymentProofAction(formData: FormData) {
 }
 
 export async function adminApproveFeaturedPaymentRequestAction(formData: FormData) {
-  const adminUser = await requirePermission("payments.review");
+  await requirePermission("payments.review");
   const requestId = uuid(formData.get("request_id"));
   const adminNote = text(formData.get("admin_note"), 2000);
   if (!requestId) {
@@ -441,18 +454,7 @@ export async function adminApproveFeaturedPaymentRequestAction(formData: FormDat
     listingTitle = String(listing?.title ?? listingTitle);
   }
 
-  await recordAuditEvent({
-    adminUserId: adminUser.id,
-    action: "FEATURED_PAYMENT_APPROVED",
-    entityType: "promotion_payment_request",
-    entityId: requestId,
-    safeChanges: {
-      listing_id: listingId,
-      amount: request?.amount ?? null,
-      currency: request?.currency ?? null,
-      featured_until: featuredUntil,
-    },
-  });
+  // The database records approval atomically with the payment transition.
 
   if (sellerId && listingId) {
     await notifySellerFeaturedResult({
@@ -477,7 +479,7 @@ export async function adminApproveFeaturedPaymentRequestAction(formData: FormDat
 }
 
 export async function adminRejectFeaturedPaymentRequestAction(formData: FormData) {
-  const adminUser = await requirePermission("payments.review");
+  await requirePermission("payments.review");
   const requestId = uuid(formData.get("request_id"));
   const reason = text(formData.get("rejection_reason"), 2000);
   const adminNote = text(formData.get("admin_note"), 2000);
@@ -510,18 +512,7 @@ export async function adminRejectFeaturedPaymentRequestAction(formData: FormData
     listingTitle = String(listing?.title ?? listingTitle);
   }
 
-  await recordAuditEvent({
-    adminUserId: adminUser.id,
-    action: "FEATURED_PAYMENT_REJECTED",
-    entityType: "promotion_payment_request",
-    entityId: requestId,
-    safeChanges: {
-      listing_id: listingId,
-      amount: request?.amount ?? null,
-      currency: request?.currency ?? null,
-      reason_code: "manual_payment_review_rejected",
-    },
-  });
+  // The database records rejection atomically, including the review notes.
 
   if (sellerId && listingId) {
     await notifySellerFeaturedResult({

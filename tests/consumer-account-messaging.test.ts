@@ -19,6 +19,35 @@ import {
 import type { Message } from "@/types/database";
 import { notificationDestination } from "@/lib/notifications/destination";
 import { getUiTranslations } from "@/lib/i18n/ui";
+import { PROFILE_FEEDBACK } from "@/lib/account/profile-feedback";
+
+test("profile save feedback covers every server outcome in EN/FA/PS", () => {
+  const keys = ["saving", "saved", "invalid_name", "invalid_phone", "unavailable"];
+  for (const locale of ["en", "fa", "ps"] as const) {
+    assert.deepEqual(Object.keys(PROFILE_FEEDBACK[locale]).sort(), [...keys].sort());
+    for (const value of Object.values(PROFILE_FEEDBACK[locale])) {
+      assert.ok(value.trim().length > 0);
+      if (locale !== "en") assert.match(value, /[\u0600-\u06ff]/);
+    }
+  }
+});
+
+test("profile settings consume save results, retain edits, and announce failures", () => {
+  const form = readFileSync(join(process.cwd(), "components/account/profile-form.tsx"), "utf8");
+  const page = readFileSync(join(process.cwd(), "app/dashboard/settings/account/page.tsx"), "utf8");
+  const actions = readFileSync(join(process.cwd(), "lib/actions/profile.ts"), "utf8");
+  assert.match(page, /<AccountProfileForm/);
+  assert.doesNotMatch(page, /await updateAccountProfileAction\(formData\)/);
+  assert.match(form, /useActionState<ProfileResult, FormData>/);
+  assert.match(form, /feedback\[result\.code\]/);
+  assert.match(form, /role=\{result\.ok \? "status" : "alert"\}/);
+  assert.match(form, /disabled=\{pending\}/);
+  for (const field of ["fullName", "phone", "language"]) {
+    assert.match(form, new RegExp(`value=\\{${field}\\}`));
+  }
+  assert.match(actions, /\.eq\("id", user\.id\)\s*\.select\("id"\)\s*\.maybeSingle\(\)/);
+  assert.match(actions, /if \(error \|\| !updatedProfile\)/);
+});
 
 function message(overrides: Partial<Message>): Message {
   const base: Message = {

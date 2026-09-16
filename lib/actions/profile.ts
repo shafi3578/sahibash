@@ -15,6 +15,7 @@ export type PhoneVerificationState = {
 
 export async function updateAccountProfileAction(formData: FormData): Promise<{
   ok: boolean;
+  code: "invalid_name" | "invalid_phone" | "unavailable" | "saved";
   message: string;
 }> {
   const user = await requireUser();
@@ -27,11 +28,11 @@ export async function updateAccountProfileAction(formData: FormData): Promise<{
   const preferredLanguage = normalizeLocaleInput(String(formData.get("preferred_language") ?? ""));
 
   if (fullName.length < 2 || fullName.length > 80 || !/[\p{L}]/u.test(fullName)) {
-    return { ok: false, message: "Enter a valid full name." };
+    return { ok: false, code: "invalid_name", message: "Enter a valid full name." };
   }
 
   if (!phone.normalized) {
-    return { ok: false, message: "Enter a valid Afghanistan mobile number." };
+    return { ok: false, code: "invalid_phone", message: "Enter a valid Afghanistan mobile number." };
   }
 
   const payload: Record<string, unknown> = {
@@ -44,20 +45,22 @@ export async function updateAccountProfileAction(formData: FormData): Promise<{
     payload.preferred_language = preferredLanguage;
   }
 
-  const { error } = await supabase
+  const { data: updatedProfile, error } = await supabase
     .from("profiles")
     .update(payload)
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
-    return { ok: false, message: "Could not update your profile right now." };
+  if (error || !updatedProfile) {
+    return { ok: false, code: "unavailable", message: "Could not update your profile right now." };
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/settings/account");
   revalidatePath("/post-ad/create");
 
-  return { ok: true, message: "Profile updated." };
+  return { ok: true, code: "saved", message: "Profile updated." };
 }
 
 export async function requestProfilePhoneVerificationAction(

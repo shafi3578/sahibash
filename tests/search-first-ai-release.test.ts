@@ -16,7 +16,7 @@ const createPage = read("app", "post-ad", "create", "page.tsx");
 const categoryRoute = read("app", "api", "ai", "category-suggestion", "route.ts");
 const legacyRoute = read("app", "api", "posting", "suggest-category", "route.ts");
 const telemetry = read("lib", "search", "telemetry.ts");
-const searchGateway = read("lib", "ai", "search-gateway.ts");
+const searchGateway = read("lib", "ai", "search-gateway.ts") + read("lib", "ai", "search-gateway-request.ts");
 const searchInterpreter = read("lib", "ai", "search-interpreter.ts");
 const migration = read("supabase", "migrations", "20260829162134_search_first_ai_release.sql");
 

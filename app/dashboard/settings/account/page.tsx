@@ -3,14 +3,9 @@ import { DashboardSection } from "@/components/dashboard-section";
 import { getCurrentLocale } from "@/lib/i18n/server";
 import { ACCOUNT_EXPERIENCE_COPY } from "@/lib/account/copy";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { updateAccountProfileAction } from "@/lib/actions/profile";
+import { AccountProfileForm } from "@/components/account/profile-form";
 import { PhoneVerificationPanel } from "@/components/account/phone-verification-panel";
 import { LogoutForm } from "@/components/account/logout-form";
-
-async function handleUpdateAccountProfile(formData: FormData) {
-  "use server";
-  await updateAccountProfileAction(formData);
-}
 
 export default async function AccountManagementSettingsPage() {
   const user = await requireUser();
@@ -68,52 +63,10 @@ export default async function AccountManagementSettingsPage() {
         <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
           <h2 className="font-semibold text-[var(--ink-1)]">{profileCopy.title}</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--ink-2)]">{profileCopy.description}</p>
-          <form action={handleUpdateAccountProfile} className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold text-[var(--ink-1)]">
-              {profileCopy.fullName}
-              <input
-                name="full_name"
-                required
-                minLength={2}
-                maxLength={80}
-                defaultValue={String(profile?.full_name ?? "")}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-              />
-            </label>
-            <label className="text-sm font-semibold text-[var(--ink-1)]">
-              {profileCopy.phone}
-              <input
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                required
-                minLength={9}
-                maxLength={20}
-                defaultValue={String(profile?.phone ?? "")}
-                placeholder="+93 7xx xxx xxx"
-                className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-              />
-              <span className="mt-1 block text-xs font-normal text-[var(--ink-2)]">{profileCopy.phoneHint}</span>
-            </label>
-            <label className="text-sm font-semibold text-[var(--ink-1)]">
-              {profileCopy.language}
-              <select
-                name="preferred_language"
-                defaultValue={String(profile?.preferred_language ?? locale)}
-                className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
-              >
-                <option value="fa">دری</option>
-                <option value="ps">پښتو</option>
-                <option value="en">English</option>
-              </select>
-            </label>
-            <div className="sm:col-span-2">
-              <button className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white">
-                {profileCopy.save}
-              </button>
-            </div>
-          </form>
+          <AccountProfileForm locale={locale} copy={profileCopy}
+            initialName={String(profile?.full_name ?? "")}
+            initialPhone={String(profile?.phone ?? "")}
+            initialLanguage={String(profile?.preferred_language ?? locale)} />
           <div className="mt-4">
             <PhoneVerificationPanel locale={locale} verified={profile?.phone_verification_status === "verified"} />
           </div>

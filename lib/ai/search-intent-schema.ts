@@ -21,11 +21,58 @@ export type AiSearchStructuredIntent = {
   confidence: number;
 };
 
-const ALLOWED_KEYS = new Set([
-  "query", "categoryPath", "province", "district", "minPrice", "maxPrice", "currency",
-  "yearMin", "yearMax", "minRooms", "minLandSize", "maxLandSize", "vehicleBrand",
-  "vehicleModel", "phoneModel", "rentalType", "condition", "listingType", "sort", "confidence",
-]);
+const TEXT_LIMITS = {
+  query: 120, categoryPath: 240, province: 120, district: 120,
+  vehicleBrand: 80, vehicleModel: 120, phoneModel: 120, rentalType: 80, condition: 80,
+} as const;
+const ENUM_VALUES = {
+  currency: ["AFN", "USD"],
+  listingType: ["for_sale", "wanted"],
+  sort: ["newest", "relevant", "price_low", "price_high"],
+} as const;
+function numericLimits() {
+  return {
+    minPrice: [0, 1_000_000_000_000], maxPrice: [0, 1_000_000_000_000],
+    yearMin: [1900, new Date().getFullYear() + 2], yearMax: [1900, new Date().getFullYear() + 2],
+    minRooms: [0, 1000], minLandSize: [0, 100_000_000], maxLandSize: [0, 100_000_000],
+    confidence: [0, 1],
+  } as const;
+}
+const ALLOWED_KEYS = new Set([...Object.keys(TEXT_LIMITS), ...Object.keys(ENUM_VALUES), ...Object.keys(numericLimits())]);
+
+// One contract drives both the model instructions and the local strict validator.
+// It is prompt context, not a claim of model-specific JSON Schema support.
+export function buildAiSearchIntentContract() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["confidence"],
+    properties: {
+      ...Object.fromEntries(Object.entries(TEXT_LIMITS).map(([key, maxLength]) => [key, {
+        type: ["string", "null"], minLength: 1, maxLength,
+      }])),
+      ...Object.fromEntries(Object.entries(ENUM_VALUES).map(([key, values]) => [key, {
+        type: ["string", "null"], enum: [...values, null],
+      }])),
+      ...Object.fromEntries(Object.entries(numericLimits()).map(([key, [minimum, maximum]]) => [key, {
+        type: key === "confidence" ? "number" : ["number", "null"], minimum, maximum,
+      }])),
+    },
+  };
+}
+
+export function buildAiSearchIntentInstructions() {
+  return [
+    "Interpret an Afghanistan marketplace search. Return one JSON object only, without markdown or explanations.",
+    "Use exactly this contract (no additional keys):", JSON.stringify(buildAiSearchIntentContract()),
+    "confidence is required. All other fields are optional: omit unknown fields or use null; never guess.",
+    "Strings must be trimmed and nonempty within the stated lengths. Numbers must be JSON numbers, never quoted strings.",
+    "For each supplied min/max pair, minPrice <= maxPrice, yearMin <= yearMax, and minLandSize <= maxLandSize.",
+    "Use numeric AFN amounts. 1 lakh/لک/لاکه/لکه = 100000. 1 jerib/جریب/جریبه = 2000 square metres. 1 biswa/بسوه/بیسوه = 100 square metres.",
+    "categoryPath is a slash-separated taxonomy hint, never SQL. Use remaining product words in query.",
+    "For 'or newer' set only yearMin; for 'or older' set only yearMax.",
+  ].join(" ");
+}
 
 function optionalText(record: Record<string, unknown>, key: string, maxLength: number) {
   const value = record[key];
@@ -62,30 +109,30 @@ export function parseAiSearchStructuredIntent(input: unknown): AiSearchStructure
     if (!ALLOWED_KEYS.has(key)) throw new Error(`Unsupported AI search field: ${key}`);
   }
 
-  const confidence = optionalNumber(record, "confidence", 0, 1);
+  const limits = numericLimits();
+  const confidence = optionalNumber(record, "confidence", ...limits.confidence);
   if (confidence === undefined) throw new Error("confidence is required");
 
-  const currentYear = new Date().getFullYear();
   const parsed: AiSearchStructuredIntent = {
-    query: optionalText(record, "query", 120),
-    categoryPath: optionalText(record, "categoryPath", 240),
-    province: optionalText(record, "province", 120),
-    district: optionalText(record, "district", 120),
-    minPrice: optionalNumber(record, "minPrice", 0, 1_000_000_000_000),
-    maxPrice: optionalNumber(record, "maxPrice", 0, 1_000_000_000_000),
-    currency: optionalEnum(record, "currency", ["AFN", "USD"] as const),
-    yearMin: optionalNumber(record, "yearMin", 1900, currentYear + 2),
-    yearMax: optionalNumber(record, "yearMax", 1900, currentYear + 2),
-    minRooms: optionalNumber(record, "minRooms", 0, 1000),
-    minLandSize: optionalNumber(record, "minLandSize", 0, 100_000_000),
-    maxLandSize: optionalNumber(record, "maxLandSize", 0, 100_000_000),
-    vehicleBrand: optionalText(record, "vehicleBrand", 80),
-    vehicleModel: optionalText(record, "vehicleModel", 120),
-    phoneModel: optionalText(record, "phoneModel", 120),
-    rentalType: optionalText(record, "rentalType", 80),
-    condition: optionalText(record, "condition", 80),
-    listingType: optionalEnum(record, "listingType", ["for_sale", "wanted"] as const),
-    sort: optionalEnum(record, "sort", ["newest", "relevant", "price_low", "price_high"] as const),
+    query: optionalText(record, "query", TEXT_LIMITS.query),
+    categoryPath: optionalText(record, "categoryPath", TEXT_LIMITS.categoryPath),
+    province: optionalText(record, "province", TEXT_LIMITS.province),
+    district: optionalText(record, "district", TEXT_LIMITS.district),
+    minPrice: optionalNumber(record, "minPrice", ...limits.minPrice),
+    maxPrice: optionalNumber(record, "maxPrice", ...limits.maxPrice),
+    currency: optionalEnum(record, "currency", ENUM_VALUES.currency),
+    yearMin: optionalNumber(record, "yearMin", ...limits.yearMin),
+    yearMax: optionalNumber(record, "yearMax", ...limits.yearMax),
+    minRooms: optionalNumber(record, "minRooms", ...limits.minRooms),
+    minLandSize: optionalNumber(record, "minLandSize", ...limits.minLandSize),
+    maxLandSize: optionalNumber(record, "maxLandSize", ...limits.maxLandSize),
+    vehicleBrand: optionalText(record, "vehicleBrand", TEXT_LIMITS.vehicleBrand),
+    vehicleModel: optionalText(record, "vehicleModel", TEXT_LIMITS.vehicleModel),
+    phoneModel: optionalText(record, "phoneModel", TEXT_LIMITS.phoneModel),
+    rentalType: optionalText(record, "rentalType", TEXT_LIMITS.rentalType),
+    condition: optionalText(record, "condition", TEXT_LIMITS.condition),
+    listingType: optionalEnum(record, "listingType", ENUM_VALUES.listingType),
+    sort: optionalEnum(record, "sort", ENUM_VALUES.sort),
     confidence,
   };
 

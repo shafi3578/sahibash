@@ -63,7 +63,7 @@ export async function interpretAiSearch(input: {
       inputTokens: gateway.inputTokens,
       outputTokens: gateway.outputTokens,
       estimatedCostUsd: gateway.estimatedCostUsd,
-      fallbackReason: gateway.status,
+      fallbackReason: gateway.failureReason ?? gateway.status,
     };
   }
 

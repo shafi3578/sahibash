@@ -75,6 +75,47 @@ Held external ads retain actual before/after publication snapshots in listing_pr
 
 The opt-in live MFA suite must run only against a local or explicitly confirmed disposable non-production Supabase project. Production database verification used the authorized Supabase connection without extracting or persisting a service-role key.
 
+## Completion follow-up — 16 September 2026
+
+Further inspection found additional defects; the earlier passing test count was not proof that these flows were complete.
+
+### Repairs
+
+- Manual province/district selection in both reachable posting forms now discards old device coordinates and accuracy. A request-generation guard ignores late geolocation/reverse-lookup callbacks after manual selection. Draft hydration and persistence are unchanged.
+- Account profile saves now show EN/FA/PS success or validation/failure feedback, retain entered values on validation failure, and disable fields while saving. A zero-row profile update is no longer reported as success. Existing account values, roles, passwords and factors were not modified for testing.
+- Featured requests and receipt submissions reject expired, unpublished, removed, sold, inactive-category and non-positive-price targets. The database guard also checks direct transitions, including approval. Rejected proof corrections clear stale review fields only for the owner; the previous review is retained in an atomic, private audit trigger. Approval and rejection audit writes moved from application best-effort calls into that transaction.
+- AI search now shares exact field constraints between its prompt and validator. Safe failure-stage codes distinguish network, timeout, envelope, refusal, truncation, invalid JSON and schema failures without logging raw prompts, completions or credentials. Returned model/usage metadata survives validation failure. Model routing, timeout, output budget and deterministic fallback remain unchanged.
+
+### Newly observed runtime evidence and boundaries
+
+- An existing signed-in Super Admin session opened My Account, Messages, Favorite Searches, Notifications and Offers. The latter three activity feeds were empty where applicable. These checks establish navigation/rendering, not two-user message/offer/notification delivery.
+- Super Administrator control-center navigation correctly required fresh MFA: the browser reported current AAL1, available AAL2 and one verified factor. A handoff was left open; no factor was changed and no bypass was introduced.
+- The existing unfinished posting form was inspected without editing, navigating or reloading it. It must not be used as a disposable QA fixture: another production posting tab under the same account can update the same latest server draft through the page-exit beacon.
+- At 13:44:12 UTC, a production AI search for a Toyota Corolla in Kabul rendered the expected model/province filters, but telemetry recorded deterministic fallback / invalid_response, 1,889 ms. This is evidence of fallback availability, not a successful gateway request. The old telemetry does not identify that event's root cause.
+- Source inventory remains 150 candidates: 46 awaiting review, 43 linked to held ads, 43 rejected and 18 duplicates; zero publishable candidates and zero source-specific permission records. All 12 native listings are expired. No candidate was published, fabricated or auto-renewed during this follow-up.
+- Recovery inspection found only production and its default main branch, no disposable restore target. The four earlier scoped backups parse, but they do not cover the full 115-table database or bytes of 705 Storage objects. The provider backup dashboard requires sign-in. No production restore/reset or new billable project was attempted.
+
+### Still requires completion before unconditional release approval
+
+- Fresh browser AAL2 plus a separate authorized buyer/seller test context and safe current listings are required for full authenticated production journeys.
+- Featured promises 30 days, while an otherwise eligible ad may expire sooner. The commercial policy needs an explicit choice: seller-consented extension, clearly disclosed shorter term, or deferring paid Featured. This follow-up does not silently renew listings, shorten purchased terms, or perform a paid transaction.
+- Current source-scoped publication permissions or real seller submissions/renewals, provider backup evidence, an isolated restore drill and Storage recovery proof remain necessary for a populated, operationally verified launch.
+- SMS OTP remains intentionally deferred; ordinary posting does not require it. No SMS was sent. Native-speaker editorial review is still not established by automated translation checks.
+
+The payment pre-migration function backup is stored only in ignored .temp/release-backups/2026-09-16-before-payment-resubmission.json; SHA-256 97D7B16A67CEAE973AB0A3F0961BBA1B103EA20DE74735F59B4B587E6F5C7563. It is a scoped rollback aid, not a disaster-recovery backup.
+
+### Final follow-up verification before deployment
+
+- Full `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` completed with exit code 0 in the authoritative E: checkout. The combined run passed **321 tests**, zero failures, cancellations or skips. The build generated 87 pages. The separate `npm run test:security` rerun passed **67/67**; those tests are already included in the 321, not additional distinct tests.
+- The final Security Advisor rerun returned **0** security notices. Independent read-only review found no blocking issue in the Gateway/profile changes. `git diff --check` passed.
+- Location request guards also invalidate callbacks when a posting form unmounts; confirmation remains disabled until reverse lookup finishes and both location IDs and finite coordinates are present.
+- Signed-in Settings, Language, and the account form structure were inspected without saving preferences or exposing field values. The Settings hub was visually checked at 390 × 844 and the browser viewport reset afterwards. This does not prove the complete mobile posting or two-user interaction flows.
+- No real account settings, paid transaction, new publication, seller renewal, production test fixture, MFA factor or password was changed in this follow-up.
+
+Payment migration 20260916135905_featured_payment_target_and_resubmission_safety was applied after function drift checks and scoped function/policy backups. Security Advisor: 0 before, 0 after. Live counts remain 56 listings, 217 images, 8 users, 1 verified MFA factor and 0 payment requests. The new audit trigger is not directly executable by anon, authenticated or service_role; payment-evidence reads require payment permission in addition to the existing admin read policy. Earlier policy definitions remain intact.
+
+`node scripts/check-featured-payment-safety.mjs` passes 38 isolated, in-memory PostgreSQL assertions, including proof rejection/correction/approval, previous evidence retention, AAL1 denial, content-admin read denial, owner isolation, idempotency and rollback on audit failure. It uses synthetic local fixtures, not production identities/data. Surrounding Auth/RLS is minimally modeled; this is not live payment-provider fulfillment, concurrency testing or a Supabase disaster-recovery drill. The optional pinned PGlite dependency is installed only under ignored .temp, with no application dependency/lockfile changes.
+
 ## Post-deployment verification and workspace relocation
 
 - GitHub main and its successful Vercel status confirmed aabb5998d713db4895ff0d52f9fa73317cc7f0eb. Production HTML identified dpl_2GAhs2aGtje3vbYwmKz7vvjBnzdf, matching that status.

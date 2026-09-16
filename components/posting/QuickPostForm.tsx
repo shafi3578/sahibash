@@ -8,6 +8,7 @@ import { createListingAction, uploadListingImageAction } from "@/lib/actions/lis
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { localizePath } from "@/lib/i18n/routing";
+import { canConfirmDetectedLocation, createLocationRequestGuard, createManualLocationSelection } from "@/lib/location/posting-selection";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
@@ -1101,6 +1102,7 @@ export default function QuickPostForm({
   const [locationConfirmed, setLocationConfirmed] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationHint, setLocationHint] = useState<string | null>(null);
+  const [locationRequests] = useState(createLocationRequestGuard);
   const [showLocationDetails, setShowLocationDetails] = useState(false);
   const [selectedRootSlug, setSelectedRootSlug] = useState(() => normalizeQuickPostRootSlug(initialRootSlug));
   const [rootTouched, setRootTouched] = useState(Boolean(normalizeQuickPostRootSlug(initialRootSlug)));
@@ -1124,6 +1126,17 @@ export default function QuickPostForm({
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => () => locationRequests.cancel(), [locationRequests]);
+
+  const detectedLocationCanBeConfirmed = canConfirmDetectedLocation({
+    isDetectingLocation,
+    source: locationSource,
+    provinceId: selectedProvinceId,
+    districtId: selectedDistrictId,
+    latitude,
+    longitude,
+  });
 
   const sellerContactName = String(sellerProfile?.full_name ?? "").trim();
   const sellerContactPhone = String(sellerProfile?.phone ?? "").trim();
@@ -1982,11 +1995,26 @@ export default function QuickPostForm({
   }, []);
 
   const confirmManualLocationIfReady = useCallback((provinceId: number | null, districtId: number | null) => {
-    setLocationSource((current) => current === "device" ? current : "manual");
-    setLocationConfirmed(Boolean(provinceId && districtId));
-  }, []);
+    locationRequests.cancel();
+    const selection = createManualLocationSelection(provinceId, districtId);
+    setLocationSource(selection.source);
+    setLatitude(selection.latitude);
+    setLongitude(selection.longitude);
+    setLocationAccuracy(selection.accuracy);
+    setLocationConfirmed(selection.confirmed);
+    setLocationHint(selection.hint);
+    setIsDetectingLocation(false);
+  }, [locationRequests]);
 
   const handleUseCurrentLocation = useCallback(() => {
+    const isCurrentRequest = locationRequests.begin();
+    setSelectedProvinceId(null);
+    setSelectedDistrictId(null);
+    setLatitude(null);
+    setLongitude(null);
+    setLocationAccuracy(null);
+    setLocationConfirmed(false);
+    setIsDetectingLocation(false);
     setLocationHint(null);
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setLocationHint(c.gpsUnavailable);
@@ -1998,6 +2026,7 @@ export default function QuickPostForm({
     setIsDetectingLocation(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (!isCurrentRequest()) return;
         void (async () => {
           const nextLatitude = position.coords.latitude;
           const nextLongitude = position.coords.longitude;
@@ -2014,22 +2043,26 @@ export default function QuickPostForm({
               province?: ProvinceOption;
               district?: DistrictOption & { provinceId?: number };
             };
+            if (!isCurrentRequest()) return;
             if (!response.ok || !result.ok || !result.province || !result.district) throw new Error("UNMATCHED_LOCATION");
             setProvinceOptions((current) => current.some((item) => item.id === result.province!.id) ? current : [...current, result.province!]);
             setDistrictOptions((current) => current.some((item) => item.id === result.district!.id) ? current : [result.district!, ...current]);
             setSelectedProvinceId(result.province.id);
             setSelectedDistrictId(result.district.id);
+            setLocationConfirmed(false);
             setLocationHint(`${c.detectedLocation}: ${result.province.name} › ${result.district.name}`);
           } catch {
+            if (!isCurrentRequest()) return;
             setSelectedProvinceId(null);
             setSelectedDistrictId(null);
             setLocationHint(c.locationLookupFailed);
           } finally {
-            setIsDetectingLocation(false);
+            if (isCurrentRequest()) setIsDetectingLocation(false);
           }
         })();
       },
       (geoError) => {
+        if (!isCurrentRequest()) return;
         setLocationHint(geoError.code === 1 ? c.gpsDenied : c.gpsUnavailable);
         setLocationSource("manual");
         setLocationConfirmed(false);
@@ -2037,16 +2070,16 @@ export default function QuickPostForm({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [c.detectedLocation, c.gpsDenied, c.gpsUnavailable, c.locationLookupFailed, locale]);
+  }, [c.detectedLocation, c.gpsDenied, c.gpsUnavailable, c.locationLookupFailed, locale, locationRequests]);
 
   const handleConfirmDetectedLocation = useCallback(() => {
-    if (!selectedProvinceId || !selectedDistrictId) {
+    if (!detectedLocationCanBeConfirmed) {
       setLocationHint(c.locationMustConfirm);
       return;
     }
     setLocationConfirmed(true);
     setLocationHint(c.detectedLocation);
-  }, [c.detectedLocation, c.locationMustConfirm, selectedDistrictId, selectedProvinceId]);
+  }, [c.detectedLocation, c.locationMustConfirm, detectedLocationCanBeConfirmed]);
 
   async function saveCurrentDraftNow(stepOverride: QuickStep = step) {
     if (!draftLoaded) return { draftId, persisted: false };
@@ -2872,7 +2905,7 @@ export default function QuickPostForm({
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
             <p><span className="font-bold">{c.detectedLocation}:</span> {provinceOptions.find((item) => item.id === selectedProvinceId)?.name} › {districtOptions.find((item) => item.id === selectedDistrictId)?.name}</p>
             {!locationConfirmed ? (
-              <button type="button" onClick={handleConfirmDetectedLocation} className="shrink-0 rounded-lg bg-emerald-700 px-3 py-1.5 font-black text-white">
+              <button type="button" onClick={handleConfirmDetectedLocation} disabled={!detectedLocationCanBeConfirmed} className="shrink-0 rounded-lg bg-emerald-700 px-3 py-1.5 font-black text-white disabled:opacity-50">
                 {c.confirmLocation}
               </button>
             ) : null}

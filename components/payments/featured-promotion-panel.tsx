@@ -11,6 +11,7 @@ import {
 import { formatDate, formatNumber } from "@/lib/i18n/format";
 import type { AppLocale } from "@/lib/i18n/translations";
 import Link from "next/link";
+import { isFeaturedPaymentTargetEligible, type FeaturedPaymentTarget } from "@/lib/payments/featured-eligibility";
 
 type Copy = {
   success: string;
@@ -67,7 +68,7 @@ const COPY: Record<AppLocale, Copy> = {
     proofHint: "Accepted: JPG, PNG, WebP or PDF up to 5 MB. Receipt upload does not activate Featured automatically.",
     unavailable: "Featured payments are not configured yet.",
     unavailableHelp: "A Super Admin must configure the launch campaign and HesabPay destination first.",
-    listingStatusBlocked: "Featured can be requested only for submitted or approved listings.",
+    listingStatusBlocked: "Featured is available only for approved, publicly visible, unexpired listings. Renew an expired ad before requesting promotion.",
     freePathNote: "Free posting remains active. Featured is optional.",
   },
   fa: {
@@ -95,7 +96,7 @@ const COPY: Record<AppLocale, Copy> = {
     proofHint: "فرمت‌های مجاز: JPG، PNG، WebP یا PDF تا ۵ MB. بارگذاری رسید به تنهایی اعلان را ویژه نمی‌کند.",
     unavailable: "پرداخت اعلان ویژه هنوز تنظیم نشده است.",
     unavailableHelp: "ابتدا سوپر ادمین باید کمپاین آغازین و مقصد HesabPay را تنظیم کند.",
-    listingStatusBlocked: "درخواست ویژه فقط برای اعلان‌های ثبت‌شده یا تأییدشده ممکن است.",
+    listingStatusBlocked: "ویژه‌سازی فقط برای اعلان‌های تأییدشده، قابل نمایش عمومی و منقضی‌نشده ممکن است. ابتدا اعلان منقضی‌شده را تمدید کنید.",
     freePathNote: "ثبت رایگان اعلان فعال است. ویژه‌سازی اختیاری است.",
   },
   ps: {
@@ -123,7 +124,7 @@ const COPY: Record<AppLocale, Copy> = {
     proofHint: "منل کېږي: JPG، PNG، WebP یا PDF تر ۵ MB. رسید پورته کول په خپله اعلان ځانګړی نه کوي.",
     unavailable: "د ځانګړي اعلان تادیه لا نه ده تنظیم شوې.",
     unavailableHelp: "سوپر اډمین باید لومړی د پیل کمپاین او د HesabPay ځای تنظیم کړي.",
-    listingStatusBlocked: "ځانګړی حالت یوازې د ثبت شویو یا تایید شویو اعلانونو لپاره غوښتل کېږي.",
+    listingStatusBlocked: "ځانګړی کول یوازې د تایید شویو، عامو او نه منقضي شویو اعلانونو لپاره شوني دي. لومړی منقضي شوی اعلان نوی کړئ.",
     freePathNote: "وړیا اعلان ورکول فعال دي. ځانګړی کول اختیاري دي.",
   },
 };
@@ -146,7 +147,7 @@ export function FeaturedPromotionPanel({
   listingId: string;
   listingStatus: string;
   listingTitle: string;
-  listing: { featured?: boolean; featured_until?: string | null };
+  listing: FeaturedPaymentTarget & { featured?: boolean; featured_until?: string | null };
   summary: FeaturedPaymentSummary;
   locale: AppLocale;
 }) {
@@ -154,7 +155,7 @@ export function FeaturedPromotionPanel({
   const config = summary.config;
   const request = summary.request;
   const isActive = summary.activePromotion || isFeaturedCurrentlyActive(listing);
-  const canRequest = listingStatus === "pending" || listingStatus === "approved";
+  const canRequest = isFeaturedPaymentTargetEligible({ ...listing, status: listingStatus });
   const requestStatus = request?.status;
 
   return (
@@ -236,7 +237,7 @@ export function FeaturedPromotionPanel({
         </div>
       ) : null}
 
-      {!isActive && request && config && ["pending_payment", "rejected"].includes(request.status) ? (
+      {!isActive && request && config && canRequest && ["pending_payment", "rejected"].includes(request.status) ? (
         <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
           <div>
             <p className="text-sm font-bold text-slate-950">{copy.hesabPayInstructions}</p>
