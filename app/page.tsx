@@ -12,6 +12,7 @@ import { localizePath } from "@/lib/i18n/routing";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 import { formatListingPrice } from "@/lib/listings/price-display";
 import { getLocalizedListingLocation } from "@/lib/i18n/location-labels";
+import { getUiTranslations } from "@/lib/i18n/ui";
 
 function getHomePageCopy(
   locale: "en" | "fa" | "ps",
@@ -67,6 +68,7 @@ export default async function HomePage({
   const siteSettingsPromise = getSiteSettings();
   const homepageSectionsPromise = getHomepageSections();
   const { t, locale } = await dictionaryPromise;
+  const ui = getUiTranslations(locale);
   const href = (path: string) => localizePath(path, locale);
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const pageValue = Array.isArray(resolvedSearchParams.page) ? resolvedSearchParams.page[0] : resolvedSearchParams.page;
@@ -216,6 +218,11 @@ export default async function HomePage({
           {t.home.latestListings}
         </div>
         <div className="divide-y divide-slate-100 sm:divide-slate-200">
+          {latest.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm leading-6 text-slate-600">
+              {ui.listingsPage.empty}
+            </p>
+          ) : null}
           {latest.map((listing, index) => {
             const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
             const displayTitle = listing.translated_title || listing.title;

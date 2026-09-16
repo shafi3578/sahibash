@@ -21,7 +21,7 @@ The corrective release is suitable for deployment after its recorded checks. Dep
 | --- | --- | --- |
 | Dependency audit | PASS | npm audit: 0 vulnerabilities |
 | Lint / typecheck / build | PASS | Full commands exited 0; Next.js 16.3.5 generated 87 pages |
-| Automated tests | PASS | 299 passed, 0 failed, 0 skipped; includes 67 security tests |
+| Automated tests | PASS | 300 passed, 0 failed, 0 skipped in the final rerun; includes 67 security tests |
 | Test coverage inventory | PASS | Ten previously omitted suites now run in npm test; only explicitly opt-in live Auth MFA suite is excluded |
 | Security Advisor | PASS | Before: 0; after each migration: 0 security notices |
 | RLS coverage | PASS | 0 public tables lacking RLS; 0 public SECURITY DEFINER functions executable by anon/authenticated |
@@ -35,7 +35,7 @@ The corrective release is suitable for deployment after its recorded checks. Dep
 | Authenticated production browser journeys | NOT VERIFIED in this release | No full successful two-user posting/chat/notifications/contact/payment/admin browser run recorded |
 | Launch inventory | BLOCKED | 0 currently discoverable ads after expiry and rights rules; the remaining approved native ad was already expired |
 
-The 299 tests include behavioral units and source/SQL contract tests. They must not be represented as 299 browser E2E tests. Database role simulation proves policy enforcement but is not an Auth-provider login/enrollment E2E.
+The 300 tests include behavioral units and source/SQL contract tests. They must not be represented as 300 browser E2E tests. Database role simulation proves policy enforcement but is not an Auth-provider login/enrollment E2E.
 
 ## Exact live MFA policy proof
 
@@ -73,4 +73,15 @@ Held external ads retain actual before/after publication snapshots in listing_pr
 3. Verify provider/operational readiness where applicable: real payment fulfillment/refund operation, SMS when enabled, deliverability, restore drill and native-editor language review. Code checks alone do not prove those services.
 4. Performance Advisor follow-ups are explained, not hidden: 22 overlapping permissive-policy notices, 2 unindexed-FK informational findings, 149 unused-index informational findings and fixed Auth connection allocation of 10. No indexes were blindly removed and no RLS was weakened to clear a performance notice.
 
-The opt-in live MFA suite must run only against a local or explicitly confirmed disposable non-production Supabase project. The local checkout currently has public Supabase configuration but no service-role key; production database verification used the authorized Supabase connection without extracting or persisting that key.
+The opt-in live MFA suite must run only against a local or explicitly confirmed disposable non-production Supabase project. Production database verification used the authorized Supabase connection without extracting or persisting a service-role key.
+
+## Post-deployment verification and workspace relocation
+
+- GitHub main and its successful Vercel status confirmed aabb5998d713db4895ff0d52f9fa73317cc7f0eb. Production HTML identified dpl_2GAhs2aGtje3vbYwmKz7vvjBnzdf, matching that status.
+- The anonymous production smoke passed 39/39 routes: 36 public routes across EN/FA/PS and three protected routes resolving to login. The inventory redirect was also checked in a browser. These results are not authenticated user-journey evidence.
+- A second independent read-only check passed 15 EN/FA/PS home, login, listing, category and search URLs with the correct language/direction and no visible server errors.
+- Mobile FA login automated accessibility scan: 0 violations, 38 passes, one incomplete color-contrast rule requiring manual review. This is not whole-site accessibility certification.
+- A separate storage task relocated the active checkout from C: to E:\Drive C\Documents\Codex\2026-08-04\referenced-chatgpt-conversation-this-is-an-3\sahibash during final verification. This temporarily split the working tree across drives. No broad restore, reset or overwrite was performed on either original location. After the transfer, the E: checkout has zero missing tracked files, the same deployed HEAD, and only the two expected final UI/test edits before this report update. Final verification resumed there.
+- A separate recovery clone was made while the transfer was incomplete. Four ignored scoped backups were also recovered from retained audit snapshots; the first matches its original SHA-256 above. This does not replace a full disaster-recovery backup or restore drill.
+- Production data counts and Security Advisor results were rechecked after the local relocation and remained unchanged. The final small homepage repair reuses the existing EN/FA/PS empty-listing message without changing layout, calls to action, or publication rules.
+- Full lint, typecheck and the production build passed again in the relocated checkout. One initial test rerun with a temporary 768 MB heap limit terminated the search worker without assertion diagnostics; the isolated normal search command then passed all 13 tests, and a full normal npm test rerun passed all 300. No test was removed or skipped to obtain that result. The final three-file follow-up passed independent review and a secret-pattern diff scan.

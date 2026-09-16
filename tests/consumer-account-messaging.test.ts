@@ -18,6 +18,7 @@ import {
 } from "@/lib/messages/threading";
 import type { Message } from "@/types/database";
 import { notificationDestination } from "@/lib/notifications/destination";
+import { getUiTranslations } from "@/lib/i18n/ui";
 
 function message(overrides: Partial<Message>): Message {
   const base: Message = {
@@ -290,6 +291,18 @@ test("listing pagination is server-side and image viewing supports touch navigat
   assert.match(gallery, /onTouchEnd/);
   assert.match(gallery, /ArrowLeft/);
   assert.match(gallery, /ArrowRight/);
+});
+
+test("homepage explains an empty latest feed using existing localized copy", () => {
+  const home = readFileSync(join(process.cwd(), "app", "page.tsx"), "utf8");
+  const latestStart = home.indexOf("{t.home.latestListings}");
+  const latestSection = home.slice(latestStart, home.indexOf("</section>", latestStart));
+
+  assert.match(home, /const ui = getUiTranslations\(locale\)/);
+  assert.match(latestSection, /latest\.length === 0 \? \(\s*<p\b[^>]*>\s*\{ui\.listingsPage\.empty\}\s*<\/p>\s*\) : null/);
+  assert.match(getUiTranslations("en").listingsPage.empty, /No active listings/);
+  assert.match(getUiTranslations("fa").listingsPage.empty, /اعلان فعالی موجود نیست/);
+  assert.match(getUiTranslations("ps").listingsPage.empty, /فعال اعلانونه نشته/);
 });
 
 test("public listing views are counted without storing raw request fingerprints", () => {
