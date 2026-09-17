@@ -28,6 +28,14 @@ import {
   normalizeElectronicsDynamicAttributes,
 } from "@/lib/posting/electronics-dynamic";
 import { validateListingImage } from "@/lib/posting/image-validation";
+import {
+  buildListingImageRetryIdentity,
+  hashListingImageBytes,
+  isListingImageStorageCollision,
+  isListingImageStorageMissing,
+  isValidListingImageRetryKey,
+} from "@/lib/listings/image-retry";
+import { buildQuickPublishListingId, isValidQuickPublishRequestId } from "@/lib/listings/publish-retry";
 import { normalizeVehicleDamageParts } from "@/lib/vehicles/damage-report";
 import { shouldBlockPublicFixtureListing } from "@/lib/listings/fixture-guard";
 import { recordShadowModerationReview } from "@/lib/ai/moderation";
@@ -183,7 +191,7 @@ function readQuickPublishedListingId(details: unknown, publishRequestId: string)
   const directListingId = toFormValueText(
     (record.published_listing_id ?? record.quickPublishListingId) as FormDataEntryValue | null
   );
-  if (directListingId && (!publishRequestId || !storedPublishRequestId || storedPublishRequestId === publishRequestId)) {
+  if (directListingId && (!publishRequestId || storedPublishRequestId === publishRequestId)) {
     return directListingId;
   }
 
@@ -192,7 +200,7 @@ function readQuickPublishedListingId(details: unknown, publishRequestId: string)
     const publishRecord = publish as Record<string, unknown>;
     const nestedRequestId = toFormValueText(publishRecord.publishRequestId as FormDataEntryValue | null);
     const nestedListingId = toFormValueText(publishRecord.listingId as FormDataEntryValue | null);
-    if (nestedListingId && (!publishRequestId || !nestedRequestId || nestedRequestId === publishRequestId)) {
+    if (nestedListingId && (!publishRequestId || nestedRequestId === publishRequestId)) {
       return nestedListingId;
     }
   }
@@ -205,20 +213,42 @@ async function getExistingQuickPublishedListingId(
   userId: string,
   formData: FormData
 ) {
-  if (!isQuickPostingMode(formData)) return null;
+  if (!isQuickPostingMode(formData)) return { listingId: null, error: null };
   const draftId = toFormValueText(formData.get("draft_id"));
-  if (!draftId) return null;
   const publishRequestId = toFormValueText(formData.get("publish_request_id"));
+  if (!isValidQuickPublishRequestId(publishRequestId)) {
+    return { listingId: null, error: "Invalid publish request ID" };
+  }
 
-  const { data } = await supabase
+  if (draftId) {
+    const { data, error } = await supabase
+      .from("listing_drafts")
+      .select("details, status")
+      .eq("id", draftId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return { listingId: null, error: error.message };
+    if (data?.status === "published") {
+      const listingId = readQuickPublishedListingId(data.details, publishRequestId);
+      if (listingId) return { listingId, error: null };
+    }
+  }
+
+  // A partial image batch keeps the local request ID but the recovery endpoint
+  // can create a new in-progress draft after the original draft was published.
+  // Reconnect that stable request to the earlier listing instead of duplicating it.
+  const { data: prior, error: priorError } = await supabase
     .from("listing_drafts")
-    .select("details, status")
-    .eq("id", draftId)
+    .select("details")
     .eq("user_id", userId)
+    .eq("posting_type", "quick")
+    .eq("status", "published")
+    .contains("details", { publishRequestId })
+    .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-
-  if (!data || data.status !== "published") return null;
-  return readQuickPublishedListingId(data.details, publishRequestId);
+  if (priorError) return { listingId: null, error: priorError.message };
+  return { listingId: readQuickPublishedListingId(prior?.details, publishRequestId), error: null };
 }
 
 async function markQuickDraftPublished(
@@ -227,23 +257,29 @@ async function markQuickDraftPublished(
   formData: FormData,
   listingId: string
 ) {
-  if (!isQuickPostingMode(formData)) return;
+  if (!isQuickPostingMode(formData)) return { ok: true as const };
   const draftId = toFormValueText(formData.get("draft_id"));
-  if (!draftId) return;
+  if (!draftId) return { ok: false as const, message: "A saved draft is required before publishing." };
   const publishRequestId = toFormValueText(formData.get("publish_request_id"));
+  if (!isValidQuickPublishRequestId(publishRequestId)) {
+    return { ok: false as const, message: "Invalid publish request ID" };
+  }
 
-  const { data } = await supabase
+  const { data, error: readError } = await supabase
     .from("listing_drafts")
     .select("details")
     .eq("id", draftId)
     .eq("user_id", userId)
     .maybeSingle();
+  if (readError || !data) {
+    return { ok: false as const, message: readError?.message ?? "Saved draft not found." };
+  }
 
   const details = data?.details && typeof data.details === "object"
     ? { ...(data.details as Record<string, unknown>) }
     : {};
 
-  await supabase
+  const { data: updated, error: updateError } = await supabase
     .from("listing_drafts")
     .update({
       status: "published",
@@ -259,7 +295,13 @@ async function markQuickDraftPublished(
       },
     })
     .eq("id", draftId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+  if (updateError || !updated) {
+    return { ok: false as const, message: updateError?.message ?? "Could not finalize the saved draft." };
+  }
+  return { ok: true as const };
 }
 
 function buildCanonicalAreaRows(
@@ -1721,23 +1763,47 @@ export async function createListingAction(formData: FormData): Promise<{
     return { ok: false, message: "Please log in or register to publish your ad.", statusCode: 401 };
   }
   const supabase = await createSupabaseServerClient();
-  const existingQuickListingId = await getExistingQuickPublishedListingId(supabase, user.id, formData);
-  if (existingQuickListingId) {
+  const quickMode = isQuickPostingMode(formData);
+  const publishRequestId = toFormValueText(formData.get("publish_request_id"));
+  const retryListingId = quickMode ? buildQuickPublishListingId(user.id, publishRequestId) : null;
+  if (quickMode && !retryListingId) {
+    return { ok: false, message: "Invalid publish request ID", statusCode: 400 };
+  }
+
+  const existingPublished = await getExistingQuickPublishedListingId(supabase, user.id, formData);
+  if (existingPublished.error) {
+    return { ok: false, message: existingPublished.error, statusCode: 409 };
+  }
+  if (existingPublished.listingId) {
     return {
       ok: true,
       message: "Listing created successfully",
-      listingId: existingQuickListingId,
+      listingId: existingPublished.listingId,
     };
   }
 
-  const rateLimit = await consumeRateLimit({
-    scope: "listing.create",
-    userId: user.id,
-    maxRequests: 12,
-    windowSeconds: 24 * 60 * 60,
-  });
-  if (!rateLimit.allowed) {
-    return { ok: false, message: "Too many listing submissions. Please try again later.", statusCode: 429 };
+  let existingRetryListingId: string | null = null;
+  if (retryListingId) {
+    const { data: retryListing, error: retryReadError } = await supabase
+      .from("listings")
+      .select("id")
+      .eq("id", retryListingId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (retryReadError) return { ok: false, message: retryReadError.message };
+    existingRetryListingId = retryListing?.id ? String(retryListing.id) : null;
+  }
+
+  if (!existingRetryListingId) {
+    const rateLimit = await consumeRateLimit({
+      scope: "listing.create",
+      userId: user.id,
+      maxRequests: 12,
+      windowSeconds: 24 * 60 * 60,
+    });
+    if (!rateLimit.allowed) {
+      return { ok: false, message: "Too many listing submissions. Please try again later.", statusCode: 429 };
+    }
   }
 
   const parsed = listingSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -1778,14 +1844,35 @@ export async function createListingAction(formData: FormData): Promise<{
     return { ok: false, message: "Production fixture or smoke-test listings cannot be published." };
   }
 
-  const { data, error } = await insertListingWithSchemaFallback(supabase, createdListing.payload as Record<string, unknown>);
+  let data: { id: string } | null = existingRetryListingId ? { id: existingRetryListingId } : null;
+  if (!data) {
+    const listingPayload = {
+      ...(createdListing.payload as Record<string, unknown>),
+      ...(retryListingId ? { id: retryListingId } : {}),
+    };
+    const inserted = await insertListingWithSchemaFallback(supabase, listingPayload);
 
-  if (error) {
-    return { ok: false, message: error.message };
+    if (inserted.error) {
+      if (!retryListingId) return { ok: false, message: inserted.error.message };
+      const { data: recovered, error: recoveryError } = await supabase
+        .from("listings")
+        .select("id")
+        .eq("id", retryListingId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (recoveryError || !recovered?.id) {
+        return { ok: false, message: recoveryError?.message ?? inserted.error.message };
+      }
+      data = { id: String(recovered.id) };
+    } else if (inserted.data?.id) {
+      data = { id: String(inserted.data.id) };
+    }
   }
 
-  await persistListingAttributes(supabase, data.id, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath);
-  await persistQuickPostMetaAttributes(supabase, data.id, formData);
+  if (!data?.id) return { ok: false, message: "Could not confirm the published listing. Please retry." };
+
+  await persistListingAttributes(supabase, data.id, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath, quickMode);
+  await persistQuickPostMetaAttributes(supabase, data.id, formData, quickMode);
   await persistElectronicsDynamicAttributes(supabase, data.id, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
@@ -1819,7 +1906,10 @@ export async function createListingAction(formData: FormData): Promise<{
     originalLocale: createdListing.payload.original_locale,
   });
   await processPendingListingTranslationJobs(supabase, { listingId: data.id, limit: 3 });
-  await markQuickDraftPublished(supabase, user.id, formData, data.id);
+  const finalizedDraft = await markQuickDraftPublished(supabase, user.id, formData, data.id);
+  if (!finalizedDraft.ok) {
+    return { ok: false, message: finalizedDraft.message, statusCode: 409 };
+  }
 
   revalidatePublicMarketplaceCache(data.id);
   revalidatePath("/");
@@ -2175,7 +2265,8 @@ export async function uploadListingImageFormAction(
 export async function uploadListingImageAction(
   listingId: string,
   image: File,
-  isPrimary: boolean = false
+  isPrimary: boolean = false,
+  stagedImageId?: string,
 ): Promise<{
   ok: boolean;
   message: string;
@@ -2185,6 +2276,9 @@ export async function uploadListingImageAction(
   const user = await getCurrentUser();
   if (!user) {
     return { ok: false, message: "Unauthorized", statusCode: 401 };
+  }
+  if (stagedImageId !== undefined && !isValidListingImageRetryKey(stagedImageId)) {
+    return { ok: false, message: "Invalid staged image ID", statusCode: 400 };
   }
   const supabase = await createSupabaseServerClient();
 
@@ -2214,23 +2308,87 @@ export async function uploadListingImageAction(
     }
   }
 
-  const path = `${user.id}/${listingId}/${crypto.randomUUID()}.${validatedImage.extension}`;
+  const retryIdentity = stagedImageId === undefined ? null : await buildListingImageRetryIdentity(
+    user.id, listingId, stagedImageId, image, validatedImage.extension,
+  );
+  if (stagedImageId !== undefined && !retryIdentity) {
+    return { ok: false, message: "Invalid image retry identity", statusCode: 400 };
+  }
+  const path = retryIdentity?.storagePath ?? `${user.id}/${listingId}/${crypto.randomUUID()}.${validatedImage.extension}`;
+  const { data: publicUrlData } = supabase.storage.from("listing-images").getPublicUrl(path);
+
+  function uploaded(imageId: string) {
+    revalidatePublicMarketplaceCache(listingId);
+    revalidatePath(`/listings/${listingId}`);
+    revalidatePath("/dashboard/my-ads");
+    return { ok: true, message: "Image uploaded successfully", imageId };
+  }
+
+  async function readRetryImage() {
+    return supabase.from("listing_images")
+      .select("id, listing_id, storage_path, public_url")
+      .eq("id", retryIdentity!.imageId)
+      .eq("listing_id", listingId)
+      .maybeSingle();
+  }
+
+  function matchesRetryImage(row: { id: string; listing_id: string; storage_path: string; public_url: string | null }) {
+    return row.id === retryIdentity?.imageId && row.listing_id === listingId.toLowerCase()
+      && row.storage_path === path && row.public_url === publicUrlData.publicUrl;
+  }
+
+  async function inspectStoredRetryImage(): Promise<"verified" | "missing" | "unverified"> {
+    if (!retryIdentity) return "unverified";
+    const { data: storedImage, error: downloadError } = await supabase.storage.from("listing-images").download(path);
+    if (downloadError) return isListingImageStorageMissing(downloadError) ? "missing" : "unverified";
+    if (!storedImage) return "missing";
+    return storedImage.size === image.size && await hashListingImageBytes(storedImage) === retryIdentity.contentHash
+      ? "verified"
+      : "unverified";
+  }
+
+  async function restoreMissingRetryImage() {
+    const { error: restoreError } = await supabase.storage
+      .from("listing-images")
+      .upload(path, image, { cacheControl: "3600", upsert: false });
+    if (restoreError && !isListingImageStorageCollision(restoreError)) return false;
+    return await inspectStoredRetryImage() === "verified";
+  }
+  const verificationFailure = { ok: false, message: "Could not verify the previously uploaded image. Please retry.", statusCode: 409 };
+
+  if (retryIdentity) {
+    // Only inspect a retry after verifying the current caller can edit this listing.
+    const { data: existing, error: existingError } = await readRetryImage();
+    if (existingError) return { ok: false, message: existingError.message };
+    if (existing) {
+      if (!matchesRetryImage(existing)) {
+        return { ok: false, message: "This staged image ID already belongs to different image content", statusCode: 409 };
+      }
+      // An interrupted deletion can leave an exact DB row without its object.
+      const storedState = await inspectStoredRetryImage();
+      if (storedState === "verified") return uploaded(existing.id);
+      if (storedState === "missing" && await restoreMissingRetryImage()) return uploaded(existing.id);
+      return verificationFailure;
+    }
+  }
 
   const { error: uploadError } = await supabase.storage
     .from("listing-images")
     .upload(path, image, { cacheControl: "3600", upsert: false });
 
   if (uploadError) {
-    return { ok: false, message: uploadError.message };
+    if (!retryIdentity || !isListingImageStorageCollision(uploadError)) {
+      return { ok: false, message: uploadError.message };
+    }
+    // An earlier upload can have committed before its DB insert/response failed.
+    // A filename or caller-provided metadata is not proof of the stored bytes.
+    if (await inspectStoredRetryImage() !== "verified") return verificationFailure;
   }
-
-  const { data: publicUrlData } = supabase.storage
-    .from("listing-images")
-    .getPublicUrl(path);
 
   const { data, error: insertError } = await supabase
     .from("listing_images")
     .insert({
+      ...(retryIdentity ? { id: retryIdentity.imageId } : {}),
       listing_id: listingId,
       public_url: publicUrlData.publicUrl,
       storage_path: path,
@@ -2241,18 +2399,18 @@ export async function uploadListingImageAction(
     .single();
 
   if (insertError) {
+    // Plain INSERT rolls back primary-image trigger side effects on a conflict.
+    // Do not replace this with upsert/ON CONFLICT DO NOTHING.
+    if (retryIdentity && insertError.code === "23505") {
+      const { data: existing, error: existingError } = await readRetryImage();
+      if (!existingError && existing && matchesRetryImage(existing)) {
+        return await inspectStoredRetryImage() === "verified" ? uploaded(existing.id) : verificationFailure;
+      }
+    }
     return { ok: false, message: insertError.message };
   }
-
-  revalidatePublicMarketplaceCache(listingId);
-  revalidatePath(`/listings/${listingId}`);
-  revalidatePath("/dashboard/my-ads");
-
-  return {
-    ok: true,
-    message: "Image uploaded successfully",
-    imageId: data.id,
-  };
+  if (!data?.id) return { ok: false, message: "Could not confirm the uploaded image. Please retry." };
+  return uploaded(data.id);
 }
 
 export async function deleteListingImageAction(imageId: string): Promise<{

@@ -12,6 +12,7 @@ import { canConfirmDetectedLocation, createLocationRequestGuard, createManualLoc
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
+import { runQuickPostPublishAttempt } from "@/lib/posting/quick-publish";
 import {
   getPublishedPostingFields,
   hasPublishedDetailValue,
@@ -169,6 +170,7 @@ type AiResponse = {
 const QUICK_DRAFT_KEY = "sahibash_quick_post_draft_v1";
 const QUICK_IMAGE_DB_NAME = "sahibash_quick_post_images_v1";
 const QUICK_IMAGE_STORE = "images";
+const quickImagePersistenceQueues = new Map<string, Promise<void>>();
 
 const CATEGORY_ROOTS = [
   "vehicles",
@@ -926,38 +928,48 @@ function openQuickPostImageDb() {
 }
 
 async function persistQuickPostImages(images: StagedImage[], ownerScope: string) {
-  if (typeof indexedDB === "undefined") return;
-  const db = await openQuickPostImageDb();
+  if (typeof indexedDB === "undefined") throw new Error("IndexedDB is not available.");
+  const snapshot = images.slice(0, 15);
+  const previous = quickImagePersistenceQueues.get(ownerScope) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(async () => {
+    const db = await openQuickPostImageDb();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(QUICK_IMAGE_STORE, "readwrite");
+        const store = transaction.objectStore(QUICK_IMAGE_STORE);
+        const cursorRequest = store.openCursor();
+        cursorRequest.onsuccess = () => {
+          const cursor = cursorRequest.result;
+          if (cursor) {
+            if ((cursor.value as Partial<StoredQuickPostImage>).ownerScope === ownerScope) cursor.delete();
+            cursor.continue();
+            return;
+          }
+          for (const image of snapshot) {
+            store.put({
+              id: image.id,
+              ownerScope,
+              name: image.file.name,
+              type: image.file.type,
+              lastModified: image.file.lastModified,
+              isPrimary: image.isPrimary,
+              blob: image.file,
+            } satisfies StoredQuickPostImage);
+          }
+        };
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error ?? new Error("Could not save quick-post image draft."));
+        transaction.onabort = () => reject(transaction.error ?? new Error("Could not save quick-post image draft."));
+      });
+    } finally {
+      db.close();
+    }
+  });
+  quickImagePersistenceQueues.set(ownerScope, current);
   try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = db.transaction(QUICK_IMAGE_STORE, "readwrite");
-      const store = transaction.objectStore(QUICK_IMAGE_STORE);
-      const cursorRequest = store.openCursor();
-      cursorRequest.onsuccess = () => {
-        const cursor = cursorRequest.result;
-        if (cursor) {
-          if ((cursor.value as Partial<StoredQuickPostImage>).ownerScope === ownerScope) cursor.delete();
-          cursor.continue();
-          return;
-        }
-        for (const image of images.slice(0, 15)) {
-          store.put({
-            id: image.id,
-            ownerScope,
-            name: image.file.name,
-            type: image.file.type,
-            lastModified: image.file.lastModified,
-            isPrimary: image.isPrimary,
-            blob: image.file,
-          } satisfies StoredQuickPostImage);
-        }
-      };
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Could not save quick-post image draft."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("Could not save quick-post image draft."));
-    });
+    await current;
   } finally {
-    db.close();
+    if (quickImagePersistenceQueues.get(ownerScope) === current) quickImagePersistenceQueues.delete(ownerScope);
   }
 }
 
@@ -1009,6 +1021,8 @@ function readDraftBoolean(value: unknown) {
 }
 
 function readDraftNumber(value: unknown) {
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (typeof value === "string" && !value.trim()) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -1379,6 +1393,7 @@ export default function QuickPostForm({
             Array.isArray(local.userEditedDetailKeys) ? local.userEditedDetailKeys.map(String) : [],
           );
           setStep(local.step === 2 ? 2 : 1);
+          if (readDraftString(local.draftId)) setDraftId(readDraftString(local.draftId));
           if (readDraftString(local.publishRequestId)) setPublishRequestId(readDraftString(local.publishRequestId));
           setTitle(readDraftString(local.title));
           setDescription(readDraftString(local.description));
@@ -1583,6 +1598,7 @@ export default function QuickPostForm({
       updatedAt: new Date().toISOString(),
       language: locale,
       step,
+      draftId,
       publishRequestId,
       title,
       description,
@@ -2088,6 +2104,7 @@ export default function QuickPostForm({
       updatedAt: new Date().toISOString(),
       language: locale,
       step: stepOverride,
+      draftId,
       publishRequestId,
       title,
       description,
@@ -2170,6 +2187,12 @@ export default function QuickPostForm({
   }
 
   async function saveDraftAndExit() {
+    try {
+      await persistQuickPostImages(imagesRef.current, draftOwnerScope);
+    } catch {
+      setError(c.draftSaveFailed);
+      return;
+    }
     const checkpoint = await saveCurrentDraftNow(step);
     if (!checkpoint.persisted) {
       setError(c.draftSaveFailed);
@@ -2372,32 +2395,29 @@ export default function QuickPostForm({
     setIsPublishing(true);
     startTransition(() => {
       void (async () => {
-        const checkpoint = await saveCurrentDraftNow(2);
-        const savedDraftId = checkpoint.draftId;
-        const formData = buildPublishFormData(savedDraftId);
-        const result = await createListingAction(formData);
-        if (!result.ok || !result.listingId) {
-          setError(result.message);
+        const attempt = await runQuickPostPublishAttempt({
+          images,
+          persistLocalImages: async () => persistQuickPostImages(images, draftOwnerScope),
+          checkpointDraft: () => saveCurrentDraftNow(2),
+          buildFormData: (savedDraftId) => buildPublishFormData(savedDraftId),
+          createOrReuseListing: createListingAction,
+          uploadImage: uploadListingImageAction,
+          finalizeRecovery: async (savedDraftId) => {
+            window.localStorage.removeItem(quickDraftKey);
+            await clearQuickPostImages(draftOwnerScope).catch(() => undefined);
+            await deleteMyDraftAction(savedDraftId);
+          },
+          persistenceErrorMessage: c.draftSaveFailed,
+        });
+        if (!attempt.ok) {
+          setError(attempt.message);
           setStatus(null);
           setIsPublishing(false);
           return;
         }
 
-        for (const image of images) {
-          const upload = await uploadListingImageAction(result.listingId, image.file, image.isPrimary);
-          if (!upload.ok) {
-            setError(upload.message);
-            setStatus(null);
-            setIsPublishing(false);
-            return;
-          }
-        }
-
-        window.localStorage.removeItem(quickDraftKey);
-        await clearQuickPostImages(draftOwnerScope).catch(() => undefined);
-        if (savedDraftId || draftId) await deleteMyDraftAction(savedDraftId || draftId);
         setStatus(c.success);
-        router.push(localizePath(`/listings/${result.listingId}/manage`, locale));
+        router.push(localizePath(`/listings/${attempt.listingId}/manage`, locale));
       })().catch((publishError) => {
         setError(publishError instanceof Error ? publishError.message : "Publishing failed.");
         setStatus(null);

@@ -113,7 +113,7 @@ test("Quick Post protects local work without continuously server-saving while ty
   assert.match(quickPostForm, /const checkpoint = await saveCurrentDraftNow\(step\)/);
   assert.match(quickPostForm, /if \(!checkpoint\.persisted\)/);
   assert.match(quickPostForm, /window\.localStorage\.removeItem\(quickDraftKey\);[\s\S]*router\.push/);
-  assert.match(quickPostForm, /const savedDraftId = checkpoint\.draftId/);
+  assert.match(quickPostForm, /buildFormData: \(savedDraftId\) => buildPublishFormData\(savedDraftId\)/);
 });
 
 test("local posting recovery is isolated per authenticated account", () => {
