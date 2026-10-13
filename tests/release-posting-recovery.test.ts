@@ -221,6 +221,55 @@ test("partial image failure, reload and retry preserve exact local bytes and con
   assert.equal(events.filter((event) => event === "finalize").length, 1);
 });
 
+test("cleanup failure keeps publish in a retryable failed state", async () => {
+  const result = await runQuickPostPublishAttempt({
+    images: [{ id: "slot", file: new File(["synthetic bytes"], "one.jpg", { type: "image/jpeg" }), isPrimary: true }],
+    persistLocalImages: async () => undefined,
+    checkpointDraft: async () => ({ persisted: true, draftId: "draft-one" }),
+    buildFormData: () => new FormData(),
+    createOrReuseListing: async () => ({ ok: true, message: "", listingId: "listing-one" }),
+    uploadImage: async () => ({ ok: true, message: "" }),
+    finalizeRecovery: async () => { throw new Error("Synthetic photo cleanup failure"); },
+    persistenceErrorMessage: "Synthetic recovery data could not be cleared",
+  });
+
+  assert.deepEqual(result, { ok: false, message: "Synthetic recovery data could not be cleared" });
+});
+
+test("quick attribute replacement keeps existing rows when the replacement write fails", async () => {
+  const { persistQuickPostMetaAttributes } = functionsFromSource<{
+    persistQuickPostMetaAttributes: (client: unknown, listingId: string, formData: FormData, replaceExisting?: boolean) => Promise<{ ok: boolean; message?: string }>;
+  }>("lib/actions/listings.ts", [
+    "toFormValueText",
+    "isQuickPostingMode",
+    "parseQuickPostNumber",
+    "toFormValueBoolean",
+    "persistQuickPostMetaAttributes",
+  ], {
+    QUICK_POST_TEXT_ATTRIBUTES: ["color"],
+    QUICK_POST_NUMBER_ATTRIBUTES: [],
+    QUICK_POST_BOOLEAN_ATTRIBUTES: [],
+    normalizeAfghanLandAreaUnit: () => null,
+  });
+
+  const events: string[] = [];
+  const client = {
+    from() {
+      return {
+        upsert: async () => { events.push("upsert"); return { error: { message: "Synthetic replacement failure" } }; },
+        delete: () => { events.push("delete"); throw new Error("Delete must not run before a failed write"); },
+      };
+    },
+  };
+  const form = new FormData();
+  form.set("posting_mode", "quick");
+  form.set("color", "red");
+  const result = await persistQuickPostMetaAttributes(client, "listing-one", form, true);
+  assert.equal(result.ok, false);
+  assert.equal(result.message, "Synthetic replacement failure");
+  assert.deepEqual(events, ["upsert"]);
+});
+
 test("quick publish IDs are bounded and deterministic across draft replacement", () => {
   const owner = "11111111-1111-4111-8111-111111111111";
   for (const invalid of ["", " ", "../escape", "a/b", "x".repeat(129)]) assert.equal(isValidQuickPublishRequestId(invalid), false);
@@ -242,7 +291,6 @@ test("a replacement in-progress draft reconnects to the prior published listing 
   });
   const client = {
     from(table: string) {
-      assert.equal(table, "listing_drafts");
       const filters = new Map<string, unknown>();
       let contained: Record<string, unknown> | null = null;
       const query = {
@@ -252,6 +300,12 @@ test("a replacement in-progress draft reconnects to the prior published listing 
         order() { return query; },
         limit() { return query; },
         async maybeSingle() {
+          if (table === "listings") {
+            assert.equal(filters.get("id"), listingId);
+            assert.equal(filters.get("user_id"), owner);
+            return { data: { id: listingId }, error: null };
+          }
+          assert.equal(table, "listing_drafts");
           if (filters.get("id") === "draft-two") {
             return { data: { status: "in_progress", details: { publishRequestId: requestId } }, error: null };
           }

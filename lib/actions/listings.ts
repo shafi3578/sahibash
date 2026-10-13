@@ -220,6 +220,17 @@ async function getExistingQuickPublishedListingId(
     return { listingId: null, error: "Invalid publish request ID" };
   }
 
+  const verifyOwnedListing = async (candidateId: string) => {
+    const { data, error } = await supabase
+      .from("listings")
+      .select("id")
+      .eq("id", candidateId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return { listingId: null, error: error.message };
+    return { listingId: data?.id ? String(data.id) : null, error: null };
+  };
+
   if (draftId) {
     const { data, error } = await supabase
       .from("listing_drafts")
@@ -230,7 +241,11 @@ async function getExistingQuickPublishedListingId(
     if (error) return { listingId: null, error: error.message };
     if (data?.status === "published") {
       const listingId = readQuickPublishedListingId(data.details, publishRequestId);
-      if (listingId) return { listingId, error: null };
+      if (listingId) {
+        const verified = await verifyOwnedListing(listingId);
+        if (verified.error) return verified;
+        if (verified.listingId) return verified;
+      }
     }
   }
 
@@ -248,7 +263,9 @@ async function getExistingQuickPublishedListingId(
     .limit(1)
     .maybeSingle();
   if (priorError) return { listingId: null, error: priorError.message };
-  return { listingId: readQuickPublishedListingId(prior?.details, publishRequestId), error: null };
+  const listingId = readQuickPublishedListingId(prior?.details, publishRequestId);
+  if (!listingId) return { listingId: null, error: null };
+  return verifyOwnedListing(listingId);
 }
 
 async function markQuickDraftPublished(
@@ -767,7 +784,7 @@ async function persistQuickPostMetaAttributes(
   listingId: string,
   formData: FormData,
   replaceExisting: boolean = false
-) {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const explicitQuickMode = isQuickPostingMode(formData);
   type ListingAttributeUpsertRow = {
     listing_id: string;
@@ -840,20 +857,29 @@ async function persistQuickPostMetaAttributes(
     ...QUICK_POST_BOOLEAN_ATTRIBUTES,
   ]));
 
-  if (replaceExisting && trackedKeys.length > 0) {
-    const keysToDelete = explicitQuickMode ? trackedKeys : rows.map((row) => row.attribute_key);
+  if (rows.length === 0) {
+    if (!replaceExisting) return { ok: true };
+    const { error } = await supabase.from("listing_attributes").delete()
+      .eq("listing_id", listingId).in("attribute_key", trackedKeys);
+    return error ? { ok: false, message: error.message } : { ok: true };
+  }
+
+  const { error: upsertError } = await supabase.from("listing_attributes").upsert(rows, {
+    onConflict: "listing_id,attribute_key",
+  });
+  if (upsertError) return { ok: false, message: upsertError.message };
+
+  if (replaceExisting) {
+    const keysToDelete = (explicitQuickMode ? trackedKeys : rows.map((row) => row.attribute_key))
+      .filter((key) => !rows.some((row) => row.attribute_key === key));
     if (keysToDelete.length > 0) {
-      await supabase.from("listing_attributes").delete().eq("listing_id", listingId).in("attribute_key", keysToDelete);
+      const { error: deleteError } = await supabase.from("listing_attributes").delete()
+        .eq("listing_id", listingId).in("attribute_key", keysToDelete);
+      if (deleteError) return { ok: false, message: deleteError.message };
     }
   }
 
-  if (rows.length === 0) {
-    return;
-  }
-
-  await supabase.from("listing_attributes").upsert(rows, {
-    onConflict: "listing_id,attribute_key",
-  });
+  return { ok: true };
 }
 
 async function persistListingCategoryPath(
@@ -1025,7 +1051,7 @@ async function persistListingAttributes(
   formData: FormData,
   categoryPath: string | null | undefined,
   replaceExisting: boolean = false
-) {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const quickMode = isQuickPostingMode(formData);
   const simpleKind = getSimpleCategoryKind(categoryPath ?? undefined, null);
   const simpleFieldKeys = new Set(getSimpleCategoryFieldKeys(simpleKind));
@@ -1064,6 +1090,17 @@ async function persistListingAttributes(
         .eq("is_active", true);
 
   const fieldMap = new Map((fields ?? []).map((field) => [field.field_key, field]));
+  let existingKeys: string[] = [];
+  if (replaceExisting) {
+    const { data: existingRows, error: existingError } = await supabase
+      .from("listing_attributes")
+      .select("attribute_key")
+      .eq("listing_id", listingId);
+    if (existingError) return { ok: false, message: existingError.message };
+    existingKeys = Array.from(new Set((existingRows ?? [])
+      .map((row) => String((row as { attribute_key?: unknown }).attribute_key ?? ""))
+      .filter(Boolean)));
+  }
   const attributeRows: ListingAttributeDraft[] = !usesConfiguredSchema && simpleKind && simpleConfig
     ? simpleConfig.fields.flatMap<ListingAttributeDraft>((field) => {
         const values = formData.getAll(field.key).map((value) => toFormValueText(value)).filter(Boolean);
@@ -1171,28 +1208,24 @@ async function persistListingAttributes(
         .filter((row) => Boolean(row));
   attributeRows.push(...buildCanonicalAreaRows(formData, categoryPath));
 
-  if (replaceExisting) {
-    if (simpleKind && !usesConfiguredSchema) {
-      const keys = Array.from(new Set([
+  if (attributeRows.length === 0) {
+    if (!replaceExisting) return { ok: true };
+    const keys = simpleKind && !usesConfiguredSchema
+      ? Array.from(new Set([
         ...allSimpleFieldKeys,
         ...simpleFieldKeys,
         "area_original_value",
         "area_original_unit",
         "area_sqm",
-      ]));
-      if (keys.length > 0) {
-        await supabase.from("listing_attributes").delete().eq("listing_id", listingId).in("attribute_key", keys);
-      }
-    } else {
-      await supabase.from("listing_attributes").delete().eq("listing_id", listingId);
-    }
+      ]))
+      : existingKeys;
+    if (keys.length === 0) return { ok: true };
+    const { error } = await supabase.from("listing_attributes").delete()
+      .eq("listing_id", listingId).in("attribute_key", keys);
+    return error ? { ok: false, message: error.message } : { ok: true };
   }
 
-  if (attributeRows.length === 0) {
-    return;
-  }
-
-  await supabase.from("listing_attributes").insert(
+  const { error: upsertError } = await supabase.from("listing_attributes").upsert(
     attributeRows.map((row) => ({
       listing_id: listingId,
       category_field_id: row.category_field_id,
@@ -1202,8 +1235,31 @@ async function persistListingAttributes(
       attribute_value_boolean: row.attribute_value_boolean ?? null,
       attribute_value_json: row.attribute_value_json ?? null,
       unit: row.unit ?? null,
-    }))
+    })),
+    { onConflict: "listing_id,attribute_key" },
   );
+  if (upsertError) return { ok: false, message: upsertError.message };
+
+  if (replaceExisting) {
+    const desiredKeys = new Set(attributeRows.map((row) => row.attribute_key));
+    const staleKeys = (simpleKind && !usesConfiguredSchema
+      ? Array.from(new Set([
+        ...allSimpleFieldKeys,
+        ...simpleFieldKeys,
+        "area_original_value",
+        "area_original_unit",
+        "area_sqm",
+      ]))
+      : existingKeys
+    ).filter((key) => !desiredKeys.has(key));
+    if (staleKeys.length > 0) {
+      const { error: deleteError } = await supabase.from("listing_attributes").delete()
+        .eq("listing_id", listingId).in("attribute_key", staleKeys);
+      if (deleteError) return { ok: false, message: deleteError.message };
+    }
+  }
+
+  return { ok: true };
 }
 
 async function resolveCategoryContext(
@@ -1707,8 +1763,10 @@ export async function createListingFormAction(formData: FormData): Promise<void>
     return;
   }
 
-  await persistListingAttributes(supabase, data.id, listing.context.categoryNodeId, formData, listing.context.categoryPath);
-  await persistQuickPostMetaAttributes(supabase, data.id, formData);
+  const attributesResult = await persistListingAttributes(supabase, data.id, listing.context.categoryNodeId, formData, listing.context.categoryPath);
+  if (!attributesResult.ok) return;
+  const quickAttributesResult = await persistQuickPostMetaAttributes(supabase, data.id, formData);
+  if (!quickAttributesResult.ok) return;
   await persistElectronicsDynamicAttributes(supabase, data.id, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
@@ -1871,8 +1929,10 @@ export async function createListingAction(formData: FormData): Promise<{
 
   if (!data?.id) return { ok: false, message: "Could not confirm the published listing. Please retry." };
 
-  await persistListingAttributes(supabase, data.id, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath, quickMode);
-  await persistQuickPostMetaAttributes(supabase, data.id, formData, quickMode);
+  const attributesResult = await persistListingAttributes(supabase, data.id, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath, quickMode);
+  if (!attributesResult.ok) return { ok: false, message: attributesResult.message, statusCode: 409 };
+  const quickAttributesResult = await persistQuickPostMetaAttributes(supabase, data.id, formData, quickMode);
+  if (!quickAttributesResult.ok) return { ok: false, message: quickAttributesResult.message, statusCode: 409 };
   await persistElectronicsDynamicAttributes(supabase, data.id, formData);
   await persistLockedListingSpecs(supabase, data.id, formData);
   await persistVehicleMetaAttributes(supabase, data.id, formData);
@@ -2007,8 +2067,10 @@ export async function updateListingAction(
     });
   }
 
-  await persistListingAttributes(supabase, listingId, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath, true);
-  await persistQuickPostMetaAttributes(supabase, listingId, formData, true);
+  const attributesResult = await persistListingAttributes(supabase, listingId, createdListing.context.categoryNodeId, formData, createdListing.context.categoryPath, true);
+  if (!attributesResult.ok) return { ok: false, message: attributesResult.message, statusCode: 409 };
+  const quickAttributesResult = await persistQuickPostMetaAttributes(supabase, listingId, formData, true);
+  if (!quickAttributesResult.ok) return { ok: false, message: quickAttributesResult.message, statusCode: 409 };
   await persistElectronicsDynamicAttributes(supabase, listingId, formData);
   await persistLockedListingSpecs(supabase, listingId, formData);
   await persistVehicleMetaAttributes(supabase, listingId, formData);

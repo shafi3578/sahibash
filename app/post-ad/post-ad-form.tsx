@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
-import { AFGHAN_PROVINCES, CURRENCIES } from "@/lib/constants/marketplace";
+import { AFGHAN_PROVINCES, CURRENCIES, getProvinceLabel } from "@/lib/constants/marketplace";
 import type { Category, CategoryField, CategoryNode } from "@/types/database";
 import {
   EMPTY_VEHICLE_SELECTION,
@@ -83,13 +83,15 @@ type CoreForm = {
   rulesAccepted: boolean;
 };
 
-type ProvinceOption = { id: number; name: string };
-type DistrictOption = { id: number; name: string; province_id: number };
+type ProvinceOption = { id: number; name: string; canonicalName?: string };
+type DistrictOption = { id: number; name: string; province_id: number; canonicalName?: string };
 type LocationApiOption = {
   id: number | string;
   province_id?: number | string;
   name?: string | null;
   name_en?: string | null;
+  name_fa?: string | null;
+  name_ps?: string | null;
 };
 type LocationApiResponse<T> = { success?: boolean; data?: T[] };
 type LocationMethod = "device" | "manual" | null;
@@ -109,22 +111,29 @@ function maskSellerPhone(phone: string) {
 const DRAFT_KEY = "sahibash_post_ad_draft_v2";
 const PREVIOUS_LOCATION_KEY = "sahibash_previous_location";
 
-function readLocationOptionName(option: LocationApiOption) {
-  return String(option.name ?? option.name_en ?? "").trim();
+function readLocationOptionName(option: LocationApiOption, locale: AppLocale) {
+  const localized = locale === "fa" ? option.name_fa : locale === "ps" ? option.name_ps : option.name_en;
+  return String(localized ?? option.name ?? option.name_en ?? "").trim();
 }
 
-function toProvinceOption(option: LocationApiOption): ProvinceOption | null {
+function readCanonicalLocationOptionName(option: LocationApiOption) {
+  return String(option.name_en ?? option.name ?? "").trim();
+}
+
+function toProvinceOption(option: LocationApiOption, locale: AppLocale): ProvinceOption | null {
   const id = Number(option.id);
-  const name = readLocationOptionName(option);
-  return Number.isFinite(id) && name ? { id, name } : null;
+  const name = readLocationOptionName(option, locale);
+  const canonicalName = readCanonicalLocationOptionName(option);
+  return Number.isFinite(id) && name ? { id, name, canonicalName } : null;
 }
 
-function toDistrictOption(option: LocationApiOption): DistrictOption | null {
+function toDistrictOption(option: LocationApiOption, locale: AppLocale): DistrictOption | null {
   const id = Number(option.id);
   const provinceId = Number(option.province_id);
-  const name = readLocationOptionName(option);
+  const name = readLocationOptionName(option, locale);
+  const canonicalName = readCanonicalLocationOptionName(option);
   return Number.isFinite(id) && Number.isFinite(provinceId) && name
-    ? { id, province_id: provinceId, name }
+    ? { id, province_id: provinceId, name, canonicalName }
     : null;
 }
 
@@ -992,9 +1001,9 @@ export default function PostAdForm({
       if (!active) return;
 
       const normalizedRows = data
-        .map(toProvinceOption)
+        .map((option) => toProvinceOption(option, locale))
         .filter((row): row is ProvinceOption => Boolean(row))
-        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(row.name) }));
+        .map((row) => ({ id: row.id, rawName: row.canonicalName ?? row.name, norm: normalizeLocationName(row.canonicalName ?? row.name) }));
 
       const whitelist = AFGHAN_PROVINCES.map((name) => ({
         name,
@@ -1004,7 +1013,7 @@ export default function PostAdForm({
       const mapped = whitelist.reduce<ProvinceOption[]>((acc, item) => {
         const match = normalizedRows.find((row) => row.norm === item.norm);
         if (!match) return acc;
-        acc.push({ id: match.id, name: item.name });
+        acc.push({ id: match.id, name: getProvinceLabel(item.name, locale), canonicalName: item.name });
         return acc;
       }, []);
 
@@ -1015,7 +1024,7 @@ export default function PostAdForm({
     return () => {
       active = false;
     };
-  }, [normalizeLocationName]);
+  }, [locale, normalizeLocationName]);
 
   useEffect(() => {
     let active = true;
@@ -1030,7 +1039,7 @@ export default function PostAdForm({
       const data = (await fetchLocationOptions(
         `/api/location/districts?province_id=${encodeURIComponent(String(selectedProvinceId))}`
       ))
-        .map(toDistrictOption)
+        .map((option) => toDistrictOption(option, locale))
         .filter((row): row is DistrictOption => Boolean(row));
 
       if (!active) return;
@@ -1045,7 +1054,7 @@ export default function PostAdForm({
     return () => {
       active = false;
     };
-  }, [selectedProvinceId]);
+  }, [locale, selectedProvinceId]);
 
   function selectManualLocation(provinceId: number | null, districtId: number | null) {
     locationRequests.cancel();
@@ -1091,7 +1100,7 @@ export default function PostAdForm({
 
       if (provinceHint) {
         const matchedProvince = provinceOptions.find(
-          (option) => normalizeLocationName(option.name) === normalizeLocationName(provinceHint)
+          (option) => normalizeLocationName(option.canonicalName ?? option.name) === normalizeLocationName(provinceHint)
         );
         if (matchedProvince) {
           setSelectedProvinceId(matchedProvince.id);
@@ -1100,12 +1109,12 @@ export default function PostAdForm({
             const districtsForProvince = (await fetchLocationOptions(
               `/api/location/districts?province_id=${encodeURIComponent(String(matchedProvince.id))}`
             ))
-              .map(toDistrictOption)
+              .map((option) => toDistrictOption(option, locale))
               .filter((row): row is DistrictOption => Boolean(row));
             if (!isCurrentRequest()) return;
 
             const matchedDistrict = districtsForProvince.find(
-              (option) => normalizeLocationName(option.name) === normalizeLocationName(districtHint)
+              (option) => normalizeLocationName(option.canonicalName ?? option.name) === normalizeLocationName(districtHint)
             );
 
             if (matchedDistrict) {

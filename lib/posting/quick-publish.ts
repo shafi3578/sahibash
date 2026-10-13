@@ -54,6 +54,14 @@ export async function runQuickPostPublishAttempt(input: {
     }
   }
 
-  await input.finalizeRecovery(checkpoint.draftId, created.listingId);
+  try {
+    // Cleanup is part of the publish transaction from the user's point of
+    // view. If it fails, keep the draft/bytes available for a safe retry and
+    // never report a successful publish that silently leaves recovery data
+    // behind.
+    await input.finalizeRecovery(checkpoint.draftId, created.listingId);
+  } catch {
+    return { ok: false, message: input.persistenceErrorMessage };
+  }
   return { ok: true, listingId: created.listingId, draftId: checkpoint.draftId };
 }

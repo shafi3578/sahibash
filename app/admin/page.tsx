@@ -23,6 +23,7 @@ export default async function AdminPage() {
       hasAdminPermission(user.id, "search.view"),
       hasAdminPermission(user.id, "users.view"),
       hasAdminPermission(user.id, "audit_logs.view"),
+      hasAdminPermission(user.id, "audit_logs.view"),
       hasAdminPermission(user.id, "business_sellers.view"),
     ]),
   ]);
@@ -33,6 +34,7 @@ export default async function AdminPage() {
     canViewSearch,
     canViewUsers,
     canViewAudit,
+    canViewSupport,
     canViewBusinessSellers,
   ] = permissions;
   const href = (path: string) => adminPath(path);
@@ -131,6 +133,11 @@ export default async function AdminPage() {
         <Link href={href("/admin/users")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.users}</Link>
         <Link href={href("/admin/roles")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.roles}</Link>
         <Link href={href("/admin/audit")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">{copy.auditLog}</Link>
+        {canViewSupport ? (
+          <Link href={href("/admin/support")} className="inline-block rounded-xl border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold">
+            {locale === "fa" ? "درخواست‌های پشتیبانی" : locale === "ps" ? "د ملاتړ غوښتنې" : "Support requests"}
+          </Link>
+        ) : null}
       </div>
     </main>
   );

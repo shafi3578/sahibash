@@ -2403,9 +2403,13 @@ export default function QuickPostForm({
           createOrReuseListing: createListingAction,
           uploadImage: uploadListingImageAction,
           finalizeRecovery: async (savedDraftId) => {
+            // Keep the recovery marker and local bytes until both server
+            // cleanup operations have completed. If either operation fails,
+            // the retry flow can checkpoint the preserved work again.
+            const deletedDraft = await deleteMyDraftAction(savedDraftId);
+            if (!deletedDraft.ok) throw new Error(deletedDraft.message);
+            await clearQuickPostImages(draftOwnerScope);
             window.localStorage.removeItem(quickDraftKey);
-            await clearQuickPostImages(draftOwnerScope).catch(() => undefined);
-            await deleteMyDraftAction(savedDraftId);
           },
           persistenceErrorMessage: c.draftSaveFailed,
         });

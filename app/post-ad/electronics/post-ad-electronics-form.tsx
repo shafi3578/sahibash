@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createListingAction, uploadListingImageAction } from "@/lib/actions/listings";
-import { CURRENCIES, AFGHAN_PROVINCES } from "@/lib/constants/marketplace";
+import { CURRENCIES, AFGHAN_PROVINCES, getProvinceLabel } from "@/lib/constants/marketplace";
 import type { TRANSLATIONS } from "@/lib/i18n/translations";
 import DynamicCategoryFields from "@/data/componentsDynamicCategoryFields";
 import { getLeafById } from "@/data/electronics-categories";
@@ -55,13 +55,15 @@ type PostingConfig = {
 
 type StagedImage = { file: File; previewUrl: string; isPrimary: boolean };
 
-type ProvinceOption = { id: number; name: string };
-type DistrictOption = { id: number; name: string; province_id: number };
+type ProvinceOption = { id: number; name: string; canonicalName?: string };
+type DistrictOption = { id: number; name: string; province_id: number; canonicalName?: string };
 type LocationApiOption = {
   id: number | string;
   province_id?: number | string;
   name?: string | null;
   name_en?: string | null;
+  name_fa?: string | null;
+  name_ps?: string | null;
 };
 type LocationApiResponse<T> = { success?: boolean; data?: T[] };
 type LocationMethod = "device" | "manual" | null;
@@ -87,22 +89,25 @@ const REPAIR_HISTORY_OPTIONS = [
 ];
 const NETWORK_REGISTERED_OPTIONS = ["Registered", "Not Registered", "Unknown"];
 
-function readLocationOptionName(option: LocationApiOption) {
-  return String(option.name ?? option.name_en ?? "").trim();
+function readLocationOptionName(option: LocationApiOption, locale: "en" | "fa" | "ps") {
+  const localized = locale === "fa" ? option.name_fa : locale === "ps" ? option.name_ps : option.name_en;
+  return String(localized ?? option.name ?? option.name_en ?? "").trim();
 }
 
-function toProvinceOption(option: LocationApiOption): ProvinceOption | null {
+function toProvinceOption(option: LocationApiOption, locale: "en" | "fa" | "ps"): ProvinceOption | null {
   const id = Number(option.id);
-  const name = readLocationOptionName(option);
-  return Number.isFinite(id) && name ? { id, name } : null;
+  const name = readLocationOptionName(option, locale);
+  const canonicalName = String(option.name_en ?? option.name ?? "").trim();
+  return Number.isFinite(id) && name ? { id, name, canonicalName } : null;
 }
 
-function toDistrictOption(option: LocationApiOption): DistrictOption | null {
+function toDistrictOption(option: LocationApiOption, locale: "en" | "fa" | "ps"): DistrictOption | null {
   const id = Number(option.id);
   const provinceId = Number(option.province_id);
-  const name = readLocationOptionName(option);
+  const name = readLocationOptionName(option, locale);
+  const canonicalName = String(option.name_en ?? option.name ?? "").trim();
   return Number.isFinite(id) && Number.isFinite(provinceId) && name
-    ? { id, province_id: provinceId, name }
+    ? { id, province_id: provinceId, name, canonicalName }
     : null;
 }
 
@@ -321,7 +326,7 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
     const rows = (await fetchLocationOptions(
       `/api/location/districts?province_id=${encodeURIComponent(String(provinceId))}`
     ))
-      .map(toDistrictOption)
+      .map((option) => toDistrictOption(option, locale))
       .filter((row): row is DistrictOption => Boolean(row));
     setDistrictOptions(rows);
     return rows;
@@ -354,7 +359,7 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
 
       if (provinceHint) {
         const matchedProvince = provinceOptions.find(
-          (option) => normalizeLocationName(option.name) === normalizeLocationName(provinceHint)
+          (option) => normalizeLocationName(option.canonicalName ?? option.name) === normalizeLocationName(provinceHint)
         );
         if (matchedProvince) {
           setSelectedProvinceId(matchedProvince.id);
@@ -363,7 +368,7 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
 
           if (districtHint) {
             const matchedDistrict = loadedDistricts.find(
-              (option) => normalizeLocationName(option.name) === normalizeLocationName(districtHint)
+              (option) => normalizeLocationName(option.canonicalName ?? option.name) === normalizeLocationName(districtHint)
             );
             if (matchedDistrict) {
               setSelectedDistrictId(matchedDistrict.id);
@@ -429,9 +434,9 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
       if (!active) return;
 
       const normalizedRows = data
-        .map(toProvinceOption)
+        .map((option) => toProvinceOption(option, locale))
         .filter((row): row is ProvinceOption => Boolean(row))
-        .map((row) => ({ id: row.id, rawName: row.name, norm: normalizeLocationName(row.name) }));
+        .map((row) => ({ id: row.id, rawName: row.canonicalName ?? row.name, norm: normalizeLocationName(row.canonicalName ?? row.name) }));
 
       const whitelist = AFGHAN_PROVINCES.map((name) => ({
         name,
@@ -441,7 +446,7 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
       const mapped = whitelist.reduce<ProvinceOption[]>((acc, item) => {
         const match = normalizedRows.find((row) => row.norm === item.norm);
         if (!match) return acc;
-        acc.push({ id: match.id, name: item.name });
+        acc.push({ id: match.id, name: getProvinceLabel(item.name, locale), canonicalName: item.name });
         return acc;
       }, []);
 
@@ -452,7 +457,7 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
     return () => {
       active = false;
     };
-  }, []);
+  }, [locale]);
 
   function updateDynamicAttributes(key: string, value: unknown) {
     setDynamicAttributes((prev) => ({ ...prev, [key]: value }));
