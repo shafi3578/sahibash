@@ -50,13 +50,13 @@ export type BridgeListingLike = {
 };
 
 const SOURCE_COPY: Record<ListingSourceType, Record<AppLocale, string>> = {
-  native: { en: "Sahibash seller", fa: "فروشنده صاحبش", ps: "د صاحبش پلورونکی" },
+  native: { en: "Justujo seller", fa: "فروشنده جستجو", ps: "د جستجو پلورونکی" },
   dealer_managed: { en: "Dealer inventory", fa: "موجودی فروشگاه", ps: "د دوکان موجودي" },
   partner_feed: { en: "Partner inventory", fa: "موجودی شریک", ps: "د شریک موجودي" },
   seller_approved_import: { en: "Seller-approved import", fa: "واردشده با تأیید فروشنده", ps: "د پلورونکي په تایید وارد شوی" },
   scout_assisted: { en: "Staff-assisted listing", fa: "ثبت با کمک کارمند", ps: "د کارکوونکي په مرسته اعلان" },
   external_indexed: { en: "External listing", fa: "اعلان بیرونی", ps: "بهرنی اعلان" },
-  migrated_legacy: { en: "Legacy Sahibash listing", fa: "اعلان قدیمی صاحبش", ps: "پخوانی د صاحبش اعلان" },
+  migrated_legacy: { en: "Legacy Justujo listing", fa: "اعلان قدیمی جستجو", ps: "د جستجو پخوانی اعلان" },
 };
 
 const FRESHNESS_COPY: Record<ListingFreshnessStatus, Record<AppLocale, string>> = {
@@ -74,7 +74,7 @@ const OWNERSHIP_COPY: Record<ListingOwnershipStatus, Record<AppLocale, string>> 
   claim_pending: { en: "Ownership review pending", fa: "مالکیت در حال بررسی", ps: "مالکیت تر کتنې لاندې دی" },
   claimed: { en: "Claimed seller", fa: "فروشنده مالکیت را تأیید کرده", ps: "پلورونکي مالکیت تایید کړی" },
   partner_managed: { en: "Partner managed", fa: "مدیریت‌شده توسط شریک", ps: "د شریک له خوا اداره کېږي" },
-  staff_managed: { en: "Staff managed", fa: "مدیریت‌شده توسط صاحبش", ps: "د صاحبش له خوا اداره کېږي" },
+  staff_managed: { en: "Staff managed", fa: "مدیریت‌شده توسط جستجو", ps: "د جستجو له خوا اداره کېږي" },
   disputed: { en: "Ownership disputed", fa: "مالکیت مورد اختلاف", ps: "مالکیت لانجمن دی" },
   removed: { en: "Removed", fa: "حذف‌شده", ps: "لرې شوی" },
   opted_out: { en: "Seller opted out", fa: "فروشنده انصراف داده", ps: "پلورونکی وتلی" },

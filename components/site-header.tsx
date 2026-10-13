@@ -16,6 +16,7 @@ export async function SiteHeader() {
     getNavigationItems(),
   ]);
   const brandName = getLocalizedBrandName(locale, siteSettings.site_name);
+  const brandGlyph = locale === "en" ? "J" : "ج";
   const href = (path: string) => localizePath(path, locale);
   const mobileLabels = locale === "fa"
     ? { notifications: "اعلان‌ها" }
@@ -25,9 +26,12 @@ export async function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[linear-gradient(90deg,#061923,#0a2932_55%,#0a3a37)] text-white shadow-[0_8px_28px_rgba(2,15,23,0.14)]">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[linear-gradient(100deg,#11152d_0%,#25265a_52%,#4b2d62_100%)] text-white shadow-[0_12px_34px_rgba(21,22,46,0.24)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-4 lg:px-8">
-          <Link href={href("/")} className="shrink-0 font-display text-2xl font-black tracking-tight text-[#e2c47f] sm:text-3xl">{brandName}</Link>
+          <Link href={href("/")} aria-label={brandName} className="brand-lockup shrink-0">
+            <span aria-hidden="true" className="brand-mark">{brandGlyph}</span>
+            <span className="font-display text-2xl font-black tracking-tight sm:text-3xl">{brandName}</span>
+          </Link>
           <nav className="hidden flex-1 items-center justify-center gap-2 lg:flex">
             {navigationItems.map((link) => (
               <Link key={`${link.id}-${link.path}`} href={href(link.path)} className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/15">

@@ -84,7 +84,7 @@ export async function getListingMetadata(id: string, locale: AppLocale): Promise
   const listing = await getListingById(id, locale);
   if (!listing) return {};
 
-  const title = String(listing.translated_title || listing.title || "Sahibash").trim().slice(0, 80);
+  const title = String(listing.translated_title || listing.title || "Justujo").trim().slice(0, 80);
   const description = String(listing.translated_description || listing.description || "")
     .replace(/\s+/g, " ")
     .trim()
@@ -1031,15 +1031,15 @@ export default async function ListingDetailPage({
               <p className="font-semibold">
                 {sourceTransparency.ownershipStatus === "claimed"
                   ? locale === "fa"
-                    ? "این اعلان از منبع بیرونی وارد شده، اما مالکیت آن اکنون توسط صاحبش تأیید شده است."
+                    ? "این اعلان از منبع بیرونی وارد شده، اما مالکیت آن اکنون توسط جستجو تأیید شده است."
                     : locale === "ps"
-                      ? "دا اعلان له بهرنۍ سرچینې راغلی، خو مالکیت یې اوس د صاحبش له خوا تایید شوی دی."
-                      : "This listing was imported from an external source, and its ownership is now verified by Sahibash."
+                      ? "دا اعلان له بهرنۍ سرچینې راغلی، خو مالکیت یې اوس د جستجو له خوا تایید شوی دی."
+                      : "This listing was imported from an external source, and its ownership is now verified by Justujo."
                   : locale === "fa"
-                    ? "این اعلان از منبع بیرونی وارد شده و هنوز به حساب فروشنده در صاحبش وصل نیست. پیام و پیشنهاد پس از تأیید مالک فعال می‌شود."
+                    ? "این اعلان از منبع بیرونی وارد شده و هنوز به حساب فروشنده در جستجو وصل نیست. پیام و پیشنهاد پس از تأیید مالک فعال می‌شود."
                     : locale === "ps"
-                      ? "دا اعلان له بهرنۍ سرچینې راغلی او لا د صاحبش د پلورونکي له حساب سره نه دی تړلی. پیغام او وړاندیز د مالک له تایید وروسته فعالېږي."
-                      : "This listing came from an external source and is not yet connected to a Sahibash seller account. Messaging and offers activate after ownership verification."}
+                      ? "دا اعلان له بهرنۍ سرچینې راغلی او لا د جستجو د پلورونکي له حساب سره نه دی تړلی. پیغام او وړاندیز د مالک له تایید وروسته فعالېږي."
+                      : "This listing came from an external source and is not yet connected to a Justujo seller account. Messaging and offers activate after ownership verification."}
               </p>
               {sourceTransparency.needsAvailabilityWarning ? (
                 <p className="mt-1">
@@ -1100,10 +1100,10 @@ export default async function ListingDetailPage({
           {sourceTransparency.isExternal && !hasAccountSeller ? (
             <p className="mt-3 rounded-xl bg-[var(--surface-2)] px-3 py-2 text-xs font-semibold text-[var(--ink-2)]">
               {locale === "fa"
-                ? "این فروشنده هنوز صندوق پیام صاحبش ندارد. برای پرسش درباره موجودیت فقط از گزینه تماس منبع استفاده کنید و پیش‌پرداخت نفرستید."
+                ? "این فروشنده هنوز صندوق پیام جستجو ندارد. برای پرسش درباره موجودیت فقط از گزینه تماس منبع استفاده کنید و پیش‌پرداخت نفرستید."
                 : locale === "ps"
-                  ? "دا پلورونکی لا د صاحبش د پیغام صندوق نه لري. د شتون پوښتنې لپاره یوازې د سرچینې د اړیکې لاره وکاروئ او مخکې پیسې مه لېږئ."
-                  : "This seller does not have a Sahibash inbox yet. Use the source contact option only to confirm availability, and do not send advance payment."}
+                  ? "دا پلورونکی لا د جستجو د پیغام صندوق نه لري. د شتون پوښتنې لپاره یوازې د سرچینې د اړیکې لاره وکاروئ او مخکې پیسې مه لېږئ."
+                  : "This seller does not have a Justujo inbox yet. Use the source contact option only to confirm availability, and do not send advance payment."}
             </p>
           ) : null}
         </section>

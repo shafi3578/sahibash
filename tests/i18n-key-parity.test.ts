@@ -171,9 +171,9 @@ test("localized metadata preserves route and exposes canonical language alternat
 });
 
 test("brand identity cannot fall back to a legacy runtime name", () => {
-  assert.equal(getLocalizedBrandName("en", "yawzai"), "Sahibash");
-  assert.equal(getLocalizedBrandName("fa", "yawzai"), "صاحبش");
-  assert.equal(getLocalizedBrandName("ps", "yawzai"), "صاحبش");
+  assert.equal(getLocalizedBrandName("en", "yawzai"), "Justujo");
+  assert.equal(getLocalizedBrandName("fa", "yawzai"), "جستجو");
+  assert.equal(getLocalizedBrandName("ps", "yawzai"), "جستجو");
   assert.doesNotMatch(JSON.stringify([TRANSLATIONS, UI_TRANSLATIONS, USER_COPY, USER_EVENT_TEMPLATES]), /صاحباش/);
 });
 

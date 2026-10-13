@@ -101,7 +101,7 @@ export default async function AdminNetworkReadinessPage() {
   const copy = locale === "fa"
     ? {
         back: "بازگشت به ادمین",
-        title: "آمادگی شبکه صاحبش",
+        title: "آمادگی شبکه جستجو",
         subtitle: "نمای تجمیعی و بدون اطلاعات شخصی برای نقدینگی بازار، کاهش وابستگی به موجودی خارجی، قیمت، اعتماد و سلامت منبع.",
         nextBest: "بازارهای پیشنهادی بعدی",
         retirement: "شبیه‌سازی کاهش موجودی خارجی",
@@ -113,7 +113,7 @@ export default async function AdminNetworkReadinessPage() {
     : locale === "ps"
       ? {
           back: "ادمین ته بېرته",
-          title: "د صاحبش شبکې چمتووالی",
+          title: "د جستجو شبکې چمتووالی",
           subtitle: "د بازار مایعیت، بهرني موجودي کمولو، بیې، باور او سرچینې روغتیا لپاره ټولیز او بې‌PII لید.",
           nextBest: "راتلونکي غوره بازارونه",
           retirement: "د بهرني موجودي کمولو شبیه‌سازي",
@@ -124,7 +124,7 @@ export default async function AdminNetworkReadinessPage() {
         }
       : {
           back: "Back to admin",
-          title: "Sahibash Network Readiness",
+          title: "Justujo Network Readiness",
           subtitle: "Aggregate, PII-safe control room for liquidity, bootstrap retirement, price intelligence, trust quality, and source health.",
           nextBest: "Next Best Markets",
           retirement: "External Retirement Simulation",

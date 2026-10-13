@@ -7,9 +7,9 @@ import type { AppLocale } from "@/lib/i18n/translations";
 import { localizePath } from "@/lib/i18n/routing";
 
 const COPY = {
-  en: { open: "Search", title: "Search Sahibash", placeholder: "Search cars, homes, phones…", cancel: "Cancel" },
-  fa: { open: "جستجو", title: "جستجو در صاحبش", placeholder: "موتر، خانه، موبایل…", cancel: "لغو" },
-  ps: { open: "لټون", title: "په صاحبش کې لټون", placeholder: "موټر، کور، موبایل…", cancel: "بندول" },
+  en: { open: "Search", title: "Search Justujo", placeholder: "Search cars, homes, phones…", cancel: "Cancel" },
+  fa: { open: "جستجو", title: "جستجو در جستجو", placeholder: "موتر، خانه، موبایل…", cancel: "لغو" },
+  ps: { open: "لټون", title: "په جستجو کې لټون", placeholder: "موټر، کور، موبایل…", cancel: "بندول" },
 } as const;
 
 type SearchSuggestion = {

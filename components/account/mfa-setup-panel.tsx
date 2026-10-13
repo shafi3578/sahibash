@@ -180,7 +180,7 @@ export function MfaSetupPanel({
   async function startEnrollment() {
     const { data, error: enrollError } = await supabase.auth.mfa.enroll({
       factorType: "totp",
-      friendlyName: "Sahibash Authenticator",
+      friendlyName: "Justujo Authenticator",
     });
     if (enrollError || !data || data.type !== "totp") throw enrollError ?? new Error("MFA enrollment failed");
 

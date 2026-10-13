@@ -7,7 +7,7 @@ import { formatNumber } from "@/lib/i18n/format";
 const COPY = {
   en: {
     title: "Professional Seller",
-    description: "A launch dashboard for stores, dealers, and regular sellers using your existing Sahibash account.",
+    description: "A launch dashboard for stores, dealers, and regular sellers using your existing Justujo account.",
     storeProfile: "Store profile",
     inventory: "Inventory",
     active: "Active listings",
@@ -25,7 +25,7 @@ const COPY = {
   },
   fa: {
     title: "فروشنده حرفه‌ای",
-    description: "داشبورد آغازین برای دکان‌ها، نمایشگاه‌ها و فروشندگان فعال با همان حساب صاحبش.",
+    description: "داشبورد آغازین برای دکان‌ها، نمایشگاه‌ها و فروشندگان فعال با همان حساب جستجو.",
     storeProfile: "پروفایل فروشگاه",
     inventory: "موجودی",
     active: "اعلان‌های فعال",
@@ -43,7 +43,7 @@ const COPY = {
   },
   ps: {
     title: "مسلکي پلورونکی",
-    description: "د دوکانونو، ډیلرانو او فعالو پلورونکو لپاره د هماغه صاحبش حساب سره د پیل ډشبورډ.",
+    description: "د دوکانونو، ډیلرانو او فعالو پلورونکو لپاره د هماغه جستجو حساب سره د پیل ډشبورډ.",
     storeProfile: "د پلورنځي پروفایل",
     inventory: "موجودي",
     active: "فعال اعلانونه",

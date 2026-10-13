@@ -45,7 +45,7 @@ export function wantedCopy(locale: AppLocale) {
       soon: "به‌زودی",
       urgent: "فوری",
       channels: "روش اطلاع‌رسانی",
-      inApp: "داخل صاحبش",
+      inApp: "داخل جستجو",
       email: "ایمیل",
       whatsapp: "واتساپ",
     };
@@ -62,7 +62,7 @@ export function wantedCopy(locale: AppLocale) {
       soon: "ژر",
       urgent: "بیړنی",
       channels: "د خبرتیا لارې",
-      inApp: "په صاحبش کې",
+      inApp: "په جستجو کې",
       email: "ایمیل",
       whatsapp: "واټس‌اپ",
     };
@@ -70,7 +70,7 @@ export function wantedCopy(locale: AppLocale) {
 
   return {
     title: "Find It For Me",
-    intro: "If the right result is not here yet, save your request and Sahibash can notify you when a strong match appears.",
+    intro: "If the right result is not here yet, save your request and Justujo can notify you when a strong match appears.",
     button: "Create request",
     name: "Request title",
     urgency: "Urgency",
@@ -78,7 +78,7 @@ export function wantedCopy(locale: AppLocale) {
     soon: "Soon",
     urgent: "Urgent",
     channels: "Notification channels",
-    inApp: "In Sahibash",
+    inApp: "In Justujo",
     email: "Email",
     whatsapp: "WhatsApp",
   };

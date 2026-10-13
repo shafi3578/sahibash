@@ -19,7 +19,7 @@ test("unclaimed external listings do not expose in-app message or offer controls
   assert.match(listingPage, /const canUseSahibashSellerTools = !isOwner && hasAccountSeller/);
   assert.match(listingPage, /qp\.compose === "1" && canUseSahibashSellerTools/);
   assert.match(listingPage, /qp\.offerbox === "1" && canUseSahibashSellerTools/);
-  assert.match(listingPage, /does not have a Sahibash inbox yet/);
+  assert.match(listingPage, /does not have a Justujo inbox yet/);
   assert.doesNotMatch(listingPage, /remove_request_click/);
 });
 

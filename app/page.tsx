@@ -22,12 +22,12 @@ function getHomePageCopy(
     return {
       tagline: "بازار آنلاین افغانستان",
       heroTitle: "اعلان‌های تازه با منبع روشن",
-      heroSubtitle: "اعلان‌های فروشندگان صاحبش و منابع بیرونی با برچسب روشن؛ موجودیت اعلان‌ها در هر ولایت متفاوت است.",
+      heroSubtitle: "اعلان‌های فروشندگان جستجو و منابع بیرونی با برچسب روشن؛ موجودیت اعلان‌ها در هر ولایت متفاوت است.",
       primaryCta: "دیدن اعلان‌ها",
       secondaryCta: "ثبت اعلان",
       allFeatured: "همه ویژه‌ها",
       adBadge: "اعلان",
-      brandBadge: "صاحبش",
+      brandBadge: "جستجو",
       paginationLabel: "صفحه‌های جدیدترین اعلان‌ها",
     };
   }
@@ -36,12 +36,12 @@ function getHomePageCopy(
     return {
       tagline: "د افغانستان آنلاین بازار",
       heroTitle: "تازه اعلانونه له روښانه سرچینې سره",
-      heroSubtitle: "د صاحبش د پلورونکو او روښانه نښه شویو بهرنیو سرچینو اعلانونه؛ د اعلانونو شتون په هر ولایت کې توپیر لري.",
+      heroSubtitle: "د جستجو د پلورونکو او روښانه نښه شویو بهرنیو سرچینو اعلانونه؛ د اعلانونو شتون په هر ولایت کې توپیر لري.",
       primaryCta: "اعلانونه وګورئ",
       secondaryCta: "اعلان ثبت کړئ",
       allFeatured: "ټول ځانګړي",
       adBadge: "اعلان",
-      brandBadge: "صاحبش",
+      brandBadge: "جستجو",
       paginationLabel: "د تازه اعلانونو پاڼې",
     };
   }
@@ -49,7 +49,7 @@ function getHomePageCopy(
   return {
     tagline: siteSettings.site_tagline,
     heroTitle: "Fresh listings with clear sources",
-    heroSubtitle: "Browse Sahibash sellers and clearly labeled external sources. Listing availability varies by province.",
+    heroSubtitle: "Browse Justujo sellers and clearly labeled external sources. Listing availability varies by province.",
     primaryCta: siteSettings.home_primary_cta_label,
     secondaryCta: siteSettings.home_secondary_cta_label,
     allFeatured: "All featured",
@@ -92,11 +92,11 @@ export default async function HomePage({
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_4%_0%,rgba(202,158,72,0.22),transparent_28%),radial-gradient(circle_at_98%_18%,rgba(7,117,105,0.13),transparent_32%),linear-gradient(180deg,#fcf8ef_0%,#efe7d9_46%,#eef4f1_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
-      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_17%_10%,rgba(207,174,101,0.30)_0,rgba(10,93,88,0.50)_24%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(173,126,55,0.16),transparent_38%),linear-gradient(135deg,#06131d_0%,#082a30_54%,#030c13_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#d8bd7a]/35 sm:shadow-[0_28px_72px_-25px_rgba(1,15,24,0.70),0_1px_0_rgba(255,255,255,0.1)_inset]">
+    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_4%_0%,rgba(126,91,214,0.16),transparent_28%),radial-gradient(circle_at_98%_18%,rgba(255,118,103,0.12),transparent_32%),linear-gradient(180deg,#ffffff_0%,#f5f5fb_46%,#eef0fa_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+      <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_17%_10%,rgba(255,189,122,0.34)_0,rgba(76,65,158,0.55)_24%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(255,118,103,0.22),transparent_38%),linear-gradient(135deg,#10132c_0%,#22265c_54%,#121536_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#ffbd7a]/35 sm:shadow-[0_28px_72px_-25px_rgba(15,16,45,0.70),0_1px_0_rgba(255,255,255,0.1)_inset]">
         <div className={`grid gap-6 px-4 py-7 sm:px-6 lg:px-8 lg:py-10 ${heroListings.length > 0 ? "lg:grid-cols-[1.1fr_0.9fr]" : ""}`}>
           <div>
-            <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur">{homeCopy.tagline}</p>
+            <p className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#ffd2a5] backdrop-blur">{homeCopy.tagline}</p>
             <h1 className="mt-4 max-w-2xl font-display text-4xl font-black leading-tight sm:text-5xl">
               {homeCopy.heroTitle}
             </h1>
@@ -126,7 +126,7 @@ export default async function HomePage({
                   </div>
                   <div className="p-3">
                     <p className="line-clamp-2 text-xs font-bold sm:text-sm">{displayTitle}</p>
-                    <p className="mt-1 text-xs font-semibold text-[#ead39d]">{formatListingPrice(listing, locale)}</p>
+                    <p className="mt-1 text-xs font-semibold text-[#ffc58e]">{formatListingPrice(listing, locale)}</p>
                   </div>
                 </Link>
               );
@@ -152,22 +152,22 @@ export default async function HomePage({
         </section>
       ) : null}
 
-      <section className="hidden border-y border-[#d7c49a] bg-[#fffdf8] sm:block sm:rounded-2xl sm:border sm:shadow-[0_18px_45px_-34px_rgba(4,27,34,0.55)]">
+      <section className="hidden border border-[#e3e5f1] bg-white/90 sm:block sm:rounded-2xl sm:shadow-[0_18px_45px_-34px_rgba(36,31,87,0.32)]">
         <form action={href("/search")} className="grid grid-cols-[1fr_auto] gap-2 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-4">
           <input
             name="q"
             placeholder={t.home.searchPlaceholder}
-            className="min-w-0 rounded-xl border border-[#d8c7a3] bg-[#f8f4eb] px-3 py-2.5 text-sm text-[#0a2630] outline-none transition focus:border-[#a98843] focus:ring-2 focus:ring-[#d8bd7a]/25"
+            className="min-w-0 rounded-xl border border-[#e1e4ef] bg-[#f8f8fc] px-3 py-2.5 text-sm text-[#171936] outline-none transition focus:border-[#8a78e6] focus:ring-2 focus:ring-[#8a78e6]/20"
           />
           <button
             type="submit"
-            className="rounded-xl bg-[#073b3a] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(3,58,56,0.9)] transition hover:bg-[#09504c]"
+            className="rounded-xl bg-[#5b4cc4] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_-14px_rgba(91,76,196,0.9)] transition hover:bg-[#4939ad]"
           >
             {t.home.searchButton}
           </button>
           <Link
             href={postAdHref}
-            className="col-span-2 rounded-xl border border-[#b9974d] bg-[#fffaf0] px-4 py-2.5 text-center text-sm font-semibold text-[#5f481d] transition hover:bg-[#f4e8cc] sm:col-span-1"
+            className="col-span-2 rounded-xl border border-[#ffb989] bg-[#fff7f2] px-4 py-2.5 text-center text-sm font-semibold text-[#a64736] transition hover:bg-[#ffe9dd] sm:col-span-1"
           >
             {t.home.postAd}
           </Link>
@@ -178,10 +178,10 @@ export default async function HomePage({
         <CategoryHomeList categories={mobileCategories} locale={locale} />
       </section>
 
-      {featuredRow.length > 0 ? <section className="overflow-hidden border-y border-[#d9c8a3] bg-[#fffdf9] sm:rounded-3xl sm:border sm:shadow-[0_22px_52px_-40px_rgba(3,28,35,0.62)]">
-        <div className="flex items-center justify-between border-b border-[#d9c8a3] bg-[linear-gradient(90deg,#efe1c1_0%,#fbf7ef_48%,#f4f7f4_100%)] px-4 py-3 text-xs font-black uppercase tracking-wide text-[#18343a]">
+      {featuredRow.length > 0 ? <section className="overflow-hidden border-y border-[#e3e5f1] bg-white sm:rounded-3xl sm:border sm:shadow-[0_22px_52px_-40px_rgba(36,31,87,0.35)]">
+        <div className="flex items-center justify-between border-b border-[#e3e5f1] bg-[linear-gradient(90deg,#eeeaff_0%,#fbf9ff_48%,#fff3ee_100%)] px-4 py-3 text-xs font-black uppercase tracking-wide text-[#29254f]">
           {t.home.featuredListings}
-          <Link href={href("/featured")} className="rounded-full bg-[#efe2c5] px-2 py-1 text-[10px] text-[#614c21]">{homeCopy.allFeatured}</Link>
+          <Link href={href("/featured")} className="rounded-full bg-[#ffe4d5] px-2 py-1 text-[10px] text-[#9a4938]">{homeCopy.allFeatured}</Link>
         </div>
         <div className="overflow-x-auto px-3 py-3 [scrollbar-width:none]">
           <div className="flex min-w-max gap-3">
@@ -213,8 +213,8 @@ export default async function HomePage({
         </div>
       </section> : null}
 
-      <section className="overflow-hidden bg-[#fffdf9] sm:rounded-3xl sm:border sm:border-[#d9c8a3] sm:shadow-[0_22px_52px_-40px_rgba(3,28,35,0.62)]">
-        <div className="border-y border-[#d9c8a3] bg-[linear-gradient(90deg,#f2e6cd_0%,#fffdf9_54%,#edf3f0_100%)] px-4 py-3 text-xs font-black uppercase tracking-wide text-[#18343a] sm:border-b sm:border-t-0">
+      <section className="overflow-hidden bg-white sm:rounded-3xl sm:border sm:border-[#e3e5f1] sm:shadow-[0_22px_52px_-40px_rgba(36,31,87,0.35)]">
+        <div className="border-y border-[#e3e5f1] bg-[linear-gradient(90deg,#eeeaff_0%,#ffffff_54%,#fff1eb_100%)] px-4 py-3 text-xs font-black uppercase tracking-wide text-[#29254f] sm:border-b sm:border-t-0">
           {t.home.latestListings}
         </div>
         <div className="divide-y divide-slate-100 sm:divide-slate-200">

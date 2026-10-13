@@ -20,7 +20,7 @@ export default async function AccountManagementSettingsPage() {
   const profileCopy = locale === "fa"
     ? {
         title: "پروفایل فروشنده",
-        description: "نام و شماره موبایل شما از اینجا برای تمام اعلان‌های صاحبش استفاده می‌شود.",
+        description: "نام و شماره موبایل شما از اینجا برای تمام اعلان‌های جستجو استفاده می‌شود.",
         fullName: "نام کامل",
         phone: "شماره موبایل",
         language: "زبان ترجیحی",
@@ -32,7 +32,7 @@ export default async function AccountManagementSettingsPage() {
     : locale === "ps"
       ? {
           title: "د پلورونکي پروفایل",
-          description: "ستاسو نوم او موبایل شمېره له همدې ځایه د صاحبش ټولو اعلانونو لپاره کارېږي.",
+        description: "ستاسو نوم او موبایل شمېره له همدې ځایه د جستجو ټولو اعلانونو لپاره کارېږي.",
           fullName: "بشپړ نوم",
           phone: "د موبایل شمېره",
           language: "غوره ژبه",
@@ -43,7 +43,7 @@ export default async function AccountManagementSettingsPage() {
         }
       : {
           title: "Seller profile",
-          description: "Your name and mobile phone here are used as the contact source for every Sahibash ad.",
+        description: "Your name and mobile phone here are used as the contact source for every Justujo ad.",
           fullName: "Full name",
           phone: "Mobile phone",
           language: "Preferred language",

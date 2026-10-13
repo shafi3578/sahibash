@@ -8,8 +8,8 @@ export type ListingAiFact = {
 
 const COPY = {
   en: {
-    title: "Ask Sahibash about this ad",
-    subtitle: "Factual answers only from the listing. If the seller did not provide a detail, Sahibash says so.",
+    title: "Ask Justujo about this ad",
+    subtitle: "Factual answers only from the listing. If the seller did not provide a detail, Justujo says so.",
     notMentioned: "Not mentioned in this listing",
     knownFacts: "Known facts",
     price: "What is the price?",
@@ -19,8 +19,8 @@ const COPY = {
     sellerTipText: "Add missing high-value details to get better buyer questions and fewer repeated messages.",
   },
   fa: {
-    title: "از صاحبش درباره این اعلان بپرسید",
-    subtitle: "فقط پاسخ‌های واقعی از معلومات خود اعلان. اگر فروشنده چیزی ننوشته باشد، صاحبش واضح می‌گوید.",
+    title: "از جستجو درباره این اعلان بپرسید",
+    subtitle: "فقط پاسخ‌های واقعی از معلومات خود اعلان. اگر فروشنده چیزی ننوشته باشد، جستجو واضح می‌گوید.",
     notMentioned: "در این اعلان ذکر نشده است",
     knownFacts: "معلومات موجود",
     price: "قیمت چقدر است؟",
@@ -30,8 +30,8 @@ const COPY = {
     sellerTipText: "جزئیات مهمِ کمبود را اضافه کنید تا پرسش‌های خریدار بهتر و پیام‌های تکراری کمتر شود.",
   },
   ps: {
-    title: "له صاحبش څخه د دې اعلان په اړه وپوښتئ",
-    subtitle: "یوازې د اعلان له معلوماتو څخه واقعي ځوابونه. که پلورونکي جزئیات نه وي لیکلي، صاحبش یې ښکاره وایي.",
+    title: "له جستجو څخه د دې اعلان په اړه وپوښتئ",
+    subtitle: "یوازې د اعلان له معلوماتو څخه واقعي ځوابونه. که پلورونکي جزئیات نه وي لیکلي، جستجو یې ښکاره وایي.",
     notMentioned: "په دې اعلان کې نه دي یاد شوي",
     knownFacts: "شته معلومات",
     price: "بیه څو ده؟",

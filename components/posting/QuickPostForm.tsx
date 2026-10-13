@@ -202,7 +202,7 @@ const COPY = {
     stepTwo: "Step 2 of 2",
     stepOneTitle: "Post your ad",
     stepTwoTitle: "Confirm category and details",
-    subtitle: "Photos, title, description, location and price. Sahibash fills the rest, and you can edit every suggestion.",
+    subtitle: "Photos, title, description, location and price. Justujo fills the rest, and you can edit every suggestion.",
     manualSubtitle: "Add the essential information, then choose the exact active category and optional details yourself.",
     continue: "Continue",
     back: "Back",
@@ -219,7 +219,7 @@ const COPY = {
     descriptionPlaceholder: "Example: Toyota Corolla 2012, automatic, clean body, located in Kabul...",
     descriptionRequirement: "At least 20 characters are required before publishing.",
     title: "Title",
-    titleHint: "Keep it short and clear. Sahibash may suggest a better one later, but you stay in control.",
+    titleHint: "Keep it short and clear. Justujo may suggest a better one later, but you stay in control.",
     manualTitleHint: "Keep it short, specific and easy for buyers to understand.",
     titleTooShort: "Add a little more detail to the title.",
     price: "Price",
@@ -257,7 +257,7 @@ const COPY = {
     area: "Area or neighborhood (optional)",
     street: "Village or street note (optional)",
     select: "Select",
-    detected: "Sahibash detected",
+    detected: "Justujo detected",
     detectionHint: "Edit any chip. If detection is uncertain, choose one category.",
     suggestionsTitle: "Suggested categories",
     manualCategory: "Choose category manually",
@@ -315,7 +315,7 @@ const COPY = {
     stepTwo: "مرحله ۲ از ۲",
     stepOneTitle: "اعلان خود را ثبت کنید",
     stepTwoTitle: "دسته و جزئیات را تایید کنید",
-    subtitle: "عکس‌ها، عنوان، توضیحات، موقعیت و قیمت را وارد کنید. صاحبش جزئیات دیگر را پیشنهاد می‌کند و اختیار ویرایش همیشه با شماست.",
+    subtitle: "عکس‌ها، عنوان، توضیحات، موقعیت و قیمت را وارد کنید. جستجو جزئیات دیگر را پیشنهاد می‌کند و اختیار ویرایش همیشه با شماست.",
     manualSubtitle: "معلومات اساسی را وارد کنید، سپس دسته فعال دقیق و جزئیات اختیاری را خودتان انتخاب کنید.",
     continue: "ادامه",
     back: "برگشت",
@@ -332,7 +332,7 @@ const COPY = {
     descriptionPlaceholder: "مثال: تویوتا کرولا ۲۰۱۲، اتومات، بدنه پاک، موقعیت کابل...",
     descriptionRequirement: "برای نشر اعلان حداقل ۲۰ حرف لازم است.",
     title: "عنوان",
-    titleHint: "کوتاه و واضح بنویسید. صاحبش می‌تواند بعداً پیشنهاد بهتر بدهد، اما اختیار با شماست.",
+    titleHint: "کوتاه و واضح بنویسید. جستجو می‌تواند بعداً پیشنهاد بهتر بدهد، اما اختیار با شماست.",
     manualTitleHint: "عنوان را کوتاه، مشخص و برای خریداران قابل فهم بنویسید.",
     titleTooShort: "کمی جزئیات بیشتر به عنوان اضافه کنید.",
     price: "قیمت",
@@ -370,7 +370,7 @@ const COPY = {
     area: "ناحیه یا محله (اختیاری)",
     street: "قریه یا نشانی سرک (اختیاری)",
     select: "انتخاب",
-    detected: "صاحبش تشخیص داد",
+    detected: "جستجو تشخیص داد",
     detectionHint: "هر چیپ را ویرایش کنید. اگر تشخیص نامطمئن باشد، یک دسته را انتخاب کنید.",
     suggestionsTitle: "دسته‌های پیشنهادی",
     manualCategory: "انتخاب دستی دسته",
@@ -428,7 +428,7 @@ const COPY = {
     stepTwo: "۲ له ۲ مرحلې",
     stepOneTitle: "خپل اعلان ثبت کړئ",
     stepTwoTitle: "کټګوري او تفصیلات تایید کړئ",
-    subtitle: "انځورونه، سرلیک، تشریح، ځای او بیه ولیکئ. صاحبش نور تفصیلات وړاندیز کوي او تاسو هر وړاندیز سمولای شئ.",
+    subtitle: "انځورونه، سرلیک، تشریح، ځای او بیه ولیکئ. جستجو نور تفصیلات وړاندیز کوي او تاسو هر وړاندیز سمولای شئ.",
     manualSubtitle: "اړین معلومات ولیکئ، بیا خپله کره فعاله کټګوري او اختیاري تفصیلات وټاکئ.",
     continue: "دوام",
     back: "شاته",
@@ -445,7 +445,7 @@ const COPY = {
     descriptionPlaceholder: "بېلګه: ټویوټا کرولا ۲۰۱۲، اتومات، پاک بدن، په کابل کې...",
     descriptionRequirement: "د خپرولو لپاره لږ تر لږه ۲۰ توري اړین دي.",
     title: "سرلیک",
-    titleHint: "لنډ او روښانه یې ولیکئ. صاحبش وروسته ښه وړاندیز کولای شي، خو اختیار ستاسو دی.",
+    titleHint: "لنډ او روښانه یې ولیکئ. جستجو وروسته ښه وړاندیز کولای شي، خو اختیار ستاسو دی.",
     manualTitleHint: "سرلیک لنډ، روښانه او د پېرېدونکو لپاره د پوهېدو وړ ولیکئ.",
     titleTooShort: "سرلیک ته لږ نور تفصیل زیات کړئ.",
     price: "بیه",
@@ -483,7 +483,7 @@ const COPY = {
     area: "سیمه یا ګاونډ (اختیاري)",
     street: "کلی یا د سړک پته (اختیاري)",
     select: "وټاکئ",
-    detected: "صاحبش وموندل",
+    detected: "جستجو وموندل",
     detectionHint: "هر چیپ سمولای شئ. که ډاډ کم وي، یوه کټګوري وټاکئ.",
     suggestionsTitle: "وړاندیز شوې کټګورۍ",
     manualCategory: "کټګوري لاسي وټاکئ",
@@ -808,7 +808,7 @@ function buildSuggestedQuickPostTitle({
     if (title) return title;
   }
 
-  return "Sahibash listing";
+  return "Justujo listing";
 }
 
 function maskSellerPhone(phone: string) {
@@ -2285,7 +2285,7 @@ export default function QuickPostForm({
         sale: c.forSale,
         rent: c.forRent,
         lease: c.forLease,
-        listing: categoryLabel || "Sahibash listing",
+        listing: categoryLabel || "Justujo listing",
         near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near",
       },
     });
@@ -2593,7 +2593,7 @@ export default function QuickPostForm({
                     sale: c.forSale,
                     rent: c.forRent,
                     lease: c.forLease,
-                    listing: categoryLabel || "Sahibash listing",
+                    listing: categoryLabel || "Justujo listing",
                     near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near",
                   },
                 });
@@ -3066,7 +3066,7 @@ export default function QuickPostForm({
                   districtName: districtOptions.find((item) => item.id === selectedDistrictId)?.name,
                   areaText,
                   transaction,
-                  labels: { sale: c.forSale, rent: c.forRent, lease: c.forLease, listing: categoryLabel || "Sahibash listing", near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near" },
+                  labels: { sale: c.forSale, rent: c.forRent, lease: c.forLease, listing: categoryLabel || "Justujo listing", near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near" },
                 })}</p>
                 <p className="mt-1 text-[var(--accent)]">{`${priceValueForSubmit() || priceAmount || "—"} ${currency}`}</p>
                 <p className="mt-1 text-[var(--ink-2)]">

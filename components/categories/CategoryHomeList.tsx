@@ -84,11 +84,11 @@ export async function CategoryHomeList({ categories, locale = "en", showComingSo
 
   return (
     <div className="space-y-3">
-      <section className="relative mx-3 w-[calc(100%_-_1.5rem)] overflow-hidden rounded-[1.75rem] border border-[#d3b46f]/65 bg-[radial-gradient(circle_at_8%_-12%,rgba(228,197,126,0.28),transparent_34%),radial-gradient(circle_at_94%_118%,rgba(18,139,121,0.27),transparent_42%),linear-gradient(145deg,#02080e_0%,#061c24_46%,#07332f_100%)] shadow-[0_34px_78px_-34px_rgba(0,8,13,0.94),0_1px_0_rgba(255,255,255,0.14)_inset] sm:mx-0 sm:w-full">
-        <div aria-hidden="true" className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#ffe4a3] to-transparent" />
-        <div className="relative flex items-center justify-between gap-3 border-b border-[#e4c97e]/25 bg-black/10 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#f8dfa0] sm:px-5 sm:py-4 sm:text-xs">
+      <section className="relative mx-3 w-[calc(100%_-_1.5rem)] overflow-hidden rounded-[1.75rem] border border-[#8b7be5]/40 bg-[radial-gradient(circle_at_8%_-12%,rgba(255,189,122,0.28),transparent_34%),radial-gradient(circle_at_94%_118%,rgba(255,118,103,0.22),transparent_42%),linear-gradient(145deg,#14152f_0%,#29235b_46%,#3d2855_100%)] shadow-[0_34px_78px_-34px_rgba(25,21,63,0.94),0_1px_0_rgba(255,255,255,0.14)_inset] sm:mx-0 sm:w-full">
+        <div aria-hidden="true" className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#ffd2a5] to-transparent" />
+        <div className="relative flex items-center justify-between gap-3 border-b border-[#b6a8ff]/25 bg-black/10 px-4 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#ffe2c5] sm:px-5 sm:py-4 sm:text-xs">
           <span>{t.home.mainCategories}</span>
-          <a href={localizePath("/categories", locale)} className="min-w-0 max-w-[9rem] truncate rounded-full border border-[#e5c978]/60 bg-[#e5c978]/10 px-3 py-1.5 text-end tracking-normal text-[#fffaf0] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:border-[#ffe3a0] hover:bg-[#e5c978]/20 sm:max-w-none">
+          <a href={localizePath("/categories", locale)} className="min-w-0 max-w-[9rem] truncate rounded-full border border-[#ffbd7a]/60 bg-[#ffbd7a]/10 px-3 py-1.5 text-end tracking-normal text-[#fffaf0] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:border-[#ffd9b4] hover:bg-[#ffbd7a]/20 sm:max-w-none">
             <span className="sm:hidden">{t.search.allCategories}</span>
             <span className="hidden sm:inline">{t.home.openCategoryBrowser}</span>
           </a>
@@ -97,7 +97,7 @@ export async function CategoryHomeList({ categories, locale = "en", showComingSo
           {launchRows.slice(0, 4).map((category) => {
             const style = CATEGORY_CARD_STYLE[category.slug] ?? CATEGORY_CARD_FALLBACK;
             return (
-              <a key={category.id} href={localizePath(`/categories/${category.slug}`, locale)} className="group relative flex min-h-[8.25rem] min-w-0 flex-col items-center justify-between overflow-hidden rounded-[1.15rem] border border-[#ead692]/35 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.16),transparent_48%),linear-gradient(155deg,rgba(255,255,255,0.13),rgba(255,255,255,0.025))] px-0.5 pb-2.5 pt-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_20px_36px_-23px_rgba(0,0,0,0.98)] transition duration-300 hover:-translate-y-1 hover:border-[#ffe4a0]/80 hover:bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.22),transparent_52%),linear-gradient(155deg,rgba(255,255,255,0.17),rgba(255,255,255,0.04))] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_26px_46px_-22px_rgba(0,0,0,0.98)] active:scale-[0.98] sm:min-h-[11.75rem] sm:rounded-[1.55rem] sm:px-3 sm:pb-3 sm:pt-3">
+              <a key={category.id} href={localizePath(`/categories/${category.slug}`, locale)} className="group relative flex min-h-[8.25rem] min-w-0 flex-col items-center justify-between overflow-hidden rounded-[1.15rem] border border-[#cfc8ff]/35 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.18),transparent_48%),linear-gradient(155deg,rgba(255,255,255,0.15),rgba(255,255,255,0.025))] px-0.5 pb-2.5 pt-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_20px_36px_-23px_rgba(0,0,0,0.98)] transition duration-300 hover:-translate-y-1 hover:border-[#ffd9b4]/80 hover:bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.24),transparent_52%),linear-gradient(155deg,rgba(255,255,255,0.18),rgba(255,255,255,0.04))] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_26px_46px_-22px_rgba(0,0,0,0.98)] active:scale-[0.98] sm:min-h-[11.75rem] sm:rounded-[1.55rem] sm:px-3 sm:pb-3 sm:pt-3">
                 <span aria-hidden="true" className={`absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-[72%] rounded-full blur-2xl sm:h-36 sm:w-36 ${style.halo}`} />
                 <span aria-hidden="true" className="relative grid h-[5.35rem] w-full place-items-center transition duration-300 sm:h-[8.6rem]">
                   <CategoryIcon slug={category.slug} />
@@ -130,13 +130,13 @@ export async function CategoryHomeList({ categories, locale = "en", showComingSo
 }
 
 const CATEGORY_CARD_FALLBACK = {
-  halo: "bg-[#d8bd7a]/20",
-  line: "via-[#d8bd7a]/80",
+  halo: "bg-[#a69aff]/20",
+  line: "via-[#ffbd7a]/80",
 };
 
 const CATEGORY_CARD_STYLE: Record<string, typeof CATEGORY_CARD_FALLBACK> = {
-  vehicles: { halo: "bg-[#20a48f]/30", line: "via-[#55d5bd]" },
-  "real-estate": { halo: "bg-[#d8a34d]/30", line: "via-[#f0c773]" },
-  "mobile-phones-tablets": { halo: "bg-[#5b83c7]/30", line: "via-[#8db2ed]" },
-  "second-hand-items": { halo: "bg-[#9f7652]/30", line: "via-[#d5ab7a]" },
+  vehicles: { halo: "bg-[#50d0c6]/30", line: "via-[#78e8dc]" },
+  "real-estate": { halo: "bg-[#ff9d82]/30", line: "via-[#ffc09d]" },
+  "mobile-phones-tablets": { halo: "bg-[#a69aff]/30", line: "via-[#c4bcff]" },
+  "second-hand-items": { halo: "bg-[#ffd47c]/30", line: "via-[#ffe0a6]" },
 };

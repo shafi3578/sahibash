@@ -4,7 +4,7 @@ import { resolvePublicSiteSettings } from '../lib/data/site-settings';
 
 test('resolvePublicSiteSettings applies public branding defaults and overrides', () => {
   const defaults = resolvePublicSiteSettings();
-  assert.equal(defaults.site_name, 'Sahibash');
+  assert.equal(defaults.site_name, 'Justujo');
   assert.equal(defaults.site_tagline, 'Marketplace for Afghanistan');
 
   const custom = resolvePublicSiteSettings({

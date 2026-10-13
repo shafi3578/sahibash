@@ -35,7 +35,7 @@ export default async function AdminSupportPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Support requests</h1>
-          <p className="mt-1 text-[var(--ink-2)]">Review, respond to, and triage contact requests from Sahibash users.</p>
+          <p className="mt-1 text-[var(--ink-2)]">Review, respond to, and triage contact requests from Justujo users.</p>
         </div>
         <span className="rounded-full bg-[var(--surface-2)] px-3 py-1 text-sm font-bold">{requests.length} recent</span>
       </div>

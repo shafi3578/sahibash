@@ -31,10 +31,10 @@ export default async function PublicSellerPage({ params }: { params: Promise<{ i
       ])
     : [{ data: null }, { data: null }];
   const text = locale === "fa"
-    ? { listings: "اعلان‌های فعال", followers: "دنبال‌کنندگان", following: "دنبال‌شده", follow: "دنبال کردن", unfollow: "لغو دنبال کردن", seller: "فروشندهٔ صاحبش", activeSince: "اعلان فعال از", empty: "اعلان فعالی وجود ندارد" }
+    ? { listings: "اعلان‌های فعال", followers: "دنبال‌کنندگان", following: "دنبال‌شده", follow: "دنبال کردن", unfollow: "لغو دنبال کردن", seller: "فروشندهٔ جستجو", activeSince: "اعلان فعال از", empty: "اعلان فعالی وجود ندارد" }
     : locale === "ps"
-      ? { listings: "فعال اعلانونه", followers: "تعقیبوونکي", following: "تعقیبوي", follow: "تعقیب کړئ", unfollow: "تعقیب بند کړئ", seller: "د صاحبش پلورونکی", activeSince: "فعال اعلان له", empty: "فعال اعلان نشته" }
-      : { listings: "Active listings", followers: "Followers", following: "Following", follow: "Follow", unfollow: "Unfollow", seller: "Sahibash seller", activeSince: "Active listing since", empty: "No active listings" };
+      ? { listings: "فعال اعلانونه", followers: "تعقیبوونکي", following: "تعقیبوي", follow: "تعقیب کړئ", unfollow: "تعقیب بند کړئ", seller: "د جستجو پلورونکی", activeSince: "فعال اعلان له", empty: "فعال اعلان نشته" }
+      : { listings: "Active listings", followers: "Followers", following: "Following", follow: "Follow", unfollow: "Unfollow", seller: "Justujo seller", activeSince: "Active listing since", empty: "No active listings" };
   const sellerName = listings.find((listing) => listing.contact_name?.trim())?.contact_name?.trim() || text.seller;
   const oldestVisibleListing = listings[listings.length - 1];
 

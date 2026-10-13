@@ -600,25 +600,25 @@ export default async function SearchPage({
   closeMobileFilterParams.delete("mobileFilters");
   const aiCopy = locale === "fa"
     ? {
-        title: "جستجوی صاحبش",
+        title: "جستجوی جستجو",
         placeholder: "مثلاً کرولا در کابل زیر 400000",
         button: "جستجوی هوشمند",
-        interpreted: "برداشت صاحبش",
+        interpreted: "برداشت جستجو",
         confidence: "اعتماد",
       }
     : locale === "ps"
       ? {
-          title: "د صاحبش لټون",
+          title: "د جستجو لټون",
           placeholder: "لکه Corolla in Kabul under 400000",
           button: "هوښیار لټون",
-          interpreted: "د صاحبش برداشت",
+          interpreted: "د جستجو برداشت",
           confidence: "باور",
         }
       : {
-          title: "Search Sahibash",
+          title: "Search Justujo",
           placeholder: "a Corolla in Kabul under 400000",
           button: "AI search",
-          interpreted: "Sahibash understood",
+          interpreted: "Justujo understood",
           confidence: "Confidence",
         };
 

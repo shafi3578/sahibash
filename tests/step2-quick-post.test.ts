@@ -134,7 +134,7 @@ test("Quick Post localizes category-specific labels without changing canonical s
   assert.match(quickPostForm, /quickFieldLabel\(locale, field\)/);
   assert.match(quickPostForm, /quickOptionValue\(option\)/);
   assert.match(quickPostForm, /quickOptionLabel\(locale, option\)/);
-  assert.match(quickPostForm, /detected: "صاحبش تشخیص داد"/);
+  assert.match(quickPostForm, /detected: "جستجو تشخیص داد"/);
   assert.match(quickPostForm, /make: \{ fa: "برند \/ سازنده", ps: "برانډ \/ جوړوونکی" \}/);
   assert.match(quickPostForm, /Automatic: \{ fa: "اتومات", ps: "اتومات" \}/);
 });

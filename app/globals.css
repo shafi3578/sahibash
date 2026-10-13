@@ -3,14 +3,14 @@
 :root {
   --font-body: "Segoe UI", Tahoma, Arial, sans-serif;
   --font-display: "Segoe UI", Tahoma, Arial, sans-serif;
-  --surface-1: #f2eee5;
-  --surface-2: #fcfaf5;
-  --ink-1: #0c2530;
-  --ink-2: #59676b;
-  --line: #ddd6c8;
-  --brand: #061c29;
-  --brand-gold: #d5b86f;
-  --accent: #08736c;
+  --surface-1: #f6f7fb;
+  --surface-2: #ffffff;
+  --ink-1: #171936;
+  --ink-2: #667085;
+  --line: #e4e7f0;
+  --brand: #15162e;
+  --brand-gold: #ffbd7a;
+  --accent: #5b4cc4;
 }
 
 @theme inline {
@@ -21,8 +21,9 @@
 
 body {
   background:
-    radial-gradient(circle at 8% 0%, rgb(213 184 111 / 13%) 0%, transparent 28%),
-    linear-gradient(180deg, #fcfaf5 0%, #f3f1eb 48%, #edf3f1 100%) fixed;
+    radial-gradient(circle at 6% 0%, rgb(126 91 214 / 13%) 0%, transparent 28%),
+    radial-gradient(circle at 96% 20%, rgb(255 118 103 / 10%) 0%, transparent 26%),
+    linear-gradient(180deg, #ffffff 0%, #f6f7fb 48%, #eef0fa 100%) fixed;
   color: var(--ink-1);
   font-family: var(--font-body), sans-serif;
 }
@@ -63,6 +64,36 @@ html[dir="rtl"] select {
 
 .hero-glow {
   background:
-    radial-gradient(circle at 15% 5%, rgb(199 164 92 / 28%) 0%, transparent 38%),
-    radial-gradient(circle at 85% 20%, rgb(47 128 119 / 24%) 0%, transparent 30%);
+    radial-gradient(circle at 15% 5%, rgb(255 189 122 / 28%) 0%, transparent 38%),
+    radial-gradient(circle at 85% 20%, rgb(107 92 224 / 24%) 0%, transparent 30%);
+}
+
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #fff;
+}
+
+.brand-mark {
+  display: grid;
+  height: 2.1rem;
+  width: 2.1rem;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 0.8rem;
+  background: linear-gradient(145deg, #ffbd7a 0%, #ff7b6d 52%, #7359d8 100%);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 900;
+  box-shadow: 0 8px 20px rgb(12 11 38 / 24%), inset 0 1px 0 rgb(255 255 255 / 35%);
+}
+
+@media (min-width: 640px) {
+  .brand-mark {
+    height: 2.45rem;
+    width: 2.45rem;
+    border-radius: 0.9rem;
+    font-size: 1.2rem;
+  }
 }

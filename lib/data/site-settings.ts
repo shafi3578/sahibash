@@ -31,7 +31,7 @@ export type SiteSettingsVersionRecord = SiteSettingsRecord & {
 };
 
 export const DEFAULT_SITE_SETTINGS = {
-  site_name: "Sahibash",
+  site_name: "Justujo",
   site_tagline: "Marketplace for Afghanistan",
   contact_email: "hello@afghan.com",
   contact_phone: "+93700000000",
