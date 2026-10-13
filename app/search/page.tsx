@@ -832,7 +832,7 @@ export default async function SearchPage({
         </section>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 lg:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 px-4 pb-4 lg:hidden">
         <a
           href={buildUrlWithParams(openMobileFilterParams, locale)}
           className="mx-auto flex w-full max-w-7xl items-center justify-between rounded-2xl bg-[var(--ink-1)] px-4 py-3 text-sm font-semibold text-white shadow-lg"

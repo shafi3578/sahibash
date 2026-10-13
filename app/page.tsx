@@ -92,7 +92,7 @@ export default async function HomePage({
   const totalPages = Math.max(1, Math.min(7, Math.ceil(totalListings / pageSize)));
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_4%_0%,rgba(126,91,214,0.16),transparent_28%),radial-gradient(circle_at_98%_18%,rgba(255,118,103,0.12),transparent_32%),linear-gradient(180deg,#ffffff_0%,#f5f5fb_46%,#eef0fa_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:px-6">
+    <main className="mx-auto min-h-[calc(100svh-4rem)] w-full max-w-7xl space-y-3 bg-[radial-gradient(circle_at_4%_0%,rgba(126,91,214,0.16),transparent_28%),radial-gradient(circle_at_98%_18%,rgba(255,118,103,0.12),transparent_32%),linear-gradient(180deg,#ffffff_0%,#f5f5fb_46%,#eef0fa_100%)] px-0 pb-28 pt-0 sm:bg-transparent sm:px-4 sm:space-y-4 sm:pb-16 sm:pt-4 lg:min-h-0 lg:px-6">
       <section className="hidden overflow-hidden bg-[radial-gradient(circle_at_17%_10%,rgba(255,189,122,0.34)_0,rgba(76,65,158,0.55)_24%,transparent_50%),radial-gradient(circle_at_92%_100%,rgba(255,118,103,0.22),transparent_38%),linear-gradient(135deg,#10132c_0%,#22265c_54%,#121536_100%)] text-white sm:block sm:rounded-3xl sm:border sm:border-[#ffbd7a]/35 sm:shadow-[0_28px_72px_-25px_rgba(15,16,45,0.70),0_1px_0_rgba(255,255,255,0.1)_inset]">
         <div className={`grid gap-6 px-4 py-7 sm:px-6 lg:px-8 lg:py-10 ${heroListings.length > 0 ? "lg:grid-cols-[1.1fr_0.9fr]" : ""}`}>
           <div>

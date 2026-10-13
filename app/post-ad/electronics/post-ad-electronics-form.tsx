@@ -1033,7 +1033,7 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
         {error ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p> : null}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--line)] bg-white px-4 py-3">
+      <div className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 border-t border-[var(--line)] bg-white px-4 py-3 lg:bottom-0">
         <div className="mx-auto flex w-full max-w-5xl gap-2">
           {step !== "category" ? (
             <button type="button" onClick={gotoPrev} className="rounded-xl border border-[var(--line)] px-4 py-3 text-sm font-semibold">

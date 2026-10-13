@@ -82,7 +82,7 @@ export function MobileSearchSheet({ locale }: { locale: AppLocale }) {
       </button>
       {open ? (
         <div className="fixed inset-0 z-50 bg-black/35 p-3 backdrop-blur-sm lg:hidden" role="dialog" aria-modal="true">
-          <div className="mx-auto mt-3 max-w-xl rounded-3xl bg-white p-3 shadow-2xl">
+          <div className="mx-auto mt-3 max-w-xl rounded-3xl bg-white p-3 text-[var(--ink-1)] shadow-2xl">
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setOpen(false)} className="rounded-full px-3 py-2 text-sm font-semibold text-slate-600">
                 {copy.cancel}

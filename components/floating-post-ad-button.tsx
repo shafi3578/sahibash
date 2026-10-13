@@ -23,7 +23,7 @@ export function FloatingPostAdButton({ locale, label, href }: Props) {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 px-4 lg:hidden">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 px-4 lg:hidden">
       <div className="mx-auto flex max-w-7xl justify-center">
         <Link
           href={href}

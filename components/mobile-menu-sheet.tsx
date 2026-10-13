@@ -30,7 +30,7 @@ export function MobileMenuSheet({ locale }: { locale: AppLocale }) {
   return <>
     <button type="button" onClick={() => setOpen(true)} aria-label={copy.open} className="grid h-10 w-10 place-items-center rounded-full bg-white/85 text-[var(--ink-1)] lg:hidden"><MenuIcon /></button>
     {open ? <div className="fixed inset-0 z-50 bg-black/40 p-3 backdrop-blur-sm lg:hidden" role="dialog" aria-modal="true" aria-label={copy.title} onClick={() => setOpen(false)}>
-      <div className="ms-auto mt-2 w-full max-w-sm rounded-3xl bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div className="ms-auto mt-2 w-full max-w-sm rounded-3xl bg-white p-4 text-[var(--ink-1)] shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between"><h2 className="text-lg font-black">{copy.title}</h2><button type="button" onClick={() => setOpen(false)} className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold">{copy.close}</button></div>
         <nav className="mt-4 grid grid-cols-2 gap-2">
           {items.map(([label, path, icon]) => <Link key={path} href={localizePath(path, locale)} onClick={() => setOpen(false)} className="flex min-h-20 flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold transition active:bg-slate-100"><span className="text-xl text-[var(--accent)]">{icon}</span><span>{label}</span></Link>)}
