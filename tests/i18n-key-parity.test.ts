@@ -161,6 +161,9 @@ test("normal-user email and notification events have complete locale templates",
 
 test("localized metadata preserves route and exposes canonical language alternates", () => {
   const metadata = buildLocalizedMetadata("ps", ["search"]);
+  assert.equal(buildLocalizedMetadata("en", ["search"]).title, "Justujo | Search listings");
+  assert.equal(buildLocalizedMetadata("fa", ["search"]).title, "جستجو | جستجوی اعلان‌ها");
+  assert.equal(metadata.title, "جستجو | اعلانونه ولټوئ");
   assert.equal(metadata.alternates?.canonical, "/ps/search");
   assert.deepEqual(metadata.alternates?.languages, {
     en: "/en/search",

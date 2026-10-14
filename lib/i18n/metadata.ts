@@ -1,5 +1,6 @@
 import type { AppLocale } from "@/lib/i18n/translations";
 import type { Metadata } from "next";
+import { getLocalizedBrandName } from "@/lib/i18n/brand";
 import { localizePath } from "@/lib/i18n/routing";
 import { USER_COPY, type UserInfoPage } from "@/lib/i18n/user-copy";
 
@@ -30,7 +31,8 @@ export function buildLocalizedMetadata(locale: AppLocale, slug: string[] = []): 
   const info = (["privacy", "terms", "safety", "contact"] as UserInfoPage[]).includes(section as UserInfoPage)
     ? USER_COPY[locale].info[section as UserInfoPage]
     : null;
-  const title = info?.title ?? ROUTE_TITLES[locale][section] ?? SITE_METADATA[locale].titleSuffix;
+  const baseTitle = info?.title ?? ROUTE_TITLES[locale][section] ?? SITE_METADATA[locale].titleSuffix;
+  const title = getLocalizedBrandName(locale) + " | " + baseTitle;
   const description = info?.intro ?? SITE_METADATA[locale].description;
   const canonical = localizePath(path, locale);
   return {
