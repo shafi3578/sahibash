@@ -1,10 +1,8 @@
-import { NewPostingFormv2 } from '@/components/posting/NewPostingFormv2';
+import { redirect } from "next/navigation";
+import { getCurrentLocale } from "@/lib/i18n/server";
+import { localizePath } from "@/lib/i18n/routing";
 
-export const metadata = {
-  title: 'Post a New Ad - v2',
-  description: 'Create a new listing on Afghan with the new form',
-};
-
-export default async function PostAdPage() {
-  return <NewPostingFormv2 />;
+export default async function LegacyLocalizedPostAdV2Page() {
+  const locale = await getCurrentLocale();
+  redirect(localizePath("/post-ad/create", locale));
 }
