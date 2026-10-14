@@ -759,7 +759,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       language: "زبان",
     },
     footer: {
-      platform: "افغان",
+      platform: "جستجو",
       tagline: "بازار آنلاین افغانستان با منبع روشن اعلان‌ها.",
       quickLinks: "پیوندهای سریع",
     },
@@ -877,7 +877,7 @@ const CRITICAL_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       language: "ژبه",
     },
     footer: {
-      platform: "افغان",
+      platform: "جستجو",
       tagline: "د افغانستان بازار له روښانه اعلان سرچینو سره.",
       quickLinks: "چټک تړونونه",
     },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SUPPORTED_LOCALES, TRANSLATIONS, type AppLocale } from "@/lib/i18n/translations";
+import { getSafeTranslations, SUPPORTED_LOCALES, TRANSLATIONS, type AppLocale } from "@/lib/i18n/translations";
 import { UI_TRANSLATIONS } from "@/lib/i18n/ui";
 import { localizePath } from "@/lib/i18n/routing";
 import { localizeActionMessage, localizeAuthError, USER_COPY } from "@/lib/i18n/user-copy";
@@ -174,6 +174,9 @@ test("brand identity cannot fall back to a legacy runtime name", () => {
   assert.equal(getLocalizedBrandName("en", "yawzai"), "Justujo");
   assert.equal(getLocalizedBrandName("fa", "yawzai"), "جستجو");
   assert.equal(getLocalizedBrandName("ps", "yawzai"), "جستجو");
+  assert.equal(getSafeTranslations("en").footer.platform, "Justujo");
+  assert.equal(getSafeTranslations("fa").footer.platform, "جستجو");
+  assert.equal(getSafeTranslations("ps").footer.platform, "جستجو");
   assert.doesNotMatch(JSON.stringify([TRANSLATIONS, UI_TRANSLATIONS, USER_COPY, USER_EVENT_TEMPLATES]), /صاحباش/);
 });
 
