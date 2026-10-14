@@ -99,6 +99,10 @@ type QuickKind =
 
 type DetailValue = string | boolean;
 
+function defaultListingLabel(locale: AppLocale) {
+  return locale === "fa" ? "اعلان جستجو" : locale === "ps" ? "د جستجو اعلان" : "Justujo listing";
+}
+
 function readLocationOptionName(option: LocationApiOption, locale: AppLocale) {
   return String(option[`name_${locale}`] ?? option.name ?? option.name_en ?? "").trim();
 }
@@ -787,7 +791,7 @@ function buildSuggestedQuickPostTitle({
     if (title) return title;
   }
 
-  return "Justujo listing";
+  return labels.listing;
 }
 
 function maskSellerPhone(phone: string) {
@@ -2151,7 +2155,7 @@ export default function QuickPostForm({
         sale: c.forSale,
         rent: c.forRent,
         lease: c.forLease,
-        listing: categoryLabel || "Justujo listing",
+        listing: categoryLabel || defaultListingLabel(locale),
         near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near",
       },
     });
@@ -2456,7 +2460,7 @@ export default function QuickPostForm({
                     sale: c.forSale,
                     rent: c.forRent,
                     lease: c.forLease,
-                    listing: categoryLabel || "Justujo listing",
+                    listing: categoryLabel || defaultListingLabel(locale),
                     near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near",
                   },
                 });
@@ -2889,7 +2893,7 @@ export default function QuickPostForm({
                   districtName: districtOptions.find((item) => item.id === selectedDistrictId)?.name,
                   areaText,
                   transaction,
-                  labels: { sale: c.forSale, rent: c.forRent, lease: c.forLease, listing: categoryLabel || "Justujo listing", near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near" },
+                  labels: { sale: c.forSale, rent: c.forRent, lease: c.forLease, listing: categoryLabel || defaultListingLabel(locale), near: locale === "fa" ? "نزدیک" : locale === "ps" ? "نږدې" : "near" },
                 })}</p>
                 <p className="mt-1 text-[var(--accent)]">{`${priceValueForSubmit() || priceAmount || "—"} ${currency}`}</p>
                 <p className="mt-1 text-[var(--ink-2)]">
@@ -2908,7 +2912,7 @@ export default function QuickPostForm({
           </section>
 
           <section className="order-50 rounded-3xl border border-[var(--line)] bg-white p-4 text-sm text-[var(--ink-2)] shadow-sm sm:p-5">
-            <p className="font-semibold text-[var(--ink-1)]">{sellerContactName || "Profile contact"}</p>
+            <p className="font-semibold text-[var(--ink-1)]">{sellerContactName || c.missingContact}</p>
             <p className="mt-1">{maskedSellerContactPhone || c.missingContact}</p>
             <p className="mt-2">{c.noOverride}</p>
             <label className="mt-4 flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 font-bold text-[var(--ink-1)]">

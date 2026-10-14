@@ -10,8 +10,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const LABELS = {
   en: { nav: "Mobile navigation", home: "Home", search: "Search", sell: "Sell", messages: "Messages", account: "Account" },
-  fa: { nav: "راهنمای موبایل", home: "خانه", search: "جستجو", sell: "فروش", messages: "پیام‌ها", account: "حساب" },
-  ps: { nav: "د موبایل لاره", home: "کور", search: "لټون", sell: "پلور", messages: "پیغامونه", account: "حساب" },
+  fa: { nav: "ناوبری موبایل", home: "خانه", search: "جستجو", sell: "فروش", messages: "پیام‌ها", account: "حساب" },
+  ps: { nav: "د موبایل ناوبری", home: "کور", search: "لټون", sell: "پلور", messages: "پیغامونه", account: "حساب" },
 } as const;
 
 function NavIcon({ name, active = false }: { name: string; active?: boolean }) {
