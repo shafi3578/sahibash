@@ -19,7 +19,7 @@ import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { localizeActionMessage } from "@/lib/i18n/user-copy";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { localizePath } from "@/lib/i18n/routing";
-import { canConfirmDetectedLocation, createLocationRequestGuard, createManualLocationSelection } from "@/lib/location/posting-selection";
+import { createManualLocationSelection } from "@/lib/location/posting-selection";
 import { isDeprecatedCategoryPath } from "@/lib/categories/deprecatedPaths";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
@@ -94,11 +94,11 @@ type LocationApiOption = {
   name_ps?: string | null;
 };
 type LocationApiResponse<T> = { success?: boolean; data?: T[] };
-type LocationMethod = "device" | "manual" | null;
 type StoredLocation = {
   provinceId: number;
   districtId: number;
   areaText: string;
+  streetText: string;
   locationVisibility: "exact" | "approximate" | "province_district";
 };
 
@@ -317,7 +317,7 @@ export default function PostAdForm({
     core?: CoreForm;
     dynamicValues?: Record<string, string | boolean | string[]>;
     category?: { root_slug?: string; final_path?: string; listing_type?: "for_sale" | "for_rent" | "wanted" };
-    location?: { province_id?: number; district_id?: number; area_text?: string; location_visibility?: "exact" | "approximate" | "province_district" };
+    location?: { province_id?: number; district_id?: number; area_text?: string; street_text?: string; location_visibility?: "exact" | "approximate" | "province_district" };
   } | null>(null);
 
   const [step, setStep] = useState<Step>(1);
@@ -368,28 +368,12 @@ export default function PostAdForm({
 
   const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
   const [districtOptions, setDistrictOptions] = useState<DistrictOption[]>([]);
-  const [locationMethod, setLocationMethod] = useState<LocationMethod>(null);
   const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
   const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
   const [areaText, setAreaText] = useState("");
+  const [streetText, setStreetText] = useState("");
   const [locationVisibility, setLocationVisibility] = useState<"exact" | "approximate" | "province_district">("province_district");
-  const [deviceLatitude, setDeviceLatitude] = useState<number | null>(null);
-  const [deviceLongitude, setDeviceLongitude] = useState<number | null>(null);
-  const [deviceAccuracy, setDeviceAccuracy] = useState<number | null>(null);
-  const [locationConfirmed, setLocationConfirmed] = useState(false);
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationHint, setLocationHint] = useState<string | null>(null);
-  const [locationRequests] = useState(createLocationRequestGuard);
-  useEffect(() => () => locationRequests.cancel(), [locationRequests]);
-
-  const detectedLocationCanBeConfirmed = canConfirmDetectedLocation({
-    isDetectingLocation,
-    source: locationMethod,
-    provinceId: selectedProvinceId,
-    districtId: selectedDistrictId,
-    latitude: deviceLatitude,
-    longitude: deviceLongitude,
-  });
 
   const previousLocation = useMemo<StoredLocation | null>(() => {
     if (typeof window === "undefined") {
@@ -1057,129 +1041,8 @@ export default function PostAdForm({
   }, [locale, selectedProvinceId]);
 
   function selectManualLocation(provinceId: number | null, districtId: number | null) {
-    locationRequests.cancel();
     const selection = createManualLocationSelection(provinceId, districtId);
-    setLocationMethod(selection.source);
-    setDeviceLatitude(selection.latitude);
-    setDeviceLongitude(selection.longitude);
-    setDeviceAccuracy(selection.accuracy);
-    setLocationConfirmed(selection.confirmed);
     setLocationHint(selection.hint);
-    setIsDetectingLocation(false);
-  }
-
-  async function attemptReverseGeocode(latitude: number, longitude: number, isCurrentRequest: () => boolean) {
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}&accept-language=en`;
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
-      const payload = (await response.json()) as {
-        address?: {
-          state?: string;
-          province?: string;
-          county?: string;
-          city_district?: string;
-          municipality?: string;
-          town?: string;
-          city?: string;
-        };
-      };
-      if (!isCurrentRequest()) return;
-
-      const provinceHint = payload.address?.state || payload.address?.province || "";
-      const districtHint = payload.address?.county || payload.address?.city_district || payload.address?.municipality || payload.address?.town || payload.address?.city || "";
-
-      if (provinceHint) {
-        const matchedProvince = provinceOptions.find(
-          (option) => normalizeLocationName(option.canonicalName ?? option.name) === normalizeLocationName(provinceHint)
-        );
-        if (matchedProvince) {
-          setSelectedProvinceId(matchedProvince.id);
-
-          if (districtHint) {
-            const districtsForProvince = (await fetchLocationOptions(
-              `/api/location/districts?province_id=${encodeURIComponent(String(matchedProvince.id))}`
-            ))
-              .map((option) => toDistrictOption(option, locale))
-              .filter((row): row is DistrictOption => Boolean(row));
-            if (!isCurrentRequest()) return;
-
-            const matchedDistrict = districtsForProvince.find(
-              (option) => normalizeLocationName(option.canonicalName ?? option.name) === normalizeLocationName(districtHint)
-            );
-
-            if (matchedDistrict) {
-              setSelectedDistrictId(matchedDistrict.id);
-              setLocationConfirmed(false);
-            }
-          }
-        }
-      }
-    } catch {
-      // Best-effort only.
-    }
-  }
-
-  function handleUseMyLocation() {
-    const isCurrentRequest = locationRequests.begin();
-    setSelectedProvinceId(null);
-    setSelectedDistrictId(null);
-    setDeviceLatitude(null);
-    setDeviceLongitude(null);
-    setDeviceAccuracy(null);
-    setIsDetectingLocation(false);
-    setLocationMethod("device");
-    setLocationConfirmed(false);
-    setLocationHint(null);
-
-    if (!navigator.geolocation) {
-      setLocationHint(postAdCopy.couldNotDetectLocation);
-      setLocationMethod("manual");
-      return;
-    }
-
-    setIsDetectingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (!isCurrentRequest()) return;
-        setDeviceLatitude(position.coords.latitude);
-        setDeviceLongitude(position.coords.longitude);
-        setDeviceAccuracy(Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null);
-        setLocationHint(postAdCopy.detectedLocationNeedsConfirmation);
-        void attemptReverseGeocode(position.coords.latitude, position.coords.longitude, isCurrentRequest).finally(() => {
-          if (isCurrentRequest()) setIsDetectingLocation(false);
-        });
-      },
-      () => {
-        if (!isCurrentRequest()) return;
-        setIsDetectingLocation(false);
-        setLocationMethod("manual");
-        setLocationHint(postAdCopy.couldNotDetectLocation);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
-    );
-  }
-
-  function handleConfirmDetectedLocation() {
-    if (!detectedLocationCanBeConfirmed) {
-      setStepError(postAdCopy.confirmProvinceDistrictForDetected);
-      return;
-    }
-    setLocationConfirmed(true);
-    setLocationHint(postAdCopy.locationConfirmed);
   }
 
   function handleUsePreviousLocation() {
@@ -1192,6 +1055,7 @@ export default function PostAdForm({
     setSelectedProvinceId(previousLocation.provinceId);
     setSelectedDistrictId(previousLocation.districtId);
     setAreaText(previousLocation.areaText || "");
+    setStreetText(previousLocation.streetText || "");
     setLocationVisibility(previousLocation.locationVisibility || "province_district");
     setLocationHint(postAdCopy.previousLocationApplied);
   }
@@ -1315,11 +1179,8 @@ export default function PostAdForm({
       setSelectedProvinceId(Number(pendingDraft.location.province_id) || null);
       setSelectedDistrictId(Number(pendingDraft.location.district_id) || null);
       setAreaText(String(pendingDraft.location.area_text ?? ""));
+      setStreetText(String(pendingDraft.location.street_text ?? ""));
       setLocationVisibility(pendingDraft.location.location_visibility ?? "province_district");
-      if (pendingDraft.location.province_id && pendingDraft.location.district_id) {
-        setLocationMethod("manual");
-        setLocationConfirmed(true);
-      }
     }
 
     const finalPathToRestore = pendingDraft?.category?.final_path;
@@ -1400,6 +1261,7 @@ export default function PostAdForm({
           province_id: selectedProvinceId,
           district_id: selectedDistrictId,
           area_text: areaText,
+          street_text: streetText,
           location_visibility: locationVisibility,
         },
         language: locale,
@@ -1417,6 +1279,7 @@ export default function PostAdForm({
     selectedProvinceId,
     selectedDistrictId,
     areaText,
+    streetText,
     locationVisibility,
     locale,
     rootSlug,
@@ -1520,12 +1383,6 @@ export default function PostAdForm({
   function validateLocationStep() {
     if (!selectedProvinceId || !selectedDistrictId) {
       return postAdCopy.addLocationBeforePublish;
-    }
-    if (!locationMethod) {
-      return postAdCopy.addLocationBeforePublish;
-    }
-    if (locationMethod === "device" && !locationConfirmed) {
-      return postAdCopy.detectedLocationNeedsConfirmation;
     }
     return null;
   }
@@ -1655,15 +1512,13 @@ export default function PostAdForm({
     form.set("district", selectedDistrict?.name ?? "");
     form.set("province_id", String(selectedProvinceId ?? ""));
     form.set("district_id", String(selectedDistrictId ?? ""));
-    form.set("area_text", areaText);
-    form.set("address_optional", core.address_optional || areaText);
-    if (deviceLatitude !== null) form.set("latitude", String(deviceLatitude));
-    if (deviceLongitude !== null) form.set("longitude", String(deviceLongitude));
-    if (deviceAccuracy !== null) form.set("location_accuracy", String(deviceAccuracy));
-    form.set("location_source", locationMethod === "device" ? "device" : "manual");
+    const manualAddress = [areaText.trim(), streetText.trim()].filter(Boolean).join(" · ");
+    form.set("area_text", manualAddress);
+    form.set("address_optional", core.address_optional || manualAddress);
+    form.set("location_source", "manual");
     const submitLocationVisibility = locationVisibility === "province_district" ? "hidden" : locationVisibility;
     form.set("location_visibility", submitLocationVisibility);
-    form.set("is_location_confirmed", locationMethod === "device" ? (locationConfirmed ? "true" : "false") : "true");
+    form.set("is_location_confirmed", "true");
     form.set("contact_phone", sellerContactPhone);
     form.set("contact_name", sellerContactName);
     form.set("meeting_preference", core.contact_preferences);
@@ -1747,6 +1602,7 @@ export default function PostAdForm({
           provinceId: selectedProvinceId,
           districtId: selectedDistrictId,
           areaText,
+          streetText,
           locationVisibility,
         };
         globalThis.localStorage?.setItem(previousLocationKey, JSON.stringify(snapshot));
@@ -2573,47 +2429,25 @@ export default function PostAdForm({
         {isLocationStep ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
             <h2 className="font-display text-lg font-bold">{t.postAd.whereLocated}</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.chooseLocationMethod}</p>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.manualLocation} — {t.postAd.chooseProvinceDistrict}</p>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={handleUseMyLocation}
-                className={`rounded-xl border p-4 text-left ${locationMethod === "device" ? "border-emerald-600 bg-emerald-50" : "border-[var(--line)]"}`}
-              >
-                <p className="text-sm font-bold">{t.postAd.useMyLocation}</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.detectAutomatically}</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  selectManualLocation(selectedProvinceId, selectedDistrictId);
-                }}
-                className={`rounded-xl border p-4 text-left ${locationMethod === "manual" ? "border-sky-600 bg-sky-50" : "border-[var(--line)]"}`}
-              >
-                <p className="text-sm font-bold">{t.postAd.manualLocation}</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.chooseProvinceDistrict}</p>
-              </button>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-800">{t.postAd.manualLocation}</span>
               <button
                 type="button"
                 onClick={handleUsePreviousLocation}
-                className={`rounded-xl border p-4 text-left ${previousLocation ? "border-amber-500 bg-amber-50" : "border-[var(--line)] opacity-60"}`}
+                disabled={!previousLocation}
+                className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <p className="text-sm font-bold">{postAdCopy.usePreviousLocation}</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">{postAdCopy.applyPreviousLocation}</p>
+                {postAdCopy.usePreviousLocation}
               </button>
             </div>
-
-            {isDetectingLocation ? (
-              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">{t.postAd.detectingLocation}</p>
-            ) : null}
 
             {locationHint ? (
               <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">{locationHint}</p>
             ) : null}
 
-            {(locationMethod === "manual" || locationMethod === "device") ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="text-sm font-semibold">{t.postAd.province}
                   <select
                     value={selectedProvinceId ? String(selectedProvinceId) : ""}
@@ -2654,6 +2488,10 @@ export default function PostAdForm({
                   <input value={areaText} onChange={(event) => setAreaText(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
                 </label>
 
+                <label className="text-sm font-semibold sm:col-span-2">{t.postAd.streetAvenueOptional}
+                  <input value={streetText} onChange={(event) => setStreetText(event.target.value)} placeholder={t.postAd.streetAvenuePlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+                </label>
+
                 <label className="text-sm font-semibold sm:col-span-2">{t.postAd.locationVisibility}
                   <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "province_district")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
                     <option value="province_district">{t.postAd.hideExactShowProvinceDistrict}</option>
@@ -2662,19 +2500,7 @@ export default function PostAdForm({
                   </select>
                 </label>
 
-                {locationMethod === "device" && deviceLatitude !== null && deviceLongitude !== null ? (
-                  <div className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-                    <p className="font-semibold">{t.postAd.detectedLocation}</p>
-                    <p className="mt-1">{t.postAd.latitude}: {deviceLatitude.toFixed(6)}</p>
-                    <p>{t.postAd.longitude}: {deviceLongitude.toFixed(6)}</p>
-                    <p>{t.postAd.accuracy}: {deviceAccuracy !== null ? `${deviceAccuracy} m` : t.postAd.unknown}</p>
-                    <button type="button" onClick={handleConfirmDetectedLocation} disabled={!detectedLocationCanBeConfirmed} className="mt-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
-                      {t.postAd.confirmLocation}
-                    </button>
-                  </div>
-                ) : null}
               </div>
-            ) : null}
           </section>
         ) : null}
 

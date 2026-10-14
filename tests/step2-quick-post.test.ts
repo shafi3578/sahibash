@@ -235,8 +235,6 @@ test("Quick Post tracks suggested detail provenance and preserves seller edits",
 
 test("Quick Post supports professional item location without exposing device GPS by default", () => {
   for (const marker of [
-    "handleUseCurrentLocation",
-    "navigator.geolocation.getCurrentPosition",
     "locationSource",
     "locationVisibility",
     "privacyApproximate",
@@ -244,8 +242,8 @@ test("Quick Post supports professional item location without exposing device GPS
     "hidden",
     "formData.set(\"location_visibility\", locationVisibility)",
     "formData.set(\"is_location_confirmed\", locationConfirmed ? \"true\" : \"false\")",
-    "/api/location/reverse",
     "streetText",
+    "street",
   ]) {
     assert.match(quickPostForm, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -256,9 +254,8 @@ test("Quick Post supports professional item location without exposing device GPS
     quickPostForm.indexOf('data-testid="quick-post-location"'),
     quickPostForm.indexOf('data-testid="quick-post-advanced-details"'),
   );
-  assert.match(locationSection, /showLocationDetails/);
-  assert.match(locationSection, /aria-expanded=\{showLocationDetails\}/);
-  assert.match(locationSection, /id="quick-post-location-optional-details"/);
+  assert.doesNotMatch(locationSection, /showLocationDetails|useCurrentLocation|navigator\.geolocation/);
+  assert.match(locationSection, /\{c\.street\}/);
   assert.match(locationSection, /name="location_visibility"[\s\S]*<option value="approximate"/);
   assert.doesNotMatch(locationSection, /type="radio"/);
 });

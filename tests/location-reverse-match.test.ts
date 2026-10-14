@@ -121,46 +121,30 @@ test("detected locations cannot be confirmed before reverse lookup settles with 
   assert.equal(canConfirmDetectedLocation({ ...resolved, source: "manual" }), false);
 });
 
-test("both reachable posting forms reset all device state on manual selection and guard late responses", () => {
-  for (const [path, resetName, latitudeSetter, longitudeSetter, accuracySetter, sourceSetter] of [
-    ["components/posting/QuickPostForm.tsx", "confirmManualLocationIfReady", "setLatitude", "setLongitude", "setLocationAccuracy", "setLocationSource"],
-    ["app/post-ad/post-ad-form.tsx", "selectManualLocation", "setDeviceLatitude", "setDeviceLongitude", "setDeviceAccuracy", "setLocationMethod"],
+test("reachable posting forms are manual-only and collect Afghanistan street context", () => {
+  for (const path of [
+    "components/posting/QuickPostForm.tsx",
+    "app/post-ad/post-ad-form.tsx",
+    "app/post-ad/electronics/post-ad-electronics-form.tsx",
+    "components/posting/LocationModal.tsx",
   ]) {
     const form = readFileSync(join(process.cwd(), path), "utf8");
-    const reset = form.slice(form.indexOf(resetName), form.indexOf("setIsDetectingLocation(false)", form.indexOf(resetName)));
-    assert.match(reset, /locationRequests\.cancel\(\)/);
-    assert.match(reset, /createManualLocationSelection\(provinceId, districtId\)/);
-    for (const [setter, property] of [[latitudeSetter, "latitude"], [longitudeSetter, "longitude"], [accuracySetter, "accuracy"], [sourceSetter, "source"], ["setLocationHint", "hint"], ["setLocationConfirmed", "confirmed"]]) {
-      assert.ok(reset.includes(`${setter}(selection.${property})`), `${path} resets ${property}`);
-    }
-    assert.ok(form.includes(`${resetName}(nextProvinceId, null)`));
-    assert.ok(form.includes(`${resetName}(selectedProvinceId, nextDistrictId)`));
-    assert.ok((form.match(/if \(!isCurrentRequest\(\)\) return;/g) ?? []).length >= 4, `${path} guards GPS success/error and delayed reverse lookup`);
+    assert.doesNotMatch(form, /navigator\.geolocation/);
+    assert.doesNotMatch(form, /Use My Location|useCurrentLocation|detectAutomatically/);
   }
-  const standard = readFileSync(join(process.cwd(), "app/post-ad/post-ad-form.tsx"), "utf8");
-  assert.match(standard, /selectManualLocation\(previousLocation\.provinceId, previousLocation\.districtId\)/);
-  assert.match(standard, /selectManualLocation\(selectedProvinceId, selectedDistrictId\)/);
-});
 
-test("posting forms cancel on unmount, clear stale IDs, and gate confirmation until reverse lookup ends", () => {
-  for (const [path, detectionHandler] of [
-    ["components/posting/QuickPostForm.tsx", "const handleUseCurrentLocation"],
-    ["app/post-ad/post-ad-form.tsx", "function handleUseMyLocation"],
-  ]) {
-    const form = readFileSync(join(process.cwd(), path), "utf8");
-    assert.match(form, /useEffect\(\(\) => \(\) => locationRequests\.cancel\(\), \[locationRequests\]\)/);
-    const detectionStart = form.slice(form.indexOf(detectionHandler), form.indexOf("navigator.geolocation.getCurrentPosition", form.indexOf(detectionHandler)));
-    assert.match(detectionStart, /setSelectedProvinceId\(null\)/);
-    assert.match(detectionStart, /setSelectedDistrictId\(null\)/);
-    assert.match(detectionStart, /setLocationConfirmed\(false\)/);
-    assert.match(form, /const detectedLocationCanBeConfirmed = canConfirmDetectedLocation\(\{\s*isDetectingLocation,/);
-    const confirmation = form.slice(form.indexOf("handleConfirmDetectedLocation"), form.indexOf("setLocationConfirmed(true)", form.indexOf("handleConfirmDetectedLocation")));
-    assert.match(confirmation, /if \(!detectedLocationCanBeConfirmed\)/);
-    assert.match(form, /onClick=\{handleConfirmDetectedLocation\} disabled=\{!detectedLocationCanBeConfirmed\}/);
-    assert.match(form, /setSelectedDistrictId\((?:result\.district\.id|matchedDistrict\.id)\);\s*setLocationConfirmed\(false\)/);
-  }
+  const quickPost = readFileSync(join(process.cwd(), "components/posting/QuickPostForm.tsx"), "utf8");
+  assert.match(quickPost, /Street, avenue or landmark/);
+  assert.match(quickPost, /سرک، جاده یا نشانی نزدیک/);
+  assert.match(quickPost, /سړک، کوڅه یا نږدې نښه/);
+  assert.match(quickPost, /location_source\", locationSource/);
+  assert.match(quickPost, /latitude: null/);
+  assert.match(quickPost, /longitude: null/);
+
   const standard = readFileSync(join(process.cwd(), "app/post-ad/post-ad-form.tsx"), "utf8");
-  const deviceSuccess = standard.slice(standard.indexOf("navigator.geolocation.getCurrentPosition"), standard.indexOf("\n      () => {", standard.indexOf("navigator.geolocation.getCurrentPosition")));
-  assert.doesNotMatch(deviceSuccess.slice(0, deviceSuccess.indexOf("void attemptReverseGeocode")), /setIsDetectingLocation\(false\)/);
-  assert.match(deviceSuccess, /attemptReverseGeocode\([^\n]+\)\.finally\(\(\) => \{\s*if \(isCurrentRequest\(\)\) setIsDetectingLocation\(false\)/);
+  assert.match(standard, /streetAvenueOptional/);
+  assert.match(standard, /streetText/);
+  assert.match(standard, /form\.set\("location_source", "manual"\)/);
+  assert.doesNotMatch(standard, /form\.set\("latitude"/);
+  assert.doesNotMatch(standard, /form\.set\("longitude"/);
 });

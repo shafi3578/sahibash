@@ -170,6 +170,7 @@ export function Step1BasicAd({
             <span>
               📍 {state.location.provinceName || "Province"} - {state.location.districtName || "District"}
               {state.location.areaText && ` - ${state.location.areaText}`}
+              {state.location.streetText && ` - ${state.location.streetText}`}
             </span>
           ) : (
             <span className="text-gray-400">{t("posting.selectLocation") || "Click to select location"}</span>

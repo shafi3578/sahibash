@@ -29,7 +29,7 @@ test("all application routes receive the required browser security headers", asy
   assert.equal(nextConfig.poweredByHeader, false);
 });
 
-test("CSP permits the reverse-geocoding origin used by both client posting forms", async () => {
+test("manual posting forms do not depend on a reverse-geocoding origin", async () => {
   const configured = await nextConfig.headers?.();
   const csp = configured?.[0]?.headers.find((header) => header.key === "Content-Security-Policy")?.value;
   assert.ok(csp);
@@ -42,10 +42,7 @@ test("CSP permits the reverse-geocoding origin used by both client posting forms
     "app/post-ad/electronics/post-ad-electronics-form.tsx",
   ]) {
     const source = readFileSync(join(process.cwd(), relativePath), "utf8");
-    const reverseUrl = source.match(/https:\/\/[^/`\s]+\/reverse\?/u)?.[0];
-    assert.ok(reverseUrl, `${relativePath} must expose its reverse-geocoding endpoint`);
-    const origin = new URL(reverseUrl).origin;
-    assert.ok(connectSources.includes(origin), `${origin} must be permitted for ${relativePath}`);
+    assert.doesNotMatch(source, /navigator\.geolocation|\/reverse\?/u, `${relativePath} must remain manual-only`);
   }
 
   assert.ok(!connectSources.includes("*"), "do not permit arbitrary connections");

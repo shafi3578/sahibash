@@ -11,6 +11,7 @@ export type LocationData = {
   districtId?: number;
   districtName?: string;
   areaText?: string;
+  streetText?: string;
   latitude?: number;
   longitude?: number;
   useDeviceLocation: boolean;

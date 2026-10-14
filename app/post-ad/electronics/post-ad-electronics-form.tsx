@@ -66,7 +66,6 @@ type LocationApiOption = {
   name_ps?: string | null;
 };
 type LocationApiResponse<T> = { success?: boolean; data?: T[] };
-type LocationMethod = "device" | "manual" | null;
 
 type Props = {
   subcategories: ElectronicsCategory[];
@@ -187,15 +186,9 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
   const [districtOptions, setDistrictOptions] = useState<DistrictOption[]>([]);
   const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
   const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
-  const [locationMethod, setLocationMethod] = useState<LocationMethod>(null);
   const [locationVisibility, setLocationVisibility] = useState<"exact" | "approximate" | "province_district">("province_district");
-  const [deviceLatitude, setDeviceLatitude] = useState<number | null>(null);
-  const [deviceLongitude, setDeviceLongitude] = useState<number | null>(null);
-  const [deviceAccuracy, setDeviceAccuracy] = useState<number | null>(null);
-  const [locationConfirmed, setLocationConfirmed] = useState(false);
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [locationHint, setLocationHint] = useState<string | null>(null);
   const [area, setArea] = useState("");
+  const [street, setStreet] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactName, setContactName] = useState("");
 
@@ -332,99 +325,6 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
     return rows;
   }
 
-  async function attemptReverseGeocode(latitude: number, longitude: number) {
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}&accept-language=en`;
-      const response = await fetch(url, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
-
-      if (!response.ok) return;
-
-      const payload = (await response.json()) as {
-        address?: {
-          state?: string;
-          province?: string;
-          county?: string;
-          city_district?: string;
-          municipality?: string;
-          town?: string;
-          city?: string;
-        };
-      };
-
-      const provinceHint = payload.address?.state || payload.address?.province || "";
-      const districtHint = payload.address?.county || payload.address?.city_district || payload.address?.municipality || payload.address?.town || payload.address?.city || "";
-
-      if (provinceHint) {
-        const matchedProvince = provinceOptions.find(
-          (option) => normalizeLocationName(option.canonicalName ?? option.name) === normalizeLocationName(provinceHint)
-        );
-        if (matchedProvince) {
-          setSelectedProvinceId(matchedProvince.id);
-          setProvince(matchedProvince.name);
-          const loadedDistricts = await loadDistricts(matchedProvince.id);
-
-          if (districtHint) {
-            const matchedDistrict = loadedDistricts.find(
-              (option) => normalizeLocationName(option.canonicalName ?? option.name) === normalizeLocationName(districtHint)
-            );
-            if (matchedDistrict) {
-              setSelectedDistrictId(matchedDistrict.id);
-              setDistrict(matchedDistrict.name);
-            }
-          }
-        }
-      }
-    } catch {
-      // Best-effort lookup only.
-    }
-  }
-
-  function handleUseMyLocation() {
-    setLocationMethod("device");
-    setLocationConfirmed(false);
-    setLocationHint(null);
-
-    if (!navigator.geolocation) {
-      setLocationHint("We could not detect your location. Please choose manually.");
-      setLocationMethod("manual");
-      return;
-    }
-
-    setIsDetectingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setIsDetectingLocation(false);
-        setDeviceLatitude(position.coords.latitude);
-        setDeviceLongitude(position.coords.longitude);
-        setDeviceAccuracy(Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null);
-        setLocationHint("We detected your location. Please confirm it before publishing.");
-        void attemptReverseGeocode(position.coords.latitude, position.coords.longitude);
-      },
-      () => {
-        setIsDetectingLocation(false);
-        setLocationMethod("manual");
-        setLocationHint("We could not detect your location. Please choose manually.");
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
-    );
-  }
-
-  function handleConfirmDetectedLocation() {
-    if (!selectedProvinceId || !selectedDistrictId || deviceLatitude === null || deviceLongitude === null) {
-      setStepError("Please confirm province and district for the detected location.");
-      return;
-    }
-    setLocationConfirmed(true);
-    setLocationHint("Location confirmed.");
-  }
-
   useEffect(() => {
     let active = true;
 
@@ -541,22 +441,6 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
         return;
       }
 
-      if (!locationMethod) {
-        setStepError("Please add a location before publishing your ad.");
-        return;
-      }
-
-      if (locationMethod === "device") {
-        if (deviceLatitude === null || deviceLongitude === null) {
-          setStepError("Please detect your device location or choose manual location.");
-          return;
-        }
-        if (!locationConfirmed) {
-          setStepError("We detected your location. Please confirm it before publishing.");
-          return;
-        }
-      }
-
       if (!contactPhone.trim() || contactPhone.trim().length < 7) {
         setStepError("Contact phone is required (minimum 7 digits).");
         return;
@@ -600,14 +484,12 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
     form.set("district", district);
     form.set("province_id", String(selectedProvinceId ?? ""));
     form.set("district_id", String(selectedDistrictId ?? ""));
-    form.set("area_text", area);
-    form.set("address_optional", area);
-    if (deviceLatitude !== null) form.set("latitude", String(deviceLatitude));
-    if (deviceLongitude !== null) form.set("longitude", String(deviceLongitude));
-    if (deviceAccuracy !== null) form.set("location_accuracy", String(deviceAccuracy));
-    form.set("location_source", locationMethod === "device" ? "device" : "manual");
+    const manualAddress = [area.trim(), street.trim()].filter(Boolean).join(" · ");
+    form.set("area_text", manualAddress);
+    form.set("address_optional", manualAddress);
+    form.set("location_source", "manual");
     form.set("location_visibility", locationVisibility);
-    form.set("is_location_confirmed", locationMethod === "device" ? (locationConfirmed ? "true" : "false") : "true");
+    form.set("is_location_confirmed", "true");
     form.set("contact_phone", contactPhone.trim());
     form.set("contact_name", contactName.trim());
 
@@ -629,7 +511,7 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
     form.set("electronics_charger_included", chargerIncluded ? "true" : "false");
     form.set("electronics_repair_history", repairHistory);
     form.set("electronics_network_registered", networkRegistered);
-    form.set("electronics_area", area);
+    form.set("electronics_area", manualAddress);
     form.set("electronics_description", description);
     form.set(ELECTRONICS_DYNAMIC_LEAF_KEY, dynamicLeafId ?? "");
     form.set(ELECTRONICS_DYNAMIC_ATTRIBUTES_KEY, JSON.stringify(dynamicAttributes));
@@ -909,38 +791,10 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
         {step === "location" ? (
           <section className="rounded-2xl border border-[var(--line)] bg-white p-4">
             <h2 className="font-display text-lg font-bold">{t.postAd.whereLocated}</h2>
-            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.chooseLocationMethod}</p>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={handleUseMyLocation}
-                className={`rounded-xl border p-4 text-left ${locationMethod === "device" ? "border-emerald-600 bg-emerald-50" : "border-[var(--line)]"}`}
-              >
-                <p className="text-sm font-bold">{t.postAd.useMyLocation}</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.detectAutomatically}</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLocationMethod("manual");
-                  setLocationConfirmed(true);
-                  setLocationHint(null);
-                }}
-                className={`rounded-xl border p-4 text-left ${locationMethod === "manual" ? "border-sky-600 bg-sky-50" : "border-[var(--line)]"}`}
-              >
-                <p className="text-sm font-bold">{t.postAd.manualLocation}</p>
-                <p className="mt-1 text-xs text-[var(--ink-2)]">{t.postAd.chooseProvinceDistrict}</p>
-              </button>
+            <p className="mt-1 text-sm text-[var(--ink-2)]">{t.postAd.manualLocation} — {t.postAd.chooseProvinceDistrict}</p>
+            <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-900">
+              {t.postAd.streetAvenueOptional}
             </div>
-
-            {isDetectingLocation ? (
-              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">{t.postAd.detectingLocation}</p>
-            ) : null}
-
-            {locationHint ? (
-              <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-sm">{locationHint}</p>
-            ) : null}
 
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold">Province
@@ -949,7 +803,6 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
                   onChange={async (event) => {
                     const next = event.target.value ? Number(event.target.value) : null;
                     setSelectedProvinceId(next);
-                    setLocationConfirmed(locationMethod === "manual");
                     setSelectedDistrictId(null);
                     setDistrict("");
                     if (next) {
@@ -975,7 +828,6 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
                     setSelectedDistrictId(next);
                     const selected = districtOptions.find((item) => item.id === next);
                     setDistrict(selected?.name ?? "");
-                    setLocationConfirmed(locationMethod === "manual");
                   }}
                   className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2"
                   disabled={!selectedProvinceId}
@@ -987,6 +839,9 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
               <label className="text-sm font-semibold sm:col-span-2">Area (optional)
                 <input value={area} onChange={(event) => setArea(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>
+              <label className="text-sm font-semibold sm:col-span-2">{t.postAd.streetAvenueOptional}
+                <input value={street} onChange={(event) => setStreet(event.target.value)} placeholder={t.postAd.streetAvenuePlaceholder} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
+              </label>
               <label className="text-sm font-semibold sm:col-span-2">Location Visibility
                 <select value={locationVisibility} onChange={(event) => setLocationVisibility(event.target.value as "exact" | "approximate" | "province_district")} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2">
                   <option value="province_district">{t.postAd.hideExactShowProvinceDistrict}</option>
@@ -994,17 +849,6 @@ export default function ElectronicsPostAdForm({ subcategories, t, locale = "en" 
                   <option value="exact">{t.postAd.showExactLocation}</option>
                 </select>
               </label>
-              {locationMethod === "device" && deviceLatitude !== null && deviceLongitude !== null ? (
-                <div className="sm:col-span-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 text-sm">
-                  <p className="font-semibold">Detected Location</p>
-                  <p className="mt-1">Province: {province || "Not matched"}</p>
-                  <p>District: {district || "Not matched"}</p>
-                  <p>Accuracy: {deviceAccuracy !== null ? `${deviceAccuracy} m` : "Unknown"}</p>
-                  <button type="button" onClick={handleConfirmDetectedLocation} className="mt-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">
-                    {t.postAd.confirmLocation}
-                  </button>
-                </div>
-              ) : null}
               <label className="text-sm font-semibold">Contact Phone
                 <input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-[var(--line)] px-3 py-2" />
               </label>

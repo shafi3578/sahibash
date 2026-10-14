@@ -8,7 +8,7 @@ import { createListingAction, uploadListingImageAction } from "@/lib/actions/lis
 import { deleteMyDraftAction, getMyActiveDraftAction, saveListingDraftAction } from "@/lib/actions/drafts";
 import { localizeCategoryName } from "@/lib/i18n/category-labels";
 import { localizePath } from "@/lib/i18n/routing";
-import { canConfirmDetectedLocation, createLocationRequestGuard, createManualLocationSelection } from "@/lib/location/posting-selection";
+import { createManualLocationSelection } from "@/lib/location/posting-selection";
 import type { AppLocale, TRANSLATIONS } from "@/lib/i18n/translations";
 import { parseSmartPostingText, type SmartPostingParseResult } from "@/lib/posting/smart-parser";
 import { ALLOWED_LISTING_IMAGE_TYPES, MAX_LISTING_IMAGE_BYTES } from "@/lib/posting/image-validation";
@@ -77,7 +77,7 @@ type LocationApiOption = {
 };
 type LocationApiResponse<T> = { success?: boolean; data?: T[] };
 type QuickStep = 1 | 2;
-type QuickLocationSource = "manual" | "device";
+type QuickLocationSource = "manual";
 type QuickLocationVisibility = "exact" | "approximate" | "province_district" | "hidden";
 
 type StagedImage = {
@@ -236,18 +236,11 @@ const COPY = {
     dormFee: "Dormitory fee",
     landLeasePrice: "Lease price",
     location: "Location",
-    useCurrentLocation: "Current location",
-    currentLocationHint: "Choose the item's province and district. Your exact address stays private.",
-    detectingLocation: "Detecting location...",
-    detectedLocation: "Detected item location",
-    confirmLocation: "Use this location",
-    chooseManualLocation: "Choose manually",
+    currentLocationHint: "Choose the item's province and district manually. Add a neighborhood and street or avenue if helpful.",
     moreLocationOptions: "Address & privacy",
     hideLocationOptions: "Hide optional location details",
     locationRequired: "Required",
     locationConfirmedLabel: "Confirmed",
-    gpsDenied: "Location permission was denied. You can continue by choosing manually.",
-    gpsUnavailable: "We could not detect your location right now. Choose the province and district manually.",
     locationPrivacy: "Public location privacy",
     privacyApproximate: "Approximate area (recommended)",
     privacyDistrict: "District / city only",
@@ -255,7 +248,7 @@ const COPY = {
     province: "Province",
     district: "District / City",
     area: "Area or neighborhood (optional)",
-    street: "Village or street note (optional)",
+    street: "Street, avenue or landmark (optional)",
     select: "Select",
     detected: "Justujo detected",
     detectionHint: "Edit any chip. If detection is uncertain, choose one category.",
@@ -349,18 +342,11 @@ const COPY = {
     dormFee: "فیس خوابگاه",
     landLeasePrice: "قیمت اجاره",
     location: "موقعیت",
-    useCurrentLocation: "موقعیت فعلی",
-    currentLocationHint: "ولایت و ولسوالی جنس را انتخاب کنید؛ نشانی دقیق شما نمایش داده نمی‌شود.",
-    detectingLocation: "در حال تشخیص موقعیت...",
-    detectedLocation: "موقعیت جنس تشخیص شد",
-    confirmLocation: "استفاده از این موقعیت",
-    chooseManualLocation: "انتخاب دستی",
+    currentLocationHint: "ولایت و ولسوالی جنس را به صورت دستی انتخاب کنید. در صورت نیاز ناحیه و سرک یا جاده را اضافه کنید.",
     moreLocationOptions: "نشانی و حریم خصوصی",
     hideLocationOptions: "بستن جزئیات اختیاری موقعیت",
     locationRequired: "ضروری",
     locationConfirmedLabel: "تایید شد",
-    gpsDenied: "اجازه موقعیت داده نشد. می‌توانید دستی ادامه دهید.",
-    gpsUnavailable: "فعلاً نتوانستیم موقعیت را تشخیص دهیم. ولایت و ولسوالی را دستی انتخاب کنید.",
     locationPrivacy: "حریم خصوصی موقعیت عمومی",
     privacyApproximate: "محدوده تقریبی (پیشنهادی)",
     privacyDistrict: "فقط شهر / ولسوالی",
@@ -368,7 +354,7 @@ const COPY = {
     province: "ولایت",
     district: "ولسوالی / شهر",
     area: "ناحیه یا محله (اختیاری)",
-    street: "قریه یا نشانی سرک (اختیاری)",
+    street: "سرک، جاده یا نشانی نزدیک (اختیاری)",
     select: "انتخاب",
     detected: "جستجو تشخیص داد",
     detectionHint: "هر چیپ را ویرایش کنید. اگر تشخیص نامطمئن باشد، یک دسته را انتخاب کنید.",
@@ -462,18 +448,11 @@ const COPY = {
     dormFee: "د لیلیې فیس",
     landLeasePrice: "د اجارې بیه",
     location: "ځای",
-    useCurrentLocation: "فعلي ځای",
-    currentLocationHint: "د توکي ولایت او ولسوالي وټاکئ؛ ستاسو دقیق ادرس نه ښودل کېږي.",
-    detectingLocation: "ځای موندل کېږي...",
-    detectedLocation: "د توکي ځای وموندل شو",
-    confirmLocation: "دا ځای وکاروئ",
-    chooseManualLocation: "لاسي انتخاب",
+    currentLocationHint: "د توکي ولایت او ولسوالي په لاسي ډول وټاکئ. که اړتیا وي سیمه او سړک یا کوڅه هم ولیکئ.",
     moreLocationOptions: "ادرس او محرمیت",
     hideLocationOptions: "اختیاري ځای تفصیلات پټ کړئ",
     locationRequired: "اړین",
     locationConfirmedLabel: "تایید شو",
-    gpsDenied: "د ځای اجازه رد شوه. تاسو لاسي انتخاب سره ادامه ورکولای شئ.",
-    gpsUnavailable: "اوس ځای ونه موندل شو. ولایت او ولسوالي په لاسي ډول وټاکئ.",
     locationPrivacy: "د عامه ځای محرمیت",
     privacyApproximate: "نږدې سیمه (سپارښتنه)",
     privacyDistrict: "یوازې ښار / ولسوالي",
@@ -481,7 +460,7 @@ const COPY = {
     province: "ولایت",
     district: "ولسوالي / ښار",
     area: "سیمه یا ګاونډ (اختیاري)",
-    street: "کلی یا د سړک پته (اختیاري)",
+    street: "سړک، کوڅه یا نږدې نښه (اختیاري)",
     select: "وټاکئ",
     detected: "جستجو وموندل",
     detectionHint: "هر چیپ سمولای شئ. که ډاډ کم وي، یوه کټګوري وټاکئ.",
@@ -1020,13 +999,6 @@ function readDraftBoolean(value: unknown) {
   return value === true || value === "true" || value === "on" || value === "1";
 }
 
-function readDraftNumber(value: unknown) {
-  if (typeof value !== "number" && typeof value !== "string") return null;
-  if (typeof value === "string" && !value.trim()) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function isQuickPostCarDamageCategory(rootSlug: string | null | undefined, path: string | null | undefined) {
   const normalizedRoot = String(rootSlug ?? "").toLowerCase();
   const normalizedPath = String(path ?? "").toLowerCase();
@@ -1109,15 +1081,8 @@ export default function QuickPostForm({
   const [areaText, setAreaText] = useState("");
   const [streetText, setStreetText] = useState("");
   const [locationSource, setLocationSource] = useState<QuickLocationSource>("manual");
-  const [locationVisibility, setLocationVisibility] = useState<QuickLocationVisibility>("approximate");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [locationVisibility, setLocationVisibility] = useState<QuickLocationVisibility>("province_district");
   const [locationConfirmed, setLocationConfirmed] = useState(false);
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [locationHint, setLocationHint] = useState<string | null>(null);
-  const [locationRequests] = useState(createLocationRequestGuard);
-  const [showLocationDetails, setShowLocationDetails] = useState(false);
   const [selectedRootSlug, setSelectedRootSlug] = useState(() => normalizeQuickPostRootSlug(initialRootSlug));
   const [rootTouched, setRootTouched] = useState(Boolean(normalizeQuickPostRootSlug(initialRootSlug)));
   const [selectedCategory, setSelectedCategory] = useState<CandidateNode | null>(null);
@@ -1140,17 +1105,6 @@ export default function QuickPostForm({
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-
-  useEffect(() => () => locationRequests.cancel(), [locationRequests]);
-
-  const detectedLocationCanBeConfirmed = canConfirmDetectedLocation({
-    isDetectingLocation,
-    source: locationSource,
-    provinceId: selectedProvinceId,
-    districtId: selectedDistrictId,
-    latitude,
-    longitude,
-  });
 
   const sellerContactName = String(sellerProfile?.full_name ?? "").trim();
   const sellerContactPhone = String(sellerProfile?.phone ?? "").trim();
@@ -1417,12 +1371,10 @@ export default function QuickPostForm({
           if (["exact", "approximate", "province_district", "hidden"].includes(nextVisibility)) {
             setLocationVisibility(nextVisibility as QuickLocationVisibility);
           }
-          const nextSource = readDraftString(location.locationSource);
-          setLocationSource(nextSource === "device" ? "device" : "manual");
-          setLatitude(readDraftNumber(location.latitude));
-          setLongitude(readDraftNumber(location.longitude));
-          setLocationAccuracy(readDraftNumber(location.locationAccuracy));
-          setLocationConfirmed(readDraftBoolean(location.isConfirmed));
+          // Location is intentionally manual-only. Older drafts may contain device
+          // coordinates; do not carry them into a new submission.
+          setLocationSource("manual");
+          setLocationConfirmed(Boolean(Number(location.provinceId) && Number(location.districtId)));
           const localCategory = (local.selectedCategory && typeof local.selectedCategory === "object" ? local.selectedCategory : null) as Record<string, unknown> | null;
           setRootTouched(readDraftBoolean(local.rootTouched) || Boolean(localCategory?.id && localCategory?.path));
           if (localCategory?.id && localCategory?.path) {
@@ -1531,12 +1483,10 @@ export default function QuickPostForm({
         if (["exact", "approximate", "province_district", "hidden"].includes(serverVisibility)) {
           setLocationVisibility(serverVisibility as QuickLocationVisibility);
         }
-        const serverSource = readDraftString(serverLocation.locationSource);
-        setLocationSource(serverSource === "device" ? "device" : "manual");
-        setLatitude(readDraftNumber(serverLocation.latitude));
-        setLongitude(readDraftNumber(serverLocation.longitude));
-        setLocationAccuracy(readDraftNumber(serverLocation.locationAccuracy));
-        setLocationConfirmed(readDraftBoolean(serverLocation.isConfirmed));
+        // Server drafts created by an older version may contain device data. The
+        // current posting flow always requires an explicit manual selection.
+        setLocationSource("manual");
+        setLocationConfirmed(Boolean(Number(serverLocation.provinceId) && Number(serverLocation.districtId)));
         if (Array.isArray(serverDetails.damageParts)) {
           const restoredDamage = serverDetails.damageParts
             .filter((part): part is DamagePart => Boolean(part) && typeof part === "object" && "key" in part && "condition" in part)
@@ -1642,9 +1592,9 @@ export default function QuickPostForm({
         streetText,
         locationSource,
         locationVisibility,
-        latitude,
-        longitude,
-        locationAccuracy,
+        latitude: null,
+        longitude: null,
+        locationAccuracy: null,
         isConfirmed: locationConfirmed,
       },
     };
@@ -1661,12 +1611,9 @@ export default function QuickPostForm({
     gerawyAmount,
     images,
     landLeasePrice,
-    latitude,
-    locationAccuracy,
     locationConfirmed,
     locationSource,
     locationVisibility,
-    longitude,
     locale,
     monthlyRent,
     priceAmount,
@@ -2011,91 +1958,10 @@ export default function QuickPostForm({
   }, []);
 
   const confirmManualLocationIfReady = useCallback((provinceId: number | null, districtId: number | null) => {
-    locationRequests.cancel();
     const selection = createManualLocationSelection(provinceId, districtId);
     setLocationSource(selection.source);
-    setLatitude(selection.latitude);
-    setLongitude(selection.longitude);
-    setLocationAccuracy(selection.accuracy);
     setLocationConfirmed(selection.confirmed);
-    setLocationHint(selection.hint);
-    setIsDetectingLocation(false);
-  }, [locationRequests]);
-
-  const handleUseCurrentLocation = useCallback(() => {
-    const isCurrentRequest = locationRequests.begin();
-    setSelectedProvinceId(null);
-    setSelectedDistrictId(null);
-    setLatitude(null);
-    setLongitude(null);
-    setLocationAccuracy(null);
-    setLocationConfirmed(false);
-    setIsDetectingLocation(false);
-    setLocationHint(null);
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocationHint(c.gpsUnavailable);
-      setLocationSource("manual");
-      setLocationConfirmed(false);
-      return;
-    }
-
-    setIsDetectingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (!isCurrentRequest()) return;
-        void (async () => {
-          const nextLatitude = position.coords.latitude;
-          const nextLongitude = position.coords.longitude;
-          setLatitude(nextLatitude);
-          setLongitude(nextLongitude);
-          setLocationAccuracy(Math.round(position.coords.accuracy));
-          setLocationSource("device");
-          setLocationVisibility((current) => current === "exact" || current === "hidden" ? current : "approximate");
-          setLocationConfirmed(false);
-          try {
-            const response = await fetch(`/api/location/reverse?latitude=${encodeURIComponent(String(nextLatitude))}&longitude=${encodeURIComponent(String(nextLongitude))}&locale=${locale}`);
-            const result = await response.json() as {
-              ok?: boolean;
-              province?: ProvinceOption;
-              district?: DistrictOption & { provinceId?: number };
-            };
-            if (!isCurrentRequest()) return;
-            if (!response.ok || !result.ok || !result.province || !result.district) throw new Error("UNMATCHED_LOCATION");
-            setProvinceOptions((current) => current.some((item) => item.id === result.province!.id) ? current : [...current, result.province!]);
-            setDistrictOptions((current) => current.some((item) => item.id === result.district!.id) ? current : [result.district!, ...current]);
-            setSelectedProvinceId(result.province.id);
-            setSelectedDistrictId(result.district.id);
-            setLocationConfirmed(false);
-            setLocationHint(`${c.detectedLocation}: ${result.province.name} › ${result.district.name}`);
-          } catch {
-            if (!isCurrentRequest()) return;
-            setSelectedProvinceId(null);
-            setSelectedDistrictId(null);
-            setLocationHint(c.locationLookupFailed);
-          } finally {
-            if (isCurrentRequest()) setIsDetectingLocation(false);
-          }
-        })();
-      },
-      (geoError) => {
-        if (!isCurrentRequest()) return;
-        setLocationHint(geoError.code === 1 ? c.gpsDenied : c.gpsUnavailable);
-        setLocationSource("manual");
-        setLocationConfirmed(false);
-        setIsDetectingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  }, [c.detectedLocation, c.gpsDenied, c.gpsUnavailable, c.locationLookupFailed, locale, locationRequests]);
-
-  const handleConfirmDetectedLocation = useCallback(() => {
-    if (!detectedLocationCanBeConfirmed) {
-      setLocationHint(c.locationMustConfirm);
-      return;
-    }
-    setLocationConfirmed(true);
-    setLocationHint(c.detectedLocation);
-  }, [c.detectedLocation, c.locationMustConfirm, detectedLocationCanBeConfirmed]);
+  }, []);
 
   async function saveCurrentDraftNow(stepOverride: QuickStep = step) {
     if (!draftLoaded) return { draftId, persisted: false };
@@ -2148,9 +2014,9 @@ export default function QuickPostForm({
         streetText,
         locationSource,
         locationVisibility,
-        latitude,
-        longitude,
-        locationAccuracy,
+        latitude: null,
+        longitude: null,
+        locationAccuracy: null,
         isConfirmed: locationConfirmed,
       },
     };
@@ -2314,9 +2180,6 @@ export default function QuickPostForm({
     formData.set("whatsapp_enabled", whatsappEnabled ? "true" : "false");
     formData.set("publish_request_id", publishRequestId);
     appendIfPresent(formData, "draft_id", savedDraftId);
-    appendIfPresent(formData, "latitude", latitude);
-    appendIfPresent(formData, "longitude", longitude);
-    appendIfPresent(formData, "location_accuracy", locationAccuracy);
     formData.set("negotiable", readDraftBoolean(details.negotiable) ? "true" : "false");
 
     if (priceMode === "monthly_rent") {
@@ -2859,7 +2722,7 @@ export default function QuickPostForm({
           </span>
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <label className="text-xs font-bold">
             {c.province}
             <select
@@ -2898,46 +2761,7 @@ export default function QuickPostForm({
             </select>
           </label>
         </div>
-
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={handleUseCurrentLocation}
-            disabled={isDetectingLocation}
-            className="min-h-9 flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[11px] font-black text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60"
-          >
-            {isDetectingLocation ? c.detectingLocation : c.useCurrentLocation}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowLocationDetails((current) => !current)}
-            aria-expanded={showLocationDetails}
-            aria-controls="quick-post-location-optional-details"
-            className="min-h-9 flex-1 rounded-lg border border-[var(--line)] bg-white px-2 py-1.5 text-[11px] font-bold transition hover:bg-[var(--surface-2)]"
-          >
-            {showLocationDetails ? c.hideLocationOptions : c.moreLocationOptions}
-          </button>
-        </div>
-
-        {locationHint ? (
-          <p className="mt-2 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--ink-2)]">
-            {locationHint}
-          </p>
-        ) : null}
-
-        {locationSource !== "manual" && selectedProvinceId && selectedDistrictId ? (
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-            <p><span className="font-bold">{c.detectedLocation}:</span> {provinceOptions.find((item) => item.id === selectedProvinceId)?.name} › {districtOptions.find((item) => item.id === selectedDistrictId)?.name}</p>
-            {!locationConfirmed ? (
-              <button type="button" onClick={handleConfirmDetectedLocation} disabled={!detectedLocationCanBeConfirmed} className="shrink-0 rounded-lg bg-emerald-700 px-3 py-1.5 font-black text-white disabled:opacity-50">
-                {c.confirmLocation}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {showLocationDetails ? (
-          <div id="quick-post-location-optional-details" className="mt-3 space-y-3 border-t border-[var(--line)] pt-3">
+        <div className="mt-3 space-y-3 border-t border-[var(--line)] pt-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-bold">
                 {c.area}
@@ -2962,8 +2786,7 @@ export default function QuickPostForm({
                 <span className="mt-1 block text-xs font-normal text-[var(--ink-2)]">{c.exactHidden}</span>
               </label>
             </div>
-          </div>
-        ) : null}
+        </div>
       </section>
       ) : null}
 

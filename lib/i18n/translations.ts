@@ -295,6 +295,8 @@ type TranslationTree = {
     province: string;
     district: string;
     areaNeighborhoodOptional: string;
+    streetAvenueOptional: string;
+    streetAvenuePlaceholder: string;
     locationVisibility: string;
     hideExactShowProvinceDistrict: string;
     showApproximateLocation: string;
@@ -642,6 +644,8 @@ export const TRANSLATIONS: Record<AppLocale, TranslationTree> = {
       province: "Province",
       district: "District",
       areaNeighborhoodOptional: "Area / Neighborhood (optional)",
+      streetAvenueOptional: "Street / Avenue / Landmark (optional)",
+      streetAvenuePlaceholder: "Example: Shahr-e Naw Avenue, market, or a nearby landmark",
       locationVisibility: "Location Visibility",
       hideExactShowProvinceDistrict: "Hide exact location, show only province/district",
       showApproximateLocation: "Show approximate location",
@@ -1124,6 +1128,8 @@ const COMPLETE_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       province: "ولایت",
       district: "ولسوالی",
       areaNeighborhoodOptional: "ناحیه / محله (اختیاری)",
+      streetAvenueOptional: "سرک / جاده / نشانی نزدیک (اختیاری)",
+      streetAvenuePlaceholder: "مثال: سرک شهر نو، بازار یا نشانی نزدیک",
       locationVisibility: "نمایش موقعیت",
       hideExactShowProvinceDistrict: "موقعیت دقیق پنهان؛ فقط ولایت و ولسوالی نمایش داده شود",
       showApproximateLocation: "موقعیت تقریبی نمایش داده شود",
@@ -1315,6 +1321,8 @@ const COMPLETE_TRANSLATION_OVERRIDES: Partial<Record<AppLocale, Record<string, u
       province: "ولایت",
       district: "ولسوالي",
       areaNeighborhoodOptional: "سیمه / ګاونډ (اختیاري)",
+      streetAvenueOptional: "سړک / کوڅه / نږدې نښه (اختیاري)",
+      streetAvenuePlaceholder: "بېلګه: د شهر نو سړک، بازار یا نږدې نښه",
       locationVisibility: "د موقعیت ښودنه",
       hideExactShowProvinceDistrict: "کره موقعیت پټ؛ یوازې ولایت او ولسوالي وښودل شي",
       showApproximateLocation: "نږدې موقعیت وښودل شي",

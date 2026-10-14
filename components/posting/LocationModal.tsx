@@ -41,13 +41,10 @@ export function LocationModal({
   locale,
 }: LocationModalProps) {
   const { t } = useTranslation(locale as any);
-  const [method, setMethod] = useState<"auto" | "manual">(
-    initialLocation?.useDeviceLocation ? "auto" : "manual"
-  );
   const [provinceId, setProvinceId] = useState(initialLocation?.provinceId || "");
   const [districtId, setDistrictId] = useState(initialLocation?.districtId || "");
   const [areaText, setAreaText] = useState(initialLocation?.areaText || "");
-  const [loading, setLoading] = useState(false);
+  const [streetText, setStreetText] = useState(initialLocation?.streetText || "");
   const [provinces, setProvinces] = useState<Array<{ id: number; name: string }>>([]);
   const [districts, setDistricts] = useState<Array<{ id: number; name: string }>>([]);
 
@@ -102,30 +99,6 @@ export function LocationModal({
     void loadDistricts();
   }, [provinceId]);
 
-  const handleUseDeviceLocation = async () => {
-    setLoading(true);
-    try {
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition((position) => {
-          const { latitude, longitude } = position.coords;
-          onSave({
-            useDeviceLocation: true,
-            latitude,
-            longitude,
-            visibility: "exact",
-            provinceId: provinceId ? Number(provinceId) : undefined,
-            districtId: districtId ? Number(districtId) : undefined,
-          });
-          onClose();
-        });
-      }
-    } catch (error) {
-      console.error("Failed to get device location:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSaveManualLocation = () => {
     if (!provinceId || !districtId) {
       alert("Province and District are required");
@@ -137,6 +110,7 @@ export function LocationModal({
       provinceId: Number(provinceId),
       districtId: Number(districtId),
       areaText,
+      streetText,
       visibility: "province_district",
     });
     onClose();
@@ -149,49 +123,11 @@ export function LocationModal({
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">{t("location.title") || "Select Location"}</h2>
 
-        {/* Method Selection */}
-        <div className="mb-6">
-          <p className="text-sm font-semibold mb-3">{t("location.method") || "How?"}</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMethod("auto")}
-              className={`flex-1 px-4 py-2 rounded border-2 transition ${
-                method === "auto"
-                  ? "border-green-500 bg-green-50"
-                  : "border-gray-300 bg-white hover:border-gray-400"
-              }`}
-            >
-              {t("location.useDevice") || "Auto"}
-            </button>
-            <button
-              onClick={() => setMethod("manual")}
-              className={`flex-1 px-4 py-2 rounded border-2 transition ${
-                method === "manual"
-                  ? "border-green-500 bg-green-50"
-                  : "border-gray-300 bg-white hover:border-gray-400"
-              }`}
-            >
-              {t("location.manual") || "Manual"}
-            </button>
-          </div>
+        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          {t("location.manualOnly") || "Choose the province, district, and optional street details manually."}
         </div>
 
-        {/* Auto Location */}
-        {method === "auto" && (
-          <div className="mb-6">
-            <button
-              onClick={handleUseDeviceLocation}
-              disabled={loading}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
-            >
-              {loading ? "Getting location..." : t("location.useCurrentLocation") || "Use Current Location"}
-            </button>
-          </div>
-        )}
-
-        {/* Manual Location */}
-        {method === "manual" && (
-          <div className="space-y-4">
+        <div className="space-y-4">
             {/* Province */}
             <div>
               <label className="block text-sm font-semibold mb-1">
@@ -244,8 +180,20 @@ export function LocationModal({
                 className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">
+                {t("location.street") || "Street / Avenue / Landmark"} {t("common.optional") || "(Optional)"}
+              </label>
+              <input
+                type="text"
+                value={streetText}
+                onChange={(e) => setStreetText(e.target.value)}
+                placeholder={t("location.streetPlaceholder") || "e.g., Shahr-e Naw Avenue or a nearby landmark"}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
-        )}
 
         {/* Buttons */}
         <div className="flex gap-2 mt-6">
@@ -256,7 +204,7 @@ export function LocationModal({
             {t("common.cancel") || "Cancel"}
           </button>
           <button
-            onClick={method === "auto" ? handleUseDeviceLocation : handleSaveManualLocation}
+            onClick={handleSaveManualLocation}
             className="flex-1 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
           >
             {t("common.save") || "Save"}

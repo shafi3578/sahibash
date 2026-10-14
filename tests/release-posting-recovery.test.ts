@@ -42,19 +42,14 @@ function functionsFromSource<T>(path: string, names: string[], dependencies: Rec
   }, { timeout: 1000 }) as T;
 }
 
-test("draft recovery never fabricates coordinates from missing or nonnumeric values", () => {
-  const { readDraftNumber } = functionsFromSource<{ readDraftNumber: (value: unknown) => number | null }>(quickPostPath, ["readDraftNumber"]);
-  for (const value of [null, undefined, "", " \t\r\n ", true, false, [], [34], {}, Number.NaN, Infinity, -Infinity, "Infinity", "not-a-number"]) {
-    assert.equal(readDraftNumber(value), null, `Reject coordinate ${JSON.stringify(value)}`);
-  }
-  for (const [value, expected] of [[0, 0], [34.555, 34.555], [-12.5, -12.5], ["0", 0], [" 69.2075 ", 69.2075]] as const) {
-    assert.equal(readDraftNumber(value), expected);
-  }
+test("manual posting never recovers device coordinates from older drafts", () => {
+  const source = readFileSync(join(process.cwd(), quickPostPath), "utf8");
+  assert.doesNotMatch(source, /readDraftNumber|setLatitude\(readDraft|setLongitude\(readDraft/);
+  assert.match(source, /older version may contain device data/);
 });
 
-test("recovered missing coordinates are omitted from actual publish FormData while explicit zero remains", () => {
-  const { readDraftNumber } = functionsFromSource<{ readDraftNumber: (value: unknown) => number | null }>(quickPostPath, ["readDraftNumber"]);
-  for (const savedCoordinate of [null, 0]) {
+test("manual-only posting omits recovered device coordinates from publish FormData", () => {
+  for (const savedCoordinate of [null, 0, 34.555]) {
     const { buildPublishFormData } = functionsFromSource<{ buildPublishFormData: () => FormData }>(quickPostPath, ["appendIfPresent", "buildPublishFormData", "readDraftBoolean"], {
       draftId: "synthetic-draft", priceValueForSubmit: () => "120",
       provinceOptions: [{ id: 1, name: "Synthetic province" }], districtOptions: [{ id: 2, name: "Synthetic district" }],
@@ -65,16 +60,15 @@ test("recovered missing coordinates are omitted from actual publish FormData whi
       selectedCategory: { id: 20, category_id: 2, path: "second-hand-items/table" }, priceMode: "fixed", currency: "AFN",
       sellerContactPhone: "0000000000", sellerContactName: "Synthetic seller", locationSource: "manual",
       locationVisibility: "province_district", locationConfirmed: true, whatsappEnabled: false,
-      publishRequestId: "synthetic-publish-request", latitude: readDraftNumber(savedCoordinate),
-      longitude: readDraftNumber(savedCoordinate), locationAccuracy: readDraftNumber(savedCoordinate),
+      publishRequestId: "synthetic-publish-request", latitude: savedCoordinate,
+      longitude: savedCoordinate, locationAccuracy: savedCoordinate,
       isHousing: false, isDormitory: false, isCarDamageEligible: false,
     });
     const form = buildPublishFormData();
     assert.equal(form.get("draft_id"), "synthetic-draft");
     assert.equal(form.get("publish_request_id"), "synthetic-publish-request");
     for (const field of ["latitude", "longitude", "location_accuracy"]) {
-      assert.equal(form.has(field), savedCoordinate !== null);
-      assert.equal(form.get(field), savedCoordinate === null ? null : "0");
+      assert.equal(form.has(field), false, `manual posting never sends ${field} from recovered drafts`);
     }
   }
 });
