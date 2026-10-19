@@ -25,6 +25,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: `${brandName} | ${localizedMetadata.titleSuffix}`,
     description: (locale === "en" ? siteSettings.site_tagline : null) || localizedMetadata.description,
+    icons: {
+      icon: [{ url: "/brand/justujo-logo-192.webp", type: "image/webp" }],
+      apple: [{ url: "/brand/justujo-logo-192.webp", type: "image/webp" }],
+    },
     alternates: {
       languages: {
         en: "/en",

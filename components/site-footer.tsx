@@ -5,6 +5,7 @@ import { localizePath } from "@/lib/i18n/routing";
 import { localizeNavigationLabel } from "@/lib/i18n/navigation-labels";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 import Link from "next/link";
+import Image from "next/image";
 
 const ESSENTIAL_LINKS = {
   en: [
@@ -42,7 +43,18 @@ export async function SiteFooter() {
       <div className="mx-auto max-w-7xl px-4 py-8 text-sm text-[var(--ink-2)] sm:px-6 lg:px-8">
         <div className="grid gap-6 md:grid-cols-[1.5fr_1fr]">
           <div>
-            <p className="font-semibold text-[var(--ink-1)]">{brandName}</p>
+            <div className="flex items-center gap-3">
+              <Image
+                src="/brand/justujo-logo.webp"
+                alt=""
+                width={56}
+                height={56}
+                loading="lazy"
+                sizes="56px"
+                className="h-12 w-12 rounded-xl object-cover"
+              />
+              <p className="font-semibold text-[var(--ink-1)]">{brandName}</p>
+            </div>
             <p className="mt-1 max-w-xl">{locale === "en" ? siteSettings.site_tagline || t.footer.tagline : t.footer.tagline}</p>
             <p className="mt-2 flex flex-wrap items-center gap-1 text-xs">
               <bdi dir="ltr">{siteSettings.contact_email}</bdi>
