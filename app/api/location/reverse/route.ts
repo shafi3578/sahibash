@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&addressdetails=1&lat=${encodeURIComponent(String(latitude))}&lon=${encodeURIComponent(String(longitude))}`,
       {
-        headers: { "Accept-Language": `${locale},en;q=0.8`, "User-Agent": "Sahibash/1.0 location resolver" },
+        headers: { "Accept-Language": `${locale},en;q=0.8`, "User-Agent": "Justujo/1.0 location resolver" },
         cache: "no-store",
         signal: controller.signal,
       },

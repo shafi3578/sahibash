@@ -6,6 +6,7 @@ test('resolvePublicSiteSettings applies public branding defaults and overrides',
   const defaults = resolvePublicSiteSettings();
   assert.equal(defaults.site_name, 'Justujo');
   assert.equal(defaults.site_tagline, 'Marketplace for Afghanistan');
+  assert.equal(defaults.contact_email, 'support@justujo.com');
 
   const custom = resolvePublicSiteSettings({
     site_name: '  Test Bazaar  ',
@@ -20,4 +21,11 @@ test('resolvePublicSiteSettings applies public branding defaults and overrides',
   assert.equal(custom.contact_email, 'hello@test.com');
   assert.equal(custom.contact_phone, '+123');
   assert.equal(custom.default_locale, 'en');
+
+  const legacy = resolvePublicSiteSettings({
+    site_name: 'Sahibash',
+    contact_email: 'info@sahibash.com',
+  });
+  assert.equal(legacy.site_name, 'Justujo');
+  assert.equal(legacy.contact_email, 'support@justujo.com');
 });

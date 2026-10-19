@@ -5,7 +5,7 @@ import { normalizeSiteSettings, resolveSiteSettingsVersionSnapshot } from "../li
 
 test("normalizeSiteSettings keeps required values and strips empty ones", () => {
   const normalized = normalizeSiteSettings({
-    site_name: "Sahibash",
+    site_name: "Justujo",
     site_tagline: "",
     contact_email: "hello@example.com",
     contact_phone: "",
@@ -21,7 +21,7 @@ test("normalizeSiteSettings keeps required values and strips empty ones", () => 
   });
 
   assert.deepEqual(normalized, {
-    site_name: "Sahibash",
+    site_name: "Justujo",
     contact_email: "hello@example.com",
     default_locale: "fa",
     home_hero_title: "Control Center",

@@ -33,7 +33,7 @@ export type SiteSettingsVersionRecord = SiteSettingsRecord & {
 export const DEFAULT_SITE_SETTINGS = {
   site_name: "Justujo",
   site_tagline: "Marketplace for Afghanistan",
-  contact_email: "hello@afghan.com",
+  contact_email: "support@justujo.com",
   contact_phone: "+93700000000",
   default_locale: "fa",
   home_hero_title: "Fresh listings with clear sources",
@@ -48,6 +48,17 @@ export const DEFAULT_SITE_SETTINGS = {
   ],
   step_up_window_minutes: 15,
 } as const;
+
+const LEGACY_BRAND_EMAIL_PATTERN = /@sahibash\.com$/i;
+const LEGACY_BRAND_NAMES = new Set(["sahibash", "صاحبش"]);
+
+function normalizePublicBrandName(siteName: string): string {
+  return LEGACY_BRAND_NAMES.has(siteName.trim().toLocaleLowerCase()) ? DEFAULT_SITE_SETTINGS.site_name : siteName;
+}
+
+function normalizePublicContactEmail(email: string): string {
+  return LEGACY_BRAND_EMAIL_PATTERN.test(email) ? DEFAULT_SITE_SETTINGS.contact_email : email;
+}
 
 function normalizeNavigationLinks(input: unknown): NavigationLinkRecord[] | undefined {
   if (Array.isArray(input)) {
@@ -90,8 +101,10 @@ function normalizeNavigationLinks(input: unknown): NavigationLinkRecord[] | unde
 export function normalizeSiteSettings(input: Record<string, unknown>): Partial<SiteSettingsRecord> {
   const next: Partial<SiteSettingsRecord> = {};
 
-  const siteName = typeof input.site_name === "string" ? input.site_name.trim() : "";
-  const contactEmail = typeof input.contact_email === "string" ? input.contact_email.trim() : "";
+  const siteName = typeof input.site_name === "string" ? normalizePublicBrandName(input.site_name.trim()) : "";
+  const contactEmail = typeof input.contact_email === "string"
+    ? normalizePublicContactEmail(input.contact_email.trim())
+    : "";
   const defaultLocale = typeof input.default_locale === "string" ? input.default_locale.trim() : "";
   const siteTagline = typeof input.site_tagline === "string" ? input.site_tagline.trim() : "";
   const rawContactPhone = typeof input.contact_phone === "string" ? input.contact_phone.trim() : "";
