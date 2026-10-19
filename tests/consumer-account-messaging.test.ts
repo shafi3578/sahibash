@@ -9,7 +9,7 @@ import {
   localizeAccountPath,
   stripLocaleAndQuery,
 } from "@/lib/account/navigation";
-import { adminPath, isAdminWebPath } from "@/lib/admin/routing";
+import { adminPath, isAdminApiPath, isAdminControlHost, isAdminWebPath } from "@/lib/admin/routing";
 import {
   buildMessageThreads,
   isUuid,
@@ -179,6 +179,14 @@ test("admin routes stay web-only and are stripped from localized consumer paths"
   assert.equal(isAdminWebPath("/ps/administrator/settings"), true);
   assert.equal(isAdminWebPath("/dashboard/admin"), false);
   assert.equal(adminPath("/fa/admin/listings"), "/admin/listings");
+});
+
+test("admin and super-admin surfaces are restricted to the dedicated control domain", () => {
+  assert.equal(isAdminApiPath("/api/admin/inventory/schema"), true);
+  assert.equal(isAdminApiPath("/api/listings/123"), false);
+  assert.equal(isAdminControlHost("sahibash.com"), true);
+  assert.equal(isAdminControlHost("www.sahibash.com"), true);
+  assert.equal(isAdminControlHost("sahibash-three.vercel.app"), false);
 });
 
 test("login redirect helper keeps account redirects separate from posting intent", () => {

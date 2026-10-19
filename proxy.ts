@@ -5,7 +5,7 @@ import { LOCALE_COOKIE } from "@/lib/i18n/server";
 import { localizePath, normalizeLocaleInput, splitLocaleFromPath } from "@/lib/i18n/routing";
 import { getSupabaseEnv, hasSupabaseEnv } from "@/lib/supabase/env";
 import { isPostAdPath, isProtectedPostingPath } from "@/lib/auth/protected-routes";
-import { isAdminWebPath } from "@/lib/admin/routing";
+import { isAdminApiPath, isAdminControlHost, isAdminWebPath } from "@/lib/admin/routing";
 
 const EXCLUDED_PATH_PREFIXES = ["/api", "/_next", "/_vercel", "/favicon.ico", "/robots.txt", "/sitemap.xml"];
 
@@ -45,6 +45,11 @@ export function resolveBrowserLocale(acceptLanguage: string | null) {
 export async function proxy(request: NextRequest) {
   const { search } = request.nextUrl;
   const { originalPathname, effectivePathname, pathLocale, strippedPath } = resolveProxyPath(request.url, request.nextUrl.pathname);
+
+  const isAdminSurface = isAdminWebPath(originalPathname) || isAdminApiPath(originalPathname);
+  if (isAdminSurface && !isAdminControlHost(request.nextUrl.hostname)) {
+    return new NextResponse("Not found", { status: 404 });
+  }
 
   if (isProxyExcludedPath(effectivePathname)) {
     return updateSession(request);
