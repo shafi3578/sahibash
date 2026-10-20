@@ -12,7 +12,6 @@ import { localizePath } from "@/lib/i18n/routing";
 import { getLocalizedBrandName } from "@/lib/i18n/brand";
 import { formatListingPrice } from "@/lib/listings/price-display";
 import { getLocalizedListingLocation } from "@/lib/i18n/location-labels";
-import { getUiTranslations } from "@/lib/i18n/ui";
 
 function getHomePageCopy(
   locale: "en" | "fa" | "ps",
@@ -29,6 +28,13 @@ function getHomePageCopy(
       adBadge: "اعلان",
       brandBadge: "جستجو",
       paginationLabel: "صفحه‌های جدیدترین اعلان‌ها",
+      marketplaceLabel: "بازار زنده جستجو",
+      marketplaceTitle: "از خرید محلی مطمئن شروع کنید",
+      marketplaceBody: "اعلان‌های واقعی را ببینید، فروشنده را بشناسید و برای معامله حضوری امن آماده شوید.",
+      activeListingsLabel: "اعلان فعال",
+      activeCategoriesLabel: "دسته فعال",
+      lowInventoryTitle: "بازار هنوز در حال رشد است",
+      lowInventoryBody: "با ثبت اولین اعلان خود، به خریداران ولایت‌تان کمک کنید بازار جستجو را بسازند.",
     };
   }
 
@@ -43,6 +49,13 @@ function getHomePageCopy(
       adBadge: "اعلان",
       brandBadge: "جستجو",
       paginationLabel: "د تازه اعلانونو پاڼې",
+      marketplaceLabel: "د جستجو ژوندی بازار",
+      marketplaceTitle: "له باوري محلي پېرود څخه پیل وکړئ",
+      marketplaceBody: "اصلي اعلانونه وګورئ، پلورونکی وپېژنئ او د خوندي حضوري معاملې لپاره چمتو شئ.",
+      activeListingsLabel: "فعال اعلانونه",
+      activeCategoriesLabel: "فعالې کټګورۍ",
+      lowInventoryTitle: "بازار لا هم د ودې په حال کې دی",
+      lowInventoryBody: "خپل لومړی اعلان ثبت کړئ او له خپل ولایت څخه د جستجو بازار په جوړولو کې مرسته وکړئ.",
     };
   }
 
@@ -56,6 +69,13 @@ function getHomePageCopy(
     adBadge: "Ad",
     brandBadge: getLocalizedBrandName(locale, siteSettings.site_name),
     paginationLabel: "Latest listing pages",
+    marketplaceLabel: "Justujo marketplace",
+    marketplaceTitle: "Start with a trusted local deal",
+    marketplaceBody: "Browse real listings, understand the seller, and prepare for a safer in-person transaction.",
+    activeListingsLabel: "active listings",
+    activeCategoriesLabel: "active categories",
+    lowInventoryTitle: "The marketplace is growing",
+    lowInventoryBody: "Post the first listing in your area and help build a useful local market on Justujo.",
   };
 }
 
@@ -68,7 +88,6 @@ export default async function HomePage({
   const siteSettingsPromise = getSiteSettings();
   const homepageSectionsPromise = getHomepageSections();
   const { t, locale } = await dictionaryPromise;
-  const ui = getUiTranslations(locale);
   const href = (path: string) => localizePath(path, locale);
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const pageValue = Array.isArray(resolvedSearchParams.page) ? resolvedSearchParams.page[0] : resolvedSearchParams.page;
@@ -152,6 +171,23 @@ export default async function HomePage({
         </section>
       ) : null}
 
+      <section className="mx-3 overflow-hidden rounded-[1.5rem] border border-[#d9d4ff] bg-[radial-gradient(circle_at_92%_8%,rgba(255,169,119,0.24),transparent_36%),linear-gradient(135deg,#f2f0ff_0%,#ffffff_52%,#fff5ed_100%)] shadow-[0_22px_55px_-35px_rgba(42,35,94,0.45)] sm:mx-0 sm:rounded-3xl">
+        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 lg:p-6">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#6658c9]">{homeCopy.marketplaceLabel}</p>
+            <h2 className="mt-1 font-display text-xl font-black text-[#1c1b3b] sm:text-2xl">{homeCopy.marketplaceTitle}</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[#5c5a72]">{homeCopy.marketplaceBody}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-[#4d4a65]">
+              <span className="rounded-full border border-[#d9d4ff] bg-white/80 px-3 py-1.5">{totalListings.toLocaleString(locale)} {homeCopy.activeListingsLabel}</span>
+              <span className="rounded-full border border-[#f2d6c5] bg-white/80 px-3 py-1.5">{mobileCategories.filter((category) => !category.is_coming_soon).length.toLocaleString(locale)} {homeCopy.activeCategoriesLabel}</span>
+            </div>
+          </div>
+          <Link href={postAdHref} className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#201d4b] px-4 py-3 text-sm font-black text-white shadow-[0_12px_24px_-16px_rgba(32,29,75,0.95)] transition hover:-translate-y-0.5 hover:bg-[#342e72]">
+            {homeCopy.secondaryCta}
+          </Link>
+        </div>
+      </section>
+
       <section className="hidden border border-[#e3e5f1] bg-white/90 sm:block sm:rounded-2xl sm:shadow-[0_18px_45px_-34px_rgba(36,31,87,0.32)]">
         <form action={href("/search")} className="grid grid-cols-[1fr_auto] gap-2 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:p-4">
           <input
@@ -219,9 +255,14 @@ export default async function HomePage({
         </div>
         <div className="divide-y divide-slate-100 sm:divide-slate-200">
           {latest.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm leading-6 text-slate-600">
-              {ui.listingsPage.empty}
-            </p>
+            <div className="mx-3 my-3 rounded-2xl border border-dashed border-[#d9d4ff] bg-[#faf9ff] px-4 py-6 text-center sm:mx-4">
+              <p className="font-display text-lg font-black text-[#252247]">{homeCopy.lowInventoryTitle}</p>
+              <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-600">{homeCopy.lowInventoryBody}</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <Link href={postAdHref} className="rounded-xl bg-[#201d4b] px-4 py-2.5 text-sm font-bold text-white">{homeCopy.secondaryCta}</Link>
+                <Link href={href("/categories")} className="rounded-xl border border-[#d9d4ff] bg-white px-4 py-2.5 text-sm font-bold text-[#3d3677]">{t.home.openCategoryBrowser}</Link>
+              </div>
+            </div>
           ) : null}
           {latest.map((listing, index) => {
             const image = listing.listing_images?.[0]?.image_url ?? listing.listing_images?.[0]?.public_url;
